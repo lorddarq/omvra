@@ -147,7 +147,7 @@ export function TaskDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[760px] rounded-2xl border-0 p-0">
+      <DialogContent className="max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-[760px] rounded-2xl border-0 p-0">
         <DialogHeader className="px-8 pt-8 pb-1">
           <DialogTitle className="text-2xl font-semibold tracking-tight">
             {task ? 'Edit Task' : 'Create Task'}

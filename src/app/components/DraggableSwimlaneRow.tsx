@@ -294,10 +294,7 @@ export function DraggableSwimlaneRow({
 
   // Helper to convert hex color to rgba with opacity
   const getRowBackgroundColor = (color?: string) => {
-    if (!color) {
-      console.log('No color for swimlane:', swimlane.name);
-      return undefined;
-    }
+    if (!color) return undefined;
     
     // Parse hex color to RGB
     const hex = color.replace('#', '');
@@ -305,9 +302,7 @@ export function DraggableSwimlaneRow({
     const g = parseInt(hex.substring(2, 4), 16);
     const b = parseInt(hex.substring(4, 6), 16);
     
-    const rgba = `rgba(${r}, ${g}, ${b}, 0.08)`;
-    console.log(`Swimlane ${swimlane.name} color:`, color, '→', rgba);
-    return rgba;
+    return `rgba(${r}, ${g}, ${b}, 0.08)`;
   };
 
   return (

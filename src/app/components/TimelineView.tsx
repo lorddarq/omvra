@@ -29,12 +29,15 @@ const PAD_DAYS = 7;
 const DEFAULT_ROW_HEIGHT = 48;
 const HEADER_HEIGHT = 72;
 const DEFAULT_DAY_WIDTH = 60;
+const MONTH_WIDTHS_KEY = 'plumy.monthWidths.v1';
+const LEFT_COL_WIDTH_KEY = 'plumy.leftColWidth.v1';
 
 interface TimelineViewProps {
   tasks: Task[];
   swimlanes: TimelineSwimlane[];
   people?: Person[];
   statusColumns?: Array<{ id: TaskStatus; title: string; color?: string }>;
+  initialScrollLeft?: number;
   onTaskClick: (task: Task) => void;
   onAddTask: (date: Date, swimlaneId: string, endDate?: Date, mode?: 'projects' | 'people') => void;
   onUpdateTaskDates: (taskId: string, startDate: string, endDate: string) => void;
@@ -43,6 +46,7 @@ interface TimelineViewProps {
   onReorderSwimlanes: (swimlanes: TimelineSwimlane[]) => void;
   onReorderPeople?: (people: Person[]) => void;
   onReorderTasks: (tasks: Task[]) => void;
+  onTimelineScroll?: (state: { scrollLeft: number; scrollTop: number }) => void;
 }
 
 export function TimelineView({
@@ -50,6 +54,7 @@ export function TimelineView({
   swimlanes,
   people = [],
   statusColumns,
+  initialScrollLeft,
   onTaskClick,
   onAddTask,
   onUpdateTaskDates,
@@ -58,12 +63,19 @@ export function TimelineView({
   onReorderSwimlanes,
   onReorderPeople,
   onReorderTasks,
+  onTimelineScroll,
 }: TimelineViewProps) {
   // Left column width state
-  const [leftColWidth, setLeftColWidth] = useState<number>(200);
+  const [leftColWidth, setLeftColWidth] = useState<number>(() => {
+    if (typeof window === 'undefined') return 200;
+    const raw = window.localStorage.getItem(LEFT_COL_WIDTH_KEY);
+    const parsed = raw ? Number(raw) : NaN;
+    return Number.isFinite(parsed) ? Math.max(120, Math.min(480, parsed)) : 200;
+  });
   const [isResizingLeft, setIsResizingLeft] = useState<boolean>(false);
   const leftResizeRef = useRef<{ startX: number; startWidth: number; pendingWidth?: number } | null>(null);
   const resizeRafRef = useRef<number | null>(null);
+  const monthResizeRef = useRef<{ monthKey: string; startX: number; startWidth: number } | null>(null);
 
   // Mode state: Projects or People
   const [mode, setMode] = useState<'projects' | 'people'>('projects');
@@ -194,11 +206,19 @@ export function TimelineView({
 
   // Initialize month widths
   const [monthWidths, setMonthWidths] = useState<Record<string, number>>(() => {
-    const mw: Record<string, number> = {};
+    const defaults: Record<string, number> = {};
     Object.entries(datesByMonth).forEach(([k, monthDates]) => {
-      mw[k] = monthDates.length * DEFAULT_DAY_WIDTH;
+      defaults[k] = monthDates.length * DEFAULT_DAY_WIDTH;
     });
-    return mw;
+    if (typeof window === 'undefined') return defaults;
+    try {
+      const raw = window.localStorage.getItem(MONTH_WIDTHS_KEY);
+      if (!raw) return defaults;
+      const stored = JSON.parse(raw) as Record<string, number>;
+      return { ...defaults, ...stored };
+    } catch {
+      return defaults;
+    }
   });
 
   // Derive day widths
@@ -212,6 +232,30 @@ export function TimelineView({
   });
 
   // Update dayWidths when monthWidths changes
+  useEffect(() => {
+    setMonthWidths(prev => {
+      const next = { ...prev };
+      let changed = false;
+      Object.entries(datesByMonth).forEach(([k, monthDates]) => {
+        if (!next[k]) {
+          next[k] = monthDates.length * DEFAULT_DAY_WIDTH;
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [datesByMonth]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(LEFT_COL_WIDTH_KEY, String(leftColWidth));
+  }, [leftColWidth]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(MONTH_WIDTHS_KEY, JSON.stringify(monthWidths));
+  }, [monthWidths]);
+
   useEffect(() => {
     const arr: number[] = [];
     Object.entries(datesByMonth).forEach(([k, monthDates]) => {
@@ -351,6 +395,27 @@ export function TimelineView({
       document.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isResizingLeft, leftColWidth]);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!monthResizeRef.current) return;
+      const { monthKey, startX, startWidth } = monthResizeRef.current;
+      const delta = e.clientX - startX;
+      const newWidth = Math.max(120, startWidth + delta);
+      setMonthWidths(prev => ({ ...prev, [monthKey]: newWidth }));
+    };
+
+    const handleMouseUp = () => {
+      monthResizeRef.current = null;
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
 
   // Handle task resize with 60px grid snapping
   useEffect(() => {
@@ -492,11 +557,15 @@ export function TimelineView({
   useEffect(() => {
     // Delay to ensure DOM is ready
     const timer = setTimeout(() => {
-      scrollToToday({ smooth: false });
+      if (typeof initialScrollLeft === 'number' && rowsContainerRef.current) {
+        rowsContainerRef.current.scrollLeft = initialScrollLeft;
+      } else {
+        scrollToToday({ smooth: false });
+      }
     }, 100);
     
     return () => clearTimeout(timer);
-  }, [scrollToToday]);
+  }, [scrollToToday, initialScrollLeft]);
 
   // Swimlane reordering
   const handleMoveSwimlane = useCallback((dragIndex: number, hoverIndex: number) => {
@@ -527,10 +596,14 @@ export function TimelineView({
     if (!leftListRef.current || !rowsContainerRef.current || isScrollingRef.current) return;
     isScrollingRef.current = true;
     leftListRef.current.scrollTop = rowsContainerRef.current.scrollTop;
+    onTimelineScroll?.({
+      scrollLeft: rowsContainerRef.current.scrollLeft,
+      scrollTop: rowsContainerRef.current.scrollTop,
+    });
     setTimeout(() => {
       isScrollingRef.current = false;
     }, 0);
-  }, []);
+  }, [onTimelineScroll]);
 
   // Attach vertical scroll listeners
   useEffect(() => {
@@ -725,6 +798,21 @@ export function TimelineView({
                 todayOffset={todayOffset}
                 highlightToday={true}
                 headerRef={headerRef}
+                onMonthResizeStart={(monthKey, e) => {
+                  e.preventDefault();
+                  monthResizeRef.current = {
+                    monthKey,
+                    startX: e.clientX,
+                    startWidth: monthWidths[monthKey] || DEFAULT_DAY_WIDTH,
+                  };
+                }}
+                onMonthReset={(monthKey) => {
+                  const monthDates = datesByMonth[monthKey] || [];
+                  setMonthWidths(prev => ({
+                    ...prev,
+                    [monthKey]: monthDates.length * DEFAULT_DAY_WIDTH,
+                  }));
+                }}
               />
             </div>
 

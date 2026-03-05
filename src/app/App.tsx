@@ -37,6 +37,7 @@ import { TaskDialog } from './components/TaskDialog';
 import { SwimlaneDialog } from './components/SwimlaneDialog';
 import { PeoplePanel } from './components/PeoplePanel';
 import { TaskDetailsDialog } from './components/TaskDetailsDialog';
+import logo from './images/logo.svg';
 import { Button } from './components/ui/button';
 import { Menu, Plus, Bell, CheckCircle, User } from 'lucide-react';
 import { swimlanes as defaultSwimlanes } from './constants/swimlanes';
@@ -52,17 +53,32 @@ function App() {
   // Refs for view containers (to capture scroll position)
   const timelineContainerRef = useRef<HTMLDivElement>(null);
   const kanbanContainerRef = useRef<HTMLDivElement>(null);
+  const timelineScrollStateRef = useRef<{ scrollLeft: number; scrollTop: number }>({
+    scrollLeft: 0,
+    scrollTop: 0,
+  });
 
   const [tasks, setTasks] = useState<Task[]>(() => {
     const stored = safeReadJSON<Task[]>(TASKS_KEY, initialTasks);
     const swimlanes = safeReadJSON<TimelineSwimlane[]>(SWIMLANES_KEY, initialTimelineSwimlanes);
     
-    // Migrate: Update task.project to match swimlane name
+    // Migrate: Ensure project names and multi-project ids are present.
     return stored.map(task => {
-      const swimlane = swimlanes.find(s => s.id === task.swimlaneId);
+      const projectIds = task.projectIds?.length
+        ? task.projectIds
+        : (task.swimlaneId ? [task.swimlaneId] : []);
+      const projectName = projectIds
+        .map(projectId => swimlanes.find(s => s.id === projectId)?.name)
+        .filter(Boolean)
+        .join(', ');
+
       return {
         ...task,
-        project: swimlane?.name || task.project
+        projectIds,
+        project: projectName || task.project,
+        size: task.size || 'm',
+        complexity: task.complexity || 'medium',
+        blocked: Boolean(task.blocked),
       };
     });
   });
@@ -174,6 +190,9 @@ function App() {
         title: taskData.title!,
         status: taskData.status || 'open',
         notes: taskData.notes,
+        size: taskData.size || 'm',
+        complexity: taskData.complexity || 'medium',
+        blocked: Boolean(taskData.blocked),
         startDate: taskData.startDate,
         endDate: taskData.endDate,
         swimlaneOnly: taskData.swimlaneOnly,
@@ -318,7 +337,7 @@ function App() {
       <header className="bg-white border-b px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <h1 className="font-semibold text-gray-900">plumy</h1>
+            <img src={logo} alt="Plumy" className="h-7 w-auto" />
           </div>
           {/* View Toggle */}
           <ViewToggle
@@ -327,7 +346,8 @@ function App() {
               // Save current view state before switching
               if (viewState.currentView === 'timeline') {
                 viewState.saveViewState('timeline', {
-                  scrollLeft: timelineContainerRef.current?.scrollLeft || 0,
+                  scrollLeft: timelineScrollStateRef.current.scrollLeft,
+                  scrollTop: timelineScrollStateRef.current.scrollTop,
                   collapsedSwimlanes: [],
                   mode: 'projects',
                 });
@@ -343,9 +363,7 @@ function App() {
               // Restore scroll position for the new view
               setTimeout(() => {
                 const savedState = viewState.getViewState(view);
-                if (view === 'timeline' && timelineContainerRef.current) {
-                  timelineContainerRef.current.scrollLeft = savedState.scrollLeft || 0;
-                } else if (view === 'kanban' && kanbanContainerRef.current) {
+                if (view === 'kanban' && kanbanContainerRef.current) {
                   kanbanContainerRef.current.scrollLeft = savedState.scrollLeft || 0;
                   kanbanContainerRef.current.scrollTop = savedState.scrollTop || 0;
                 }
@@ -374,6 +392,7 @@ function App() {
               swimlanes={timelineSwimlanes}
               people={people}
               statusColumns={statusColumns}
+              initialScrollLeft={viewState.getViewState('timeline').scrollLeft || 0}
               onTaskClick={handleTaskClick}
               onAddTask={handleAddTaskFromTimeline}
               onUpdateTaskDates={handleUpdateTaskDates}
@@ -382,6 +401,9 @@ function App() {
               onReorderSwimlanes={handleReorderSwimlanes}
               onReorderPeople={handleReorderPeople}
               onReorderTasks={handleReorderTasks}
+              onTimelineScroll={(state) => {
+                timelineScrollStateRef.current = state;
+              }}
             />
           </div>
         )}

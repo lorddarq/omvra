@@ -23,6 +23,8 @@ interface TimelineHeaderProps {
   todayOffset?: number | null;
   highlightToday?: boolean;
   headerRef: React.RefObject<HTMLDivElement>;
+  onMonthResizeStart?: (monthKey: string, e: React.MouseEvent<HTMLDivElement>) => void;
+  onMonthReset?: (monthKey: string) => void;
 }
 
 function getMonthLabel(date: Date): string {
@@ -53,6 +55,8 @@ export function TimelineHeader({
   todayOffset,
   highlightToday = true,
   headerRef,
+  onMonthResizeStart,
+  onMonthReset,
 }: TimelineHeaderProps) {
   // Ordered month keys
   const monthKeysOrdered = Object.keys(datesByMonth).sort((a, b) => {
@@ -97,11 +101,19 @@ export function TimelineHeader({
                 {/* Month header */}
                 <div
                   data-month-header
-                  className="month-header"
+                  className="month-header relative"
                 >
                   <span className="month-header-text">
                     {getMonthLabel(m.dates[0])}
                   </span>
+                  <div
+                    role="separator"
+                    aria-orientation="vertical"
+                    className="absolute right-0 top-0 h-full w-2 cursor-col-resize hover:bg-gray-300/40"
+                    onMouseDown={(e) => onMonthResizeStart?.(m.key, e)}
+                    onDoubleClick={() => onMonthReset?.(m.key)}
+                    title="Drag to resize month. Double-click to reset."
+                  />
                 </div>
 
                 {/* Day row */}

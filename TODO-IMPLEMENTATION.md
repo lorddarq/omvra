@@ -2,8 +2,8 @@
 
 **Status:** Active  
 **Created:** 2026-02-03  
-**Last Updated:** 2026-02-03  
-**Progress:** 45/57 tasks complete (79%)  
+**Last Updated:** 2026-03-06  
+**Progress:** 47/57 tasks complete (82%)  
 **Action Items:**
 - ⚠️ Phase 3: Verify virtualization window extension (rapid scroll chains, seamless transitions)
 - ⚠️ Phase 4: Verify dynamic track heights and overlapping task rendering
@@ -83,7 +83,7 @@ Temporarily disabled virtualization (showing all dates) to restore task visibili
 - [x] 4.3 Assign tasks to first available track (first-fit)
 - [x] 4.4 Memoize track computation: `useCallback([tasks, dates])`
 - [x] 4.5 Update swimlane row height calculation: `baseHeight + (trackCount - 1) * trackHeight`
-- [ ] 4.6 Update task drag/drop to preserve/reassign track after drop
+- [x] 4.6 Update task drag/drop to preserve/reassign track after drop
 - [ ] 4.7 Throttle re-renders during drag via `rAF` (prevent layout thrash)
 - [ ] 4.8 Unit test: track allocation correctness (overlaps, single-day tasks, etc.)
 - [ ] 4.9 Test: Multiple overlapping tasks stack into tracks, height grows/shrinks
@@ -95,7 +95,7 @@ Temporarily disabled virtualization (showing all dates) to restore task visibili
 - [x] 7.3 Add Projects/People toggle within TimelineView
 - [ ] 7.4 Refine out-of-range drop extrapolation: use per-day widths at timeline edges ⚠️ **DEFERRED**
 - [ ] 7.5 Implement auto-scroll for newly created out-of-range tasks ⚠️ **DEFERRED**
-- [ ] 7.6 Add visual drop hints (ghost placeholder during drag) ⚠️ **DEFERRED**
+- [x] 7.6 Add visual drop hints (drop line indicator during drag)
 - [ ] 7.7 Unit test: snapping behavior, out-of-range drop logic ⚠️ **DEFERRED TO PHASE 8**
 - [ ] 7.8 Test: Drag tasks out of range, auto-scroll + highlight works ⚠️ **DEFERRED TO PHASE 8**
 

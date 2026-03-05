@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Briefcase, CalendarDays, User } from 'lucide-react';
-import { Task, TaskStatus, TimelineSwimlane, Person } from '../types';
+import { Task, TaskStatus, TimelineSwimlane, Person, TaskSize, TaskComplexity } from '../types';
 import { toLocalISODate } from '../utils/date';
 import {
   Dialog,
@@ -54,44 +54,61 @@ export function TaskDialog({
   people = [],
 }: TaskDialogProps) {
   const NO_PROJECT_VALUE = 'none';
+  const NO_TIMELINE_VALUE = 'none';
+  const todayISO = toLocalISODate(new Date());
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState<TaskStatus>('open');
   const [notes, setNotes] = useState('');
+  const [size, setSize] = useState<TaskSize>('m');
+  const [complexity, setComplexity] = useState<TaskComplexity>('medium');
+  const [blocked, setBlocked] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [swimlaneId, setSwimlaneId] = useState(NO_PROJECT_VALUE);
+  const [projectIds, setProjectIds] = useState<string[]>([]);
+  const [swimlaneId, setSwimlaneId] = useState(NO_TIMELINE_VALUE);
   const [assigneeId, setAssigneeId] = useState('unassigned');
 
   useEffect(() => {
     if (task) {
+      const initialProjectIds = task.projectIds?.length
+        ? task.projectIds
+        : (task.swimlaneId ? [task.swimlaneId] : []);
+      const existingStart = task.startDate || todayISO;
+      const existingEnd = task.endDate || existingStart;
       setTitle(task.title);
       setStatus(task.status);
       setNotes(task.notes || '');
-      setStartDate(task.startDate || '');
-      setEndDate(task.endDate || '');
-      setSwimlaneId(task.swimlaneId || NO_PROJECT_VALUE);
+      setSize(task.size || 'm');
+      setComplexity(task.complexity || 'medium');
+      setBlocked(Boolean(task.blocked));
+      setStartDate(existingStart);
+      setEndDate(existingEnd);
+      setProjectIds(initialProjectIds);
+      setSwimlaneId(task.swimlaneId || (initialProjectIds[0] || NO_TIMELINE_VALUE));
       setAssigneeId(task.assigneeId || 'unassigned');
     } else {
+      const initialProjectIds = defaultSwimlaneId ? [defaultSwimlaneId] : [];
       setTitle('');
       setStatus(defaultStatus || 'open');
       setNotes('');
-      setSwimlaneId(defaultSwimlaneId || NO_PROJECT_VALUE);
+      setSize('m');
+      setComplexity('medium');
+      setBlocked(false);
+      setProjectIds(initialProjectIds);
+      setSwimlaneId(defaultSwimlaneId || NO_TIMELINE_VALUE);
       setAssigneeId(defaultAssigneeId || 'unassigned');
       
       if (defaultDate) {
         const dateStr = toLocalISODate(defaultDate);
         setStartDate(dateStr);
         const endDateObj = defaultEndDate || new Date(defaultDate);
-        if (!defaultEndDate) {
-          endDateObj.setDate(endDateObj.getDate() + 2);
-        }
         setEndDate(toLocalISODate(endDateObj));
       } else {
-        setStartDate('');
-        setEndDate('');
+        setStartDate(todayISO);
+        setEndDate(todayISO);
       }
     }
-  }, [task, defaultStatus, defaultDate, defaultEndDate, defaultSwimlaneId, defaultAssigneeId, isOpen]);
+  }, [task, defaultStatus, defaultDate, defaultEndDate, defaultSwimlaneId, defaultAssigneeId, isOpen, todayISO]);
 
   const handleSave = () => {
     if (!title.trim()) return;
@@ -101,18 +118,21 @@ export function TaskDialog({
       title: title.trim(),
       status,
       notes: notes.trim(),
-      swimlaneOnly: swimlaneId === NO_PROJECT_VALUE,
-      swimlaneId: swimlaneId === NO_PROJECT_VALUE ? undefined : swimlaneId,
+      size,
+      complexity,
+      blocked,
+      projectIds,
+      swimlaneOnly: projectIds.length === 0 || swimlaneId === NO_TIMELINE_VALUE,
+      swimlaneId: swimlaneId === NO_TIMELINE_VALUE ? undefined : swimlaneId,
+      project: projectIds
+        .map(id => swimlanes.find(s => s.id === id)?.name)
+        .filter(Boolean)
+        .join(', ') || undefined,
       assigneeId: assigneeId === 'unassigned' ? undefined : assigneeId,
     };
 
-    if (swimlaneId !== NO_PROJECT_VALUE && startDate && endDate) {
-      taskData.startDate = startDate;
-      taskData.endDate = endDate;
-    } else {
-      taskData.startDate = undefined;
-      taskData.endDate = undefined;
-    }
+    taskData.startDate = startDate || todayISO;
+    taskData.endDate = endDate || taskData.startDate;
 
     onSave(taskData);
     onClose();
@@ -175,23 +195,110 @@ export function TaskDialog({
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="task-size">Task Size</Label>
+              <Select value={size} onValueChange={(value) => setSize(value as TaskSize)}>
+                <SelectTrigger id="task-size" className="h-11 rounded-xl border-0 bg-gray-100 px-4">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="xs">XS</SelectItem>
+                  <SelectItem value="s">S</SelectItem>
+                  <SelectItem value="m">M</SelectItem>
+                  <SelectItem value="l">L</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="swimlane">Assign to Swimlane</Label>
-              <Select value={swimlaneId} onValueChange={setSwimlaneId}>
-                <SelectTrigger id="swimlane" className="relative h-11 rounded-xl border-0 bg-gray-100 pl-10 pr-10">
-                  <Briefcase className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-700" />
-                  <SelectValue placeholder="Select project" />
+              <Label htmlFor="task-complexity">Complexity</Label>
+              <Select value={complexity} onValueChange={(value) => setComplexity(value as TaskComplexity)}>
+                <SelectTrigger id="task-complexity" className="h-11 rounded-xl border-0 bg-gray-100 px-4">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NO_PROJECT_VALUE}>No project (Kanban only)</SelectItem>
-                  {swimlanes.map(swimlane => (
-                    <SelectItem key={swimlane.id} value={swimlane.id}>
-                      {swimlane.name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="routine">Routine</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="hard">Hard</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-end">
+              <label className="flex items-center gap-2 rounded-xl bg-gray-100 px-3 py-2">
+                <input
+                  type="checkbox"
+                  checked={blocked}
+                  onChange={(e) => setBlocked(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <span className="text-sm text-gray-800">Blocked task</span>
+              </label>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Assign to Projects</Label>
+              <div className="space-y-2 rounded-xl bg-gray-100 p-3">
+                {swimlanes.map(swimlane => {
+                  const isChecked = projectIds.includes(swimlane.id);
+                  return (
+                    <label key={swimlane.id} className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setProjectIds(prev => {
+                            const next = checked
+                              ? [...new Set([...prev, swimlane.id])]
+                              : prev.filter(id => id !== swimlane.id);
+
+                            setSwimlaneId(current => {
+                              if (current !== NO_TIMELINE_VALUE && !next.includes(current)) {
+                                return next[0] || NO_TIMELINE_VALUE;
+                              }
+                              return current;
+                            });
+
+                            return next;
+                          });
+                        }}
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      <span className="text-sm text-gray-800">{swimlane.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="swimlane">Primary Timeline Project</Label>
+              <Select value={swimlaneId} onValueChange={setSwimlaneId}>
+                <SelectTrigger
+                  id="swimlane"
+                  className="relative h-11 rounded-xl border-0 bg-gray-100 pl-10 pr-10"
+                  disabled={projectIds.length === 0}
+                >
+                  <Briefcase className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-700" />
+                  <SelectValue placeholder={projectIds.length ? 'Select timeline project' : 'No project selected'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_TIMELINE_VALUE}>No timeline project</SelectItem>
+                  {projectIds.map(projectId => {
+                    const project = swimlanes.find(swimlane => swimlane.id === projectId);
+                    if (!project) return null;
+                    return (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -217,7 +324,7 @@ export function TaskDialog({
             )}
           </div>
 
-          {swimlaneId !== NO_PROJECT_VALUE && (
+          {swimlaneId !== NO_TIMELINE_VALUE && (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="startDate">Start Date</Label>

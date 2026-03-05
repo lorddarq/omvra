@@ -11,10 +11,10 @@ interface DroppableColumnProps {
   tasks: Task[];
   swimlanes: Array<{ id: TaskStatus; title: string }>;
   onTaskClick: (task: Task) => void;
+  onEditTask?: (task: Task) => void;
   onAddTask: (status: TaskStatus) => void;
   onMoveTask: (taskId: string, newStatus: TaskStatus) => void;
   onReorderTask: (dragIndex: number, hoverIndex: number, status: TaskStatus) => void;
-  onRenameTask?: (taskId: string, newTitle: string) => void;
   onRenameColumn?: (colId: string, newTitle: string) => void;
   onChangeColumnColor?: (colId: string, newColor: string) => void;
   onDeleteColumn?: (colId: string) => void;
@@ -25,10 +25,10 @@ export function DroppableColumn({
   tasks: swimlaneTasks,
   swimlanes,
   onTaskClick,
+  onEditTask,
   onAddTask,
   onMoveTask,
   onReorderTask,
-  onRenameTask,
   onRenameColumn,
   onChangeColumnColor,
   onDeleteColumn,
@@ -119,9 +119,9 @@ export function DroppableColumn({
             task={task}
             index={index}
             onTaskClick={onTaskClick}
+            onEditTask={onEditTask}
             onMoveTask={onMoveTask}
             onReorderTask={onReorderTask}
-            onRenameTask={onRenameTask}
             swimlanes={swimlanes}
           />
         ))}

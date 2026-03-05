@@ -5,6 +5,7 @@ import { Task, TimelineSwimlane } from '../types';
 import { Button } from '../components/ui/button';
 import { DraggableTimelineTask, TIMELINE_TASK_TYPE } from '../components/DraggableTimelineTask';
 import { allocateTasksToTracks } from '../utils/trackAllocation';
+import { toLocalISODate } from '../utils/date';
 
 const ITEM_TYPE = 'SWIMLANE_ROW';
 
@@ -78,6 +79,26 @@ export function DraggableSwimlaneRow({
   const trackAssignments = useMemo(
     () => allocateTasksToTracks(tasks),
     [tasks]
+  );
+
+  const getVisibleIndexForDate = useCallback(
+    (date: Date, mode: 'start' | 'end'): number => {
+      if (dates.length === 0) return -1;
+      const target = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+
+      if (mode === 'start') {
+        for (let i = 0; i < dates.length; i++) {
+          if (dates[i].getTime() >= target) return i;
+        }
+        return dates.length - 1;
+      }
+
+      for (let i = dates.length - 1; i >= 0; i--) {
+        if (dates[i].getTime() <= target) return i;
+      }
+      return 0;
+    },
+    [dates]
   );
 
   // Helper function to calculate drop line position from client coordinates
@@ -249,8 +270,8 @@ export function DraggableSwimlaneRow({
       const newEnd = new Date(newStart);
       newEnd.setDate(newStart.getDate() + durationDays - 1);
 
-      const newStartISO = newStart.toISOString().split('T')[0];
-      const newEndISO = newEnd.toISOString().split('T')[0];
+      const newStartISO = toLocalISODate(newStart);
+      const newEndISO = toLocalISODate(newEnd);
 
       onMoveTaskToSwimlane(task.id, swimlane.id, newStartISO, newEndISO);
     },
@@ -339,11 +360,6 @@ export function DraggableSwimlaneRow({
             const prefix: number[] = [0];
             for (let i = 0; i < dayWidths.length; i++) prefix.push(prefix[i] + dayWidths[i]);
 
-            const firstDate = dates[0];
-
-            // helper to compute day index for a date (0-based)
-            const dateIndex = (d: Date) => Math.floor((new Date(d).getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24));
-
             // build monthStarts map
             const monthStarts: Record<string, number> = {};
             (monthKeys ?? []).forEach((k) => {
@@ -356,8 +372,10 @@ export function DraggableSwimlaneRow({
 
             // Precompute task ranges
             const tasksRanges = timelineTasks.map(task => {
-              const s = task.startDate ? dateIndex(new Date(task.startDate)) : -1;
-              const e = task.endDate ? (dateIndex(new Date(task.endDate))) : -1;
+              const s = task.startDate ? getVisibleIndexForDate(new Date(task.startDate), 'start') : -1;
+              const e = task.endDate
+                ? getVisibleIndexForDate(new Date(task.endDate), 'end')
+                : s;
               return { task, startIndex: s, endIndex: e };
             });
 

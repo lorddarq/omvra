@@ -21,3 +21,18 @@
 Notes:
 - The first task scaffolded basic components and wired the header to use `MonthsScroller` so we can iterate visually.
 - Mark items as done here as I finish them.
+
+---
+
+## New Backlog Items
+
+- [x] Add markdown support in task description/notes (render + edit UX). ✅
+- [ ] Increase task card footprint and preview density so cards show more useful summary content.
+- [ ] Support tasks belonging to multiple projects (data model + UI + filtering/assignment flows).
+- [x] Move position information under the person name as compact subtext to reduce header space usage. ✅
+- [x] Add ability to edit person details after creation (name, role/position, and related fields). ✅
+- [x] Fix 5-day mode so timeline drag/drop, task positioning, and start/end date updates remain fully functional when weekends are hidden. ✅
+- [x] Fix timeline task update race/stale-state overwrite during drag/drop and date update operations. ✅
+- [x] Fix local date persistence to avoid timezone day-shift issues (`toISOString` date-only bugs). ✅
+- [x] Fix Electron packaging failure (`npm run build:electron`) caused by missing `dist/mac-arm64/LICENSE`. ✅ (next blocker: `hdiutil` failure during DMG creation)
+- [ ] Fix timeline scroll-state persistence so switching views restores the actual timeline scroll position.

@@ -80,7 +80,12 @@ export function DraggableSwimlaneLabel({ swimlane, index, leftColWidth, rowHeigh
               <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
                 <User className="w-4 h-4 text-blue-600" />
               </div>
-              <span className="text-sm font-semibold text-gray-700 truncate">{swimlane.name}</span>
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-gray-700 truncate">{swimlane.name}</div>
+                {swimlane.subtitle && (
+                  <div className="text-xs text-gray-500 truncate">{swimlane.subtitle}</div>
+                )}
+              </div>
             </div>
             <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0">{taskCount} {taskCount === 1 ? 'task' : 'tasks'}</span>
           </>

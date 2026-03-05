@@ -1,5 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Edit2 } from 'lucide-react';
+import React from 'react';
 import { Badge } from './ui/badge';
 
 interface TaskCardProps {
@@ -8,64 +7,34 @@ interface TaskCardProps {
   color?: string;
   project?: string;
   onClick?: () => void;
-  onRename?: (newTitle: string) => void;
+  onEdit?: () => void;
 }
 
-export function TaskCard({ title, notes, color, project, onClick, onRename }: TaskCardProps) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [draft, setDraft] = useState(title);
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => setDraft(title), [title]);
-  useEffect(() => { if (isEditing) inputRef.current?.focus(); }, [isEditing]);
-
-  const commit = () => {
-    const trimmed = draft.trim();
-    if (onRename && trimmed && trimmed !== title) onRename(trimmed);
-    setIsEditing(false);
-  };
-
+export function TaskCard({ title, notes, color, project, onClick, onEdit }: TaskCardProps) {
   return (
     <div
       onClick={(e) => { e.stopPropagation(); onClick?.(); }}
       className="bg-white rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-gray-200 max-w-[300px] overflow-hidden"
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="flex items-start gap-3 ">
-          <div className="flex-1 min-w-0 overflow-hidden pr-12 truncate-anywhere max-w-[320px]">
-            {isEditing ? (
-              <input
-                ref={inputRef}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onBlur={commit}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') commit();
-                  if (e.key === 'Escape') { setIsEditing(false); setDraft(title); }
-                }}
-                className="w-full border-b px-1 py-0.5 text-sm font-medium"
-              />
-            ) : (
-              <p
-                className="text-sm font-medium text-gray-900 w-full max-w-[296px] truncate-anywhere truncate-fade truncate-fade-horizontal"
-                onDoubleClick={(e) => { e.stopPropagation(); if (onRename) setIsEditing(true); }}
-              >
-                {title}
-              </p>
-            )}
+        <div className="flex-1 min-w-0 overflow-hidden">
+          <div className="truncate-anywhere">
+            <p className="text-sm font-medium text-gray-900 w-full max-w-[296px] truncate-anywhere truncate-fade truncate-fade-horizontal">
+              {title}
+            </p>
 
             {project && <div className="mt-1"><Badge variant="outline">{project}</Badge></div>}
             {notes && <p className="text-xs text-gray-500 mt-1 line-clamp-3">{notes}</p>}
           </div>
         </div>
 
-        {onRename && (
+        {onEdit && (
           <button
-            onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
-            className="text-gray-400 hover:text-gray-600 p-1"
-            aria-label="Edit title"
+            onClick={(e) => { e.stopPropagation(); onEdit(); }}
+            className="shrink-0 rounded border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
+            aria-label="Edit task"
           >
-            <Edit2 className="w-4 h-4" />
+            Edit
           </button>
         )}
       </div>

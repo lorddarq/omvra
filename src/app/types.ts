@@ -31,5 +31,6 @@ export interface Swimlane {
 export interface TimelineSwimlane {
   id: string;
   name: string;
+  subtitle?: string;
   color?: string;
 }

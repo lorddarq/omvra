@@ -36,6 +36,7 @@ import { SwimlanesView } from './components/SwimlanesView';
 import { TaskDialog } from './components/TaskDialog';
 import { SwimlaneDialog } from './components/SwimlaneDialog';
 import { PeoplePanel } from './components/PeoplePanel';
+import { TaskDetailsDialog } from './components/TaskDetailsDialog';
 import { Button } from './components/ui/button';
 import { Menu, Plus, Bell, CheckCircle, User } from 'lucide-react';
 import { swimlanes as defaultSwimlanes } from './constants/swimlanes';
@@ -107,9 +108,11 @@ function App() {
   }, [people]);
 
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const [isTaskDetailsOpen, setIsTaskDetailsOpen] = useState(false);
   const [isSwimlaneDialogOpen, setIsSwimlaneDialogOpen] = useState(false);
   const [isPeoplePanelOpen, setIsPeoplePanelOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [detailsTaskId, setDetailsTaskId] = useState<string | null>(null);
   const [selectedSwimlane, setSelectedSwimlane] = useState<TimelineSwimlane | null>(null);
   const [defaultStatus, setDefaultStatus] = useState<TaskStatus>('open');
   const [defaultDate, setDefaultDate] = useState<Date | undefined>(undefined);
@@ -117,12 +120,24 @@ function App() {
   const [defaultSwimlaneId, setDefaultSwimlaneId] = useState<string | undefined>(undefined);
   const [defaultAssigneeId, setDefaultAssigneeId] = useState<string | undefined>(undefined);
 
+  const detailsTask = detailsTaskId ? tasks.find(t => t.id === detailsTaskId) ?? null : null;
+
   const handleTaskClick = (task: Task) => {
+    setDetailsTaskId(task.id);
+    setIsTaskDetailsOpen(true);
+  };
+
+  const handleEditTaskFromKanban = (task: Task) => {
     setSelectedTask(task);
     setDefaultStatus(task.status);
     setDefaultDate(undefined);
     setDefaultSwimlaneId(task.swimlaneId);
     setIsTaskDialogOpen(true);
+  };
+
+  const handleEditTaskFromDetails = (task: Task) => {
+    setIsTaskDetailsOpen(false);
+    handleEditTaskFromKanban(task);
   };
 
   const handleAddTaskFromTimeline = (date: Date, swimlaneId: string, endDate?: Date, mode?: 'projects' | 'people') => {
@@ -151,7 +166,7 @@ function App() {
   const handleSaveTask = (taskData: Partial<Task>) => {
     if (taskData.id) {
       // Update existing task
-      setTasks(tasks.map(t => (t.id === taskData.id ? { ...t, ...taskData } : t)));
+      setTasks(prevTasks => prevTasks.map(t => (t.id === taskData.id ? { ...t, ...taskData } : t)));
     } else {
       // Create new task
       const newTask: Task = {
@@ -165,24 +180,20 @@ function App() {
         swimlaneId: taskData.swimlaneId,
         assigneeId: taskData.assigneeId,
       };
-      setTasks([...tasks, newTask]);
+      setTasks(prevTasks => [...prevTasks, newTask]);
     }
   };
 
   const handleDeleteTask = (taskId: string) => {
-    setTasks(tasks.filter(t => t.id !== taskId));
+    setTasks(prevTasks => prevTasks.filter(t => t.id !== taskId));
   };
 
   const handleMoveTask = (taskId: string, newStatus: TaskStatus) => {
-    setTasks(tasks.map(t => (t.id === taskId ? { ...t, status: newStatus } : t)));
+    setTasks(prevTasks => prevTasks.map(t => (t.id === taskId ? { ...t, status: newStatus } : t)));
   };
 
   const handleUpdateTaskDates = (taskId: string, startDate: string, endDate: string) => {
-    setTasks(tasks.map(t => (t.id === taskId ? { ...t, startDate, endDate } : t)));
-  };
-
-  const handleRenameTask = (taskId: string, newTitle: string) => {
-    setTasks(tasks.map(t => (t.id === taskId ? { ...t, title: newTitle } : t)));
+    setTasks(prevTasks => prevTasks.map(t => (t.id === taskId ? { ...t, startDate, endDate } : t)));
   };
 
   const handleCloseTaskDialog = () => {
@@ -221,11 +232,9 @@ function App() {
 
   const handleDeleteSwimlane = (swimlaneId: string) => {
     // Remove swimlane
-    setTimelineSwimlanes(timelineSwimlanes.filter(s => s.id !== swimlaneId));
+    setTimelineSwimlanes(prevSwimlanes => prevSwimlanes.filter(s => s.id !== swimlaneId));
     // Update tasks to remove swimlane reference
-    setTasks(
-      tasks.map(t => (t.swimlaneId === swimlaneId ? { ...t, swimlaneId: undefined } : t))
-    );
+    setTasks(prevTasks => prevTasks.map(t => (t.swimlaneId === swimlaneId ? { ...t, swimlaneId: undefined } : t)));
   };
 
   const handleCloseSwimlaneDialog = () => {
@@ -240,12 +249,16 @@ function App() {
       role: personData.role,
       avatar: personData.avatar,
     };
-    setPeople([...people, newPerson]);
+    setPeople(prevPeople => [...prevPeople, newPerson]);
   };
 
   const handleDeletePerson = (personId: string) => {
-    setPeople(people.filter(p => p.id !== personId));
-    setTasks(tasks.map(t => (t.assigneeId === personId ? { ...t, assigneeId: undefined } : t)));
+    setPeople(prevPeople => prevPeople.filter(p => p.id !== personId));
+    setTasks(prevTasks => prevTasks.map(t => (t.assigneeId === personId ? { ...t, assigneeId: undefined } : t)));
+  };
+
+  const handleUpdatePerson = (personId: string, updates: Pick<Person, 'name' | 'role'>) => {
+    setPeople(prevPeople => prevPeople.map(p => (p.id === personId ? { ...p, ...updates } : p)));
   };
 
   const handleReorderSwimlanes = (reorderedSwimlanes: TimelineSwimlane[]) => {
@@ -381,11 +394,11 @@ function App() {
                 tasks={tasks}
                 swimlanes={statusColumns}
                 onTaskClick={handleTaskClick}
+                onEditTask={handleEditTaskFromKanban}
                 onAddTask={handleAddTaskFromSwimlane}
                 onMoveTask={handleMoveTask}
                 onReorderTasks={handleReorderTasks}
                 onReorderColumns={handleReorderStatusColumns}
-                onRenameTask={handleRenameTask}
                 onRenameColumn={handleRenameStatusColumn}
                 onChangeColumnColor={handleChangeStatusColumnColor}
                 onAddColumn={handleAddStatusColumn}
@@ -413,6 +426,17 @@ function App() {
         people={people}
       />
 
+      {/* Task Details Dialog */}
+      <TaskDetailsDialog
+        isOpen={isTaskDetailsOpen}
+        onClose={() => setIsTaskDetailsOpen(false)}
+        onEdit={handleEditTaskFromDetails}
+        task={detailsTask}
+        swimlanes={timelineSwimlanes}
+        people={people}
+        statusColumns={statusColumns}
+      />
+
       {/* Swimlane Dialog */}
       <SwimlaneDialog
         isOpen={isSwimlaneDialogOpen}
@@ -430,6 +454,7 @@ function App() {
         tasks={tasks}
         statusColumns={statusColumns}
         onAddPerson={handleAddPerson}
+        onUpdatePerson={handleUpdatePerson}
         onDeletePerson={handleDeletePerson}
       />
     </div>

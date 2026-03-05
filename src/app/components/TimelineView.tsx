@@ -21,6 +21,7 @@ import { DraggableSwimlaneLabel } from './DraggableSwimlaneLabel';
 import { DraggableSwimlaneRow } from './DraggableSwimlaneRow';
 import { allocateTasksToTracks, calculateSwimlaneHeight } from '../utils/trackAllocation';
 import { getReadableTextClassFor } from '../utils/contrast';
+import { toLocalISODate } from '../utils/date';
 import { useVirtualizedTimeline } from '../hooks/useVirtualizedTimeline';
 import { TIMELINE_CONFIG } from '../constants/timeline';
 
@@ -75,7 +76,8 @@ export function TimelineView({
     if (mode === 'people') {
       return people.map(person => ({
         id: person.id,
-        name: `${person.name} - ${person.role}`,
+        name: person.name,
+        subtitle: person.role,
         color: person.color || '#3b82f6', // Default blue if no color
       }));
     }
@@ -285,6 +287,26 @@ export function TimelineView({
 
   const endPadding = 24;
 
+  const getVisibleIndexForDate = useCallback(
+    (date: Date, mode: 'start' | 'end'): number => {
+      if (dates.length === 0) return -1;
+      const target = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+
+      if (mode === 'start') {
+        for (let i = 0; i < dates.length; i++) {
+          if (dates[i].getTime() >= target) return i;
+        }
+        return dates.length - 1;
+      }
+
+      for (let i = dates.length - 1; i >= 0; i--) {
+        if (dates[i].getTime() <= target) return i;
+      }
+      return 0;
+    },
+    [dates]
+  );
+
   // Handle left column resize
   const handleLeftResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -342,8 +364,8 @@ export function TimelineView({
       const startDate = new Date(sd.getFullYear(), sd.getMonth(), sd.getDate());
       const ed = task.endDate ? new Date(task.endDate) : startDate;
       const endDate = task.endDate ? new Date(ed.getFullYear(), ed.getMonth(), ed.getDate()) : startDate;
-      const startIdx = dates.findIndex(d => d.getTime() === startDate.getTime());
-      const endIdx = dates.findIndex(d => d.getTime() === endDate.getTime());
+      const startIdx = getVisibleIndexForDate(startDate, 'start');
+      const endIdx = getVisibleIndexForDate(endDate, 'end');
 
       if (startIdx < 0) return;
 
@@ -373,7 +395,7 @@ export function TimelineView({
         // Drag start date (can't go past end)
         if (newIdx <= endIdx && newIdx >= 0 && newIdx < dates.length) {
           const newDate = new Date(dates[newIdx]);
-          const newISO = newDate.toISOString().split('T')[0];
+          const newISO = toLocalISODate(newDate);
           if (newISO !== task.startDate) {
             onUpdateTaskDates(task.id, newISO, task.endDate || '');
           }
@@ -382,7 +404,7 @@ export function TimelineView({
         // Drag end date (can't go before start)
         if (newIdx >= startIdx && newIdx >= 0 && newIdx < dates.length) {
           const newDate = new Date(dates[newIdx]);
-          const newISO = newDate.toISOString().split('T')[0];
+          const newISO = toLocalISODate(newDate);
           if (newISO !== task.endDate) {
             onUpdateTaskDates(task.id, task.startDate || '', newISO);
           }
@@ -402,7 +424,7 @@ export function TimelineView({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [resizingTask, tasks, dates, dayWidths, onUpdateTaskDates]);
+  }, [resizingTask, tasks, dates, dayWidths, onUpdateTaskDates, getVisibleIndexForDate]);
 
   // Scroll to today
   const scrollToToday = useCallback((opts?: { smooth?: boolean }) => {
@@ -531,7 +553,7 @@ export function TimelineView({
 
       const sd = new Date(task.startDate);
       const startDate = new Date(sd.getFullYear(), sd.getMonth(), sd.getDate());
-      const startIdx = dates.findIndex(d => d.getTime() === startDate.getTime());
+      const startIdx = getVisibleIndexForDate(startDate, 'start');
       if (startIdx < 0) return null;
 
       // Adjust position for window offset
@@ -543,13 +565,13 @@ export function TimelineView({
         const ed = new Date(task.endDate);
         endDate = new Date(ed.getFullYear(), ed.getMonth(), ed.getDate());
       }
-      const endIdx = dates.findIndex(d => d.getTime() === endDate.getTime());
+      const endIdx = getVisibleIndexForDate(endDate, 'end');
       const endIdx2 = endIdx >= 0 ? endIdx : startIdx;
       const width = dayWidths.slice(startIdx, endIdx2 + 1).reduce((a, b) => a + b, dayWidths[startIdx] || DEFAULT_DAY_WIDTH);
 
       return { left, width };
     },
-    [dates, dayWidths, timeline.windowStartIndex]
+    [dates, dayWidths, timeline.windowStartIndex, getVisibleIndexForDate]
   );
 
   // Get task color helper with fallback for orphaned statuses
@@ -750,11 +772,6 @@ export function TimelineView({
                           
                           // Update the task in the state
                           onReorderTasks(tasks.map(t => (t.id === taskId ? updated : t)));
-                          
-                          // Also trigger onUpdateTaskDates if dates changed
-                          if (newStartDate && newEndDate) {
-                            onUpdateTaskDates(taskId, newStartDate, newEndDate);
-                          }
                         }
                       }}
                       getTaskPosition={getTaskPosition}

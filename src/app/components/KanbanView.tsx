@@ -17,11 +17,11 @@ interface KanbanViewProps {
   tasks: Task[];
   swimlanes: Array<{ id: TaskStatus; title: string; color?: string }>;
   onTaskClick: (task: Task) => void;
+  onEditTask?: (task: Task) => void;
   onAddTask: (status: TaskStatus) => void;
   onMoveTask: (taskId: string, newStatus: TaskStatus) => void;
   onReorderTasks: (tasks: Task[]) => void;
   onReorderColumns: (fromIndex: number, toIndex: number) => void;
-  onRenameTask?: (taskId: string, newTitle: string) => void;
   onRenameColumn?: (colId: string, newTitle: string) => void;
   onChangeColumnColor?: (colId: string, newColor: string) => void;
   onAddColumn?: (col: any) => void;
@@ -32,11 +32,11 @@ export function KanbanView({
   tasks,
   swimlanes,
   onTaskClick,
+  onEditTask,
   onAddTask,
   onMoveTask,
   onReorderTasks,
   onReorderColumns,
-  onRenameTask,
   onRenameColumn,
   onChangeColumnColor,
   onAddColumn,
@@ -84,11 +84,11 @@ export function KanbanView({
         tasks={tasks}
         swimlanes={swimlanes}
         onTaskClick={onTaskClick}
+        onEditTask={onEditTask}
         onAddTask={onAddTask}
         onMoveTask={onMoveTask}
         onReorderTasks={onReorderTasks}
         onReorderColumns={onReorderColumns}
-        onRenameTask={onRenameTask}
         onRenameColumn={onRenameColumn}
         onChangeColumnColor={onChangeColumnColor}
         onAddColumn={onAddColumn}

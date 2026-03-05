@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
+import { Briefcase, CalendarDays, User } from 'lucide-react';
 import { Task, TaskStatus, TimelineSwimlane, Person } from '../types';
+import { toLocalISODate } from '../utils/date';
 import {
   Dialog,
   DialogContent,
@@ -51,15 +53,14 @@ export function TaskDialog({
   statusColumns,
   people = [],
 }: TaskDialogProps) {
+  const NO_PROJECT_VALUE = 'none';
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState<TaskStatus>('open');
   const [notes, setNotes] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [swimlaneOnly, setSwimlaneOnly] = useState(false);
-  const [swimlaneId, setSwimlaneId] = useState('');
+  const [swimlaneId, setSwimlaneId] = useState(NO_PROJECT_VALUE);
   const [assigneeId, setAssigneeId] = useState('unassigned');
-  const [color, setColor] = useState('');
 
   useEffect(() => {
     if (task) {
@@ -68,34 +69,29 @@ export function TaskDialog({
       setNotes(task.notes || '');
       setStartDate(task.startDate || '');
       setEndDate(task.endDate || '');
-      setSwimlaneOnly(task.swimlaneOnly || false);
-      setSwimlaneId(task.swimlaneId || '');
+      setSwimlaneId(task.swimlaneId || NO_PROJECT_VALUE);
       setAssigneeId(task.assigneeId || 'unassigned');
     } else {
       setTitle('');
       setStatus(defaultStatus || 'open');
       setNotes('');
-      // Only set default swimlaneId if not creating a people-assigned task
-      setSwimlaneId(defaultSwimlaneId || (defaultAssigneeId ? '' : (swimlanes[0]?.id || '')));
+      setSwimlaneId(defaultSwimlaneId || NO_PROJECT_VALUE);
       setAssigneeId(defaultAssigneeId || 'unassigned');
-      setColor('');
       
       if (defaultDate) {
-        const dateStr = defaultDate.toISOString().split('T')[0];
+        const dateStr = toLocalISODate(defaultDate);
         setStartDate(dateStr);
         const endDateObj = defaultEndDate || new Date(defaultDate);
         if (!defaultEndDate) {
           endDateObj.setDate(endDateObj.getDate() + 2);
         }
-        setEndDate(endDateObj.toISOString().split('T')[0]);
-        setSwimlaneOnly(false);
+        setEndDate(toLocalISODate(endDateObj));
       } else {
         setStartDate('');
         setEndDate('');
-        setSwimlaneOnly(true);
       }
     }
-  }, [task, defaultStatus, defaultDate, defaultEndDate, defaultSwimlaneId, defaultAssigneeId, swimlanes, isOpen]);
+  }, [task, defaultStatus, defaultDate, defaultEndDate, defaultSwimlaneId, defaultAssigneeId, isOpen]);
 
   const handleSave = () => {
     if (!title.trim()) return;
@@ -105,15 +101,17 @@ export function TaskDialog({
       title: title.trim(),
       status,
       notes: notes.trim(),
-      color: color || undefined,
-      swimlaneOnly,
-      swimlaneId: swimlaneOnly ? undefined : (swimlaneId || undefined),
+      swimlaneOnly: swimlaneId === NO_PROJECT_VALUE,
+      swimlaneId: swimlaneId === NO_PROJECT_VALUE ? undefined : swimlaneId,
       assigneeId: assigneeId === 'unassigned' ? undefined : assigneeId,
     };
 
-    if (!swimlaneOnly && startDate && endDate) {
+    if (swimlaneId !== NO_PROJECT_VALUE && startDate && endDate) {
       taskData.startDate = startDate;
       taskData.endDate = endDate;
+    } else {
+      taskData.startDate = undefined;
+      taskData.endDate = undefined;
     }
 
     onSave(taskData);
@@ -129,85 +127,66 @@ export function TaskDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>{task ? 'Edit Task' : 'Create Task'}</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="sm:max-w-[760px] rounded-2xl border-0 p-0">
+        <DialogHeader className="px-8 pt-8 pb-1">
+          <DialogTitle className="text-2xl font-semibold tracking-tight">
+            {task ? 'Edit Task' : 'Create Task'}
+          </DialogTitle>
+          <DialogDescription className="sr-only">
             {task ? 'Edit the task details below.' : 'Enter the task details below.'}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          {/* Title */}
-          <div className="space-y-2">
-            <Label htmlFor="title">Task Title</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter task title..."
-              autoFocus
-            />
-          </div>
+        <div className="space-y-6 px-8 py-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="title">Task Title</Label>
+              <Input
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder=""
+                autoFocus
+                className="h-11 rounded-xl border-0 bg-gray-100"
+              />
+            </div>
 
-          {/* Status */}
-          <div className="space-y-2">
-            <Label htmlFor="status">Status</Label>
-            <Select value={status} onValueChange={(value) => setStatus(value as TaskStatus)}>
-              <SelectTrigger id="status">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {statusColumns && statusColumns.length > 0 ? (
-                  statusColumns.map(col => (
-                    <SelectItem key={col.id} value={col.id}>
-                      {col.title}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <>
-                    <SelectItem value="open">Open</SelectItem>
-                    <SelectItem value="in-progress">In Progress</SelectItem>
-                    <SelectItem value="under-review">Under Review</SelectItem>
-                    <SelectItem value="done">Done</SelectItem>
-                  </>
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Color */}
-          <div className="space-y-2">
-            <Label htmlFor="color">Accent Color</Label>
-            <div className="flex items-center gap-2">
-              <input id="color" type="color" value={color || '#3b82f6'} onChange={(e) => setColor(e.target.value)} />
-              <Input id="color-hex" value={color} onChange={(e) => setColor(e.target.value)} placeholder="#aabbcc" />
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select value={status} onValueChange={(value) => setStatus(value as TaskStatus)}>
+                <SelectTrigger id="status" className="h-11 rounded-xl border-0 bg-gray-100 px-4">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusColumns && statusColumns.length > 0 ? (
+                    statusColumns.map(col => (
+                      <SelectItem key={col.id} value={col.id}>
+                        {col.title}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <>
+                      <SelectItem value="open">Open</SelectItem>
+                      <SelectItem value="in-progress">In Progress</SelectItem>
+                      <SelectItem value="under-review">Under Review</SelectItem>
+                      <SelectItem value="done">Done</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
-          {/* Timeline toggle */}
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="swimlaneOnly"
-              checked={swimlaneOnly}
-              onChange={(e) => setSwimlaneOnly(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300"
-            />
-            <Label htmlFor="swimlaneOnly" className="cursor-pointer">
-              Status columns only (no timeline)
-            </Label>
-          </div>
-
-          {/* Swimlane selection */}
-          {!swimlaneOnly && swimlanes.length > 0 && (
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="swimlane">Assign to Swimlane</Label>
               <Select value={swimlaneId} onValueChange={setSwimlaneId}>
-                <SelectTrigger id="swimlane">
-                  <SelectValue placeholder="Select swimlane" />
+                <SelectTrigger id="swimlane" className="relative h-11 rounded-xl border-0 bg-gray-100 pl-10 pr-10">
+                  <Briefcase className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-700" />
+                  <SelectValue placeholder="Select project" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value={NO_PROJECT_VALUE}>No project (Kanban only)</SelectItem>
                   {swimlanes.map(swimlane => (
                     <SelectItem key={swimlane.id} value={swimlane.id}>
                       {swimlane.name}
@@ -216,75 +195,92 @@ export function TaskDialog({
                 </SelectContent>
               </Select>
             </div>
-          )}
 
-          {/* Assignee selection */}
-          {people.length > 0 && (
-            <div className="space-y-2">
-              <Label htmlFor="assignee">Assign to Person (Optional)</Label>
-              <Select value={assigneeId} onValueChange={setAssigneeId}>
-                <SelectTrigger id="assignee">
-                  <SelectValue placeholder="Unassigned" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {people.map(person => (
-                    <SelectItem key={person.id} value={person.id}>
-                      {person.name} - {person.role}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+            {people.length > 0 && (
+              <div className="space-y-2">
+                <Label htmlFor="assignee">Assign to Person (Optional)</Label>
+                <Select value={assigneeId} onValueChange={setAssigneeId}>
+                  <SelectTrigger id="assignee" className="relative h-11 rounded-xl border-0 bg-gray-100 pl-10 pr-10">
+                    <User className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-700" />
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {people.map(person => (
+                      <SelectItem key={person.id} value={person.id}>
+                        {person.name} - {person.role}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
 
-          {/* Dates */}
-          {!swimlaneOnly && (
-            <div className="grid grid-cols-2 gap-4">
+          {swimlaneId !== NO_PROJECT_VALUE && (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="startDate">Start Date</Label>
-                <Input
-                  id="startDate"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                />
+                <div className="relative">
+                  <CalendarDays className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-700" />
+                  <Input
+                    id="startDate"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="h-11 rounded-xl border-0 bg-gray-100 pl-10 pr-4"
+                  />
+                </div>
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="endDate">End Date</Label>
-                <Input
-                  id="endDate"
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                />
+                <div className="relative">
+                  <CalendarDays className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-700" />
+                  <Input
+                    id="endDate"
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="h-11 rounded-xl border-0 bg-gray-100 pl-10 pr-4"
+                  />
+                </div>
               </div>
             </div>
           )}
 
-          {/* Notes */}
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes & Details</Label>
+            <div className="flex items-baseline justify-between">
+              <Label htmlFor="notes">Notes & Details</Label>
+              <p className="hidden text-base text-gray-500 md:block">
+                {task ? 'Edit the task details below.' : 'Enter the task details below.'}
+              </p>
+            </div>
             <Textarea
               id="notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add notes, details, or requirements..."
-              rows={4}
+              placeholder=""
+              className="min-h-[240px] rounded-xl border-0 bg-gray-100 p-4"
             />
           </div>
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="px-8 pb-8 pt-1">
           {task && onDelete && (
-            <Button variant="destructive" onClick={handleDelete} className="mr-auto">
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              className="mr-auto h-10 rounded-xl px-5"
+            >
               Delete
             </Button>
           )}
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={!title.trim()}>
+          <Button
+            onClick={handleSave}
+            disabled={!title.trim()}
+            className="h-10 rounded-xl bg-[#020329] px-5 hover:bg-[#020329]/90"
+          >
             {task ? 'Update' : 'Create'}
           </Button>
         </DialogFooter>

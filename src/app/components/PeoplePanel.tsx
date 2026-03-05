@@ -4,7 +4,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Plus, User, Trash2 } from 'lucide-react';
+import { Edit2, Plus, User, Trash2 } from 'lucide-react';
 
 interface PeoplePanelProps {
   isOpen: boolean;
@@ -13,6 +13,7 @@ interface PeoplePanelProps {
   tasks: Task[];
   statusColumns: Array<{ id: TaskStatus; title: string; color?: string }>;
   onAddPerson: (person: Omit<Person, 'id'>) => void;
+  onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role'>) => void;
   onDeletePerson: (personId: string) => void;
 }
 
@@ -23,11 +24,15 @@ export function PeoplePanel({
   tasks,
   statusColumns,
   onAddPerson,
+  onUpdatePerson,
   onDeletePerson,
 }: PeoplePanelProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [newRole, setNewRole] = useState('');
+  const [editingPersonId, setEditingPersonId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editRole, setEditRole] = useState('');
 
   function getTaskCountForPerson(personId: string, status?: TaskStatus): number {
     return tasks.filter(t => {
@@ -43,6 +48,27 @@ export function PeoplePanel({
     setNewName('');
     setNewRole('');
     setIsAdding(false);
+  }
+
+  function startEditPerson(person: Person) {
+    setEditingPersonId(person.id);
+    setEditName(person.name);
+    setEditRole(person.role);
+  }
+
+  function cancelEditPerson() {
+    setEditingPersonId(null);
+    setEditName('');
+    setEditRole('');
+  }
+
+  function saveEditedPerson(personId: string) {
+    if (!editName.trim()) return;
+    onUpdatePerson(personId, {
+      name: editName.trim(),
+      role: editRole.trim() || 'Team Member',
+    });
+    cancelEditPerson();
   }
 
   return (
@@ -94,6 +120,7 @@ export function PeoplePanel({
           <div className="space-y-3">
             {people.map(person => {
               const totalTasks = getTaskCountForPerson(person.id);
+              const isEditing = editingPersonId === person.id;
               
               return (
                 <div key={person.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
@@ -102,19 +129,57 @@ export function PeoplePanel({
                       <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
                         <User className="w-5 h-5 text-blue-600" />
                       </div>
-                      <div>
-                        <div className="font-medium">{person.name}</div>
-                        <div className="text-sm text-gray-500">{person.role}</div>
-                      </div>
+                      {isEditing ? (
+                        <div className="space-y-2">
+                          <Input
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            placeholder="Name"
+                            className="h-8"
+                          />
+                          <Input
+                            value={editRole}
+                            onChange={(e) => setEditRole(e.target.value)}
+                            placeholder="Role"
+                            className="h-8"
+                          />
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="font-medium">{person.name}</div>
+                          <div className="text-sm text-gray-500">{person.role}</div>
+                        </div>
+                      )}
                     </div>
-                    <Button
-                      onClick={() => onDeletePerson(person.id)}
-                      variant="ghost"
-                      size="sm"
-                      className="text-gray-400 hover:text-red-600"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      {isEditing ? (
+                        <>
+                          <Button onClick={() => saveEditedPerson(person.id)} size="sm">Save</Button>
+                          <Button onClick={cancelEditPerson} variant="outline" size="sm">Cancel</Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            onClick={() => startEditPerson(person)}
+                            variant="ghost"
+                            size="sm"
+                            className="text-gray-400 hover:text-gray-700"
+                            aria-label="Edit person"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            onClick={() => onDeletePerson(person.id)}
+                            variant="ghost"
+                            size="sm"
+                            className="text-gray-400 hover:text-red-600"
+                            aria-label="Delete person"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   {/* Task count by status */}

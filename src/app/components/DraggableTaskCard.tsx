@@ -10,9 +10,9 @@ interface DraggableTaskCardProps {
   task: Task;
   index: number;
   onTaskClick: (task: Task) => void;
+  onEditTask?: (task: Task) => void;
   onMoveTask: (taskId: string, newStatus: TaskStatus) => void;
   onReorderTask: (dragIndex: number, hoverIndex: number, status: TaskStatus) => void;
-  onRenameTask?: (taskId: string, newTitle: string) => void;
   swimlanes: Array<{ id: TaskStatus; title: string }>;
 }
 
@@ -27,9 +27,9 @@ export function DraggableTaskCard({
   task,
   index,
   onTaskClick,
+  onEditTask,
   onMoveTask,
   onReorderTask,
-  onRenameTask,
   swimlanes,
 }: DraggableTaskCardProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -88,7 +88,7 @@ export function DraggableTaskCard({
         color={task.color}
         project={task.project}
         onClick={() => onTaskClick(task)}
-        onRename={(newTitle) => onRenameTask && onRenameTask(task.id, newTitle)}
+        onEdit={onEditTask ? () => onEditTask(task) : undefined}
       />
     </div>
   );

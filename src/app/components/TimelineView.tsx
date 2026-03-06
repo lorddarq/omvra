@@ -109,6 +109,9 @@ export function TimelineView({
   const hasInitializedScrollRef = useRef<boolean>(false);
   const isScrollingRef = useRef<boolean>(false); // Flag to prevent feedback loops
   const scrollNotifyRafRef = useRef<number | null>(null);
+  const resizeUpdateRafRef = useRef<number | null>(null);
+  const pendingDateUpdateRef = useRef<{ taskId: string; startDate: string; endDate: string } | null>(null);
+  const pendingRevealDateRef = useRef<string | null>(null);
   const timelineVirtual = useVirtualizedTimeline(new Date());
 
   // State for task resizing
@@ -423,6 +426,20 @@ export function TimelineView({
     [dates]
   );
 
+  const queueTaskDateUpdate = useCallback((taskId: string, startDate: string, endDate: string) => {
+    pendingDateUpdateRef.current = { taskId, startDate, endDate };
+    if (resizeUpdateRafRef.current == null) {
+      resizeUpdateRafRef.current = requestAnimationFrame(() => {
+        const pending = pendingDateUpdateRef.current;
+        if (pending) {
+          onUpdateTaskDates(pending.taskId, pending.startDate, pending.endDate);
+        }
+        pendingDateUpdateRef.current = null;
+        resizeUpdateRafRef.current = null;
+      });
+    }
+  }, [onUpdateTaskDates]);
+
   // Handle left column resize
   const handleLeftResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -534,7 +551,7 @@ export function TimelineView({
           const newDate = new Date(dates[newIdx]);
           const newISO = toLocalISODate(newDate);
           if (newISO !== task.startDate) {
-            onUpdateTaskDates(task.id, newISO, task.endDate || '');
+            queueTaskDateUpdate(task.id, newISO, task.endDate || '');
           }
         }
       } else {
@@ -543,13 +560,22 @@ export function TimelineView({
           const newDate = new Date(dates[newIdx]);
           const newISO = toLocalISODate(newDate);
           if (newISO !== task.endDate) {
-            onUpdateTaskDates(task.id, task.startDate || '', newISO);
+            queueTaskDateUpdate(task.id, task.startDate || '', newISO);
           }
         }
       }
     };
 
     const handleMouseUp = () => {
+      if (resizeUpdateRafRef.current != null) {
+        cancelAnimationFrame(resizeUpdateRafRef.current);
+        resizeUpdateRafRef.current = null;
+      }
+      const pending = pendingDateUpdateRef.current;
+      if (pending) {
+        onUpdateTaskDates(pending.taskId, pending.startDate, pending.endDate);
+      }
+      pendingDateUpdateRef.current = null;
       setResizingTask(null);
       setIgnoreAddTaskUntil(Date.now() + 300);
     };
@@ -561,7 +587,7 @@ export function TimelineView({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [resizingTask, tasks, dates, dayWidths, onUpdateTaskDates, getVisibleIndexForDate]);
+  }, [resizingTask, tasks, dates, dayWidths, onUpdateTaskDates, getVisibleIndexForDate, queueTaskDateUpdate]);
 
   // Scroll to today
   const scrollToToday = useCallback((opts?: { smooth?: boolean }) => {
@@ -714,6 +740,30 @@ export function TimelineView({
       viewportWidth: rowsContainerRef.current.clientWidth,
     });
   }, [dayWidths.length, leftColWidth, showWeekends]);
+
+  useEffect(() => {
+    const pendingISO = pendingRevealDateRef.current;
+    if (!pendingISO || !rowsContainerRef.current || dates.length === 0 || dayWidths.length === 0) return;
+
+    const revealDate = new Date(pendingISO);
+    if (isNaN(revealDate.getTime())) {
+      pendingRevealDateRef.current = null;
+      return;
+    }
+
+    const idx = getVisibleIndexForDate(revealDate, 'start');
+    if (idx < 0) return;
+
+    const left = dayWidths.slice(0, idx).reduce((a, b) => a + b, 0);
+    const target = Math.max(0, left - rowsContainerRef.current.clientWidth * 0.25);
+    try {
+      rowsContainerRef.current.scrollTo({ left: target, behavior: 'smooth' });
+    } catch {
+      rowsContainerRef.current.scrollLeft = target;
+    }
+
+    pendingRevealDateRef.current = null;
+  }, [dates, dayWidths, getVisibleIndexForDate]);
 
   // Get task color helper with fallback for orphaned statuses
   const getTaskColor = useCallback(
@@ -936,6 +986,9 @@ export function TimelineView({
                           // Update the task in the state
                           onReorderTasks(tasks.map(t => (t.id === taskId ? updated : t)));
                         }
+                      }}
+                      onRevealDate={(dateISO) => {
+                        pendingRevealDateRef.current = dateISO;
                       }}
                       getTaskColor={getTaskColor}
                       handleResizeStart={(e, task, edge) => {

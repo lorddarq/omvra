@@ -30,6 +30,7 @@ interface DraggableSwimlaneRowProps {
   onEditSwimlane: (swimlane: TimelineSwimlane) => void;
   onMoveSwimlane: (dragIndex: number, hoverIndex: number) => void;
   onMoveTaskToSwimlane: (taskId: string, swimlaneId: string, newStartDate?: string, newEndDate?: string) => void;
+  onRevealDate?: (dateISO: string) => void;
   getTaskColor: (status: string) => { className?: string; style?: React.CSSProperties };
   handleResizeStart: (e: React.MouseEvent, task: Task, edge: 'start' | 'end') => void;
   resizingTaskId: string | null;
@@ -64,6 +65,7 @@ export function DraggableSwimlaneRow({
   onEditSwimlane,
   onMoveSwimlane,
   onMoveTaskToSwimlane,
+  onRevealDate,
   getTaskColor,
   handleResizeStart,
   resizingTaskId,
@@ -84,6 +86,42 @@ export function DraggableSwimlaneRow({
     () => allocateTasksToTracks(tasks),
     [tasks]
   );
+  const includesWeekends = useMemo(
+    () => dates.some(d => d.getDay() === 0 || d.getDay() === 6),
+    [dates]
+  );
+
+  const addTimelineDays = useCallback((baseDate: Date, deltaDays: number): Date => {
+    const next = new Date(baseDate);
+    if (deltaDays === 0) return next;
+
+    if (includesWeekends) {
+      next.setDate(next.getDate() + deltaDays);
+      return next;
+    }
+
+    const direction = deltaDays > 0 ? 1 : -1;
+    let remaining = Math.abs(deltaDays);
+    while (remaining > 0) {
+      next.setDate(next.getDate() + direction);
+      const day = next.getDay();
+      if (day !== 0 && day !== 6) remaining -= 1;
+    }
+    return next;
+  }, [includesWeekends]);
+
+  const getDateForDropIndex = useCallback((dayIdx: number): Date | null => {
+    if (dates.length === 0) return null;
+    if (dayIdx >= 0 && dayIdx < dates.length) return new Date(dates[dayIdx]);
+
+    if (dayIdx < 0) {
+      const steps = Math.abs(dayIdx);
+      return addTimelineDays(new Date(dates[0]), -steps);
+    }
+
+    const steps = dayIdx - (dates.length - 1);
+    return addTimelineDays(new Date(dates[dates.length - 1]), steps);
+  }, [dates, addTimelineDays]);
 
   const getVisibleIndexForDate = useCallback(
     (date: Date, mode: 'start' | 'end'): number => {
@@ -220,12 +258,6 @@ export function DraggableSwimlaneRow({
       // + scrollLeft = position within the entire scrolled content
       const localX = clientOffset.x - containerRect.left + scrollLeft;
 
-      // Validate localX is reasonable
-      if (localX < 0) {
-        onMoveTaskToSwimlane(task.id, swimlane.id);
-        return;
-      }
-
       // Compute prefix sums for day widths to find which day slot the drop is over
       const dayWidthsLocal = (dateWidths && dateWidths.length === dates.length) ? dateWidths : dates.map(() => 60);
       const prefix: number[] = [0];
@@ -235,27 +267,34 @@ export function DraggableSwimlaneRow({
 
       // Find which day index the drop position corresponds to
       let dayIdx = 0;
-      for (let i = 0; i < prefix.length - 1; i++) {
-        if (localX >= prefix[i] && localX < prefix[i + 1]) {
-          dayIdx = i;
-          // Snap to nearest day center
-          const dayCenter = prefix[i] + (dayWidthsLocal[i] ?? 60) / 2;
-          if (localX > dayCenter && i < prefix.length - 2) {
-            dayIdx = i + 1;
+      let isOutOfRangeDrop = false;
+      if (localX < 0 && dates.length > 0) {
+        const leftEdgeWidth = dayWidthsLocal[0] ?? 60;
+        const daysBeyondLeft = Math.max(1, Math.ceil(Math.abs(localX) / leftEdgeWidth));
+        dayIdx = -daysBeyondLeft;
+        isOutOfRangeDrop = true;
+      } else if (localX >= prefix[prefix.length - 1] && dates.length > 0) {
+        const rightEdgeWidth = dayWidthsLocal[dayWidthsLocal.length - 1] ?? 60;
+        const overflow = localX - prefix[prefix.length - 1];
+        const daysBeyondRight = Math.floor((overflow + rightEdgeWidth / 2) / rightEdgeWidth);
+        dayIdx = (dates.length - 1) + daysBeyondRight;
+        isOutOfRangeDrop = true;
+      } else {
+        for (let i = 0; i < prefix.length - 1; i++) {
+          if (localX >= prefix[i] && localX < prefix[i + 1]) {
+            dayIdx = i;
+            // Snap to nearest day center
+            const dayCenter = prefix[i] + (dayWidthsLocal[i] ?? 60) / 2;
+            if (localX > dayCenter && i < prefix.length - 2) {
+              dayIdx = i + 1;
+            }
+            break;
           }
-          break;
         }
       }
-      // Handle drops beyond last day
-      if (localX >= prefix[prefix.length - 1] && dates.length > 0) {
-        dayIdx = dates.length - 1;
-      }
-      
-      // Clamp dayIdx to valid range
-      dayIdx = Math.max(0, Math.min(dayIdx, Math.max(0, dates.length - 1)));
 
-      // If no valid dates, don't proceed with drop
-      if (dates.length === 0 || !dates[dayIdx]) {
+      const newStart = getDateForDropIndex(dayIdx);
+      if (!newStart) {
         onMoveTaskToSwimlane(task.id, swimlane.id);
         return;
       }
@@ -270,7 +309,6 @@ export function DraggableSwimlaneRow({
       }
 
       // Calculate new dates based on the dropped day index
-      const newStart = new Date(dates[dayIdx]);
       const newEnd = new Date(newStart);
       newEnd.setDate(newStart.getDate() + durationDays - 1);
 
@@ -278,6 +316,9 @@ export function DraggableSwimlaneRow({
       const newEndISO = toLocalISODate(newEnd);
 
       onMoveTaskToSwimlane(task.id, swimlane.id, newStartISO, newEndISO);
+      if (isOutOfRangeDrop) {
+        onRevealDate?.(newStartISO);
+      }
     },
     collect: (monitor) => {
       const offset = calculateDropPosition(monitor.getClientOffset());

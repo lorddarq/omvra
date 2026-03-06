@@ -3,7 +3,7 @@
 **Status:** Active  
 **Created:** 2026-02-03  
 **Last Updated:** 2026-03-06  
-**Progress:** 48/57 tasks complete (84%)  
+**Progress:** 51/57 tasks complete (89%)  
 **Action Items:**
 - ⚠️ Phase 3: Verify virtualization window extension (rapid scroll chains, seamless transitions)
 - ⚠️ Phase 4: Verify dynamic track heights and overlapping task rendering
@@ -82,7 +82,7 @@ Remaining work: benchmark/tune `WINDOW_CHUNK_SIZE` and `WINDOW_BUFFER_DAYS`, plu
 - [x] 4.4 Memoize track computation: `useCallback([tasks, dates])`
 - [x] 4.5 Update swimlane row height calculation: `baseHeight + (trackCount - 1) * trackHeight`
 - [x] 4.6 Update task drag/drop to preserve/reassign track after drop
-- [ ] 4.7 Throttle re-renders during drag via `rAF` (prevent layout thrash)
+- [x] 4.7 Throttle re-renders during drag via `rAF` (prevent layout thrash)
 - [ ] 4.8 Unit test: track allocation correctness (overlaps, single-day tasks, etc.)
 - [ ] 4.9 Test: Multiple overlapping tasks stack into tracks, height grows/shrinks
 
@@ -91,13 +91,13 @@ Remaining work: benchmark/tune `WINDOW_CHUNK_SIZE` and `WINDOW_BUFFER_DAYS`, plu
 - [x] 7.1 Implement Projects mode (use refactored swimlanes with tracks)
 - [x] 7.2 Scaffold People mode (placeholder structure)
 - [x] 7.3 Add Projects/People toggle within TimelineView
-- [ ] 7.4 Refine out-of-range drop extrapolation: use per-day widths at timeline edges ⚠️ **DEFERRED**
-- [ ] 7.5 Implement auto-scroll for newly created out-of-range tasks ⚠️ **DEFERRED**
+- [x] 7.4 Refine out-of-range drop extrapolation: use per-day widths at timeline edges
+- [x] 7.5 Implement auto-scroll for newly created out-of-range tasks
 - [x] 7.6 Add visual drop hints (drop line indicator during drag)
 - [ ] 7.7 Unit test: snapping behavior, out-of-range drop logic ⚠️ **DEFERRED TO PHASE 8**
 - [ ] 7.8 Test: Drag tasks out of range, auto-scroll + highlight works ⚠️ **DEFERRED TO PHASE 8**
 
-**NOTE:** Core mode toggle (7.1-7.3) implemented. Out-of-range features (7.4-7.8) deferred to Phase 8 (testing & edge cases).
+**NOTE:** Core mode toggle and out-of-range behavior (7.1-7.6) are implemented. Remaining work in this phase is test coverage and edge-case QA (7.7-7.8).
 
 ### Phase 8: Testing, Polish & Validation (Days 12–14)
 

@@ -55,6 +55,14 @@ export function TaskDetailsDialog({
   const taskLoadContribution = task && task.assigneeId
     ? getTaskLoadContributionPercent(task)
     : null;
+  const priorityLabel = task
+    ? ({
+        urgent: 'Urgent',
+        moderate: 'Moderate',
+        normal: 'Normal',
+        low: 'Low priority',
+      } as const)[task.priority || 'normal']
+    : '';
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -92,6 +100,10 @@ export function TaskDetailsDialog({
               <div>
                 <div className="text-xs uppercase tracking-wide text-gray-500">Complexity</div>
                 <div className="text-sm font-medium text-gray-900 capitalize">{task.complexity || 'medium'}</div>
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wide text-gray-500">Priority</div>
+                <div className="text-sm font-medium text-gray-900">{priorityLabel}</div>
               </div>
               <div>
                 <div className="text-xs uppercase tracking-wide text-gray-500">Blocked</div>

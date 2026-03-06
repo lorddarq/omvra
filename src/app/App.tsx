@@ -79,6 +79,7 @@ function App() {
         size: task.size || 'm',
         complexity: task.complexity || 'medium',
         blocked: Boolean(task.blocked),
+        priority: task.priority || 'normal',
       };
     });
   });
@@ -193,6 +194,7 @@ function App() {
         size: taskData.size || 'm',
         complexity: taskData.complexity || 'medium',
         blocked: Boolean(taskData.blocked),
+        priority: taskData.priority || 'normal',
         startDate: taskData.startDate,
         endDate: taskData.endDate,
         swimlaneOnly: taskData.swimlaneOnly,

@@ -112,6 +112,7 @@ export function TimelineView({
   const resizeUpdateRafRef = useRef<number | null>(null);
   const pendingDateUpdateRef = useRef<{ taskId: string; startDate: string; endDate: string } | null>(null);
   const pendingRevealDateRef = useRef<string | null>(null);
+  const pendingStartupTodayScrollRef = useRef<boolean>(false);
   const isHeaderScrubbingRef = useRef<boolean>(false);
   const scrubStartXRef = useRef<number>(0);
   const scrubStartScrollLeftRef = useRef<number>(0);
@@ -682,12 +683,21 @@ export function TimelineView({
       ) {
         rowsContainerRef.current.scrollLeft = initialScrollLeft;
       } else {
+        pendingStartupTodayScrollRef.current = true;
         scrollToToday({ smooth: false });
       }
     }, 100);
     
     return () => clearTimeout(timer);
   }, [scrollToToday, initialScrollLeft]);
+
+  // Apply one extra startup "today" scroll after timeline widths settle.
+  useEffect(() => {
+    if (!pendingStartupTodayScrollRef.current) return;
+    if (!rowsContainerRef.current || dayWidths.length === 0) return;
+    scrollToToday({ smooth: false });
+    pendingStartupTodayScrollRef.current = false;
+  }, [dayWidths.length, totalTimelineWidth, scrollToToday]);
 
   // Day-header hand scrubbing (click-drag to pan timeline horizontally)
   useEffect(() => {

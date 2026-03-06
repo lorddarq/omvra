@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Briefcase, CalendarDays, User } from 'lucide-react';
-import { Task, TaskStatus, TimelineSwimlane, Person, TaskSize, TaskComplexity } from '../types';
+import { Task, TaskStatus, TimelineSwimlane, Person, TaskSize, TaskComplexity, TaskPriority } from '../types';
 import { toLocalISODate } from '../utils/date';
 import {
   Dialog,
@@ -61,6 +61,7 @@ export function TaskDialog({
   const [notes, setNotes] = useState('');
   const [size, setSize] = useState<TaskSize>('m');
   const [complexity, setComplexity] = useState<TaskComplexity>('medium');
+  const [priority, setPriority] = useState<TaskPriority>('normal');
   const [blocked, setBlocked] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -81,6 +82,7 @@ export function TaskDialog({
       setNotes(task.notes || '');
       setSize(task.size || 'm');
       setComplexity(task.complexity || 'medium');
+      setPriority(task.priority || 'normal');
       setBlocked(Boolean(task.blocked));
       setStartDate(existingStart);
       setEndDate(existingEnd);
@@ -94,6 +96,7 @@ export function TaskDialog({
       setNotes('');
       setSize('m');
       setComplexity('medium');
+      setPriority('normal');
       setBlocked(false);
       setProjectIds(initialProjectIds);
       setSwimlaneId(defaultSwimlaneId || NO_TIMELINE_VALUE);
@@ -121,6 +124,7 @@ export function TaskDialog({
       notes: notes.trim(),
       size,
       complexity,
+      priority,
       blocked,
       projectIds,
       swimlaneOnly: projectIds.length === 0 || swimlaneId === NO_TIMELINE_VALUE,
@@ -228,6 +232,23 @@ export function TaskDialog({
               </Select>
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="task-priority">Priority</Label>
+              <Select value={priority} onValueChange={(value) => setPriority(value as TaskPriority)}>
+                <SelectTrigger id="task-priority" className="h-11 rounded-xl border-0 bg-gray-100 px-4">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="urgent">Urgent</SelectItem>
+                  <SelectItem value="moderate">Moderate</SelectItem>
+                  <SelectItem value="normal">Normal</SelectItem>
+                  <SelectItem value="low">Low priority</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className="flex items-end">
               <label className="flex items-center gap-2 rounded-xl bg-gray-100 px-3 py-2">
                 <input

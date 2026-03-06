@@ -1,19 +1,29 @@
 import React, { memo } from 'react';
 import { Badge } from './ui/badge';
+import { TaskPriority } from '../types';
+
+const PRIORITY_STYLES: Record<TaskPriority, { label: string; className: string }> = {
+  urgent: { label: 'Urgent', className: 'bg-red-500 text-white border-white/10' },
+  moderate: { label: 'Moderate', className: 'bg-orange-500 text-white border-white/10' },
+  normal: { label: 'Normal', className: 'bg-blue-500 text-white border-white/10' },
+  low: { label: 'Low', className: 'bg-green-500 text-white border-white/10' },
+};
 
 interface TaskCardProps {
   title: string;
   notes?: string;
   color?: string;
   project?: string;
+  priority?: TaskPriority;
   onClick?: () => void;
   onEdit?: () => void;
 }
 
-function TaskCardComponent({ title, notes, color, project, onClick, onEdit }: TaskCardProps) {
+function TaskCardComponent({ title, notes, color, project, priority = 'normal', onClick, onEdit }: TaskCardProps) {
   const projectLabels = project
     ? project.split(',').map(label => label.trim()).filter(Boolean)
     : [];
+  const priorityStyle = PRIORITY_STYLES[priority];
 
   return (
     <div
@@ -26,6 +36,11 @@ function TaskCardComponent({ title, notes, color, project, onClick, onEdit }: Ta
             <p className="text-base font-medium text-gray-900 w-full max-w-[304px] truncate-anywhere truncate-fade truncate-fade-horizontal">
               {title}
             </p>
+            <div className="mt-2">
+              <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${priorityStyle.className}`}>
+                {priorityStyle.label}
+              </span>
+            </div>
 
             {projectLabels.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1">

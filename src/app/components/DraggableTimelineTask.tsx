@@ -3,6 +3,12 @@ import { useDrag } from 'react-dnd';
 import { Task } from '../types';
 
 const TIMELINE_TASK_TYPE = 'TIMELINE_TASK';
+const PRIORITY_STYLES: Record<string, { label: string; className: string }> = {
+  urgent: { label: 'Urgent', className: 'bg-red-500/90 text-white' },
+  moderate: { label: 'Moderate', className: 'bg-orange-500/90 text-white' },
+  normal: { label: 'Normal', className: 'bg-blue-500/90 text-white' },
+  low: { label: 'Low', className: 'bg-green-500/90 text-white' },
+};
 
 interface DraggableTimelineTaskProps {
   task: Task;
@@ -59,7 +65,7 @@ export function DraggableTimelineTask({
   return (
     <div
       ref={ref}
-      className={`absolute h-8 rounded-md px-3 flex items-center justify-between shadow-sm cursor-pointer pointer-events-auto group/task ${textClass} text-xs transition-all ${
+      className={`absolute h-8 rounded-md px-3 flex items-center gap-2 shadow-sm cursor-pointer pointer-events-auto group/task ${textClass} text-xs transition-all ${
         resizingTaskId === task.id ? 'shadow-lg z-10' : ''
       } ${isDragging ? 'opacity-50' : ''}`}
       style={{
@@ -82,7 +88,14 @@ export function DraggableTimelineTask({
         <div className="w-0.5 h-4 bg-white/50 rounded"></div>
       </div>
 
-      <span className="truncate flex-1 text-center">{task.title}</span>
+      <span
+        className={`shrink-0 rounded-full border border-white/10 px-1.5 py-0.5 text-[10px] font-medium leading-none ${
+          PRIORITY_STYLES[task.priority || 'normal']?.className || PRIORITY_STYLES.normal.className
+        }`}
+      >
+        {PRIORITY_STYLES[task.priority || 'normal']?.label || PRIORITY_STYLES.normal.label}
+      </span>
+      <span className="truncate flex-1 text-left">{task.title}</span>
 
       {/* Right resize handle */}
       <div

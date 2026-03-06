@@ -87,6 +87,7 @@ export function DraggableTaskCard({
         notes={task.notes}
         color={task.color}
         project={task.project}
+        priority={task.priority}
         onClick={() => onTaskClick(task)}
         onEdit={onEditTask ? () => onEditTask(task) : undefined}
       />

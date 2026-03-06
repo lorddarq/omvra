@@ -1,6 +1,7 @@
 export type TaskStatus = 'open' | 'in-progress' | 'under-review' | 'done';
 export type TaskSize = 'xs' | 's' | 'm' | 'l';
 export type TaskComplexity = 'routine' | 'medium' | 'hard';
+export type TaskPriority = 'urgent' | 'moderate' | 'normal' | 'low';
 
 export interface Person {
   id: string;
@@ -21,6 +22,7 @@ export interface Task {
   size?: TaskSize;
   complexity?: TaskComplexity;
   blocked?: boolean;
+  priority?: TaskPriority;
   swimlaneOnly?: boolean; // Tasks that only appear in swimlanes
   swimlaneId?: string; // Which timeline swimlane row this task belongs to
   projectIds?: string[]; // Projects this task belongs to

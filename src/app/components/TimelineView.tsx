@@ -674,7 +674,12 @@ export function TimelineView({
 
     // Delay to ensure DOM is ready
     const timer = setTimeout(() => {
-      if (typeof initialScrollLeft === 'number' && rowsContainerRef.current) {
+      // On startup, default to today. Only restore if we have a meaningful saved offset.
+      if (
+        typeof initialScrollLeft === 'number' &&
+        initialScrollLeft > 0 &&
+        rowsContainerRef.current
+      ) {
         rowsContainerRef.current.scrollLeft = initialScrollLeft;
       } else {
         scrollToToday({ smooth: false });

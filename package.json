@@ -13,7 +13,7 @@
     "dev:pages": "vite --config pages/vite.config.ts",
     "build": "npm run build:renderer",
     "build:renderer": "vite build",
-    "build:electron": "electron-builder",
+    "build:electron": "node electron/scripts/build-electron-with-tag-version.cjs",
     "build:pages": "vite build --config pages/vite.config.ts",
     "predist": "npm run generate:icons",
     "dist": "npm run predist && npm run build:renderer && npm run build:electron",

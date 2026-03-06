@@ -30,6 +30,8 @@ npm run build
 npm run build:electron
 ```
 
+`build:electron` resolves app version from the latest git tag (for example `v0.1.3` -> `0.1.3`) and falls back to `package.json` version when no valid tag is found.
+
 ## Task UX (Current Behavior)
 
 - Clicking a task opens a **read-only Task Details dialog**.

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Badge } from './ui/badge';
 
 interface TaskCardProps {
@@ -10,7 +10,7 @@ interface TaskCardProps {
   onEdit?: () => void;
 }
 
-export function TaskCard({ title, notes, color, project, onClick, onEdit }: TaskCardProps) {
+function TaskCardComponent({ title, notes, color, project, onClick, onEdit }: TaskCardProps) {
   const projectLabels = project
     ? project.split(',').map(label => label.trim()).filter(Boolean)
     : [];
@@ -54,3 +54,5 @@ export function TaskCard({ title, notes, color, project, onClick, onEdit }: Task
     </div>
   );
 }
+
+export const TaskCard = memo(TaskCardComponent);

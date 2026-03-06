@@ -3,7 +3,7 @@
 **Status:** Active  
 **Created:** 2026-02-03  
 **Last Updated:** 2026-03-06  
-**Progress:** 47/57 tasks complete (82%)  
+**Progress:** 48/57 tasks complete (84%)  
 **Action Items:**
 - ⚠️ Phase 3: Verify virtualization window extension (rapid scroll chains, seamless transitions)
 - ⚠️ Phase 4: Verify dynamic track heights and overlapping task rendering
@@ -68,13 +68,11 @@
 - [x] 3.5 Update `TimelineHeader` to render only visible days + buffer
 - [x] 3.6 Update swimlane rows to render only visible days + buffer
 - [ ] 3.7 Benchmark `WINDOW_CHUNK_SIZE` and `WINDOW_BUFFER_DAYS` ⚠️ **ISSUE: Window indices don't match dates array**
-- [ ] 3.8 Test: Scroll left/right, window extends, rapid scroll chains ⚠️ **DISABLED—all dates shown instead**
-- [ ] 3.9 Performance benchmark: Target 60fps ⚠️ **DISABLED—virtualization off**
+- [ ] 3.8 Test: Scroll left/right, window extends, rapid scroll chains ⚠️ **IMPLEMENTED, QA PENDING**
+- [ ] 3.9 Performance benchmark: Target 60fps
 
-**CRITICAL ISSUE:** Window start/end indices initialized relative to "today" don't align with dates array which starts from min task date. Need to:
-1. Initialize window relative to min/max task dates, OR
-2. Use date-based windowing instead of index-based windowing
-Temporarily disabled virtualization (showing all dates) to restore task visibility. Must fix in Phase 8.
+**STATUS UPDATE:** Virtualization has been re-enabled using a date-driven month window + buffered rendering.
+Remaining work: benchmark/tune `WINDOW_CHUNK_SIZE` and `WINDOW_BUFFER_DAYS`, plus stress-test rapid extension chains.
 
 ### Phase 4: Dynamic Swimlane Tracks (Days 7–8) ✅
 
@@ -115,7 +113,7 @@ Temporarily disabled virtualization (showing all dates) to restore task visibili
 - [ ] 8.10 Performance profiling: 60fps scrolling with 500+ tasks, 50 swimlanes
 - [ ] 8.11 Performance profiling: 60fps kanban card scroll
 - [ ] 8.12 Performance profiling: < 100ms view switch + state restore
-- [ ] 8.13 Apply memoization: lazy-load kanban detail, `React.memo` task cards
+- [x] 8.13 Apply memoization: lazy-load kanban detail, `React.memo` task cards
 - [ ] 8.14 Pixel-perfect positioning audits (window extension edge cases)
 - [ ] 8.15 Accessibility audit (keyboard nav, ARIA labels)
 - [ ] 8.16 Cross-browser testing (Chrome, Firefox, Safari)

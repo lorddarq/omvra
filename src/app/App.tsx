@@ -251,9 +251,25 @@ function App() {
 
   const handleDeleteSwimlane = (swimlaneId: string) => {
     // Remove swimlane
-    setTimelineSwimlanes(prevSwimlanes => prevSwimlanes.filter(s => s.id !== swimlaneId));
-    // Update tasks to remove swimlane reference
-    setTasks(prevTasks => prevTasks.map(t => (t.swimlaneId === swimlaneId ? { ...t, swimlaneId: undefined } : t)));
+    const remainingSwimlanes = timelineSwimlanes.filter(s => s.id !== swimlaneId);
+    setTimelineSwimlanes(remainingSwimlanes);
+
+    // Update tasks to remove swimlane references and deleted project membership
+    setTasks(prevTasks => prevTasks.map(task => {
+      const nextProjectIds = (task.projectIds || []).filter(id => id !== swimlaneId);
+      const nextProject = nextProjectIds
+        .map(projectId => remainingSwimlanes.find(s => s.id === projectId)?.name)
+        .filter(Boolean)
+        .join(', ') || undefined;
+
+      return {
+        ...task,
+        swimlaneId: task.swimlaneId === swimlaneId ? undefined : task.swimlaneId,
+        projectIds: nextProjectIds,
+        project: nextProject,
+        swimlaneOnly: nextProjectIds.length === 0 || !task.swimlaneId || task.swimlaneId === swimlaneId,
+      };
+    }));
   };
 
   const handleCloseSwimlaneDialog = () => {

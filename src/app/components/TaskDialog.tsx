@@ -67,6 +67,7 @@ export function TaskDialog({
   const [projectIds, setProjectIds] = useState<string[]>([]);
   const [swimlaneId, setSwimlaneId] = useState(NO_TIMELINE_VALUE);
   const [assigneeId, setAssigneeId] = useState('unassigned');
+  const hasInvalidDateRange = Boolean(startDate && endDate && endDate < startDate);
 
   useEffect(() => {
     if (task) {
@@ -111,7 +112,7 @@ export function TaskDialog({
   }, [task, defaultStatus, defaultDate, defaultEndDate, defaultSwimlaneId, defaultAssigneeId, isOpen, todayISO]);
 
   const handleSave = () => {
-    if (!title.trim()) return;
+    if (!title.trim() || hasInvalidDateRange) return;
 
     const taskData: Partial<Task> = {
       ...(task && { id: task.id }),
@@ -334,7 +335,13 @@ export function TaskDialog({
                     id="startDate"
                     type="date"
                     value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
+                    onChange={(e) => {
+                      const nextStart = e.target.value;
+                      setStartDate(nextStart);
+                      if (endDate && nextStart && endDate < nextStart) {
+                        setEndDate(nextStart);
+                      }
+                    }}
                     className="h-11 rounded-xl border-0 bg-gray-100 pl-10 pr-4"
                   />
                 </div>
@@ -348,10 +355,21 @@ export function TaskDialog({
                     id="endDate"
                     type="date"
                     value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
+                    min={startDate || undefined}
+                    onChange={(e) => {
+                      const nextEnd = e.target.value;
+                      if (startDate && nextEnd && nextEnd < startDate) {
+                        setEndDate(startDate);
+                        return;
+                      }
+                      setEndDate(nextEnd);
+                    }}
                     className="h-11 rounded-xl border-0 bg-gray-100 pl-10 pr-4"
                   />
                 </div>
+                {hasInvalidDateRange && (
+                  <p className="text-xs text-red-600">End date cannot be earlier than start date.</p>
+                )}
               </div>
             </div>
           )}
@@ -385,7 +403,7 @@ export function TaskDialog({
           )}
           <Button
             onClick={handleSave}
-            disabled={!title.trim()}
+            disabled={!title.trim() || hasInvalidDateRange}
             className="h-10 rounded-xl bg-[#020329] px-5 hover:bg-[#020329]/90"
           >
             {task ? 'Update' : 'Create'}

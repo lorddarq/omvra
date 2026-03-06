@@ -12,12 +12,15 @@ const ITEM_TYPE = 'SWIMLANE_ROW';
 interface DraggableSwimlaneRowProps {
   swimlane: TimelineSwimlane;
   index: number;
+  mode?: 'projects' | 'people';
   tasks: Task[];
   dates: Date[];
   dateWidths?: number[]; // per-date widths computed by TimelineView
   monthKeys?: string[];
   monthWidths?: Record<string, number>;
   datesByMonth?: Record<string, Date[]>;
+  leadingSpacerWidth?: number;
+  trailingSpacerWidth?: number;
   totalTimelineWidth?: number;
   rowHeight?: number;
   scrollContainerRef?: React.RefObject<HTMLDivElement>; // Reference to the scrollable container for accurate drop calculations
@@ -27,7 +30,6 @@ interface DraggableSwimlaneRowProps {
   onEditSwimlane: (swimlane: TimelineSwimlane) => void;
   onMoveSwimlane: (dragIndex: number, hoverIndex: number) => void;
   onMoveTaskToSwimlane: (taskId: string, swimlaneId: string, newStartDate?: string, newEndDate?: string) => void;
-  getTaskPosition: (task: Task) => { left: number; width: number } | null;
   getTaskColor: (status: string) => { className?: string; style?: React.CSSProperties };
   handleResizeStart: (e: React.MouseEvent, task: Task, edge: 'start' | 'end') => void;
   resizingTaskId: string | null;
@@ -47,19 +49,21 @@ interface TaskDragItem {
 export function DraggableSwimlaneRow({
   swimlane,
   index,
+  mode = 'projects',
   tasks,
   dates,
   dateWidths,
   monthKeys,
   monthWidths,
   datesByMonth,
+  leadingSpacerWidth = 0,
+  trailingSpacerWidth = 0,
   totalTimelineWidth,
   onTaskClick,
   onAddTask,
   onEditSwimlane,
   onMoveSwimlane,
   onMoveTaskToSwimlane,
-  getTaskPosition,
   getTaskColor,
   handleResizeStart,
   resizingTaskId,
@@ -163,13 +167,13 @@ export function DraggableSwimlaneRow({
       if (startIdx >= 0 && startIdx < dates.length && endIdx >= 0 && endIdx < dates.length) {
         const startDate = dates[startIdx];
         const endDate = dates[endIdx];
-        onAddTask(startDate, swimlane.id, endDate, 'people');
+        onAddTask(startDate, swimlane.id, endDate, mode);
       }
     }
     setIsSelecting(false);
     setSelectionStart(null);
     setSelectionEnd(null);
-  }, [isSelecting, selectionStart, selectionEnd, dates, swimlane.id, onAddTask]);
+  }, [isSelecting, selectionStart, selectionEnd, dates, swimlane.id, onAddTask, mode]);
 
   // Global mouse up listener to end selection
   useEffect(() => {
@@ -374,7 +378,16 @@ export function DraggableSwimlaneRow({
               return { task, startIndex: s, endIndex: e };
             });
 
-            return (monthKeys ?? []).map((monthKey) => {
+            return (
+              <>
+                {leadingSpacerWidth > 0 && (
+                  <div
+                    className="month-leading-spacer flex-shrink-0"
+                    style={{ width: `${leadingSpacerWidth}px` }}
+                    aria-hidden
+                  />
+                )}
+                {(monthKeys ?? []).map((monthKey) => {
               const startIdx = monthStarts[monthKey] ?? 0;
               const len = datesByMonth?.[monthKey]?.length ?? 0;
               const monthLeft = prefix[startIdx];
@@ -500,7 +513,16 @@ export function DraggableSwimlaneRow({
                   </div>
                 </div>
               );
-            });
+            })}
+                {trailingSpacerWidth > 0 && (
+                  <div
+                    className="month-trailing-spacer flex-shrink-0"
+                    style={{ width: `${trailingSpacerWidth}px` }}
+                    aria-hidden
+                  />
+                )}
+              </>
+            );
           })()}
         </div>
       </div>

@@ -13,11 +13,15 @@ import React from 'react';
 
 interface TimelineHeaderProps {
   datesByMonth: Record<string, Date[]>;
+  monthKeys?: string[];
+  monthStartIndices?: Record<string, number>;
   monthWidths: Record<string, number>;
   dayWidths: number[];
   defaultDayWidth: number;
   totalTimelineWidth: number;
   endPadding: number;
+  leadingSpacerWidth?: number;
+  trailingSpacerWidth?: number;
   rowHeight: number;
   swimlaneCount: number;
   todayOffset?: number | null;
@@ -45,11 +49,15 @@ function isSameDate(a: Date, b: Date): boolean {
 
 export function TimelineHeader({
   datesByMonth,
+  monthKeys,
+  monthStartIndices,
   monthWidths,
   dayWidths,
   defaultDayWidth,
   totalTimelineWidth,
   endPadding,
+  leadingSpacerWidth = 0,
+  trailingSpacerWidth = 0,
   rowHeight,
   swimlaneCount,
   todayOffset,
@@ -58,12 +66,14 @@ export function TimelineHeader({
   onMonthResizeStart,
   onMonthReset,
 }: TimelineHeaderProps) {
-  // Ordered month keys
-  const monthKeysOrdered = Object.keys(datesByMonth).sort((a, b) => {
-    const ta = datesByMonth[a]?.[0]?.getTime() ?? 0;
-    const tb = datesByMonth[b]?.[0]?.getTime() ?? 0;
-    return ta - tb;
-  });
+  // Ordered month keys (from parent windowing if provided)
+  const monthKeysOrdered = monthKeys && monthKeys.length > 0
+    ? monthKeys
+    : Object.keys(datesByMonth).sort((a, b) => {
+        const ta = datesByMonth[a]?.[0]?.getTime() ?? 0;
+        const tb = datesByMonth[b]?.[0]?.getTime() ?? 0;
+        return ta - tb;
+      });
 
   // Compute month metadata with indices for day width lookup
   const monthMeta: { key: string; dates: Date[]; width: number; startIndex: number }[] = [];
@@ -71,7 +81,8 @@ export function TimelineHeader({
   monthKeysOrdered.forEach(k => {
     const md = datesByMonth[k] ?? [];
     const w = monthWidths[k] ?? md.length * defaultDayWidth;
-    monthMeta.push({ key: k, dates: md, width: w, startIndex: runningIndex });
+    const absoluteStart = monthStartIndices?.[k] ?? runningIndex;
+    monthMeta.push({ key: k, dates: md, width: w, startIndex: absoluteStart });
     runningIndex += md.length;
   });
 
@@ -92,6 +103,13 @@ export function TimelineHeader({
         {/* Month headers and day rows */}
         <div style={{ display: 'flex', width: '100%' }}>
           <div style={{ display: 'flex', width: '100%' }}>
+            {leadingSpacerWidth > 0 && (
+              <div
+                className="months-leading-spacer flex-shrink-0"
+                style={{ width: `${leadingSpacerWidth}px` }}
+                aria-hidden
+              />
+            )}
             {monthMeta.map(m => (
               <div
                 key={m.key}
@@ -181,7 +199,7 @@ export function TimelineHeader({
             {/* Trailing spacer */}
             <div
               className="months-end-spacer flex-shrink-0"
-              style={{ width: `${endPadding}px` }}
+              style={{ width: `${trailingSpacerWidth + endPadding}px` }}
               aria-hidden
             />
 

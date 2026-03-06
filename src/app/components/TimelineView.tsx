@@ -23,7 +23,6 @@ import { allocateTasksToTracks, calculateSwimlaneHeight } from '../utils/trackAl
 import { getReadableTextClassFor } from '../utils/contrast';
 import { toLocalISODate } from '../utils/date';
 import { useVirtualizedTimeline } from '../hooks/useVirtualizedTimeline';
-import { TIMELINE_CONFIG } from '../constants/timeline';
 
 const PAD_DAYS = 7;
 const DEFAULT_ROW_HEIGHT = 48;
@@ -31,6 +30,7 @@ const HEADER_HEIGHT = 72;
 const DEFAULT_DAY_WIDTH = 60;
 const MONTH_WIDTHS_KEY = 'plumy.monthWidths.v1';
 const LEFT_COL_WIDTH_KEY = 'plumy.leftColWidth.v1';
+const HORIZONTAL_RENDER_BUFFER_PX = 1200;
 
 interface TimelineViewProps {
   tasks: Task[];
@@ -82,6 +82,10 @@ export function TimelineView({
 
   // Weekend visibility toggle
   const [showWeekends, setShowWeekends] = useState<boolean>(true);
+  const [horizontalMetrics, setHorizontalMetrics] = useState<{ scrollLeft: number; viewportWidth: number }>({
+    scrollLeft: 0,
+    viewportWidth: 0,
+  });
 
   // Display swimlanes based on mode
   const displaySwimlanes = useMemo<TimelineSwimlane[]>(() => {
@@ -102,10 +106,10 @@ export function TimelineView({
   const rowsContainerRef = useRef<HTMLDivElement>(null);
   const leftListRef = useRef<HTMLDivElement>(null);
   const fixedBtnRef = useRef<HTMLDivElement>(null);
+  const hasInitializedScrollRef = useRef<boolean>(false);
   const isScrollingRef = useRef<boolean>(false); // Flag to prevent feedback loops
-
-  // Initialize virtualization with today as reference
-  const timeline = useVirtualizedTimeline();
+  const scrollNotifyRafRef = useRef<number | null>(null);
+  const timelineVirtual = useVirtualizedTimeline(new Date());
 
   // State for task resizing
   const [resizingTask, setResizingTask] = useState<{
@@ -119,8 +123,8 @@ export function TimelineView({
   // State for click suppression after resize
   const [ignoreAddTaskUntil, setIgnoreAddTaskUntil] = useState<number | null>(null);
 
-  // Calculate date range from tasks
-  const dates = useMemo(() => {
+  // Calculate full date range from tasks
+  const allDates = useMemo(() => {
     const now = new Date();
     const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
@@ -186,28 +190,29 @@ export function TimelineView({
     return arr;
   }, [tasks, showWeekends]);
 
-  // Calculate virtualized dates: only render window + buffer
-  // TODO: Fix virtualization window indexing (currently disabled to show all dates)
-  const virtualizedDates = useMemo(() => {
-    // For now, show all dates. Virtualization needs fixes to window index calculation.
-    return dates;
-  }, [dates]);
-
   // Group dates by month
-  const datesByMonth = useMemo(() => {
+  const allDatesByMonth = useMemo(() => {
     const m: Record<string, Date[]> = {};
-    virtualizedDates.forEach(date => {
+    allDates.forEach(date => {
       const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
       if (!m[monthKey]) m[monthKey] = [];
       m[monthKey].push(date);
     });
     return m;
-  }, [virtualizedDates]);
+  }, [allDates]);
+
+  const orderedMonthKeys = useMemo(() => (
+    Object.keys(allDatesByMonth).sort((a, b) => {
+      const ta = allDatesByMonth[a]?.[0]?.getTime() ?? 0;
+      const tb = allDatesByMonth[b]?.[0]?.getTime() ?? 0;
+      return ta - tb;
+    })
+  ), [allDatesByMonth]);
 
   // Initialize month widths
   const [monthWidths, setMonthWidths] = useState<Record<string, number>>(() => {
     const defaults: Record<string, number> = {};
-    Object.entries(datesByMonth).forEach(([k, monthDates]) => {
+    Object.entries(allDatesByMonth).forEach(([k, monthDates]) => {
       defaults[k] = monthDates.length * DEFAULT_DAY_WIDTH;
     });
     if (typeof window === 'undefined') return defaults;
@@ -222,9 +227,9 @@ export function TimelineView({
   });
 
   // Derive day widths
-  const [dayWidths, setDayWidths] = useState<number[]>(() => {
+  const [allDayWidths, setAllDayWidths] = useState<number[]>(() => {
     const arr: number[] = [];
-    Object.entries(datesByMonth).forEach(([k, monthDates]) => {
+    Object.entries(allDatesByMonth).forEach(([k, monthDates]) => {
       const perDay = monthWidths[k] ? monthWidths[k] / monthDates.length : DEFAULT_DAY_WIDTH;
       monthDates.forEach(() => arr.push(perDay));
     });
@@ -236,7 +241,7 @@ export function TimelineView({
     setMonthWidths(prev => {
       const next = { ...prev };
       let changed = false;
-      Object.entries(datesByMonth).forEach(([k, monthDates]) => {
+      Object.entries(allDatesByMonth).forEach(([k, monthDates]) => {
         if (!next[k]) {
           next[k] = monthDates.length * DEFAULT_DAY_WIDTH;
           changed = true;
@@ -244,7 +249,7 @@ export function TimelineView({
       });
       return changed ? next : prev;
     });
-  }, [datesByMonth]);
+  }, [allDatesByMonth]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -258,12 +263,79 @@ export function TimelineView({
 
   useEffect(() => {
     const arr: number[] = [];
-    Object.entries(datesByMonth).forEach(([k, monthDates]) => {
+    Object.entries(allDatesByMonth).forEach(([k, monthDates]) => {
       const perDay = monthWidths[k] ? monthWidths[k] / monthDates.length : DEFAULT_DAY_WIDTH;
       monthDates.forEach(() => arr.push(perDay));
     });
-    setDayWidths(arr);
-  }, [monthWidths, datesByMonth]);
+    setAllDayWidths(arr);
+  }, [monthWidths, allDatesByMonth]);
+
+  const monthMeta = useMemo(() => {
+    const entries = orderedMonthKeys.map(monthKey => ({
+      monthKey,
+      width: monthWidths[monthKey] ?? (allDatesByMonth[monthKey]?.length || 0) * DEFAULT_DAY_WIDTH,
+      dayCount: allDatesByMonth[monthKey]?.length || 0,
+    }));
+
+    let runningPx = 0;
+    let runningDayIndex = 0;
+    return entries.map(entry => {
+      const meta = {
+        ...entry,
+        startPx: runningPx,
+        endPx: runningPx + entry.width,
+        startDayIndex: runningDayIndex,
+      };
+      runningPx += entry.width;
+      runningDayIndex += entry.dayCount;
+      return meta;
+    });
+  }, [orderedMonthKeys, monthWidths, allDatesByMonth]);
+
+  const visibleMonthKeys = useMemo(() => {
+    if (monthMeta.length === 0) return orderedMonthKeys;
+    const viewportWidth = horizontalMetrics.viewportWidth || 0;
+    const left = Math.max(0, horizontalMetrics.scrollLeft - HORIZONTAL_RENDER_BUFFER_PX);
+    const right = horizontalMetrics.scrollLeft + viewportWidth + HORIZONTAL_RENDER_BUFFER_PX;
+    const keys = monthMeta
+      .filter(m => m.endPx >= left && m.startPx <= right)
+      .map(m => m.monthKey);
+    return keys.length > 0 ? keys : orderedMonthKeys;
+  }, [monthMeta, horizontalMetrics, orderedMonthKeys]);
+
+  const datesByMonth = useMemo(() => {
+    const subset: Record<string, Date[]> = {};
+    visibleMonthKeys.forEach(monthKey => {
+      subset[monthKey] = allDatesByMonth[monthKey] || [];
+    });
+    return subset;
+  }, [visibleMonthKeys, allDatesByMonth]);
+
+  const monthStartIndices = useMemo(() => {
+    const map: Record<string, number> = {};
+    monthMeta.forEach(m => {
+      map[m.monthKey] = m.startDayIndex;
+    });
+    return map;
+  }, [monthMeta]);
+
+  const leadingSpacerWidth = useMemo(() => {
+    if (visibleMonthKeys.length === 0 || monthMeta.length === 0) return 0;
+    const firstKey = visibleMonthKeys[0];
+    const first = monthMeta.find(m => m.monthKey === firstKey);
+    return first?.startPx ?? 0;
+  }, [visibleMonthKeys, monthMeta]);
+
+  const trailingSpacerWidth = useMemo(() => {
+    if (visibleMonthKeys.length === 0 || monthMeta.length === 0) return 0;
+    const lastKey = visibleMonthKeys[visibleMonthKeys.length - 1];
+    const last = monthMeta.find(m => m.monthKey === lastKey);
+    const totalWidth = monthMeta[monthMeta.length - 1].endPx;
+    return Math.max(0, totalWidth - (last?.endPx ?? totalWidth));
+  }, [visibleMonthKeys, monthMeta]);
+
+  const dates = allDates;
+  const dayWidths = allDayWidths;
 
   // Compute track assignments for each swimlane
   const swimlaneTrackAssignments = useMemo(() => {
@@ -316,8 +388,8 @@ export function TimelineView({
   }, []);
 
   const todayIndex = useMemo(() => {
-    return dates.findIndex(d => d.getTime() === today.getTime());
-  }, [dates, today]);
+    return allDates.findIndex(d => d.getTime() === today.getTime());
+  }, [allDates, today]);
 
   const todayOffset = useMemo(() => {
     if (todayIndex < 0) return null;
@@ -500,7 +572,7 @@ export function TimelineView({
     if (offset === null) {
       const todayDate = new Date();
       const todayOnly = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate());
-      const idx = dates.findIndex(d => d.getTime() === todayOnly.getTime());
+      const idx = allDates.findIndex(d => d.getTime() === todayOnly.getTime());
       if (idx >= 0) {
         offset = dayWidths.slice(0, idx).reduce((a, b) => a + b, 0);
       }
@@ -516,7 +588,7 @@ export function TimelineView({
     } catch (e) {
       rowsContainerRef.current.scrollLeft = offset;
     }
-  }, [todayOffset, dates, dayWidths, totalTimelineWidth]);
+  }, [todayOffset, allDates, dayWidths, totalTimelineWidth]);
 
   // Scroll handlers
   const handleScrollLeft = useCallback(() => {
@@ -530,14 +602,6 @@ export function TimelineView({
       rowsContainerRef.current.scrollBy({ left: 200, behavior: 'smooth' });
     }
   }, []);
-
-  // Virtualization scroll handler: detects edge proximity and extends window
-  const handleVirtualizedScroll = useCallback(() => {
-    if (!rowsContainerRef.current) return;
-    const scrollLeft = rowsContainerRef.current.scrollLeft;
-    const viewportWidth = rowsContainerRef.current.clientWidth;
-    timeline.handleScroll(scrollLeft, viewportWidth, rowsContainerRef);
-  }, [timeline]);
 
   // Sync scroll between header and rows container
   const handleHeaderScroll = useCallback(() => {
@@ -553,8 +617,11 @@ export function TimelineView({
     // No longer need horizontal sync since header is within rowsContainer
   }, []);
 
-  // Initialize scroll position to today on mount
+  // Initialize horizontal scroll only once per mount.
   useEffect(() => {
+    if (hasInitializedScrollRef.current) return;
+    hasInitializedScrollRef.current = true;
+
     // Delay to ensure DOM is ready
     const timer = setTimeout(() => {
       if (typeof initialScrollLeft === 'number' && rowsContainerRef.current) {
@@ -596,10 +663,27 @@ export function TimelineView({
     if (!leftListRef.current || !rowsContainerRef.current || isScrollingRef.current) return;
     isScrollingRef.current = true;
     leftListRef.current.scrollTop = rowsContainerRef.current.scrollTop;
-    onTimelineScroll?.({
-      scrollLeft: rowsContainerRef.current.scrollLeft,
-      scrollTop: rowsContainerRef.current.scrollTop,
-    });
+    if (scrollNotifyRafRef.current == null) {
+      scrollNotifyRafRef.current = requestAnimationFrame(() => {
+        if (rowsContainerRef.current) {
+          const nextMetrics = {
+            scrollLeft: rowsContainerRef.current.scrollLeft,
+            viewportWidth: rowsContainerRef.current.clientWidth,
+          };
+          setHorizontalMetrics(nextMetrics);
+          timelineVirtual.handleScroll(
+            nextMetrics.scrollLeft,
+            nextMetrics.viewportWidth,
+            rowsContainerRef
+          );
+          onTimelineScroll?.({
+            scrollLeft: nextMetrics.scrollLeft,
+            scrollTop: rowsContainerRef.current.scrollTop,
+          });
+        }
+        scrollNotifyRafRef.current = null;
+      });
+    }
     setTimeout(() => {
       isScrollingRef.current = false;
     }, 0);
@@ -614,38 +698,22 @@ export function TimelineView({
     leftEl.addEventListener('scroll', handleLeftScroll);
     rowsEl.addEventListener('scroll', handleRowsVerticalScroll);
     return () => {
+      if (scrollNotifyRafRef.current != null) {
+        cancelAnimationFrame(scrollNotifyRafRef.current);
+        scrollNotifyRafRef.current = null;
+      }
       leftEl.removeEventListener('scroll', handleLeftScroll);
       rowsEl.removeEventListener('scroll', handleRowsVerticalScroll);
     };
   }, [handleLeftScroll, handleRowsVerticalScroll]);
 
-  // Get task position helper
-  const getTaskPosition = useCallback(
-    (task: Task): { left: number; width: number } | null => {
-      if (!task.startDate) return null;
-
-      const sd = new Date(task.startDate);
-      const startDate = new Date(sd.getFullYear(), sd.getMonth(), sd.getDate());
-      const startIdx = getVisibleIndexForDate(startDate, 'start');
-      if (startIdx < 0) return null;
-
-      // Adjust position for window offset
-      const windowOffset = (timeline.windowStartIndex - Math.max(0, timeline.windowStartIndex)) * TIMELINE_CONFIG.DAY_SLOT_WIDTH;
-      const left = dayWidths.slice(0, startIdx).reduce((a, b) => a + b, 0) - windowOffset;
-      
-      let endDate = startDate;
-      if (task.endDate) {
-        const ed = new Date(task.endDate);
-        endDate = new Date(ed.getFullYear(), ed.getMonth(), ed.getDate());
-      }
-      const endIdx = getVisibleIndexForDate(endDate, 'end');
-      const endIdx2 = endIdx >= 0 ? endIdx : startIdx;
-      const width = dayWidths.slice(startIdx, endIdx2 + 1).reduce((a, b) => a + b, dayWidths[startIdx] || DEFAULT_DAY_WIDTH);
-
-      return { left, width };
-    },
-    [dates, dayWidths, timeline.windowStartIndex, getVisibleIndexForDate]
-  );
+  useEffect(() => {
+    if (!rowsContainerRef.current) return;
+    setHorizontalMetrics({
+      scrollLeft: rowsContainerRef.current.scrollLeft,
+      viewportWidth: rowsContainerRef.current.clientWidth,
+    });
+  }, [dayWidths.length, leftColWidth, showWeekends]);
 
   // Get task color helper with fallback for orphaned statuses
   const getTaskColor = useCallback(
@@ -788,11 +856,15 @@ export function TimelineView({
               <div className="timeline-header-container" style={{ height: 'fit-content', minHeight: `${HEADER_HEIGHT}px`, overflow: 'visible' }}>
               <TimelineHeader
                 datesByMonth={datesByMonth}
+                monthKeys={visibleMonthKeys}
+                monthStartIndices={monthStartIndices}
                 monthWidths={monthWidths}
                 dayWidths={dayWidths}
                 defaultDayWidth={DEFAULT_DAY_WIDTH}
                 totalTimelineWidth={totalTimelineWidth}
                 endPadding={endPadding}
+                leadingSpacerWidth={leadingSpacerWidth}
+                trailingSpacerWidth={trailingSpacerWidth}
                 rowHeight={DEFAULT_ROW_HEIGHT}
                 swimlaneCount={displaySwimlanes.length}
                 todayOffset={todayOffset}
@@ -833,12 +905,15 @@ export function TimelineView({
                     <DraggableSwimlaneRow
                       swimlane={swimlane}
                       index={idx}
+                      mode={mode}
                       tasks={swimlaneTasks}
                       dates={dates}
                       dateWidths={dayWidths}
-                      monthKeys={Object.keys(datesByMonth)}
+                      monthKeys={visibleMonthKeys}
                       monthWidths={monthWidths}
                       datesByMonth={datesByMonth}
+                      leadingSpacerWidth={leadingSpacerWidth}
+                      trailingSpacerWidth={trailingSpacerWidth + endPadding}
                       totalTimelineWidth={totalTimelineWidth}
                       rowHeight={height}
                       onTaskClick={onTaskClick}
@@ -862,7 +937,6 @@ export function TimelineView({
                           onReorderTasks(tasks.map(t => (t.id === taskId ? updated : t)));
                         }
                       }}
-                      getTaskPosition={getTaskPosition}
                       getTaskColor={getTaskColor}
                       handleResizeStart={(e, task, edge) => {
                         setResizingTask({

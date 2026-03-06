@@ -36,7 +36,7 @@ export function DraggableTimelineTask({
   drag(ref);
 
   const color = getTaskColor(task.status);
-  const textClass = color.textClass ?? 'text-white';
+  const textClass = color.className ?? color.textClass ?? 'text-white';
 
   function handleMouseDown(e: React.MouseEvent) {
     mouseDownPos.current = { x: e.clientX, y: e.clientY };
@@ -59,7 +59,7 @@ export function DraggableTimelineTask({
   return (
     <div
       ref={ref}
-      className={`absolute h-8 rounded-md px-3 flex items-center justify-between shadow-sm cursor-pointer pointer-events-auto group/task ${color.className ?? ''} ${textClass} text-xs transition-all ${
+      className={`absolute h-8 rounded-md px-3 flex items-center justify-between shadow-sm cursor-pointer pointer-events-auto group/task ${textClass} text-xs transition-all ${
         resizingTaskId === task.id ? 'shadow-lg z-10' : ''
       } ${isDragging ? 'opacity-50' : ''}`}
       style={{

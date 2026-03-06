@@ -17,6 +17,7 @@ const Footer = () => {
             <h4 className="text-sm font-medium text-nordic-gray-800 mb-4 uppercase tracking-wider">Product</h4>
             <ul className="space-y-3">
               <li><a href="#features" className="text-sm text-nordic-gray-600 hover:text-nordic-gray-800 font-light transition-colors">Features</a></li>
+              <li><a href="#best-for" className="text-sm text-nordic-gray-600 hover:text-nordic-gray-800 font-light transition-colors">Best For</a></li>
               <li><a href="#download" className="text-sm text-nordic-gray-600 hover:text-nordic-gray-800 font-light transition-colors">Download</a></li>
               <li><a href="#" className="text-sm text-nordic-gray-600 hover:text-nordic-gray-800 font-light transition-colors">Changelog</a></li>
             </ul>

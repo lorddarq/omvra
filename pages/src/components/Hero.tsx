@@ -10,6 +10,7 @@ const Hero = () => {
           </div>
           <div className="hidden md:flex space-x-12">
             <a href="#features" className="text-nordic-gray-600 hover:text-nordic-gray-800 transition-colors text-sm font-light">Features</a>
+            <a href="#best-for" className="text-nordic-gray-600 hover:text-nordic-gray-800 transition-colors text-sm font-light">Best For</a>
             <a href="#download" className="text-nordic-gray-600 hover:text-nordic-gray-800 transition-colors text-sm font-light">Download</a>
           </div>
         </div>
@@ -24,7 +25,7 @@ const Hero = () => {
             <span className="text-nordic-blue">simplified</span>
           </h1>
           <p className="text-xl md:text-2xl text-nordic-gray-600 font-light mb-16 leading-relaxed max-w-2xl mx-auto">
-            A free desktop application that brings clarity to your projects. Timeline and Kanban views. Local-first. No subscriptions.
+            A local-first desktop planner with Timeline and Kanban views, markdown task details, multi-project assignment, and people workload visibility.
           </p>
           <a
             href="#download"

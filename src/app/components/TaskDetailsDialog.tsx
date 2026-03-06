@@ -66,7 +66,7 @@ export function TaskDetailsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[680px]">
+      <DialogContent className="sm:max-w-170">
         <DialogHeader>
           <DialogTitle>{task?.title || 'Task details'}</DialogTitle>
           <DialogDescription>Review task details and markdown description.</DialogDescription>
@@ -74,22 +74,22 @@ export function TaskDetailsDialog({
 
         {task && (
           <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-3 rounded-md border bg-gray-50 p-3">
+            <div className="grid grid-cols-2 gap-3 rounded-md bg-gray-50 p-3">
               <div>
                 <div className="text-xs uppercase tracking-wide text-gray-500">Status</div>
-                <div className="text-sm font-medium text-gray-900">{statusLabel}</div>
+                <div className="text-xs font-medium text-gray-900">{statusLabel}</div>
               </div>
               <div>
                 <div className="text-xs uppercase tracking-wide text-gray-500">Primary Timeline Project</div>
-                <div className="text-sm font-medium text-gray-900">{primaryTimelineProject}</div>
+                <div className="text-xs font-medium text-gray-900">{primaryTimelineProject}</div>
               </div>
               <div>
                 <div className="text-xs uppercase tracking-wide text-gray-500">Assignee</div>
-                <div className="text-sm font-medium text-gray-900">{personLabel}</div>
+                <div className="text-xs font-medium text-gray-900">{personLabel}</div>
               </div>
               <div>
                 <div className="text-xs uppercase tracking-wide text-gray-500">Timeline</div>
-                <div className="text-sm font-medium text-gray-900">
+                <div className="text-xs font-medium text-gray-900">
                   {formatDate(task.startDate)} - {formatDate(task.endDate)}
                 </div>
               </div>
@@ -138,7 +138,7 @@ export function TaskDetailsDialog({
 
             <div className="space-y-2">
               <div className="text-sm font-semibold text-gray-900">Description</div>
-              <div className="max-h-[360px] overflow-y-auto rounded-md border bg-white p-4">
+              <div className="max-h-90 overflow-y-auto rounded-md border bg-white p-4">
                 {task.notes?.trim() ? (
                   <MarkdownContent content={task.notes} />
                 ) : (

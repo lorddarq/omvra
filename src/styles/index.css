@@ -3,6 +3,11 @@
 @import './theme.css';
 @import './components.css';
 
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 /* Hide native scrollbars for the timeline scroll area while keeping scrolling functional */
 .hide-scrollbar {
   -ms-overflow-style: none; /* IE and Edge */
@@ -36,6 +41,7 @@
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   overflow: hidden;
   overflow-wrap: anywhere;
   word-break: break-word;

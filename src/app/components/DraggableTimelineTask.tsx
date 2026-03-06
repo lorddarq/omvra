@@ -89,7 +89,7 @@ export function DraggableTimelineTask({
       </div>
 
       <span
-        className={`shrink-0 rounded-[4px] border border-white/10 w-3 h-3 ${
+        className={`shrink-0 rounded-xl outline-3 outline-white/25 w-3 h-3 ${
           PRIORITY_STYLES[task.priority || 'normal']?.className || PRIORITY_STYLES.normal.className
         }`}
       />

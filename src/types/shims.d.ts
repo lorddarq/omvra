@@ -1,5 +1,31 @@
 // Declarations for third-party modules without types used by the project
 
+// Asset imports
+declare module '*.svg' {
+  const content: string;
+  export default content;
+}
+
+declare module '*.png' {
+  const content: string;
+  export default content;
+}
+
+declare module '*.jpg' {
+  const content: string;
+  export default content;
+}
+
+declare module '*.jpeg' {
+  const content: string;
+  export default content;
+}
+
+declare module '*.gif' {
+  const content: string;
+  export default content;
+}
+
 declare module '@radix-ui/*';
 
 declare module '@radix-ui/react-*';

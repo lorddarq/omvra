@@ -355,7 +355,8 @@ function App() {
       <header className="bg-white border-b px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <img src={logo} alt="Plumy" className="h-7 w-auto" />
+            <img src={logo} alt="Plumy" className="h-10 w-auto antialiased" />
+            <p className="text-lg font-semibold">plumy</p>
           </div>
           {/* View Toggle */}
           <ViewToggle

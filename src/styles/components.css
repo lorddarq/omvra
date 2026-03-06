@@ -3,6 +3,11 @@
    ============================================================================ */
 
 /* Timeline View */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 .timeline-container {
   background-color: white;
   height: 100%;

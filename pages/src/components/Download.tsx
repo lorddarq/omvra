@@ -13,7 +13,7 @@ const Download = () => {
           <div className="flex flex-col items-center gap-6">
             <a 
               href="https://github.com/lorddarq/Plumy/releases/latest" 
-              className="inline-flex items-center gap-3 rounded-xl bg-gradient-to-r from-slate-900 to-indigo-700 px-8 py-4 text-lg font-medium text-white shadow-lg shadow-indigo-900/20 transition-all hover:from-slate-800 hover:to-indigo-600 hover:shadow-xl hover:shadow-indigo-900/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+              className="inline-flex items-center gap-3 rounded-xl bg-[linear-gradient(148deg,#323232_-9.84%,#151515_97.2%)] px-8 py-4 text-lg font-medium text-white shadow-lg shadow-black/30 transition-all hover:brightness-110 hover:shadow-xl hover:shadow-black/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />

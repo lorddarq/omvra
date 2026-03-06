@@ -32,7 +32,7 @@ interface TimelineHeaderProps {
 }
 
 function getMonthLabel(date: Date): string {
-  return date.toLocaleString('default', { month: 'short', year: '2-digit' });
+  return date.toLocaleString('default', { month: 'short', year: 'numeric' });
 }
 
 function getDayLabel(date: Date): string {

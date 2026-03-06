@@ -21,7 +21,7 @@ import { DraggableSwimlaneLabel } from './DraggableSwimlaneLabel';
 import { DraggableSwimlaneRow } from './DraggableSwimlaneRow';
 import { allocateTasksToTracks, calculateSwimlaneHeight } from '../utils/trackAllocation';
 import { getReadableTextClassFor } from '../utils/contrast';
-import { toLocalISODate } from '../utils/date';
+import { parseISODateLocal, toLocalISODate } from '../utils/date';
 
 const PAD_DAYS = 7;
 const DEFAULT_ROW_HEIGHT = 48;
@@ -112,11 +112,13 @@ export function TimelineView({
   const resizeUpdateRafRef = useRef<number | null>(null);
   const pendingDateUpdateRef = useRef<{ taskId: string; startDate: string; endDate: string } | null>(null);
   const pendingRevealDateRef = useRef<string | null>(null);
-  const pendingStartupTodayScrollRef = useRef<boolean>(false);
   const isHeaderScrubbingRef = useRef<boolean>(false);
   const scrubStartXRef = useRef<number>(0);
   const scrubStartScrollLeftRef = useRef<number>(0);
+  const startupScrollTimersRef = useRef<number[]>([]);
+  const startupScrollRafRef = useRef<number | null>(null);
   const [isHeaderScrubbing, setIsHeaderScrubbing] = useState(false);
+  const [needsStartupTodayScroll, setNeedsStartupTodayScroll] = useState(false);
 
   // State for task resizing
   const [resizingTask, setResizingTask] = useState<{
@@ -139,12 +141,12 @@ export function TimelineView({
       .flatMap(t => {
         const dates: Date[] = [];
         if (t.startDate) {
-          const d = new Date(t.startDate);
-          dates.push(new Date(d.getFullYear(), d.getMonth(), d.getDate()));
+          const d = parseISODateLocal(t.startDate);
+          if (d) dates.push(new Date(d.getFullYear(), d.getMonth(), d.getDate()));
         }
         if (t.endDate) {
-          const d = new Date(t.endDate);
-          dates.push(new Date(d.getFullYear(), d.getMonth(), d.getDate()));
+          const d = parseISODateLocal(t.endDate);
+          if (d) dates.push(new Date(d.getFullYear(), d.getMonth(), d.getDate()));
         }
         return dates;
       })
@@ -530,10 +532,13 @@ export function TimelineView({
       const task = tasks.find(t => t.id === resizingTask.taskId);
       if (!task) return;
 
-      const sd = new Date(task.startDate || '');
-      const startDate = new Date(sd.getFullYear(), sd.getMonth(), sd.getDate());
-      const ed = task.endDate ? new Date(task.endDate) : startDate;
-      const endDate = task.endDate ? new Date(ed.getFullYear(), ed.getMonth(), ed.getDate()) : startDate;
+      const parsedStart = parseISODateLocal(task.startDate);
+      if (!parsedStart) return;
+      const startDate = new Date(parsedStart.getFullYear(), parsedStart.getMonth(), parsedStart.getDate());
+      const parsedEnd = parseISODateLocal(task.endDate);
+      const endDate = parsedEnd
+        ? new Date(parsedEnd.getFullYear(), parsedEnd.getMonth(), parsedEnd.getDate())
+        : startDate;
       const startIdx = getVisibleIndexForDate(startDate, 'start');
       const endIdx = getVisibleIndexForDate(endDate, 'end');
 
@@ -607,7 +612,7 @@ export function TimelineView({
 
   // Scroll to today
   const scrollToToday = useCallback((opts?: { smooth?: boolean }) => {
-    if (!rowsContainerRef.current) return;
+    if (!rowsContainerRef.current) return 0;
     
     let offset = todayOffset;
     if (offset === null) {
@@ -632,13 +637,14 @@ export function TimelineView({
 
     const maxScrollLeft = Math.max(0, totalTimelineWidth - rowsContainerRef.current.clientWidth);
     offset = Math.max(0, Math.min(offset, maxScrollLeft));
-    
+
     // Use deterministic jump to avoid smooth-scroll drift while virtualization window updates.
     rowsContainerRef.current.scrollLeft = offset;
     setHorizontalMetrics({
       scrollLeft: offset,
       viewportWidth: rowsContainerRef.current.clientWidth,
     });
+    return offset;
   }, [todayOffset, allDates, dayWidths, totalTimelineWidth]);
 
   // Scroll handlers
@@ -668,36 +674,85 @@ export function TimelineView({
     // No longer need horizontal sync since header is within rowsContainer
   }, []);
 
-  // Initialize horizontal scroll only once per mount.
+  // Decide initial horizontal position only once per mount.
   useEffect(() => {
     if (hasInitializedScrollRef.current) return;
     hasInitializedScrollRef.current = true;
 
-    // Delay to ensure DOM is ready
-    const timer = setTimeout(() => {
-      // On startup, default to today. Only restore if we have a meaningful saved offset.
-      if (
-        typeof initialScrollLeft === 'number' &&
-        initialScrollLeft > 0 &&
-        rowsContainerRef.current
-      ) {
-        rowsContainerRef.current.scrollLeft = initialScrollLeft;
-      } else {
-        pendingStartupTodayScrollRef.current = true;
-        scrollToToday({ smooth: false });
-      }
-    }, 100);
-    
-    return () => clearTimeout(timer);
-  }, [scrollToToday, initialScrollLeft]);
+    // Restore saved view position only when it's meaningful; otherwise lock startup to today.
+    if (
+      typeof initialScrollLeft === 'number' &&
+      initialScrollLeft > 0 &&
+      rowsContainerRef.current
+    ) {
+      rowsContainerRef.current.scrollLeft = initialScrollLeft;
+      setHorizontalMetrics({
+        scrollLeft: initialScrollLeft,
+        viewportWidth: rowsContainerRef.current.clientWidth,
+      });
+      setNeedsStartupTodayScroll(false);
+    } else {
+      setNeedsStartupTodayScroll(true);
+    }
 
-  // Apply one extra startup "today" scroll after timeline widths settle.
+    return () => {
+      if (startupScrollRafRef.current != null) {
+        cancelAnimationFrame(startupScrollRafRef.current);
+        startupScrollRafRef.current = null;
+      }
+      startupScrollTimersRef.current.forEach(id => clearTimeout(id));
+      startupScrollTimersRef.current = [];
+    };
+  }, [initialScrollLeft]);
+
+  // Cold-start guard: keep nudging to Today until the timeline width/virtual window stabilizes.
   useEffect(() => {
-    if (!pendingStartupTodayScrollRef.current) return;
-    if (!rowsContainerRef.current || dayWidths.length === 0) return;
-    scrollToToday({ smooth: false });
-    pendingStartupTodayScrollRef.current = false;
-  }, [dayWidths.length, totalTimelineWidth, scrollToToday]);
+    if (!needsStartupTodayScroll) return;
+
+    let cancelled = false;
+    let attempts = 0;
+    let stableHits = 0;
+    const MAX_ATTEMPTS = 40; // ~4s with 100ms cadence
+
+    const applyTodayUntilStable = () => {
+      if (cancelled || !rowsContainerRef.current) return;
+
+      attempts += 1;
+      const target = scrollToToday({ smooth: false });
+      const actual = rowsContainerRef.current.scrollLeft;
+      const widthSettled = rowsContainerRef.current.scrollWidth > rowsContainerRef.current.clientWidth;
+      const aligned = Math.abs(actual - target) <= 1;
+      const canFinishAtZero = target <= 1 || !widthSettled;
+
+      if (aligned && (canFinishAtZero || actual > 1)) {
+        stableHits += 1;
+      } else {
+        stableHits = 0;
+      }
+
+      if (stableHits >= 2 || attempts >= MAX_ATTEMPTS) {
+        setNeedsStartupTodayScroll(false);
+        return;
+      }
+
+      const id = window.setTimeout(applyTodayUntilStable, 100);
+      startupScrollTimersRef.current.push(id);
+    };
+
+    startupScrollRafRef.current = requestAnimationFrame(() => {
+      applyTodayUntilStable();
+    });
+
+    return () => {
+      cancelled = true;
+      if (startupScrollRafRef.current != null) {
+        cancelAnimationFrame(startupScrollRafRef.current);
+        startupScrollRafRef.current = null;
+      }
+      startupScrollTimersRef.current.forEach(id => clearTimeout(id));
+      startupScrollTimersRef.current = [];
+    };
+  }, [needsStartupTodayScroll, scrollToToday, totalTimelineWidth, dayWidths.length, allDates.length]);
 
   // Day-header hand scrubbing (click-drag to pan timeline horizontally)
   useEffect(() => {
@@ -806,8 +861,8 @@ export function TimelineView({
     const pendingISO = pendingRevealDateRef.current;
     if (!pendingISO || !rowsContainerRef.current || dates.length === 0 || dayWidths.length === 0) return;
 
-    const revealDate = new Date(pendingISO);
-    if (isNaN(revealDate.getTime())) {
+    const revealDate = parseISODateLocal(pendingISO);
+    if (!revealDate || isNaN(revealDate.getTime())) {
       pendingRevealDateRef.current = null;
       return;
     }

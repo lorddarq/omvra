@@ -5,7 +5,7 @@ import { Task, TimelineSwimlane } from '../types';
 import { Button } from '../components/ui/button';
 import { DraggableTimelineTask, TIMELINE_TASK_TYPE } from '../components/DraggableTimelineTask';
 import { allocateTasksToTracks } from '../utils/trackAllocation';
-import { toLocalISODate } from '../utils/date';
+import { parseISODateLocal, toLocalISODate } from '../utils/date';
 
 const ITEM_TYPE = 'SWIMLANE_ROW';
 
@@ -301,8 +301,8 @@ export function DraggableSwimlaneRow({
 
       // Compute original task duration to preserve it
       const MS_PER_DAY = 1000 * 60 * 60 * 24;
-      const origStart = task.startDate ? new Date(task.startDate) : null;
-      const origEnd = task.endDate ? new Date(task.endDate) : null;
+      const origStart = parseISODateLocal(task.startDate);
+      const origEnd = parseISODateLocal(task.endDate);
       let durationDays = 1;
       if (origStart && origEnd) {
         durationDays = Math.floor((origEnd.getTime() - origStart.getTime()) / MS_PER_DAY) + 1;
@@ -412,9 +412,11 @@ export function DraggableSwimlaneRow({
 
             // Precompute task ranges
             const tasksRanges = timelineTasks.map(task => {
-              const s = task.startDate ? getVisibleIndexForDate(new Date(task.startDate), 'start') : -1;
+              const parsedStart = parseISODateLocal(task.startDate);
+              const s = parsedStart ? getVisibleIndexForDate(parsedStart, 'start') : -1;
+              const parsedEnd = parseISODateLocal(task.endDate);
               const e = task.endDate
-                ? getVisibleIndexForDate(new Date(task.endDate), 'end')
+                ? (parsedEnd ? getVisibleIndexForDate(parsedEnd, 'end') : s)
                 : s;
               return { task, startIndex: s, endIndex: e };
             });

@@ -3,11 +3,11 @@ import { useDrag } from 'react-dnd';
 import { Task } from '../types';
 
 const TIMELINE_TASK_TYPE = 'TIMELINE_TASK';
-const PRIORITY_STYLES: Record<string, { label: string; className: string }> = {
-  urgent: { label: 'Urgent', className: 'bg-red-500/90 text-white' },
-  moderate: { label: 'Moderate', className: 'bg-orange-500/90 text-white' },
-  normal: { label: 'Normal', className: 'bg-blue-500/90 text-white' },
-  low: { label: 'Low', className: 'bg-green-500/90 text-white' },
+const PRIORITY_STYLES: Record<string, { className: string }> = {
+  urgent: { className: 'bg-red-500/90' },
+  moderate: { className: 'bg-orange-500/90' },
+  normal: { className: 'bg-blue-500/90' },
+  low: { className: 'bg-green-500/90' },
 };
 
 interface DraggableTimelineTaskProps {
@@ -89,12 +89,10 @@ export function DraggableTimelineTask({
       </div>
 
       <span
-        className={`shrink-0 rounded-full border border-white/10 px-1.5 py-0.5 text-[10px] font-medium leading-none ${
+        className={`shrink-0 rounded-[4px] border border-white/10 w-3 h-3 ${
           PRIORITY_STYLES[task.priority || 'normal']?.className || PRIORITY_STYLES.normal.className
         }`}
-      >
-        {PRIORITY_STYLES[task.priority || 'normal']?.label || PRIORITY_STYLES.normal.label}
-      </span>
+      />
       <span className="truncate flex-1 text-left">{task.title}</span>
 
       {/* Right resize handle */}

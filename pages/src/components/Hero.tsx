@@ -11,6 +11,7 @@ const Hero = () => {
           <div className="hidden md:flex space-x-12">
             <a href="#features" className="text-nordic-gray-600 hover:text-nordic-gray-800 transition-colors text-sm font-light">Features</a>
             <a href="#best-for" className="text-nordic-gray-600 hover:text-nordic-gray-800 transition-colors text-sm font-light">Best For</a>
+            <a href="#privacy" className="text-nordic-gray-600 hover:text-nordic-gray-800 transition-colors text-sm font-light">Privacy</a>
             <a href="#download" className="text-nordic-gray-600 hover:text-nordic-gray-800 transition-colors text-sm font-light">Download</a>
           </div>
         </div>

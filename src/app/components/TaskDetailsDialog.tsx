@@ -9,6 +9,7 @@ import {
 } from '@/app/components/ui/dialog';
 import { Button } from '@/app/components/ui/button';
 import { MarkdownContent } from './MarkdownContent';
+import { getTaskLoadContributionPercent, getTaskLoadPoints, PERSON_CAPACITY_POINTS } from '../utils/taskLoad';
 
 interface TaskDetailsDialogProps {
   isOpen: boolean;
@@ -36,15 +37,24 @@ export function TaskDetailsDialog({
   people,
   statusColumns,
 }: TaskDetailsDialogProps) {
-  const swimlaneName = task?.swimlaneId
+  const primaryTimelineProject = task?.swimlaneId
     ? swimlanes.find(s => s.id === task.swimlaneId)?.name ?? 'Unknown swimlane'
-    : 'No swimlane';
+    : 'No timeline project';
+  const projectLabels = task?.projectIds?.length
+    ? task.projectIds
+        .map(projectId => swimlanes.find(s => s.id === projectId)?.name)
+        .filter((label): label is string => Boolean(label))
+    : [];
   const personLabel = task?.assigneeId
     ? people.find(p => p.id === task.assigneeId)?.name ?? 'Unknown assignee'
     : 'Unassigned';
   const statusLabel = task
     ? statusColumns.find(c => c.id === task.status)?.title ?? task.status
     : '';
+  const taskLoadPoints = task ? getTaskLoadPoints(task) : 0;
+  const taskLoadContribution = task && task.assigneeId
+    ? getTaskLoadContributionPercent(task)
+    : null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -62,8 +72,8 @@ export function TaskDetailsDialog({
                 <div className="text-sm font-medium text-gray-900">{statusLabel}</div>
               </div>
               <div>
-                <div className="text-xs uppercase tracking-wide text-gray-500">Swimlane</div>
-                <div className="text-sm font-medium text-gray-900">{swimlaneName}</div>
+                <div className="text-xs uppercase tracking-wide text-gray-500">Primary Timeline Project</div>
+                <div className="text-sm font-medium text-gray-900">{primaryTimelineProject}</div>
               </div>
               <div>
                 <div className="text-xs uppercase tracking-wide text-gray-500">Assignee</div>
@@ -75,6 +85,43 @@ export function TaskDetailsDialog({
                   {formatDate(task.startDate)} - {formatDate(task.endDate)}
                 </div>
               </div>
+              <div>
+                <div className="text-xs uppercase tracking-wide text-gray-500">Task Size</div>
+                <div className="text-sm font-medium text-gray-900">{(task.size || 'm').toUpperCase()}</div>
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wide text-gray-500">Complexity</div>
+                <div className="text-sm font-medium text-gray-900 capitalize">{task.complexity || 'medium'}</div>
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wide text-gray-500">Blocked</div>
+                <div className="text-sm font-medium text-gray-900">{task.blocked ? 'Yes' : 'No'}</div>
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wide text-gray-500">Load Points</div>
+                <div className="text-sm font-medium text-gray-900">{taskLoadPoints.toFixed(1)} / {PERSON_CAPACITY_POINTS}</div>
+              </div>
+              {taskLoadContribution !== null && (
+                <div className="col-span-2">
+                  <div className="text-xs uppercase tracking-wide text-gray-500">Person Load Contribution</div>
+                  <div className="text-sm font-medium text-gray-900">{taskLoadContribution}%</div>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2 rounded-md border bg-white p-4">
+              <div className="text-sm font-semibold text-gray-900">Projects</div>
+              {projectLabels.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {projectLabels.map(projectName => (
+                    <span key={projectName} className="rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700">
+                      {projectName}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500">No projects assigned.</div>
+              )}
             </div>
 
             <div className="space-y-2">

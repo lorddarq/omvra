@@ -225,6 +225,15 @@
   display: flex;
 }
 
+.timeline-day-scrub-handle {
+  cursor: grab;
+  user-select: none;
+}
+
+.timeline-header-container.scrubbing .timeline-day-scrub-handle {
+  cursor: grabbing;
+}
+
 .day-cell {
   display: flex;
   align-items: center;

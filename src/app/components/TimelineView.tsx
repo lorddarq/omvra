@@ -22,7 +22,6 @@ import { DraggableSwimlaneRow } from './DraggableSwimlaneRow';
 import { allocateTasksToTracks, calculateSwimlaneHeight } from '../utils/trackAllocation';
 import { getReadableTextClassFor } from '../utils/contrast';
 import { toLocalISODate } from '../utils/date';
-import { useVirtualizedTimeline } from '../hooks/useVirtualizedTimeline';
 
 const PAD_DAYS = 7;
 const DEFAULT_ROW_HEIGHT = 48;
@@ -31,6 +30,7 @@ const DEFAULT_DAY_WIDTH = 60;
 const MONTH_WIDTHS_KEY = 'plumy.monthWidths.v1';
 const LEFT_COL_WIDTH_KEY = 'plumy.leftColWidth.v1';
 const HORIZONTAL_RENDER_BUFFER_PX = 1200;
+const MIN_TOTAL_MONTHS = 12;
 
 interface TimelineViewProps {
   tasks: Task[];
@@ -112,7 +112,10 @@ export function TimelineView({
   const resizeUpdateRafRef = useRef<number | null>(null);
   const pendingDateUpdateRef = useRef<{ taskId: string; startDate: string; endDate: string } | null>(null);
   const pendingRevealDateRef = useRef<string | null>(null);
-  const timelineVirtual = useVirtualizedTimeline(new Date());
+  const isHeaderScrubbingRef = useRef<boolean>(false);
+  const scrubStartXRef = useRef<number>(0);
+  const scrubStartScrollLeftRef = useRef<number>(0);
+  const [isHeaderScrubbing, setIsHeaderScrubbing] = useState(false);
 
   // State for task resizing
   const [resizingTask, setResizingTask] = useState<{
@@ -130,19 +133,6 @@ export function TimelineView({
   const allDates = useMemo(() => {
     const now = new Date();
     const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
-    if (tasks.length === 0) {
-      // Return range including today and padding
-      const startDate = new Date(todayDate);
-      startDate.setDate(startDate.getDate() - PAD_DAYS);
-      const datesArr: Date[] = [];
-      for (let i = 0; i <= PAD_DAYS * 2; i++) {
-        const d = new Date(startDate);
-        d.setDate(d.getDate() + i);
-        datesArr.push(d);
-      }
-      return datesArr;
-    }
 
     const taskDates = tasks
       .flatMap(t => {
@@ -160,7 +150,19 @@ export function TimelineView({
       .filter(d => !isNaN(d.getTime()));
 
     if (taskDates.length === 0) {
-      return [new Date()];
+      const horizonMonth = new Date(todayDate.getFullYear(), todayDate.getMonth() + (MIN_TOTAL_MONTHS - 1), 1);
+      const start = new Date(todayDate.getFullYear(), todayDate.getMonth(), 1);
+      const end = new Date(horizonMonth.getFullYear(), horizonMonth.getMonth() + 1, 0);
+      const arr: Date[] = [];
+      const d = new Date(start);
+      while (d <= end) {
+        const dayOfWeek = d.getDay();
+        if (showWeekends || (dayOfWeek !== 0 && dayOfWeek !== 6)) {
+          arr.push(new Date(d));
+        }
+        d.setDate(d.getDate() + 1);
+      }
+      return arr;
     }
 
     const minDate = new Date(Math.min(...taskDates.map(d => d.getTime())));
@@ -178,6 +180,12 @@ export function TimelineView({
     const todayNoTime = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
     if (todayNoTime < start) start = new Date(todayNoTime.getFullYear(), todayNoTime.getMonth(), 1);
     if (todayNoTime > end) end = new Date(todayNoTime.getFullYear(), todayNoTime.getMonth() + 1, 0);
+
+    // Ensure at least a 12-month planning horizon (current month + next 11 months).
+    const minForwardEnd = new Date(todayNoTime.getFullYear(), todayNoTime.getMonth() + MIN_TOTAL_MONTHS, 0);
+    if (end < minForwardEnd) {
+      end = minForwardEnd;
+    }
 
     const arr: Date[] = [];
     const d = new Date(start);
@@ -391,7 +399,14 @@ export function TimelineView({
   }, []);
 
   const todayIndex = useMemo(() => {
-    return allDates.findIndex(d => d.getTime() === today.getTime());
+    if (allDates.length === 0) return -1;
+    const exactIdx = allDates.findIndex(d => d.getTime() === today.getTime());
+    if (exactIdx >= 0) return exactIdx;
+    // In 5-day mode, weekend "today" may be filtered out; use nearest visible day.
+    for (let i = 0; i < allDates.length; i++) {
+      if (allDates[i].getTime() >= today.getTime()) return i;
+    }
+    return allDates.length - 1;
   }, [allDates, today]);
 
   const todayOffset = useMemo(() => {
@@ -593,12 +608,17 @@ export function TimelineView({
   const scrollToToday = useCallback((opts?: { smooth?: boolean }) => {
     if (!rowsContainerRef.current) return;
     
-    // If todayOffset is null, compute it now
     let offset = todayOffset;
     if (offset === null) {
       const todayDate = new Date();
       const todayOnly = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate());
-      const idx = allDates.findIndex(d => d.getTime() === todayOnly.getTime());
+      let idx = allDates.findIndex(d => d.getTime() === todayOnly.getTime());
+      if (idx < 0) {
+        idx = allDates.findIndex(d => d.getTime() >= todayOnly.getTime());
+      }
+      if (idx < 0 && allDates.length > 0) {
+        idx = allDates.length - 1;
+      }
       if (idx >= 0) {
         offset = dayWidths.slice(0, idx).reduce((a, b) => a + b, 0);
       }
@@ -608,12 +628,16 @@ export function TimelineView({
       // Default to scrolling to middle of content
       offset = Math.max(0, (totalTimelineWidth - rowsContainerRef.current.clientWidth) / 2);
     }
+
+    const maxScrollLeft = Math.max(0, totalTimelineWidth - rowsContainerRef.current.clientWidth);
+    offset = Math.max(0, Math.min(offset, maxScrollLeft));
     
-    try {
-      rowsContainerRef.current.scrollTo({ left: offset, behavior: opts?.smooth ? 'smooth' : 'auto' });
-    } catch (e) {
-      rowsContainerRef.current.scrollLeft = offset;
-    }
+    // Use deterministic jump to avoid smooth-scroll drift while virtualization window updates.
+    rowsContainerRef.current.scrollLeft = offset;
+    setHorizontalMetrics({
+      scrollLeft: offset,
+      viewportWidth: rowsContainerRef.current.clientWidth,
+    });
   }, [todayOffset, allDates, dayWidths, totalTimelineWidth]);
 
   // Scroll handlers
@@ -660,6 +684,33 @@ export function TimelineView({
     return () => clearTimeout(timer);
   }, [scrollToToday, initialScrollLeft]);
 
+  // Day-header hand scrubbing (click-drag to pan timeline horizontally)
+  useEffect(() => {
+    const handleMove = (e: MouseEvent) => {
+      if (!isHeaderScrubbingRef.current || !rowsContainerRef.current) return;
+      const dx = e.clientX - scrubStartXRef.current;
+      rowsContainerRef.current.scrollLeft = scrubStartScrollLeftRef.current - dx;
+      setHorizontalMetrics({
+        scrollLeft: rowsContainerRef.current.scrollLeft,
+        viewportWidth: rowsContainerRef.current.clientWidth,
+      });
+      e.preventDefault();
+    };
+
+    const handleUp = () => {
+      if (!isHeaderScrubbingRef.current) return;
+      isHeaderScrubbingRef.current = false;
+      setIsHeaderScrubbing(false);
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+    };
+  }, []);
+
   // Swimlane reordering
   const handleMoveSwimlane = useCallback((dragIndex: number, hoverIndex: number) => {
     if (mode === 'people') {
@@ -697,11 +748,6 @@ export function TimelineView({
             viewportWidth: rowsContainerRef.current.clientWidth,
           };
           setHorizontalMetrics(nextMetrics);
-          timelineVirtual.handleScroll(
-            nextMetrics.scrollLeft,
-            nextMetrics.viewportWidth,
-            rowsContainerRef
-          );
           onTimelineScroll?.({
             scrollLeft: nextMetrics.scrollLeft,
             scrollTop: rowsContainerRef.current.scrollTop,
@@ -807,7 +853,7 @@ export function TimelineView({
           <button onClick={handleScrollLeft} className="timeline-toolbar-button">
             ◀
           </button>
-          <button onClick={() => scrollToToday({ smooth: true })} className="timeline-toolbar-button-primary">
+          <button onClick={() => scrollToToday({ smooth: false })} className="timeline-toolbar-button-primary">
             Today
           </button>
           <button onClick={handleScrollRight} className="timeline-toolbar-button">
@@ -903,7 +949,23 @@ export function TimelineView({
           <div ref={rowsContainerRef} className="timeline-right-column">
             <div className="timeline-grid-container" style={{ minWidth: `${totalTimelineWidth + endPadding}px` }}>
               {/* Header: months and days - sticky at top */}
-              <div className="timeline-header-container" style={{ height: 'fit-content', minHeight: `${HEADER_HEIGHT}px`, overflow: 'visible' }}>
+              <div
+                className={`timeline-header-container ${isHeaderScrubbing ? 'scrubbing' : ''}`}
+                style={{ height: 'fit-content', minHeight: `${HEADER_HEIGHT}px`, overflow: 'visible' }}
+                onMouseDown={(e) => {
+                  if (e.button !== 0 || !rowsContainerRef.current) return;
+                  const target = e.target as HTMLElement;
+                  const scrubZone = target.closest('.timeline-day-scrub-handle');
+                  const blockedTarget = target.closest('button, a, input, textarea, select, [role="separator"]');
+                  if (!scrubZone || blockedTarget) return;
+
+                  isHeaderScrubbingRef.current = true;
+                  setIsHeaderScrubbing(true);
+                  scrubStartXRef.current = e.clientX;
+                  scrubStartScrollLeftRef.current = rowsContainerRef.current.scrollLeft;
+                  e.preventDefault();
+                }}
+              >
               <TimelineHeader
                 datesByMonth={datesByMonth}
                 monthKeys={visibleMonthKeys}

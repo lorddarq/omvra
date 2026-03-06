@@ -137,7 +137,7 @@ export function TimelineHeader({
                 {/* Day row */}
                 <div
                   data-day-header
-                  className="day-row"
+                  className="day-row timeline-day-scrub-handle"
                   style={{ height: `${rowHeight}px` }}
                 >
                   {m.dates.map((d, i) => {

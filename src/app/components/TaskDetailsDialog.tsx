@@ -66,7 +66,7 @@ export function TaskDetailsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-170">
+      <DialogContent className="max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-[760px]">
         <DialogHeader>
           <DialogTitle>{task?.title || 'Task details'}</DialogTitle>
           <DialogDescription>Review task details and markdown description.</DialogDescription>
@@ -138,7 +138,7 @@ export function TaskDetailsDialog({
 
             <div className="space-y-2">
               <div className="text-sm font-semibold text-gray-900">Description</div>
-              <div className="max-h-90 overflow-y-auto rounded-md border bg-white p-4">
+              <div className="rounded-md border bg-white p-4">
                 {task.notes?.trim() ? (
                   <MarkdownContent content={task.notes} />
                 ) : (

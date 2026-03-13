@@ -81,6 +81,7 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
 interface SwimlanesViewProps {
   tasks: Task[];
   swimlanes: Array<{ id: TaskStatus; title: string; color?: string }>;
+  searchQuery?: string;
   onTaskClick: (task: Task) => void;
   onEditTask?: (task: Task) => void;
   onAddTask: (status: TaskStatus) => void;
@@ -95,6 +96,7 @@ interface SwimlanesViewProps {
 export function SwimlanesView({
   tasks,
   swimlanes,
+  searchQuery = '',
   onTaskClick,
   onEditTask,
   onAddTask,
@@ -106,11 +108,27 @@ export function SwimlanesView({
   onAddColumn,
   onDeleteColumn,
 }: SwimlanesViewProps) {
+  const trimmedSearch = searchQuery.trim().toLowerCase();
+  const isSearchActive = trimmedSearch.length > 0;
+
+  const matchesTaskSearch = (task: Task) => {
+    if (!isSearchActive) return true;
+    const haystack = `${task.title} ${task.notes || ''}`.toLowerCase();
+    return haystack.includes(trimmedSearch);
+  };
+
   const getTasksByStatus = (status: TaskStatus) => {
     return tasks.filter(task => task.status === status);
   };
 
+  const getVisibleTasksByStatus = (status: TaskStatus) => {
+    return getTasksByStatus(status).filter(matchesTaskSearch);
+  };
+
   const handleReorderTask = (dragIndex: number, hoverIndex: number, status: TaskStatus) => {
+    // Reordering while filtered can mismatch indices, so keep it disabled during search.
+    if (isSearchActive) return;
+
     const statusTasks = getTasksByStatus(status);
     const reorderedTasks = [...statusTasks];
     const [draggedTask] = reorderedTasks.splice(dragIndex, 1);
@@ -132,7 +150,7 @@ export function SwimlanesView({
       <div className="h-full bg-gray-50 p-6">
         <div className="flex gap-4 min-w-max h-full">
         {cols.map((swimlane, index) => {
-            const swimlaneTasks = getTasksByStatus(swimlane.id);
+            const swimlaneTasks = getVisibleTasksByStatus(swimlane.id);
             return (
               <ColumnDraggable
                 key={swimlane.id}

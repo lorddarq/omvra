@@ -8,10 +8,12 @@
  * Columns grow to fill available width or overflow-scroll if total width exceeds viewport.
  */
 
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import { Task, TaskStatus } from '../types';
 import { SwimlanesView } from './SwimlanesView';
 import { useViewState } from '../hooks/useViewState';
+import { Input } from './ui/input';
+import { Search } from 'lucide-react';
 
 interface KanbanViewProps {
   tasks: Task[];
@@ -45,6 +47,7 @@ export function KanbanView({
   // Get view state from context (assuming parent provides it)
   // For now, we'll manage scroll locally but expose it for view state preservation
   const containerRef = useRef<HTMLDivElement>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   /**
    * Handle scroll events and preserve scroll position in view state.
@@ -75,14 +78,27 @@ export function KanbanView({
   }, []);
 
   return (
-    <div
-      ref={containerRef}
-      onScroll={handleScroll}
-      className="h-full w-full overflow-x-auto overflow-y-auto bg-gray-50"
-    >
+    <div className="h-full w-full bg-gray-50 flex flex-col">
+      <div className="border-b bg-white px-4 py-3">
+        <div className="relative max-w-md">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search tasks by title or details..."
+            className="pl-9"
+          />
+        </div>
+      </div>
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="h-full w-full overflow-x-auto overflow-y-auto"
+      >
       <SwimlanesView
         tasks={tasks}
         swimlanes={swimlanes}
+        searchQuery={searchQuery}
         onTaskClick={onTaskClick}
         onEditTask={onEditTask}
         onAddTask={onAddTask}
@@ -94,6 +110,7 @@ export function KanbanView({
         onAddColumn={onAddColumn}
         onDeleteColumn={onDeleteColumn}
       />
+      </div>
     </div>
   );
 }

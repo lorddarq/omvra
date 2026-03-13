@@ -30,8 +30,11 @@ const Hero = () => {
           </p>
           <a
             href="#download"
-            className="inline-block px-12 py-4 bg-nordic-gray-800 text-white font-light text-lg rounded-lg hover:bg-nordic-gray-700 transition-colors"
+            className="inline-flex items-center gap-3 rounded-xl bg-[linear-gradient(148deg,#323232_-9.84%,#151515_97.2%)] px-8 py-4 text-lg font-medium text-white shadow-lg shadow-black/30 transition-all hover:brightness-110 hover:shadow-xl hover:shadow-black/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
           >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
             Download for macOS
           </a>
           <p className="mt-6 text-sm text-nordic-gray-500 font-light">

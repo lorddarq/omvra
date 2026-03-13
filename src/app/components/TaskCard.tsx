@@ -124,7 +124,14 @@ function TaskCardComponent({ title, notes, color, project, priority = 'normal', 
             {projectLabels.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {projectLabels.map(label => (
-                  <Badge key={label} variant="outline">{label}</Badge>
+                  <Badge
+                    key={label}
+                    variant="outline"
+                    className="max-w-[150px] justify-start overflow-hidden"
+                    title={label}
+                  >
+                    <span className="block truncate">{label}</span>
+                  </Badge>
                 ))}
               </div>
             ) : (

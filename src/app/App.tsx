@@ -32,17 +32,54 @@ function safeWriteJSON<T>(key: string, value: T) {
     // ignore
   }
 }
+
+function normalizeTask(task: Task, swimlanes: TimelineSwimlane[]): Task {
+  const projectIds = task.projectIds?.length
+    ? task.projectIds
+    : (task.swimlaneId ? [task.swimlaneId] : []);
+  const projectName = projectIds
+    .map(projectId => swimlanes.find(s => s.id === projectId)?.name)
+    .filter(Boolean)
+    .join(', ');
+
+  return {
+    ...task,
+    projectIds,
+    project: projectName || task.project,
+    size: task.size || 'm',
+    complexity: task.complexity || 'medium',
+    blocked: Boolean(task.blocked),
+    priority: task.priority || 'normal',
+  };
+}
 import { SwimlanesView } from './components/SwimlanesView';
 import { TaskDialog } from './components/TaskDialog';
 import { SwimlaneDialog } from './components/SwimlaneDialog';
 import { PeoplePanel } from './components/PeoplePanel';
+import { PreferencesPanel } from './components/PreferencesPanel';
 import { TaskDetailsDialog } from './components/TaskDetailsDialog';
 import logo from './images/logo.svg';
 import { Button } from './components/ui/button';
-import { Menu, Plus, Bell, CheckCircle, User } from 'lucide-react';
+import { Settings, User } from 'lucide-react';
 import { swimlanes as defaultSwimlanes } from './constants/swimlanes';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
+
+const PREFERENCES_KEY = 'plumy.preferences.v1';
+
+interface AppPreferences {
+  executionLoadStatusId: TaskStatus;
+  pipelineLoadStatusId: TaskStatus;
+}
+
+function getDefaultStatusId(
+  columns: Array<{ id: TaskStatus; title: string; color?: string }>,
+  preferred: TaskStatus
+): TaskStatus {
+  const preferredCol = columns.find(col => col.id === preferred);
+  if (preferredCol) return preferredCol.id;
+  return columns[0]?.id || preferred;
+}
 
 function App() {
   // Initialize hooks for view management
@@ -61,27 +98,9 @@ function App() {
   const [tasks, setTasks] = useState<Task[]>(() => {
     const stored = safeReadJSON<Task[]>(TASKS_KEY, initialTasks);
     const swimlanes = safeReadJSON<TimelineSwimlane[]>(SWIMLANES_KEY, initialTimelineSwimlanes);
-    
-    // Migrate: Ensure project names and multi-project ids are present.
-    return stored.map(task => {
-      const projectIds = task.projectIds?.length
-        ? task.projectIds
-        : (task.swimlaneId ? [task.swimlaneId] : []);
-      const projectName = projectIds
-        .map(projectId => swimlanes.find(s => s.id === projectId)?.name)
-        .filter(Boolean)
-        .join(', ');
 
-      return {
-        ...task,
-        projectIds,
-        project: projectName || task.project,
-        size: task.size || 'm',
-        complexity: task.complexity || 'medium',
-        blocked: Boolean(task.blocked),
-        priority: task.priority || 'normal',
-      };
-    });
+    // Migrate: Ensure project names and multi-project ids are present.
+    return stored.map(task => normalizeTask(task, swimlanes));
   });
   
   const [timelineSwimlanes, setTimelineSwimlanes] = useState<TimelineSwimlane[]>(() => {
@@ -108,8 +127,19 @@ function App() {
   // Status columns (swimlane columns for the kanban view) — persisted separately
   const STATUS_COLUMNS_KEY = 'plumy.statusColumns.v1';
   const [statusColumns, setStatusColumns] = useState(() => safeReadJSON(STATUS_COLUMNS_KEY, defaultSwimlanes));
+  const [preferences, setPreferences] = useState<AppPreferences>(() => {
+    const stored = safeReadJSON<Partial<AppPreferences>>(PREFERENCES_KEY, {});
+    const executionDefault = getDefaultStatusId(defaultSwimlanes, 'in-progress');
+    const pipelineDefault = getDefaultStatusId(defaultSwimlanes, 'open');
+
+    return {
+      executionLoadStatusId: stored.executionLoadStatusId || executionDefault,
+      pipelineLoadStatusId: stored.pipelineLoadStatusId || pipelineDefault,
+    };
+  });
 
   useEffect(() => { safeWriteJSON(STATUS_COLUMNS_KEY, statusColumns); }, [statusColumns]);
+  useEffect(() => { safeWriteJSON(PREFERENCES_KEY, preferences); }, [preferences]);
 
   // Persist tasks and swimlanes to localStorage whenever they change
   useEffect(() => {
@@ -128,6 +158,7 @@ function App() {
   const [isTaskDetailsOpen, setIsTaskDetailsOpen] = useState(false);
   const [isSwimlaneDialogOpen, setIsSwimlaneDialogOpen] = useState(false);
   const [isPeoplePanelOpen, setIsPeoplePanelOpen] = useState(false);
+  const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [detailsTaskId, setDetailsTaskId] = useState<string | null>(null);
   const [selectedSwimlane, setSelectedSwimlane] = useState<TimelineSwimlane | null>(null);
@@ -351,6 +382,115 @@ function App() {
     setStatusColumns((cols: any[]) => cols.filter(c => c.id !== colId));
   };
 
+  const handleNukeLocalData = () => {
+    if (typeof window === 'undefined') return;
+    const confirmed = window.confirm(
+      'This will clear local storage data for this app and reset your workspace. Continue?'
+    );
+    if (!confirmed) return;
+
+    try {
+      window.localStorage.clear();
+    } catch (err) {
+      // ignore
+    }
+
+    setTasks([]);
+    setTimelineSwimlanes([]);
+    setPeople([]);
+    setStatusColumns(defaultSwimlanes);
+    setPreferences({
+      executionLoadStatusId: getDefaultStatusId(defaultSwimlanes, 'in-progress'),
+      pipelineLoadStatusId: getDefaultStatusId(defaultSwimlanes, 'open'),
+    });
+  };
+
+  const handleExportTasksAndProjects = () => {
+    if (typeof window === 'undefined') return;
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      tasks,
+      projects: timelineSwimlanes,
+      people,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.download = `plumy-backup-${dateStamp}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleImportTasksAndProjects = async (file: File) => {
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as {
+        tasks?: Task[];
+        projects?: TimelineSwimlane[];
+        people?: Person[];
+      };
+
+      if (!Array.isArray(parsed.tasks) || !Array.isArray(parsed.projects)) {
+        window.alert('Invalid backup format. Expected "tasks" and "projects" arrays.');
+        return;
+      }
+
+      const importedProjects = parsed.projects
+        .filter(project => project && typeof project.id === 'string' && typeof project.name === 'string')
+        .map(project => ({
+          id: project.id,
+          name: project.name,
+          color: project.color || '#3b82f6',
+          subtitle: project.subtitle,
+        }));
+
+      const importedTasks = parsed.tasks
+        .filter(task => task && typeof task.id === 'string' && typeof task.title === 'string')
+        .map(task => normalizeTask(task, importedProjects));
+
+      const importedPeople = Array.isArray(parsed.people)
+        ? parsed.people
+            .filter(person => person && typeof person.id === 'string' && typeof person.name === 'string')
+            .map(person => ({
+              ...person,
+              role: person.role || 'Team Member',
+            }))
+        : people;
+
+      setTimelineSwimlanes(importedProjects);
+      setTasks(importedTasks);
+      setPeople(importedPeople);
+    } catch (err) {
+      window.alert('Could not import backup. Please select a valid JSON export file.');
+    }
+  };
+
+  useEffect(() => {
+    setPreferences(prev => {
+      const nextExecution = statusColumns.some(col => col.id === prev.executionLoadStatusId)
+        ? prev.executionLoadStatusId
+        : getDefaultStatusId(statusColumns, 'in-progress');
+      const nextPipeline = statusColumns.some(col => col.id === prev.pipelineLoadStatusId)
+        ? prev.pipelineLoadStatusId
+        : getDefaultStatusId(statusColumns, 'open');
+
+      if (nextExecution === prev.executionLoadStatusId && nextPipeline === prev.pipelineLoadStatusId) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        executionLoadStatusId: nextExecution,
+        pipelineLoadStatusId: nextPipeline,
+      };
+    });
+  }, [statusColumns]);
+
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header */}
@@ -394,8 +534,8 @@ function App() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon">
-            <CheckCircle className="w-5 h-5" />
+          <Button variant="ghost" size="icon" onClick={() => setIsPreferencesOpen(true)}>
+            <Settings className="w-5 h-5" />
           </Button>
           <Button variant="ghost" size="icon" onClick={() => setIsPeoplePanelOpen(true)}>
             <User className="w-5 h-5" />
@@ -496,9 +636,29 @@ function App() {
         people={people}
         tasks={tasks}
         statusColumns={statusColumns}
+        executionLoadStatusId={preferences.executionLoadStatusId}
+        pipelineLoadStatusId={preferences.pipelineLoadStatusId}
         onAddPerson={handleAddPerson}
         onUpdatePerson={handleUpdatePerson}
         onDeletePerson={handleDeletePerson}
+      />
+
+      {/* Preferences Panel */}
+      <PreferencesPanel
+        isOpen={isPreferencesOpen}
+        onClose={() => setIsPreferencesOpen(false)}
+        statusColumns={statusColumns}
+        executionLoadStatusId={preferences.executionLoadStatusId}
+        pipelineLoadStatusId={preferences.pipelineLoadStatusId}
+        onNukeLocalData={handleNukeLocalData}
+        onExportTasksAndProjects={handleExportTasksAndProjects}
+        onImportTasksAndProjects={handleImportTasksAndProjects}
+        onExecutionLoadStatusChange={(statusId) =>
+          setPreferences(prev => ({ ...prev, executionLoadStatusId: statusId }))
+        }
+        onPipelineLoadStatusChange={(statusId) =>
+          setPreferences(prev => ({ ...prev, pipelineLoadStatusId: statusId }))
+        }
       />
     </div>
   );

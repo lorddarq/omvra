@@ -5,7 +5,8 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Edit2, Plus, User, Trash2 } from 'lucide-react';
-import { getTaskLoadPoints, PERSON_CAPACITY_POINTS } from '../utils/taskLoad';
+import { getLoadPercentageForTasks } from '../utils/taskLoad';
+import { getReadableTextClassFor } from '../utils/contrast';
 
 interface PeoplePanelProps {
   isOpen: boolean;
@@ -13,6 +14,8 @@ interface PeoplePanelProps {
   people: Person[];
   tasks: Task[];
   statusColumns: Array<{ id: TaskStatus; title: string; color?: string }>;
+  executionLoadStatusId: TaskStatus;
+  pipelineLoadStatusId: TaskStatus;
   onAddPerson: (person: Omit<Person, 'id'>) => void;
   onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role'>) => void;
   onDeletePerson: (personId: string) => void;
@@ -24,6 +27,8 @@ export function PeoplePanel({
   people,
   tasks,
   statusColumns,
+  executionLoadStatusId,
+  pipelineLoadStatusId,
   onAddPerson,
   onUpdatePerson,
   onDeletePerson,
@@ -43,10 +48,9 @@ export function PeoplePanel({
     }).length;
   }
 
-  function getLoadPercentageForPerson(personId: string): number {
-    const personTasks = tasks.filter(t => t.assigneeId === personId);
-    const totalLoad = personTasks.reduce((sum, task) => sum + getTaskLoadPoints(task), 0);
-    return Math.round((totalLoad / PERSON_CAPACITY_POINTS) * 100);
+  function getLoadPercentageForPerson(personId: string, statusId: TaskStatus): number {
+    const personTasks = tasks.filter(t => t.assigneeId === personId && t.status === statusId);
+    return getLoadPercentageForTasks(personTasks);
   }
 
   function handleAddPerson() {
@@ -128,11 +132,18 @@ export function PeoplePanel({
             {people.map(person => {
               const totalTasks = getTaskCountForPerson(person.id);
               const isEditing = editingPersonId === person.id;
-              const loadPercentage = getLoadPercentageForPerson(person.id);
-              const loadColorClass =
-                loadPercentage > 120
+              const executionLoadPercentage = getLoadPercentageForPerson(person.id, executionLoadStatusId);
+              const pipelineLoadPercentage = getLoadPercentageForPerson(person.id, pipelineLoadStatusId);
+              const executionLoadColorClass =
+                executionLoadPercentage > 120
                   ? 'text-red-600'
-                  : loadPercentage >= 80
+                  : executionLoadPercentage >= 80
+                    ? 'text-amber-600'
+                    : 'text-emerald-600';
+              const pipelineLoadColorClass =
+                pipelineLoadPercentage > 120
+                  ? 'text-red-600'
+                  : pipelineLoadPercentage >= 80
                     ? 'text-amber-600'
                     : 'text-emerald-600';
               
@@ -204,11 +215,13 @@ export function PeoplePanel({
                     {statusColumns.map(col => {
                       const count = getTaskCountForPerson(person.id, col.id);
                       if (count === 0) return null;
+                      const bgColor = col.color || '#9ca3af';
+                      const textClass = getReadableTextClassFor(bgColor, bgColor);
                       return (
                         <div
                           key={col.id}
-                          className="text-xs px-2 py-1 rounded text-white"
-                          style={{ backgroundColor: col.color || '#9ca3af' }}
+                          className={`text-xs px-2 py-1 rounded ${textClass}`}
+                          style={{ backgroundColor: bgColor }}
                         >
                           {col.title}: {count}
                         </div>
@@ -217,8 +230,13 @@ export function PeoplePanel({
                   </div>
 
                   <div className="mt-3 flex justify-end">
-                    <div className={`text-sm font-semibold ${loadColorClass}`}>
-                      Load: {loadPercentage}%
+                    <div className="text-right">
+                      <div className={`text-sm font-semibold ${executionLoadColorClass}`}>
+                        Execution: {executionLoadPercentage}%
+                      </div>
+                      <div className={`text-xs font-medium ${pipelineLoadColorClass}`}>
+                        Pipeline: {pipelineLoadPercentage}%
+                      </div>
                     </div>
                   </div>
                 </div>

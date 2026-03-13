@@ -27,3 +27,8 @@ export function getTaskLoadPoints(task: Task): number {
 export function getTaskLoadContributionPercent(task: Task): number {
   return Math.round((getTaskLoadPoints(task) / PERSON_CAPACITY_POINTS) * 100);
 }
+
+export function getLoadPercentageForTasks(tasks: Task[]): number {
+  const totalLoad = tasks.reduce((sum, task) => sum + getTaskLoadPoints(task), 0);
+  return Math.round((totalLoad / PERSON_CAPACITY_POINTS) * 100);
+}

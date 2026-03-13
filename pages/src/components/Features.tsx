@@ -20,7 +20,7 @@ const Features = () => {
     },
     {
       title: 'Kanban Workflow',
-      description: 'Organize work in customizable status columns with direct edit actions, larger card previews, and checklist snippets.',
+      description: 'Organize work in customizable status columns with direct edit actions, task search by title/details, larger card previews, and checklist snippets.',
       icon: (
         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 4H5a2 2 0 00-2 2v14a2 2 0 002 2h4M9 4h6M9 4v16M15 4h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M15 4v16" />

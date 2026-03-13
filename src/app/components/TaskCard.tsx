@@ -102,7 +102,7 @@ function TaskCardComponent({ title, notes, color, project, priority = 'normal', 
                     type="checkbox"
                     checked={item.checked}
                     readOnly
-                    className="h-4 w-4 rounded border-gray-300"
+                    className="h-4 w-4 shrink-0 rounded border-gray-300"
                   />
                   <span className="truncate-anywhere">{item.text}</span>
                 </label>
@@ -114,11 +114,11 @@ function TaskCardComponent({ title, notes, color, project, priority = 'normal', 
           </div>
         )}
 
-        <div className="flex items-start gap-3">
+        <div className="flex items-center gap-3">
           <div className="w-[96px] shrink-0">
-            <span className={`inline-flex items-center rounded-full border px-2 py-1 text-xs font-medium leading-none ${priorityStyle.className}`}>
+            <Badge className={priorityStyle.className}>
               {priorityStyle.label}
-            </span>
+            </Badge>
           </div>
           <div className="min-w-0 flex-1">
             {projectLabels.length > 0 ? (

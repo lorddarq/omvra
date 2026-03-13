@@ -72,6 +72,13 @@ interface AppPreferences {
   pipelineLoadStatusId: TaskStatus;
 }
 
+interface StorageMeterState {
+  usedBytes: number;
+  totalBytes: number;
+  usagePercent: number;
+  sourceLabel: string;
+}
+
 function getDefaultStatusId(
   columns: Array<{ id: TaskStatus; title: string; color?: string }>,
   preferred: TaskStatus
@@ -79,6 +86,23 @@ function getDefaultStatusId(
   const preferredCol = columns.find(col => col.id === preferred);
   if (preferredCol) return preferredCol.id;
   return columns[0]?.id || preferred;
+}
+
+function getLocalStorageUsageBytes(): number {
+  if (typeof window === 'undefined') return 0;
+  try {
+    let totalChars = 0;
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const key = window.localStorage.key(i);
+      if (!key) continue;
+      const value = window.localStorage.getItem(key) || '';
+      totalChars += key.length + value.length;
+    }
+    // localStorage strings are UTF-16 in browsers, so ~2 bytes/char.
+    return totalChars * 2;
+  } catch (err) {
+    return 0;
+  }
 }
 
 function App() {
@@ -136,6 +160,12 @@ function App() {
       executionLoadStatusId: stored.executionLoadStatusId || executionDefault,
       pipelineLoadStatusId: stored.pipelineLoadStatusId || pipelineDefault,
     };
+  });
+  const [storageMeter, setStorageMeter] = useState<StorageMeterState>({
+    usedBytes: 0,
+    totalBytes: 5 * 1024 * 1024,
+    usagePercent: 0,
+    sourceLabel: 'Estimated localStorage capacity',
   });
 
   useEffect(() => { safeWriteJSON(STATUS_COLUMNS_KEY, statusColumns); }, [statusColumns]);
@@ -491,6 +521,54 @@ function App() {
     });
   }, [statusColumns]);
 
+  useEffect(() => {
+    if (!isPreferencesOpen || typeof window === 'undefined') return;
+    let cancelled = false;
+
+    const refreshStorageMeter = async () => {
+      const usedBytes = getLocalStorageUsageBytes();
+      let totalBytes = 5 * 1024 * 1024;
+      let sourceLabel = 'Estimated localStorage capacity';
+
+      try {
+        if (navigator.storage?.estimate) {
+          const estimate = await navigator.storage.estimate();
+          if (typeof estimate.quota === 'number' && estimate.quota > 0) {
+            totalBytes = estimate.quota;
+            sourceLabel = 'Browser storage estimate';
+          }
+        }
+      } catch (err) {
+        // Keep fallback values.
+      }
+
+      const usagePercent = totalBytes > 0
+        ? Math.max(0, Math.min(100, Math.round((usedBytes / totalBytes) * 100)))
+        : 0;
+
+      if (!cancelled) {
+        setStorageMeter({
+          usedBytes,
+          totalBytes,
+          usagePercent,
+          sourceLabel,
+        });
+      }
+    };
+
+    refreshStorageMeter();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isPreferencesOpen,
+    tasks,
+    timelineSwimlanes,
+    people,
+    statusColumns,
+    preferences,
+  ]);
+
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header */}
@@ -650,6 +728,7 @@ function App() {
         statusColumns={statusColumns}
         executionLoadStatusId={preferences.executionLoadStatusId}
         pipelineLoadStatusId={preferences.pipelineLoadStatusId}
+        storageMeter={storageMeter}
         onNukeLocalData={handleNukeLocalData}
         onExportTasksAndProjects={handleExportTasksAndProjects}
         onImportTasksAndProjects={handleImportTasksAndProjects}

@@ -11,6 +11,13 @@ import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Button } from './ui/button';
 
+interface StorageMeter {
+  usedBytes: number;
+  totalBytes: number;
+  usagePercent: number;
+  sourceLabel: string;
+}
+
 interface PreferencesPanelProps {
   isOpen: boolean;
   onClose: () => void;
@@ -22,6 +29,7 @@ interface PreferencesPanelProps {
   onNukeLocalData: () => void;
   onExportTasksAndProjects: () => void;
   onImportTasksAndProjects: (file: File) => void;
+  storageMeter: StorageMeter;
 }
 
 export function PreferencesPanel({
@@ -35,8 +43,14 @@ export function PreferencesPanel({
   onNukeLocalData,
   onExportTasksAndProjects,
   onImportTasksAndProjects,
+  storageMeter,
 }: PreferencesPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const formatBytes = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
@@ -91,6 +105,22 @@ export function PreferencesPanel({
             <p className="text-xs text-gray-500">
               Tasks in this column count toward pipeline pressure.
             </p>
+          </div>
+
+          <div className="space-y-3 rounded-lg border p-4">
+            <div className="text-sm font-semibold text-gray-900">Storage usage</div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+              <div
+                className="h-full bg-blue-500 transition-[width] duration-300"
+                style={{ width: `${storageMeter.usagePercent}%` }}
+              />
+            </div>
+            <div className="text-xs text-gray-500">
+              {formatBytes(storageMeter.usedBytes)} used of {formatBytes(storageMeter.totalBytes)} available ({storageMeter.usagePercent}%)
+            </div>
+            <div className="text-[11px] text-gray-400">
+              Source: {storageMeter.sourceLabel}
+            </div>
           </div>
 
           <div className="space-y-3 rounded-lg border p-4">

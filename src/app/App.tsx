@@ -197,6 +197,8 @@ function App() {
         priority: taskData.priority || 'normal',
         startDate: taskData.startDate,
         endDate: taskData.endDate,
+        projectIds: taskData.projectIds || [],
+        project: taskData.project,
         swimlaneOnly: taskData.swimlaneOnly,
         swimlaneId: taskData.swimlaneId,
         assigneeId: taskData.assigneeId,

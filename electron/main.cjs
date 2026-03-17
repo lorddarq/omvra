@@ -4,16 +4,28 @@ const fs = require('fs');
 const Store = require('electron-store');
 const { registerMcpIpcHandlers } = require('./ipc/mcp.cjs');
 const { startMcpHttpServer } = require('./services/mcp-http-server.cjs');
+const { isMcpAgentAccessEnabled } = require('./services/workspace-service.cjs');
 
 // Consider the app to be in dev mode when it's not packaged. This avoids trying to load a dev server in packaged builds.
 const isDev = !app.isPackaged;
 const store = new Store({ name: 'plumy-store' });
 let mcpHttpServer = null;
 
+function shouldStartMcpServer() {
+  // Explicit runtime overrides for troubleshooting enterprise endpoint controls.
+  if (process.env.PLUMY_DISABLE_MCP_SERVER === '1') return false;
+  if (process.env.PLUMY_ENABLE_MCP_SERVER === '1') return true;
+  return isMcpAgentAccessEnabled(store);
+}
+
 function restartMcpServer() {
   if (mcpHttpServer) {
     mcpHttpServer.close();
     mcpHttpServer = null;
+  }
+  if (!shouldStartMcpServer()) {
+    console.log('[mcp] Startup skipped (disabled by preferences or environment)');
+    return;
   }
   mcpHttpServer = startMcpHttpServer(store, { logger: console });
 }
@@ -167,6 +179,12 @@ ipcMain.handle('store/export', () => store.store);
 ipcMain.handle('mcp/restart-server', () => {
   try {
     restartMcpServer();
+    if (!mcpHttpServer) {
+      return {
+        success: false,
+        error: 'MCP server is disabled. Enable mcpAgentAccessEnabled or set PLUMY_ENABLE_MCP_SERVER=1.',
+      };
+    }
     return { success: true };
   } catch (err) {
     return {

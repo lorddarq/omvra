@@ -75,6 +75,10 @@
     ],
     "mac": {
       "icon": "electron/assets/app.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "electron/entitlements.mac.plist",
+      "entitlementsInherit": "electron/entitlements.mac.inherit.plist",
       "target": [
         "dmg",
         "pkg"

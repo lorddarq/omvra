@@ -348,6 +348,54 @@ function updateTaskAgentSummary(store, { taskId, summary, expectedRevision, acto
   }));
 }
 
+function sanitizeCompletionText(completion) {
+  if (typeof completion !== 'string') return '';
+  const normalized = completion.replace(/\s+/g, ' ').trim();
+  if (!normalized) return '';
+  return normalized.length > 240 ? `${normalized.slice(0, 240).trim()}...` : normalized;
+}
+
+function upsertCompletionSection(notes, completionText) {
+  const startMarker = '<!-- MCP_COMPLETION_START -->';
+  const endMarker = '<!-- MCP_COMPLETION_END -->';
+  const currentNotes = typeof notes === 'string' ? notes : '';
+  const escaped = currentNotes.replace(
+    new RegExp(`${startMarker}[\\s\\S]*?${endMarker}`, 'g'),
+    ''
+  ).trim();
+  const completionBlock = [
+    startMarker,
+    '### Agent Completion',
+    `- ${completionText}`,
+    endMarker,
+  ].join('\n');
+
+  if (!escaped) return completionBlock;
+  return `${escaped}\n\n${completionBlock}`;
+}
+
+function updateTaskCompletionDescription(store, {
+  taskId,
+  completion,
+  expectedRevision,
+  actor = 'agent',
+}) {
+  const completionText = sanitizeCompletionText(completion);
+  if (!completionText) {
+    return {
+      ok: false,
+      error: 'INVALID_COMPLETION',
+      message: 'completion is required.',
+    };
+  }
+
+  return updateTaskWithRevision(store, taskId, expectedRevision, (task) => ({
+    ...task,
+    notes: upsertCompletionSection(task.notes, completionText),
+    mcpLastActor: actor,
+  }));
+}
+
 function ensureRequiresHumanReviewStatusColumn(store) {
   const columns = readArray(store, STATUS_COLUMNS_KEY);
   const existing = columns.find(col => col && col.id === REQUIRES_HUMAN_REVIEW_STATUS_ID);
@@ -467,6 +515,7 @@ module.exports = {
   listTimelineCards,
   transitionTaskToUnderReview,
   updateTaskAgentSummary,
+  updateTaskCompletionDescription,
   moveTasksToRequiresHumanReviewBoard,
   REQUIRES_HUMAN_REVIEW_STATUS_ID,
   REQUIRES_HUMAN_REVIEW_STATUS_TITLE,

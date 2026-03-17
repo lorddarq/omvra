@@ -9,6 +9,7 @@ const {
   listTimelineCards,
   transitionTaskToUnderReview,
   updateTaskAgentSummary,
+  updateTaskCompletionDescription,
   moveTasksToRequiresHumanReviewBoard,
   REQUIRES_HUMAN_REVIEW_STATUS_ID,
 } = require('./workspace-service.cjs');
@@ -192,4 +193,29 @@ test('creates Requires human review board and moves qualifying tasks', () => {
   const updatedTasks = store.get(TASKS_KEY);
   const moved = updatedTasks.filter(task => result.movedTaskIds.includes(task.id));
   assert.ok(moved.every(task => task.status === REQUIRES_HUMAN_REVIEW_STATUS_ID));
+});
+
+test('completion description update appends brief completion section and is idempotent', () => {
+  const store = makeStore();
+  const task = listTasks(store, { status: 'open' })[0];
+  const rev = task[MCP_TASK_REV_FIELD];
+
+  const first = updateTaskCompletionDescription(store, {
+    taskId: task.id,
+    completion: 'Implemented final drag behaviour and fixed edge-case snapping.',
+    expectedRevision: rev,
+  });
+  assert.equal(first.ok, true);
+  assert.match(first.task.notes, /### Agent Completion/);
+  assert.match(first.task.notes, /Implemented final drag behaviour/);
+
+  const second = updateTaskCompletionDescription(store, {
+    taskId: task.id,
+    completion: 'Reworked it again with a shorter update.',
+    expectedRevision: rev + 1,
+  });
+  assert.equal(second.ok, true);
+  const sectionCount = (second.task.notes.match(/### Agent Completion/g) || []).length;
+  assert.equal(sectionCount, 1);
+  assert.match(second.task.notes, /Reworked it again with a shorter update\./);
 });

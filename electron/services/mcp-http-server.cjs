@@ -11,6 +11,7 @@ const {
   listTimelineCards,
   transitionTaskToUnderReview,
   updateTaskAgentSummary,
+  updateTaskCompletionDescription,
   moveTasksToRequiresHumanReviewBoard,
 } = require('./workspace-service.cjs');
 
@@ -119,6 +120,20 @@ const WRITE_TOOL_DEFINITIONS = [
         expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
       },
       required: ['taskId', 'summary', 'expectedRevision'],
+    },
+  },
+  {
+    name: 'tasks.update_completion_description',
+    description: 'Updates task description with a brief completion note.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        taskId: { type: 'string' },
+        completion: { type: 'string' },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+      },
+      required: ['taskId', 'completion', 'expectedRevision'],
     },
   },
   {
@@ -492,6 +507,35 @@ function handleToolCall(store, req, params) {
         skipped: result.skipped,
       });
       return { result: makeToolResult(result) };
+    }
+
+    case 'tasks.update_completion_description': {
+      const taskId = parseTaskId(args);
+      if (!taskId) {
+        return { error: invalidParams('Invalid params: "taskId" is required.') };
+      }
+      const result = updateTaskCompletionDescription(store, {
+        taskId,
+        completion: args.completion,
+        expectedRevision: args.expectedRevision,
+        actor: 'mcp-agent',
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, {
+          outcome: 'denied',
+          reason: result.error,
+          toolName: name,
+          taskId,
+        });
+        return { error: invalidParams(result.message, result) };
+      }
+      recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        taskId,
+        nextRevision: result.task?.__mcpRevision,
+      });
+      return { result: makeToolResult({ task: result.task }) };
     }
 
     default:

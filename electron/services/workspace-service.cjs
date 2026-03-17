@@ -3,6 +3,9 @@ const TASKS_KEY = 'plumy.tasks.v1';
 const PEOPLE_KEY = 'plumy.people.v1';
 const SWIMLANES_KEY = 'plumy.swimlanes.v1';
 const STATUS_COLUMNS_KEY = 'plumy.statusColumns.v1';
+const REQUIRES_HUMAN_REVIEW_STATUS_ID = 'requires-human-review';
+const REQUIRES_HUMAN_REVIEW_STATUS_TITLE = 'Requires human review';
+const REQUIRES_HUMAN_REVIEW_STATUS_COLOR = '#f97316';
 const DEFAULT_MCP_HOST = '127.0.0.1';
 const DEFAULT_MCP_PORT = 3456;
 const DEFAULT_MCP_PATH = '/mcp';
@@ -345,6 +348,105 @@ function updateTaskAgentSummary(store, { taskId, summary, expectedRevision, acto
   }));
 }
 
+function ensureRequiresHumanReviewStatusColumn(store) {
+  const columns = readArray(store, STATUS_COLUMNS_KEY);
+  const existing = columns.find(col => col && col.id === REQUIRES_HUMAN_REVIEW_STATUS_ID);
+  if (existing) {
+    return { created: false, statusId: REQUIRES_HUMAN_REVIEW_STATUS_ID };
+  }
+
+  const nextColumns = columns.concat({
+    id: REQUIRES_HUMAN_REVIEW_STATUS_ID,
+    title: REQUIRES_HUMAN_REVIEW_STATUS_TITLE,
+    color: REQUIRES_HUMAN_REVIEW_STATUS_COLOR,
+  });
+  store.set(STATUS_COLUMNS_KEY, nextColumns);
+  return { created: true, statusId: REQUIRES_HUMAN_REVIEW_STATUS_ID };
+}
+
+function isTaskCandidateForHumanReview(task, peopleById, includeDone) {
+  if (!task || typeof task !== 'object') return false;
+
+  const assignee = task.assigneeId ? peopleById.get(task.assigneeId) : null;
+  const isAgentTask = Boolean(assignee && assignee.kind === 'agentic');
+  const hasAgentSummary = typeof task.agentSummary === 'string' && task.agentSummary.trim().length > 0;
+
+  if (!isAgentTask && !hasAgentSummary) return false;
+  if (task.status === 'under-review') return true;
+  if (includeDone && task.status === 'done') return true;
+  return false;
+}
+
+function moveTasksToRequiresHumanReviewBoard(store, {
+  actor = 'mcp-agent',
+  taskIds,
+  includeDone = false,
+  expectedRevisions,
+} = {}) {
+  const ensuredColumn = ensureRequiresHumanReviewStatusColumn(store);
+  const tasks = readArray(store, TASKS_KEY);
+  const people = readArray(store, PEOPLE_KEY);
+  const peopleById = new Map(people.map(person => [person.id, person]));
+  const expectedMap = expectedRevisions && typeof expectedRevisions === 'object' ? expectedRevisions : {};
+  const taskIdFilter = Array.isArray(taskIds) && taskIds.length > 0 ? new Set(taskIds) : null;
+
+  const movedTaskIds = [];
+  const skipped = [];
+
+  const nextTasks = tasks.map(rawTask => {
+    const task = normalizeTaskForMcp(rawTask);
+    if (!task || typeof task !== 'object') return rawTask;
+    if (taskIdFilter && !taskIdFilter.has(task.id)) return rawTask;
+
+    if (!isTaskCandidateForHumanReview(task, peopleById, includeDone)) {
+      skipped.push({ taskId: task.id, reason: 'not_candidate' });
+      return rawTask;
+    }
+
+    const expected = expectedMap && Object.prototype.hasOwnProperty.call(expectedMap, task.id)
+      ? Number(expectedMap[task.id])
+      : null;
+    if (expected !== null) {
+      const currentRevision = Number(task[MCP_TASK_REV_FIELD] || 0);
+      if (!Number.isFinite(expected) || Math.floor(expected) !== currentRevision) {
+        skipped.push({
+          taskId: task.id,
+          reason: 'revision_mismatch',
+          currentRevision,
+          expectedRevision: expected,
+        });
+        return rawTask;
+      }
+    }
+
+    if (task.status === REQUIRES_HUMAN_REVIEW_STATUS_ID) {
+      skipped.push({ taskId: task.id, reason: 'already_in_board' });
+      return rawTask;
+    }
+
+    movedTaskIds.push(task.id);
+    return {
+      ...task,
+      status: REQUIRES_HUMAN_REVIEW_STATUS_ID,
+      [MCP_TASK_REV_FIELD]: Number(task[MCP_TASK_REV_FIELD] || 0) + 1,
+      mcpUpdatedAt: new Date().toISOString(),
+      mcpLastActor: actor,
+    };
+  });
+
+  if (movedTaskIds.length > 0) {
+    store.set(TASKS_KEY, nextTasks);
+  }
+
+  return {
+    statusId: REQUIRES_HUMAN_REVIEW_STATUS_ID,
+    statusCreated: ensuredColumn.created,
+    movedTaskIds,
+    skipped,
+    totalMoved: movedTaskIds.length,
+  };
+}
+
 module.exports = {
   PREFERENCES_KEY,
   DEFAULT_MCP_HOST,
@@ -365,4 +467,7 @@ module.exports = {
   listTimelineCards,
   transitionTaskToUnderReview,
   updateTaskAgentSummary,
+  moveTasksToRequiresHumanReviewBoard,
+  REQUIRES_HUMAN_REVIEW_STATUS_ID,
+  REQUIRES_HUMAN_REVIEW_STATUS_TITLE,
 };

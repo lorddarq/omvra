@@ -11,6 +11,7 @@ const {
   listTimelineCards,
   transitionTaskToUnderReview,
   updateTaskAgentSummary,
+  moveTasksToRequiresHumanReviewBoard,
 } = require('./workspace-service.cjs');
 
 const MAX_BODY_BYTES = 1024 * 1024;
@@ -118,6 +119,25 @@ const WRITE_TOOL_DEFINITIONS = [
         expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
       },
       required: ['taskId', 'summary', 'expectedRevision'],
+    },
+  },
+  {
+    name: 'tasks.move_to_requires_human_review',
+    description: 'Creates "Requires human review" board (if missing) and moves completed review-required tasks there.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        taskIds: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+        includeDone: { type: 'boolean' },
+        expectedRevisions: {
+          type: 'object',
+          additionalProperties: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+        },
+      },
     },
   },
 ];
@@ -456,6 +476,22 @@ function handleToolCall(store, req, params) {
         nextRevision: result.task?.__mcpRevision,
       });
       return { result: makeToolResult({ task: result.task }) };
+    }
+
+    case 'tasks.move_to_requires_human_review': {
+      const result = moveTasksToRequiresHumanReviewBoard(store, {
+        actor: 'mcp-agent',
+        taskIds: Array.isArray(args.taskIds) ? args.taskIds : undefined,
+        includeDone: Boolean(args.includeDone),
+        expectedRevisions: args.expectedRevisions,
+      });
+      recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        movedTaskIds: result.movedTaskIds,
+        skipped: result.skipped,
+      });
+      return { result: makeToolResult(result) };
     }
 
     default:

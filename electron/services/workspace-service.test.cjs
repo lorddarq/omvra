@@ -9,6 +9,8 @@ const {
   listTimelineCards,
   transitionTaskToUnderReview,
   updateTaskAgentSummary,
+  moveTasksToRequiresHumanReviewBoard,
+  REQUIRES_HUMAN_REVIEW_STATUS_ID,
 } = require('./workspace-service.cjs');
 
 const PREFERENCES_KEY = 'plumy.preferences.v1';
@@ -174,4 +176,20 @@ test('task normalization extracts project context from description notes', () =>
   assert.deepEqual(task.descriptionProjectContext.projectMentions, ['Mission Control']);
   assert.ok(task.descriptionProjectContext.repoHints.some(value => value.includes('github.com/acme/plumy')));
   assert.ok(task.descriptionProjectContext.urls.some(value => value.includes('github.com/acme/plumy/issues/10')));
+});
+
+test('creates Requires human review board and moves qualifying tasks', () => {
+  const store = makeStore();
+  const result = moveTasksToRequiresHumanReviewBoard(store, { includeDone: false });
+
+  assert.equal(result.statusId, REQUIRES_HUMAN_REVIEW_STATUS_ID);
+  assert.equal(result.totalMoved, 1);
+  assert.ok(result.movedTaskIds.includes('task-3'));
+
+  const statusColumns = store.get(STATUS_COLUMNS_KEY);
+  assert.ok(statusColumns.some(col => col.id === REQUIRES_HUMAN_REVIEW_STATUS_ID));
+
+  const updatedTasks = store.get(TASKS_KEY);
+  const moved = updatedTasks.filter(task => result.movedTaskIds.includes(task.id));
+  assert.ok(moved.every(task => task.status === REQUIRES_HUMAN_REVIEW_STATUS_ID));
 });

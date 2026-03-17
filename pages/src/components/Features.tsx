@@ -64,6 +64,15 @@ const Features = () => {
         </svg>
       ),
     },
+    {
+      title: 'MCP Support',
+      description: 'Connect AI assistants through Model Context Protocol (MCP) to query and update Plumy project data in a structured, tool-friendly way.',
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7.5 12h9m-9 0a3 3 0 110-6h9a3 3 0 010 6m-9 0a3 3 0 100 6h9a3 3 0 100-6" />
+        </svg>
+      ),
+    },
   ]
 
   return (
@@ -91,6 +100,21 @@ const Features = () => {
                 </p>
               </div>
             ))}
+          </div>
+
+          <div className="mt-24 rounded-2xl border border-nordic-gray-200 bg-nordic-gray-50 p-10 md:p-12">
+            <div className="max-w-3xl">
+              <p className="text-sm uppercase tracking-[0.2em] text-nordic-blue font-light mb-4">MCP</p>
+              <h3 className="text-3xl md:text-4xl font-light text-nordic-gray-800 mb-6">
+                Dedicated Model Context Protocol support
+              </h3>
+              <p className="text-lg text-nordic-gray-600 font-light leading-relaxed mb-6">
+                Plumy supports Model Context Protocol so AI tools can work with your plans using structured context instead of brittle copy-paste. This makes task updates, timeline checks, and workflow automation more reliable.
+              </p>
+              <p className="text-base text-nordic-gray-600 font-light leading-relaxed">
+                MCP integration is designed to keep humans in control while giving assistants a safer, typed interface for reading project state and helping with execution.
+              </p>
+            </div>
           </div>
         </div>
       </div>

@@ -2,12 +2,15 @@
 
 **Status:** Active  
 **Created:** 2026-02-03  
-**Last Updated:** 2026-03-06  
-**Progress:** 51/57 tasks complete (89%)  
+**Last Updated:** 2026-03-17  
+**Progress:** Legacy roadmap 51/57 complete (89%); MCP roadmap 15/24 complete (63%)  
 **Action Items:**
 - ⚠️ Phase 3: Verify virtualization window extension (rapid scroll chains, seamless transitions)
 - ⚠️ Phase 4: Verify dynamic track heights and overlapping task rendering
 - ⚠️ Phase 7: Implement out-of-range drop features and visual hints (lower priority)
+- 🟡 MCP Phase 0: Extract repository/service boundary from UI-owned state (started)
+- 🟡 MCP Phase 1: Ship read-only MCP for workspace/tasks/kanban/timeline cards (in progress)
+- 🟡 MCP Phase 2: Security baseline in progress (local-only bind + access toggle)
 
 ---
 
@@ -168,3 +171,65 @@ Phase 1 (Foundation)
 **Created by:** GitHub Copilot  
 **Confidence:** 0.85  
 **Ready to begin:** Yes ✅
+
+---
+
+## MCP Integration Roadmap (from `specs/mcp-integration-prd.md`)
+
+### MCP Phase 0: Service Boundary Extraction
+
+- [ ] M0.1 Define canonical repository interfaces for `tasks`, `people`, `projects/swimlanes`, and `statusColumns`
+- [ ] M0.2 Move direct persistence reads/writes behind repository adapters
+- [ ] M0.3 Ensure renderer accesses data only through service layer (no ad-hoc storage writes)
+- [ ] M0.4 Add schema versioning + migration guardrails for canonical task payload
+- [x] M0.5 Add contract tests to verify service outputs are stable
+
+### MCP Phase 1: Read-Only MCP Surface
+
+- [x] M1.1 Create MCP sidecar package/module and bootstrap wiring
+- [x] M1.2 Implement `workspace.get_snapshot()`
+- [x] M1.3 Implement `tasks.list(filters)` and `tasks.get(taskId)` (via snapshot adapter in renderer service)
+- [x] M1.4 Implement `cards.kanban.list(statusId?, assigneeId?, search?)` (via snapshot adapter in renderer service)
+- [x] M1.5 Implement `cards.timeline.list(laneId?, startDate?, endDate?, includeOffscreen?)` (via snapshot adapter in renderer service)
+- [x] M1.6 Add MCP resources: `plumy://workspace`, `plumy://tasks/{taskId}`, `plumy://cards/kanban`, `plumy://cards/timeline`
+- [x] M1.7 Add parity tests to assert MCP kanban/timeline cards match UI semantics
+
+### MCP Phase 2: Security, Auth, and Safe Writes
+
+- [x] M2.1 Add explicit MCP enable/disable setting (default OFF)
+- [x] M2.2 Add capability profiles: `read_only`, `task_write`, `admin`
+- [x] M2.3 Implement token-based auth with short TTL for MCP clients
+- [x] M2.4 Restrict transport to local loopback/UDS by default
+- [x] M2.5 Implement safe write tools (status transition to `under-review`, agent summary updates)
+- [x] M2.6 Add validation + optimistic revision checks for write requests
+- [x] M2.7 Add audit log for MCP writes (actor, action, timestamp, payload diff)
+
+### MCP Phase 3: Deployment and Extensibility
+
+- [ ] M3.1 Introduce pluggable storage adapters (desktop local adapter first)
+- [ ] M3.2 Define adapter contract for private/self-hosted backend deployment
+- [ ] M3.3 Verify MCP contract remains unchanged across adapter implementations
+- [ ] M3.4 Add import/export compatibility checks for adapter migration
+- [ ] M3.5 Document deployment profiles: local-only, private self-hosted, future web mode
+
+### MCP Validation & Exit Criteria
+
+- [ ] MV.1 P95 read latency < 250ms in desktop-local mode for typical datasets
+- [ ] MV.2 Agent can fetch assigned task context in <= 3 MCP calls (median)
+- [x] MV.3 Unauthorized write attempts are blocked and logged
+- [ ] MV.4 Failure rate < 1% over a 7-day validation window
+
+### MCP Notes
+
+- Source PRD: `specs/mcp-integration-prd.md`
+- Keep Phase 1 strictly read-only; do not introduce broad mutation primitives early.
+- Treat Kanban/Timeline as projections over the same canonical task entity IDs.
+- Current implementation uses Electron IPC MCP bridge + workspace snapshot service.
+- MCP HTTP endpoint is available at `http://127.0.0.1:3456/mcp` from Electron main and defaults to read-only.
+- MCP HTTP endpoint now exposes gated safe write tools when capability profile is `task_write` or `admin` (`tasks.transition_under_review`, `tasks.update_agent_summary`).
+- MCP token auth now supports TTL (`mcpAccessTokenTtlMinutes`) with expiry enforcement (`mcpAccessTokenIssuedAt`).
+- Renderer now mirrors writes for `tasks`, `people`, `projects/swimlanes`, `statusColumns`, and `preferences` into `electron-store` via preload bridge.
+- Source-of-truth is still not fully unified (renderer reads remain localStorage-first and repository adapters are still pending); keep Phase 0 open.
+- Renderer now includes a dev MCP health validator (tools availability, snapshot count/key parity, and MV.2-style median logical-call helper).
+- Renderer MCP read service now attempts `resources/read` (`plumy://workspace`, `plumy://cards/kanban`, `plumy://cards/timeline`) and falls back to read tools when resources are not exposed.
+- Automated MCP contract/parity tests added: `npm run test:mcp` (`electron/services/workspace-service.test.cjs`).

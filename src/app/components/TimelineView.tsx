@@ -93,7 +93,7 @@ export function TimelineView({
       return people.map(person => ({
         id: person.id,
         name: person.name,
-        subtitle: person.role,
+        subtitle: `${person.role} • ${person.kind === 'agentic' ? 'Agentic' : 'Human'}`,
         color: person.color || '#3b82f6', // Default blue if no color
       }));
     }

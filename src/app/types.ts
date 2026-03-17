@@ -2,11 +2,13 @@ export type TaskStatus = 'open' | 'in-progress' | 'under-review' | 'done';
 export type TaskSize = 'xs' | 's' | 'm' | 'l';
 export type TaskComplexity = 'routine' | 'medium' | 'hard';
 export type TaskPriority = 'urgent' | 'moderate' | 'normal' | 'low';
+export type PersonKind = 'human' | 'agentic';
 
 export interface Person {
   id: string;
   name: string;
   role: string;
+  kind: PersonKind;
   avatar?: string;
   color?: string;
 }

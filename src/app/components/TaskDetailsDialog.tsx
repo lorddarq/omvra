@@ -15,6 +15,7 @@ interface TaskDetailsDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onEdit?: (task: Task) => void;
+  onMoveAgentTaskToReview?: (taskId: string) => void;
   task?: Task | null;
   swimlanes: TimelineSwimlane[];
   people: Person[];
@@ -32,6 +33,7 @@ export function TaskDetailsDialog({
   isOpen,
   onClose,
   onEdit,
+  onMoveAgentTaskToReview,
   task,
   swimlanes,
   people,
@@ -48,6 +50,7 @@ export function TaskDetailsDialog({
   const personLabel = task?.assigneeId
     ? people.find(p => p.id === task.assigneeId)?.name ?? 'Unknown assignee'
     : 'Unassigned';
+  const assignee = task?.assigneeId ? people.find(p => p.id === task.assigneeId) : null;
   const statusLabel = task
     ? statusColumns.find(c => c.id === task.status)?.title ?? task.status
     : '';
@@ -63,6 +66,12 @@ export function TaskDetailsDialog({
         low: 'Low priority',
       } as const)[task.priority || 'normal']
     : '';
+  const canMoveAgentTaskToReview = Boolean(
+    task &&
+    assignee &&
+    assignee.kind === 'agentic' &&
+    task.status === 'in-progress'
+  );
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -85,7 +94,10 @@ export function TaskDetailsDialog({
               </div>
               <div>
                 <div className="text-xs uppercase tracking-wide text-gray-500">Assignee</div>
-                <div className="text-xs font-medium text-gray-900">{personLabel}</div>
+                <div className="text-xs font-medium text-gray-900">
+                  {personLabel}
+                  {assignee ? ` (${assignee.kind === 'agentic' ? 'Agentic' : 'Human'})` : ''}
+                </div>
               </div>
               <div>
                 <div className="text-xs uppercase tracking-wide text-gray-500">Timeline</div>
@@ -150,10 +162,19 @@ export function TaskDetailsDialog({
         )}
 
         <DialogFooter>
-          {task && onEdit && (
+          {task && canMoveAgentTaskToReview && onMoveAgentTaskToReview && (
             <Button
               variant="outline"
               className="mr-auto"
+              onClick={() => onMoveAgentTaskToReview(task.id)}
+            >
+              Move to In Review
+            </Button>
+          )}
+          {task && onEdit && (
+            <Button
+              variant="outline"
+              className={canMoveAgentTaskToReview ? '' : 'mr-auto'}
               onClick={() => onEdit(task)}
             >
               Edit

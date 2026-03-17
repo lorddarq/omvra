@@ -4,7 +4,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Edit2, Plus, User, Trash2 } from 'lucide-react';
+import { Edit2, Plus, User, Bot, Trash2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { getLoadPercentageForTasks } from '../utils/taskLoad';
 import { getReadableTextClassFor } from '../utils/contrast';
 
@@ -17,7 +18,7 @@ interface PeoplePanelProps {
   executionLoadStatusId: TaskStatus;
   pipelineLoadStatusId: TaskStatus;
   onAddPerson: (person: Omit<Person, 'id'>) => void;
-  onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role'>) => void;
+  onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind'>) => void;
   onDeletePerson: (personId: string) => void;
 }
 
@@ -36,9 +37,11 @@ export function PeoplePanel({
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [newRole, setNewRole] = useState('');
+  const [newKind, setNewKind] = useState<'human' | 'agentic'>('human');
   const [editingPersonId, setEditingPersonId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editRole, setEditRole] = useState('');
+  const [editKind, setEditKind] = useState<'human' | 'agentic'>('human');
 
   function getTaskCountForPerson(personId: string, status?: TaskStatus): number {
     return tasks.filter(t => {
@@ -55,9 +58,14 @@ export function PeoplePanel({
 
   function handleAddPerson() {
     if (!newName.trim()) return;
-    onAddPerson({ name: newName.trim(), role: newRole.trim() || 'Team Member' });
+    onAddPerson({
+      name: newName.trim(),
+      role: newRole.trim() || 'Team Member',
+      kind: newKind,
+    });
     setNewName('');
     setNewRole('');
+    setNewKind('human');
     setIsAdding(false);
   }
 
@@ -65,12 +73,14 @@ export function PeoplePanel({
     setEditingPersonId(person.id);
     setEditName(person.name);
     setEditRole(person.role);
+    setEditKind(person.kind === 'agentic' ? 'agentic' : 'human');
   }
 
   function cancelEditPerson() {
     setEditingPersonId(null);
     setEditName('');
     setEditRole('');
+    setEditKind('human');
   }
 
   function saveEditedPerson(personId: string) {
@@ -78,6 +88,7 @@ export function PeoplePanel({
     onUpdatePerson(personId, {
       name: editName.trim(),
       role: editRole.trim() || 'Team Member',
+      kind: editKind,
     });
     cancelEditPerson();
   }
@@ -86,9 +97,9 @@ export function PeoplePanel({
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
         <SheetHeader className="px-6">
-          <SheetTitle>Team Members</SheetTitle>
+          <SheetTitle>People</SheetTitle>
           <SheetDescription>
-            View and manage team members and their task assignments.
+            Manage humans and agentic sub-agents for task assignment.
           </SheetDescription>
         </SheetHeader>
 
@@ -115,15 +126,38 @@ export function PeoplePanel({
                   placeholder="Enter role..."
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="person-kind">Type</Label>
+                <Select value={newKind} onValueChange={(value) => setNewKind(value as 'human' | 'agentic')}>
+                  <SelectTrigger id="person-kind">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="human">Human</SelectItem>
+                    <SelectItem value="agentic">Agentic (sub-agent)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="flex gap-2">
                 <Button onClick={handleAddPerson} size="sm">Add</Button>
-                <Button onClick={() => { setIsAdding(false); setNewName(''); setNewRole(''); }} variant="outline" size="sm">Cancel</Button>
+                <Button
+                  onClick={() => {
+                    setIsAdding(false);
+                    setNewName('');
+                    setNewRole('');
+                    setNewKind('human');
+                  }}
+                  variant="outline"
+                  size="sm"
+                >
+                  Cancel
+                </Button>
               </div>
             </div>
           ) : (
             <Button onClick={() => setIsAdding(true)} className="w-full" variant="outline">
               <Plus className="w-4 h-4 mr-2" />
-              Add Team Member
+              Add Person
             </Button>
           )}
 
@@ -152,7 +186,11 @@ export function PeoplePanel({
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                        <User className="w-5 h-5 text-blue-600" />
+                        {person.kind === 'agentic' ? (
+                          <Bot className="w-5 h-5 text-blue-600" />
+                        ) : (
+                          <User className="w-5 h-5 text-blue-600" />
+                        )}
                       </div>
                       {isEditing ? (
                         <div className="space-y-2">
@@ -168,11 +206,22 @@ export function PeoplePanel({
                             placeholder="Role"
                             className="h-8"
                           />
+                          <Select value={editKind} onValueChange={(value) => setEditKind(value as 'human' | 'agentic')}>
+                            <SelectTrigger className="h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="human">Human</SelectItem>
+                              <SelectItem value="agentic">Agentic (sub-agent)</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       ) : (
                         <div>
                           <div className="font-medium">{person.name}</div>
-                          <div className="text-sm text-gray-500">{person.role}</div>
+                          <div className="text-sm text-gray-500">
+                            {person.role} • {person.kind === 'agentic' ? 'Agentic' : 'Human'}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -245,7 +294,7 @@ export function PeoplePanel({
 
             {people.length === 0 && !isAdding && (
               <div className="text-center py-8 text-gray-500">
-                No team members yet. Click "Add Team Member" to get started.
+                No people yet. Click "Add Person" to get started.
               </div>
             )}
           </div>

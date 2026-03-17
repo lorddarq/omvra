@@ -2,10 +2,21 @@ const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const Store = require('electron-store');
+const { registerMcpIpcHandlers } = require('./ipc/mcp.cjs');
+const { startMcpHttpServer } = require('./services/mcp-http-server.cjs');
 
 // Consider the app to be in dev mode when it's not packaged. This avoids trying to load a dev server in packaged builds.
 const isDev = !app.isPackaged;
 const store = new Store({ name: 'plumy-store' });
+let mcpHttpServer = null;
+
+function restartMcpServer() {
+  if (mcpHttpServer) {
+    mcpHttpServer.close();
+    mcpHttpServer = null;
+  }
+  mcpHttpServer = startMcpHttpServer(store, { logger: console });
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -126,7 +137,11 @@ function createWindow() {
 
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  // Bind MCP endpoint to localhost only; no external interface exposure.
+  restartMcpServer();
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
@@ -136,12 +151,30 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
 
+app.on('before-quit', () => {
+  if (mcpHttpServer) {
+    mcpHttpServer.close();
+    mcpHttpServer = null;
+  }
+});
+
 // =====================
 // IPC: Store
 // =====================
 ipcMain.handle('store/get', (_, key) => store.get(key));
 ipcMain.handle('store/set', (_, key, value) => store.set(key, value));
 ipcMain.handle('store/export', () => store.store);
+ipcMain.handle('mcp/restart-server', () => {
+  try {
+    restartMcpServer();
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err?.message || String(err),
+    };
+  }
+});
 
 // =====================
 // IPC: Attachments
@@ -188,3 +221,8 @@ ipcMain.handle('open-external', async (_, urlStr) => {
     return { success: false, error: err.message };
   }
 });
+
+// =====================
+// IPC: MCP bridge (read-only, gated)
+// =====================
+registerMcpIpcHandlers({ ipcMain, store });

@@ -15,4 +15,11 @@ contextBridge.exposeInMainWorld('electron', {
 
   // Open external (validated in main)
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
+
+  // MCP bridge (read-only, gated by mcpAgentAccessEnabled preference)
+  mcp: {
+    getCapabilities: () => ipcRenderer.invoke('mcp/get-capabilities'),
+    getWorkspaceSnapshot: () => ipcRenderer.invoke('mcp/workspace/snapshot'),
+    restartServer: () => ipcRenderer.invoke('mcp/restart-server'),
+  },
 });

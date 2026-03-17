@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Task, TaskStatus, TimelineSwimlane, Person } from './types';
 import { initialTasks, initialTimelineSwimlanes } from './data/sampleData';
 import { initialPeople } from './data/samplePeople';
@@ -8,6 +8,18 @@ import { ViewToggle } from './components/ViewToggle';
 import { useViewState } from './hooks/useViewState';
 import { useSharedHorizontalScroll } from './hooks/useSharedHorizontalScroll';
 import { useVirtualizedTimeline } from './hooks/useVirtualizedTimeline';
+import { useMcpDiagnostics } from './hooks/useMcpDiagnostics';
+import { useMcpHealthValidation } from './hooks/useMcpHealthValidation';
+import {
+  DEFAULT_MCP_BIND_HOST,
+  DEFAULT_MCP_PORT,
+  DEFAULT_MCP_SERVER_ADDRESS,
+  buildLocalMcpAddress,
+  normalizeMcpBindHost,
+  normalizeMcpPort,
+  normalizeMcpServerAddress,
+} from './constants/mcp';
+import { persistJSONWithElectronMirror } from './utils/storage';
 
 // LocalStorage keys
 const TASKS_KEY = 'plumy.tasks.v1';
@@ -22,14 +34,6 @@ function safeReadJSON<T>(key: string, fallback: T): T {
     return parsed;
   } catch (err) {
     return fallback;
-  }
-}
-
-function safeWriteJSON<T>(key: string, value: T) {
-  try {
-    if (typeof window !== 'undefined') window.localStorage.setItem(key, JSON.stringify(value));
-  } catch (err) {
-    // ignore
   }
 }
 
@@ -70,6 +74,14 @@ const PREFERENCES_KEY = 'plumy.preferences.v1';
 interface AppPreferences {
   executionLoadStatusId: TaskStatus;
   pipelineLoadStatusId: TaskStatus;
+  mcpAgentAccessEnabled: boolean;
+  mcpCapabilityProfile: 'read_only' | 'task_write' | 'admin';
+  mcpBindHost: string;
+  mcpPort: number;
+  mcpServerAddress: string;
+  mcpAccessToken: string;
+  mcpAccessTokenIssuedAt?: string;
+  mcpAccessTokenTtlMinutes: number;
 }
 
 interface StorageMeterState {
@@ -144,6 +156,7 @@ function App() {
     const defaultColors = ['#ec4899', '#f97316', '#eab308', '#06b6d4', '#8b5cf6', '#10b981'];
     return stored.map((person, index) => ({
       ...person,
+      kind: person.kind === 'agentic' ? 'agentic' : 'human',
       color: person.color || defaultColors[index % defaultColors.length]
     }));
   });
@@ -155,10 +168,27 @@ function App() {
     const stored = safeReadJSON<Partial<AppPreferences>>(PREFERENCES_KEY, {});
     const executionDefault = getDefaultStatusId(defaultSwimlanes, 'in-progress');
     const pipelineDefault = getDefaultStatusId(defaultSwimlanes, 'open');
+    const bindHost = normalizeMcpBindHost(stored.mcpBindHost);
+    const port = normalizeMcpPort(stored.mcpPort);
 
     return {
       executionLoadStatusId: stored.executionLoadStatusId || executionDefault,
       pipelineLoadStatusId: stored.pipelineLoadStatusId || pipelineDefault,
+      mcpAgentAccessEnabled: Boolean(stored.mcpAgentAccessEnabled),
+      mcpCapabilityProfile:
+        stored.mcpCapabilityProfile === 'task_write' || stored.mcpCapabilityProfile === 'admin'
+          ? stored.mcpCapabilityProfile
+          : 'read_only',
+      mcpBindHost: bindHost,
+      mcpPort: port,
+      mcpServerAddress: normalizeMcpServerAddress(
+        stored.mcpServerAddress || buildLocalMcpAddress(bindHost, port)
+      ),
+      mcpAccessToken: typeof stored.mcpAccessToken === 'string' ? stored.mcpAccessToken : '',
+      mcpAccessTokenIssuedAt: typeof stored.mcpAccessTokenIssuedAt === 'string' ? stored.mcpAccessTokenIssuedAt : undefined,
+      mcpAccessTokenTtlMinutes: Number.isFinite(Number(stored.mcpAccessTokenTtlMinutes))
+        ? Math.max(1, Math.min(1440, Number(stored.mcpAccessTokenTtlMinutes)))
+        : 60,
     };
   });
   const [storageMeter, setStorageMeter] = useState<StorageMeterState>({
@@ -168,20 +198,20 @@ function App() {
     sourceLabel: 'Estimated localStorage capacity',
   });
 
-  useEffect(() => { safeWriteJSON(STATUS_COLUMNS_KEY, statusColumns); }, [statusColumns]);
-  useEffect(() => { safeWriteJSON(PREFERENCES_KEY, preferences); }, [preferences]);
+  useEffect(() => { persistJSONWithElectronMirror(STATUS_COLUMNS_KEY, statusColumns); }, [statusColumns]);
+  useEffect(() => { persistJSONWithElectronMirror(PREFERENCES_KEY, preferences); }, [preferences]);
 
   // Persist tasks and swimlanes to localStorage whenever they change
   useEffect(() => {
-    safeWriteJSON(TASKS_KEY, tasks);
+    persistJSONWithElectronMirror(TASKS_KEY, tasks);
   }, [tasks]);
 
   useEffect(() => {
-    safeWriteJSON(SWIMLANES_KEY, timelineSwimlanes);
+    persistJSONWithElectronMirror(SWIMLANES_KEY, timelineSwimlanes);
   }, [timelineSwimlanes]);
 
   useEffect(() => {
-    safeWriteJSON(PEOPLE_KEY, people);
+    persistJSONWithElectronMirror(PEOPLE_KEY, people);
   }, [people]);
 
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
@@ -276,6 +306,18 @@ function App() {
     setTasks(prevTasks => prevTasks.map(t => (t.id === taskId ? { ...t, status: newStatus } : t)));
   };
 
+  const handleMoveAgentTaskToReview = (taskId: string) => {
+    setTasks(prevTasks =>
+      prevTasks.map(task => {
+        if (task.id !== taskId) return task;
+        if (task.status !== 'in-progress') return task;
+        const assignee = task.assigneeId ? people.find(person => person.id === task.assigneeId) : null;
+        if (!assignee || assignee.kind !== 'agentic') return task;
+        return { ...task, status: 'under-review' };
+      })
+    );
+  };
+
   const handleUpdateTaskDates = (taskId: string, startDate: string, endDate: string) => {
     setTasks(prevTasks => prevTasks.map(t => (t.id === taskId ? { ...t, startDate, endDate } : t)));
   };
@@ -347,6 +389,7 @@ function App() {
       id: Date.now().toString(),
       name: personData.name,
       role: personData.role,
+      kind: personData.kind === 'agentic' ? 'agentic' : 'human',
       avatar: personData.avatar,
     };
     setPeople(prevPeople => [...prevPeople, newPerson]);
@@ -357,7 +400,7 @@ function App() {
     setTasks(prevTasks => prevTasks.map(t => (t.assigneeId === personId ? { ...t, assigneeId: undefined } : t)));
   };
 
-  const handleUpdatePerson = (personId: string, updates: Pick<Person, 'name' | 'role'>) => {
+  const handleUpdatePerson = (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind'>) => {
     setPeople(prevPeople => prevPeople.map(p => (p.id === personId ? { ...p, ...updates } : p)));
   };
 
@@ -432,7 +475,28 @@ function App() {
     setPreferences({
       executionLoadStatusId: getDefaultStatusId(defaultSwimlanes, 'in-progress'),
       pipelineLoadStatusId: getDefaultStatusId(defaultSwimlanes, 'open'),
+      mcpAgentAccessEnabled: false,
+      mcpCapabilityProfile: 'read_only',
+      mcpBindHost: DEFAULT_MCP_BIND_HOST,
+      mcpPort: DEFAULT_MCP_PORT,
+      mcpServerAddress: DEFAULT_MCP_SERVER_ADDRESS,
+      mcpAccessToken: '',
+      mcpAccessTokenIssuedAt: undefined,
+      mcpAccessTokenTtlMinutes: 60,
     });
+  };
+
+  const handleRestartMcpServer = async () => {
+    try {
+      if (window.electron?.mcp?.restartServer) {
+        const result = await window.electron.mcp.restartServer();
+        if (!result?.success) {
+          window.alert(`Could not restart MCP server: ${result?.error || 'Unknown error'}`);
+        }
+      }
+    } catch (err) {
+      window.alert('Could not restart MCP server.');
+    }
   };
 
   const handleExportTasksAndProjects = () => {
@@ -489,6 +553,7 @@ function App() {
             .map(person => ({
               ...person,
               role: person.role || 'Team Member',
+              kind: person.kind === 'agentic' ? 'agentic' : 'human',
             }))
         : people;
 
@@ -568,6 +633,32 @@ function App() {
     statusColumns,
     preferences,
   ]);
+
+  useMcpDiagnostics({
+    enabled: preferences.mcpAgentAccessEnabled,
+    endpoint: preferences.mcpServerAddress,
+  });
+
+  const mcpHealthExpectation = useMemo(
+    () => ({
+      counts: {
+        tasks: tasks.length,
+        people: people.length,
+        swimlanes: timelineSwimlanes.length,
+        statusColumns: statusColumns.length,
+      },
+      requiredTaskKeys: ['id', 'title', 'status'],
+      requiredPersonKeys: ['id', 'name'],
+      requiredStatusColumnKeys: ['id', 'title'],
+    }),
+    [tasks.length, people.length, timelineSwimlanes.length, statusColumns.length]
+  );
+
+  const mcpHealth = useMcpHealthValidation({
+    enabled: preferences.mcpAgentAccessEnabled,
+    endpoint: preferences.mcpServerAddress,
+    expectation: mcpHealthExpectation,
+  });
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
@@ -692,6 +783,7 @@ function App() {
         isOpen={isTaskDetailsOpen}
         onClose={() => setIsTaskDetailsOpen(false)}
         onEdit={handleEditTaskFromDetails}
+        onMoveAgentTaskToReview={handleMoveAgentTaskToReview}
         task={detailsTask}
         swimlanes={timelineSwimlanes}
         people={people}
@@ -738,6 +830,43 @@ function App() {
         onPipelineLoadStatusChange={(statusId) =>
           setPreferences(prev => ({ ...prev, pipelineLoadStatusId: statusId }))
         }
+        mcpAgentAccessEnabled={preferences.mcpAgentAccessEnabled}
+        mcpAddress={preferences.mcpServerAddress}
+        mcpBindHost={preferences.mcpBindHost}
+        mcpPort={preferences.mcpPort}
+        mcpAccessToken={preferences.mcpAccessToken}
+        mcpAccessTokenTtlMinutes={preferences.mcpAccessTokenTtlMinutes}
+        mcpCapabilityProfile={preferences.mcpCapabilityProfile}
+        onMcpAgentAccessToggle={(enabled) =>
+          setPreferences(prev => ({ ...prev, mcpAgentAccessEnabled: enabled }))
+        }
+        onMcpAddressChange={(address) =>
+          setPreferences(prev => ({ ...prev, mcpServerAddress: normalizeMcpServerAddress(address) }))
+        }
+        onMcpBindHostChange={(host) =>
+          setPreferences(prev => ({ ...prev, mcpBindHost: normalizeMcpBindHost(host) }))
+        }
+        onMcpPortChange={(port) =>
+          setPreferences(prev => ({ ...prev, mcpPort: normalizeMcpPort(port) }))
+        }
+        onMcpAccessTokenChange={(token) =>
+          setPreferences(prev => ({
+            ...prev,
+            mcpAccessToken: token,
+            mcpAccessTokenIssuedAt: token ? new Date().toISOString() : undefined,
+          }))
+        }
+        onMcpAccessTokenTtlMinutesChange={(ttl) =>
+          setPreferences(prev => ({ ...prev, mcpAccessTokenTtlMinutes: Math.max(1, Math.min(1440, ttl || 60)) }))
+        }
+        onMcpCapabilityProfileChange={(profile) =>
+          setPreferences(prev => ({ ...prev, mcpCapabilityProfile: profile }))
+        }
+        onRestartMcpServer={handleRestartMcpServer}
+        showMcpHealthDiagnostics={mcpHealth.isDevEnvironment}
+        mcpHealthResult={mcpHealth.result}
+        mcpHealthCheckRunning={mcpHealth.isRunning}
+        onRunMcpHealthCheck={mcpHealth.runHealthCheck}
       />
     </div>
   );

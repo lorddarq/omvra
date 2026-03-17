@@ -39,3 +39,28 @@ export async function setJSON<T = any>(key: string, value: T): Promise<void> {
     // ignore
   }
 }
+
+/**
+ * Persist in localStorage and best-effort mirror to electron-store.
+ * localStorage remains the renderer source of truth for now.
+ */
+export function persistJSONWithElectronMirror<T = any>(key: string, value: T): void {
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch (err) {
+    // ignore
+  }
+
+  try {
+    const storeSet = window.electron?.storeSet;
+    if (typeof storeSet === 'function') {
+      void storeSet(key, value).catch(() => {
+        // Ignore mirror failures to keep renderer persistence non-breaking.
+      });
+    }
+  } catch (err) {
+    // ignore
+  }
+}

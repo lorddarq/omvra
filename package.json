@@ -15,6 +15,7 @@
     "build:renderer": "vite build",
     "build:electron": "node electron/scripts/build-electron-with-tag-version.cjs",
     "build:pages": "vite build --config pages/vite.config.ts",
+    "test:mcp": "node --test electron/services/workspace-service.test.cjs",
     "predist": "npm run generate:icons",
     "dist": "npm run predist && npm run build:renderer && npm run build:electron",
     "start": "electron .",

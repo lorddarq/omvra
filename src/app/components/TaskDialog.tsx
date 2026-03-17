@@ -337,7 +337,7 @@ export function TaskDialog({
                     <SelectItem value="unassigned">Unassigned</SelectItem>
                     {people.map(person => (
                       <SelectItem key={person.id} value={person.id}>
-                        {person.name} - {person.role}
+                        {person.kind === 'agentic' ? 'Agent' : 'Human'}: {person.name} - {person.role}
                       </SelectItem>
                     ))}
                   </SelectContent>

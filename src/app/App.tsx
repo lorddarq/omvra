@@ -5,7 +5,7 @@ import { initialPeople } from './data/samplePeople';
 import { TimelineView } from './components/TimelineView';
 import { KanbanView } from './components/KanbanView';
 import { ViewToggle } from './components/ViewToggle';
-import { useViewState } from './hooks/useViewState';
+import { useViewState, ViewType } from './hooks/useViewState';
 import { useSharedHorizontalScroll } from './hooks/useSharedHorizontalScroll';
 import { useVirtualizedTimeline } from './hooks/useVirtualizedTimeline';
 import { useMcpDiagnostics } from './hooks/useMcpDiagnostics';
@@ -25,6 +25,13 @@ import { persistJSONWithElectronMirror } from './utils/storage';
 const TASKS_KEY = 'plumy.tasks.v1';
 const SWIMLANES_KEY = 'plumy.swimlanes.v1';
 const PEOPLE_KEY = 'plumy.people.v1';
+const STATUS_COLUMNS_KEY = 'plumy.statusColumns.v1';
+const PREFERENCES_KEY = 'plumy.preferences.v1';
+const TIMELINE_VIEW_STATE_KEY = 'plumy_viewstate_timeline';
+const KANBAN_VIEW_STATE_KEY = 'plumy_viewstate_kanban';
+const MONTH_WIDTHS_KEY = 'plumy.monthWidths.v1';
+const LEFT_COL_WIDTH_KEY = 'plumy.leftColWidth.v1';
+const BACKUP_SCHEMA_VERSION = 2;
 
 function safeReadJSON<T>(key: string, fallback: T): T {
   try {
@@ -69,8 +76,6 @@ import { swimlanes as defaultSwimlanes } from './constants/swimlanes';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 
-const PREFERENCES_KEY = 'plumy.preferences.v1';
-
 interface AppPreferences {
   executionLoadStatusId: TaskStatus;
   pipelineLoadStatusId: TaskStatus;
@@ -89,6 +94,37 @@ interface StorageMeterState {
   totalBytes: number;
   usagePercent: number;
   sourceLabel: string;
+}
+
+interface StatusColumnBackup {
+  id: string;
+  title: string;
+  color?: string;
+}
+
+interface UiBackupState {
+  currentView?: ViewType;
+  viewState?: {
+    timeline?: Record<string, unknown>;
+    kanban?: Record<string, unknown>;
+  };
+  timeline?: {
+    leftColWidth?: number;
+    monthWidths?: Record<string, number>;
+  };
+}
+
+interface BackupFile {
+  version: number;
+  exportedAt: string;
+  tasks?: Task[];
+  projects?: TimelineSwimlane[];
+  people?: Person[];
+  statusColumns?: StatusColumnBackup[];
+  preferences?: Partial<AppPreferences>;
+  ui?: UiBackupState;
+  storage?: Record<string, string>;
+  electronStore?: Record<string, unknown>;
 }
 
 function getDefaultStatusId(
@@ -115,6 +151,214 @@ function getLocalStorageUsageBytes(): number {
   } catch (err) {
     return 0;
   }
+}
+
+function safeReadRaw(key: string): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.localStorage.getItem(key);
+  } catch (err) {
+    return null;
+  }
+}
+
+function safeWriteRaw(key: string, value: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(key, value);
+  } catch (err) {
+    // ignore
+  }
+}
+
+function safeReadLocalStorageJSON<T>(key: string, fallback: T): T {
+  const raw = safeReadRaw(key);
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch (err) {
+    return fallback;
+  }
+}
+
+function isPortableStorageKey(key: string): boolean {
+  return key.startsWith('plumy.') || key.startsWith('plumy_viewstate_');
+}
+
+function getPortableStorageSnapshot(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  const snapshot: Record<string, string> = {};
+
+  try {
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index);
+      if (!key || !isPortableStorageKey(key)) continue;
+      const value = window.localStorage.getItem(key);
+      if (typeof value === 'string') {
+        snapshot[key] = value;
+      }
+    }
+  } catch (err) {
+    return {};
+  }
+
+  return snapshot;
+}
+
+async function getPortableElectronStoreSnapshot(): Promise<Record<string, unknown>> {
+  try {
+    const exported = await window.electron?.storeExport?.();
+    if (!exported || typeof exported !== 'object') {
+      return {};
+    }
+
+    return Object.fromEntries(
+      Object.entries(exported).filter(([key]) => isPortableStorageKey(key))
+    );
+  } catch (err) {
+    return {};
+  }
+}
+
+function clearPortableStorageKeys(): void {
+  if (typeof window === 'undefined') return;
+
+  try {
+    const keys: string[] = [];
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index);
+      if (key && isPortableStorageKey(key)) {
+        keys.push(key);
+      }
+    }
+
+    keys.forEach(key => {
+      window.localStorage.removeItem(key);
+    });
+  } catch (err) {
+    // ignore
+  }
+}
+
+async function restorePortableStorageSnapshot(
+  storageSnapshot?: Record<string, string>,
+  electronStoreSnapshot?: Record<string, unknown>
+): Promise<void> {
+  clearPortableStorageKeys();
+
+  if (storageSnapshot && typeof storageSnapshot === 'object') {
+    Object.entries(storageSnapshot).forEach(([key, value]) => {
+      if (!isPortableStorageKey(key) || typeof value !== 'string') return;
+      safeWriteRaw(key, value);
+    });
+  }
+
+  if (electronStoreSnapshot && typeof electronStoreSnapshot === 'object') {
+    const storeSet = window.electron?.storeSet;
+    if (typeof storeSet === 'function') {
+      await Promise.all(
+        Object.entries(electronStoreSnapshot)
+          .filter(([key]) => isPortableStorageKey(key))
+          .map(([key, value]) => storeSet(key, value).catch(() => undefined))
+      );
+    }
+  }
+}
+
+function sanitizeStatusColumns(
+  columns: unknown,
+  fallback: Array<{ id: TaskStatus; title: string; color?: string }>
+): Array<{ id: TaskStatus; title: string; color?: string }> {
+  if (!Array.isArray(columns)) return fallback;
+
+  const sanitized = columns
+    .filter(column => column && typeof column === 'object')
+    .map(column => {
+      const candidate = column as Record<string, unknown>;
+      if (typeof candidate.id !== 'string' || typeof candidate.title !== 'string') {
+        return null;
+      }
+      return {
+        id: candidate.id as TaskStatus,
+        title: candidate.title,
+        color: typeof candidate.color === 'string' ? candidate.color : '#9ca3af',
+      };
+    })
+    .filter((column): column is { id: TaskStatus; title: string; color?: string } => Boolean(column));
+
+  return sanitized.length > 0 ? sanitized : fallback;
+}
+
+function deriveStatusColumnsFromTasks(
+  taskList: Task[],
+  currentColumns: Array<{ id: TaskStatus; title: string; color?: string }>
+): Array<{ id: TaskStatus; title: string; color?: string }> {
+  const columns = [...currentColumns];
+  const knownIds = new Set(columns.map(column => column.id));
+
+  taskList.forEach(task => {
+    if (!task.status || knownIds.has(task.status)) {
+      return;
+    }
+    knownIds.add(task.status);
+    columns.push({
+      id: task.status as TaskStatus,
+      title: `Imported column ${columns.length + 1}`,
+      color: '#9ca3af',
+    });
+  });
+
+  return columns;
+}
+
+function sanitizePreferences(
+  preferences: Partial<AppPreferences> | undefined,
+  statusColumns: Array<{ id: TaskStatus; title: string; color?: string }>,
+  fallback: AppPreferences
+): AppPreferences {
+  if (!preferences) {
+    return {
+      ...fallback,
+      executionLoadStatusId: statusColumns.some(col => col.id === fallback.executionLoadStatusId)
+        ? fallback.executionLoadStatusId
+        : getDefaultStatusId(statusColumns, 'in-progress'),
+      pipelineLoadStatusId: statusColumns.some(col => col.id === fallback.pipelineLoadStatusId)
+        ? fallback.pipelineLoadStatusId
+        : getDefaultStatusId(statusColumns, 'open'),
+    };
+  }
+
+  const bindHost = normalizeMcpBindHost(preferences.mcpBindHost || fallback.mcpBindHost);
+  const port = normalizeMcpPort(preferences.mcpPort || fallback.mcpPort);
+  const executionLoadStatusId =
+    preferences.executionLoadStatusId && statusColumns.some(col => col.id === preferences.executionLoadStatusId)
+      ? preferences.executionLoadStatusId
+      : getDefaultStatusId(statusColumns, 'in-progress');
+  const pipelineLoadStatusId =
+    preferences.pipelineLoadStatusId && statusColumns.some(col => col.id === preferences.pipelineLoadStatusId)
+      ? preferences.pipelineLoadStatusId
+      : getDefaultStatusId(statusColumns, 'open');
+
+  return {
+    executionLoadStatusId,
+    pipelineLoadStatusId,
+    mcpAgentAccessEnabled: Boolean(preferences.mcpAgentAccessEnabled),
+    mcpCapabilityProfile:
+      preferences.mcpCapabilityProfile === 'task_write' || preferences.mcpCapabilityProfile === 'admin'
+        ? preferences.mcpCapabilityProfile
+        : 'read_only',
+    mcpBindHost: bindHost,
+    mcpPort: port,
+    mcpServerAddress: normalizeMcpServerAddress(
+      preferences.mcpServerAddress || buildLocalMcpAddress(bindHost, port)
+    ),
+    mcpAccessToken: typeof preferences.mcpAccessToken === 'string' ? preferences.mcpAccessToken : '',
+    mcpAccessTokenIssuedAt:
+      typeof preferences.mcpAccessTokenIssuedAt === 'string' ? preferences.mcpAccessTokenIssuedAt : undefined,
+    mcpAccessTokenTtlMinutes: Number.isFinite(Number(preferences.mcpAccessTokenTtlMinutes))
+      ? Math.max(1, Math.min(1440, Number(preferences.mcpAccessTokenTtlMinutes)))
+      : fallback.mcpAccessTokenTtlMinutes,
+  };
 }
 
 function App() {
@@ -161,8 +405,6 @@ function App() {
     }));
   });
 
-  // Status columns (swimlane columns for the kanban view) — persisted separately
-  const STATUS_COLUMNS_KEY = 'plumy.statusColumns.v1';
   const [statusColumns, setStatusColumns] = useState(() => safeReadJSON(STATUS_COLUMNS_KEY, defaultSwimlanes));
   const [preferences, setPreferences] = useState<AppPreferences>(() => {
     const stored = safeReadJSON<Partial<AppPreferences>>(PREFERENCES_KEY, {});
@@ -227,6 +469,7 @@ function App() {
   const [defaultEndDate, setDefaultEndDate] = useState<Date | undefined>(undefined);
   const [defaultSwimlaneId, setDefaultSwimlaneId] = useState<string | undefined>(undefined);
   const [defaultAssigneeId, setDefaultAssigneeId] = useState<string | undefined>(undefined);
+  const [viewRefreshKey, setViewRefreshKey] = useState(0);
 
   const detailsTask = detailsTaskId ? tasks.find(t => t.id === detailsTaskId) ?? null : null;
 
@@ -499,14 +742,59 @@ function App() {
     }
   };
 
-  const handleExportTasksAndProjects = () => {
+  const handleExportTasksAndProjects = async () => {
     if (typeof window === 'undefined') return;
-    const payload = {
-      version: 1,
+    if (viewState.currentView === 'timeline') {
+      viewState.saveViewState('timeline', {
+        ...viewState.getViewState('timeline'),
+        scrollLeft: timelineScrollStateRef.current.scrollLeft,
+        scrollTop: timelineScrollStateRef.current.scrollTop,
+      });
+    } else {
+      viewState.saveViewState('kanban', {
+        ...viewState.getViewState('kanban'),
+        scrollLeft: kanbanContainerRef.current?.scrollLeft || 0,
+        scrollTop: kanbanContainerRef.current?.scrollTop || 0,
+      });
+    }
+
+    const currentTimelineViewState =
+      viewState.currentView === 'timeline'
+        ? {
+            ...viewState.getViewState('timeline'),
+            scrollLeft: timelineScrollStateRef.current.scrollLeft,
+            scrollTop: timelineScrollStateRef.current.scrollTop,
+          }
+        : safeReadLocalStorageJSON<Record<string, unknown>>(TIMELINE_VIEW_STATE_KEY, viewState.getViewState('timeline'));
+    const currentKanbanViewState =
+      viewState.currentView === 'kanban'
+        ? {
+            ...viewState.getViewState('kanban'),
+            scrollLeft: kanbanContainerRef.current?.scrollLeft || 0,
+            scrollTop: kanbanContainerRef.current?.scrollTop || 0,
+          }
+        : safeReadLocalStorageJSON<Record<string, unknown>>(KANBAN_VIEW_STATE_KEY, viewState.getViewState('kanban'));
+    const payload: BackupFile = {
+      version: BACKUP_SCHEMA_VERSION,
       exportedAt: new Date().toISOString(),
       tasks,
       projects: timelineSwimlanes,
       people,
+      statusColumns,
+      preferences,
+      ui: {
+        currentView: viewState.currentView,
+        viewState: {
+          timeline: currentTimelineViewState,
+          kanban: currentKanbanViewState,
+        },
+        timeline: {
+          leftColWidth: Number(safeReadRaw(LEFT_COL_WIDTH_KEY) || 200),
+          monthWidths: safeReadLocalStorageJSON<Record<string, number>>(MONTH_WIDTHS_KEY, {}),
+        },
+      },
+      storage: getPortableStorageSnapshot(),
+      electronStore: await getPortableElectronStoreSnapshot(),
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = window.URL.createObjectURL(blob);
@@ -523,11 +811,7 @@ function App() {
   const handleImportTasksAndProjects = async (file: File) => {
     try {
       const text = await file.text();
-      const parsed = JSON.parse(text) as {
-        tasks?: Task[];
-        projects?: TimelineSwimlane[];
-        people?: Person[];
-      };
+      const parsed = JSON.parse(text) as BackupFile;
 
       if (!Array.isArray(parsed.tasks) || !Array.isArray(parsed.projects)) {
         window.alert('Invalid backup format. Expected "tasks" and "projects" arrays.');
@@ -557,9 +841,60 @@ function App() {
             }))
         : people;
 
+      const importedStatusColumns = deriveStatusColumnsFromTasks(
+        importedTasks,
+        sanitizeStatusColumns(parsed.statusColumns, statusColumns)
+      );
+      const projectIds = new Set(importedProjects.map(project => project.id));
+      const personIds = new Set(importedPeople.map(person => person.id));
+      const statusIds = new Set(importedStatusColumns.map(column => column.id));
+      const fallbackStatusId = importedStatusColumns[0]?.id || 'open';
+
+      const repairedTasks = importedTasks.map(task => {
+        const nextProjectIds = (task.projectIds || []).filter(projectId => projectIds.has(projectId));
+        const nextSwimlaneId = task.swimlaneId && projectIds.has(task.swimlaneId) ? task.swimlaneId : undefined;
+        const nextAssigneeId = task.assigneeId && personIds.has(task.assigneeId) ? task.assigneeId : undefined;
+        const project = nextProjectIds
+          .map(projectId => importedProjects.find(item => item.id === projectId)?.name)
+          .filter(Boolean)
+          .join(', ');
+
+        return {
+          ...task,
+          status: (statusIds.has(task.status) ? task.status : fallbackStatusId) as TaskStatus,
+          projectIds: nextProjectIds,
+          project: project || undefined,
+          swimlaneId: nextSwimlaneId,
+          assigneeId: nextAssigneeId,
+        };
+      });
+
+      const importedPreferences = sanitizePreferences(parsed.preferences, importedStatusColumns, preferences);
+
+      await restorePortableStorageSnapshot(parsed.storage, parsed.electronStore);
+
       setTimelineSwimlanes(importedProjects);
-      setTasks(importedTasks);
+      setTasks(repairedTasks);
       setPeople(importedPeople);
+      setStatusColumns(importedStatusColumns);
+      setPreferences(importedPreferences);
+
+      if (parsed.ui?.viewState?.timeline) {
+        viewState.saveViewState('timeline', parsed.ui.viewState.timeline);
+      }
+      if (parsed.ui?.viewState?.kanban) {
+        viewState.saveViewState('kanban', parsed.ui.viewState.kanban);
+      }
+      if (parsed.ui?.timeline?.monthWidths && typeof parsed.ui.timeline.monthWidths === 'object') {
+        safeWriteRaw(MONTH_WIDTHS_KEY, JSON.stringify(parsed.ui.timeline.monthWidths));
+      }
+      if (Number.isFinite(Number(parsed.ui?.timeline?.leftColWidth))) {
+        safeWriteRaw(LEFT_COL_WIDTH_KEY, String(parsed.ui?.timeline?.leftColWidth));
+      }
+      if (parsed.ui?.currentView === 'timeline' || parsed.ui?.currentView === 'kanban') {
+        viewState.switchView(parsed.ui.currentView);
+      }
+      setViewRefreshKey(prev => prev + 1);
     } catch (err) {
       window.alert('Could not import backup. Please select a valid JSON export file.');
     }
@@ -716,7 +1051,7 @@ function App() {
       <div className="flex-1 overflow-hidden">
         {/* Timeline View */}
         {viewState.currentView === 'timeline' && (
-          <div ref={timelineContainerRef} className="h-full w-full">
+          <div key={`timeline-${viewRefreshKey}`} ref={timelineContainerRef} className="h-full w-full">
             <TimelineView
               tasks={tasks}
               swimlanes={timelineSwimlanes}
@@ -740,7 +1075,7 @@ function App() {
 
         {/* Kanban View */}
         {viewState.currentView === 'kanban' && (
-          <div ref={kanbanContainerRef} className="h-full w-full">
+          <div key={`kanban-${viewRefreshKey}`} ref={kanbanContainerRef} className="h-full w-full">
             <DndProvider backend={HTML5Backend}>
               <KanbanView
                 tasks={tasks}

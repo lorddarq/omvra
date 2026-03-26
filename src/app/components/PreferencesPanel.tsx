@@ -443,18 +443,18 @@ export function PreferencesPanel({
           <div className="space-y-3 rounded-lg border p-4">
             <div className="text-sm font-semibold text-gray-900">Backup and reset</div>
             <p className="text-xs text-gray-500">
-              Export tasks and projects for backup, or import them from a previous export.
+              Export the full workspace backup, including UI preferences, people, projects, task allocation, and board metadata.
             </p>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" onClick={onExportTasksAndProjects}>
-                Export tasks + projects
+                Export workspace backup
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => fileInputRef.current?.click()}
               >
-                Import tasks + projects
+                Import workspace backup
               </Button>
             </div>
             <input

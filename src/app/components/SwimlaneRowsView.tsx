@@ -114,7 +114,6 @@ export function SwimlaneRowsView({
             onEditSwimlane={() => {}} // will be implemented later
             onMoveSwimlane={() => {}} // will be implemented later
             onMoveTaskToSwimlane={() => {}} // will be implemented later
-            getTaskPosition={() => null} // will be implemented later
             getTaskColor={() => ({})} // will be implemented later
             handleResizeStart={() => {}} // will be implemented later
             resizingTaskId={null}

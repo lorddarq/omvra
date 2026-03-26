@@ -1,10 +1,14 @@
-import React from 'react';
 import ReactMarkdown, { Components } from 'react-markdown';
+import type { ComponentPropsWithoutRef } from 'react';
 import remarkGfm from 'remark-gfm';
 
 interface MarkdownContentProps {
   content: string;
 }
+
+type CodeComponentProps = ComponentPropsWithoutRef<'code'> & {
+  inline?: boolean;
+};
 
 const markdownComponents: Components = {
   h1: ({ children }) => <h1 className="text-xl font-semibold text-gray-900">{children}</h1>,
@@ -39,7 +43,7 @@ const markdownComponents: Components = {
   blockquote: ({ children }) => (
     <blockquote className="border-l-2 border-gray-300 pl-3 text-sm text-gray-700">{children}</blockquote>
   ),
-  code: ({ inline, className, children }) => {
+  code: ({ inline, className, children }: CodeComponentProps) => {
     if (inline) {
       return (
         <code className="rounded bg-gray-100 px-1 py-0.5 text-xs font-mono text-gray-800">

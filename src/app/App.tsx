@@ -12,6 +12,18 @@ import { useMcpDiagnostics } from './hooks/useMcpDiagnostics';
 import { useMcpHealthValidation } from './hooks/useMcpHealthValidation';
 import { createMcpReadService } from './services/mcp/service';
 import { McpBoardWatchResult } from './services/mcp/types';
+import { SwimlanesView } from './components/SwimlanesView';
+import { TaskDialog } from './components/TaskDialog';
+import { SwimlaneDialog } from './components/SwimlaneDialog';
+import { PeoplePanel } from './components/PeoplePanel';
+import { PreferencesPanel } from './components/PreferencesPanel';
+import { TaskDetailsDialog } from './components/TaskDetailsDialog';
+import logo from './images/logo.svg';
+import { Button } from './components/ui/button';
+import { Settings, User } from 'lucide-react';
+import { swimlanes as defaultSwimlanes } from './constants/swimlanes';
+import { DndProvider } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
 import {
   DEFAULT_MCP_BIND_HOST,
   DEFAULT_MCP_PORT,
@@ -22,7 +34,25 @@ import {
   normalizeMcpServerAddress,
 } from './constants/mcp';
 import { shouldBootstrapFromLocalStorage } from './utils/canonicalHydration.js';
-import { deleteStoredValue, persistJSONWithElectronMirror, persistRawWithElectronMirror } from './utils/storage';
+import {
+  generateMcpAccessToken,
+  getDefaultStatusId,
+  getMcpSettingsSignature,
+  syncLocalMcpServerAddress,
+} from './utils/mcpPreferences';
+import {
+  clearPortableElectronStoreKeys,
+  getPortableElectronStoreSnapshot,
+  getPortableStorageSnapshot,
+  getPortableStoreValue,
+  hasAnyPortableLocalStorageData,
+  persistJSONWithElectronMirror,
+  readInitialWorkspaceJSON,
+  restorePortableStorageSnapshot,
+  safeReadLocalStorageJSON,
+  safeReadRaw,
+  safeWriteRaw,
+} from './utils/storage';
 
 // LocalStorage keys
 const TASKS_KEY = 'plumy.tasks.v1';
@@ -36,29 +66,6 @@ const MONTH_WIDTHS_KEY = 'plumy.monthWidths.v1';
 const LEFT_COL_WIDTH_KEY = 'plumy.leftColWidth.v1';
 const MCP_AGENT_WATCH_CONFIGS_KEY = 'plumy.mcp.agentWatchConfigs.v1';
 const BACKUP_SCHEMA_VERSION = 2;
-
-function safeReadJSON<T>(key: string, fallback: T): T {
-  try {
-    const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw) as T;
-    return parsed;
-  } catch (err) {
-    return fallback;
-  }
-}
-
-function generateMcpAccessToken(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-
-  return `mcp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function readInitialWorkspaceJSON<T>(key: string, fallback: T): T {
-  return shouldBootstrapFromLocalStorage() ? safeReadJSON(key, fallback) : fallback;
-}
 
 function normalizeTask(task: Task, swimlanes: TimelineSwimlane[]): Task {
   const projectIds = task.projectIds?.length
@@ -79,18 +86,6 @@ function normalizeTask(task: Task, swimlanes: TimelineSwimlane[]): Task {
     priority: task.priority || 'normal',
   };
 }
-import { SwimlanesView } from './components/SwimlanesView';
-import { TaskDialog } from './components/TaskDialog';
-import { SwimlaneDialog } from './components/SwimlaneDialog';
-import { PeoplePanel } from './components/PeoplePanel';
-import { PreferencesPanel } from './components/PreferencesPanel';
-import { TaskDetailsDialog } from './components/TaskDetailsDialog';
-import logo from './images/logo.svg';
-import { Button } from './components/ui/button';
-import { Settings, User } from 'lucide-react';
-import { swimlanes as defaultSwimlanes } from './constants/swimlanes';
-import { DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
 
 const ENABLE_SAMPLE_WORKSPACE = Boolean(import.meta.env.DEV);
 const DEFAULT_TASKS_SEED = ENABLE_SAMPLE_WORKSPACE ? initialTasks : [];
@@ -181,28 +176,6 @@ interface AgentWatchRuntimeState {
   error?: string;
 }
 
-function getMcpSettingsSignature(preferences: AppPreferences): string {
-  return JSON.stringify({
-    enabled: preferences.mcpAgentAccessEnabled,
-    profile: preferences.mcpCapabilityProfile,
-    bindHost: preferences.mcpBindHost,
-    port: preferences.mcpPort,
-    address: preferences.mcpServerAddress,
-    token: preferences.mcpAccessToken,
-    tokenIssuedAt: preferences.mcpAccessTokenIssuedAt,
-    tokenTtlMinutes: preferences.mcpAccessTokenTtlMinutes,
-  });
-}
-
-function getDefaultStatusId(
-  columns: Array<{ id: TaskStatus; title: string; color?: string }>,
-  preferred: TaskStatus
-): TaskStatus {
-  const preferredCol = columns.find(col => col.id === preferred);
-  if (preferredCol) return preferredCol.id;
-  return columns[0]?.id || preferred;
-}
-
 function getLocalStorageUsageBytes(): number {
   if (typeof window === 'undefined') return 0;
   try {
@@ -217,189 +190,6 @@ function getLocalStorageUsageBytes(): number {
     return totalChars * 2;
   } catch (err) {
     return 0;
-  }
-}
-
-function safeReadRaw(key: string): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    return window.localStorage.getItem(key);
-  } catch (err) {
-    return null;
-  }
-}
-
-function safeWriteRaw(key: string, value: string): void {
-  persistRawWithElectronMirror(key, value);
-}
-
-function safeReadLocalStorageJSON<T>(key: string, fallback: T): T {
-  const raw = safeReadRaw(key);
-  if (!raw) return fallback;
-  try {
-    return JSON.parse(raw) as T;
-  } catch (err) {
-    return fallback;
-  }
-}
-
-function isPortableStorageKey(key: string): boolean {
-  return key.startsWith('plumy.') || key.startsWith('plumy_viewstate_');
-}
-
-function getPortableStorageSnapshot(): Record<string, string> {
-  if (typeof window === 'undefined') return {};
-  const snapshot: Record<string, string> = {};
-
-  try {
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index);
-      if (!key || !isPortableStorageKey(key)) continue;
-      const value = window.localStorage.getItem(key);
-      if (typeof value === 'string') {
-        snapshot[key] = value;
-      }
-    }
-  } catch (err) {
-    return {};
-  }
-
-  return snapshot;
-}
-
-function flattenPortableStoreEntries(
-  value: unknown,
-  prefix = '',
-  out: Record<string, unknown> = {}
-): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    if (prefix) {
-      out[prefix] = value;
-    }
-    return out;
-  }
-
-  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-    const nextPrefix = prefix ? `${prefix}.${key}` : key;
-    if (child && typeof child === 'object' && !Array.isArray(child)) {
-      flattenPortableStoreEntries(child, nextPrefix, out);
-    } else {
-      out[nextPrefix] = child;
-    }
-  }
-
-  return out;
-}
-
-function getPortableStoreValue<T = unknown>(
-  exported: Record<string, unknown>,
-  key: string
-): T | undefined {
-  if (Object.prototype.hasOwnProperty.call(exported, key)) {
-    return exported[key] as T;
-  }
-
-  const segments = key.split('.');
-  let current: unknown = exported;
-  for (const segment of segments) {
-    if (!current || typeof current !== 'object' || Array.isArray(current) || !(segment in (current as Record<string, unknown>))) {
-      return undefined;
-    }
-    current = (current as Record<string, unknown>)[segment];
-  }
-  return current as T;
-}
-
-async function getPortableElectronStoreSnapshot(): Promise<Record<string, unknown>> {
-  try {
-    const exported = await window.electron?.storeExport?.();
-    if (!exported || typeof exported !== 'object') {
-      return {};
-    }
-
-    const flattened = flattenPortableStoreEntries(exported);
-    return Object.fromEntries(
-      Object.entries(flattened).filter(([key]) => isPortableStorageKey(key))
-    );
-  } catch (err) {
-    return {};
-  }
-}
-
-function clearPortableStorageKeys(): void {
-  if (typeof window === 'undefined') return;
-
-  try {
-    const keys: string[] = [];
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index);
-      if (key && isPortableStorageKey(key)) {
-        keys.push(key);
-      }
-    }
-
-    keys.forEach(key => {
-      window.localStorage.removeItem(key);
-    });
-  } catch (err) {
-    // ignore
-  }
-}
-
-function hasAnyPortableLocalStorageData(): boolean {
-  if (typeof window === 'undefined') return false;
-
-  try {
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index);
-      if (key && isPortableStorageKey(key)) {
-        return true;
-      }
-    }
-  } catch (err) {
-    return false;
-  }
-
-  return false;
-}
-
-async function clearPortableElectronStoreKeys(): Promise<void> {
-  if (typeof window === 'undefined') return;
-
-  try {
-    const exported = await window.electron?.storeExport?.();
-    if (!exported || typeof exported !== 'object') return;
-
-    const keys = Object.keys(flattenPortableStoreEntries(exported)).filter(isPortableStorageKey);
-    await Promise.all(keys.map(key => deleteStoredValue(key).catch(() => undefined)));
-  } catch (err) {
-    // ignore
-  }
-}
-
-async function restorePortableStorageSnapshot(
-  storageSnapshot?: Record<string, string>,
-  electronStoreSnapshot?: Record<string, unknown>
-): Promise<void> {
-  clearPortableStorageKeys();
-  await clearPortableElectronStoreKeys();
-
-  if (storageSnapshot && typeof storageSnapshot === 'object') {
-    Object.entries(storageSnapshot).forEach(([key, value]) => {
-      if (!isPortableStorageKey(key) || typeof value !== 'string') return;
-      safeWriteRaw(key, value);
-    });
-  }
-
-  if (electronStoreSnapshot && typeof electronStoreSnapshot === 'object') {
-    const storeSet = window.electron?.storeSet;
-    if (typeof storeSet === 'function') {
-      await Promise.all(
-        Object.entries(electronStoreSnapshot)
-          .filter(([key]) => isPortableStorageKey(key))
-          .map(([key, value]) => storeSet(key, value).catch(() => undefined))
-      );
-    }
   }
 }
 
@@ -466,7 +256,7 @@ function sanitizeTimelineSwimlanes(value: unknown): TimelineSwimlane[] {
         color: typeof candidate.color === 'string' ? candidate.color : '#3b82f6',
       };
     })
-    .filter((item): item is TimelineSwimlane => Boolean(item));
+    .filter((item): item is NonNullable<typeof item> => item !== null);
 
   return sanitized;
 }
@@ -486,12 +276,12 @@ function sanitizePeople(value: unknown): Person[] {
         id: candidate.id,
         name: candidate.name,
         role: typeof candidate.role === 'string' ? candidate.role : 'Team Member',
-        kind: candidate.kind === 'agentic' ? 'agentic' : 'human',
+        kind: (candidate.kind === 'agentic' ? 'agentic' : 'human') as Person['kind'],
         avatar: typeof candidate.avatar === 'string' ? candidate.avatar : undefined,
         color: typeof candidate.color === 'string' ? candidate.color : defaultColors[index % defaultColors.length],
       };
     })
-    .filter((item): item is Person => Boolean(item));
+    .filter((item): item is NonNullable<typeof item> => item !== null);
 
   return sanitized;
 }
@@ -577,33 +367,17 @@ function sanitizeAgentWatchConfigs(value: unknown): AgentWatchConfig[] {
         statusId: candidate.statusId,
         projectId: typeof candidate.projectId === 'string' && candidate.projectId.trim() ? candidate.projectId.trim() : undefined,
         search: typeof candidate.search === 'string' && candidate.search.trim() ? candidate.search.trim() : undefined,
-        action:
+        action: (
           candidate.action === 'inspect_only' || candidate.action === 'move_to_ready_for_human_review'
             ? candidate.action
-            : 'inspect_and_work',
+            : 'inspect_and_work'
+        ) as AgentWatchAction,
         intervalSeconds: Number.isFinite(Number(candidate.intervalSeconds))
           ? Math.max(15, Math.min(3600, Math.floor(Number(candidate.intervalSeconds))))
           : 60,
       };
     })
-    .filter((item): item is AgentWatchConfig => Boolean(item));
-}
-
-function syncLocalMcpServerAddress(
-  previousPreferences: AppPreferences,
-  nextHost: string,
-  nextPort: number
-): string {
-  const previousLocalAddress = buildLocalMcpAddress(
-    previousPreferences.mcpBindHost,
-    previousPreferences.mcpPort
-  );
-  const nextLocalAddress = buildLocalMcpAddress(nextHost, nextPort);
-  const previousAddress = normalizeMcpServerAddress(previousPreferences.mcpServerAddress);
-
-  return previousAddress === previousLocalAddress
-    ? nextLocalAddress
-    : previousAddress;
+    .filter((item): item is NonNullable<typeof item> => item !== null);
 }
 
 function App() {
@@ -1160,15 +934,15 @@ function App() {
 
   // Status columns management (kanban/swimlane columns)
   const handleRenameStatusColumn = (colId: string, newTitle: string) => {
-    setStatusColumns((cols: any[]) => cols.map(c => c.id === colId ? { ...c, title: newTitle } : c));
+    setStatusColumns(cols => cols.map(c => c.id === colId ? { ...c, title: newTitle } : c));
   };
 
   const handleChangeStatusColumnColor = (colId: string, newColorClass: string) => {
-    setStatusColumns((cols: any[]) => cols.map(c => c.id === colId ? { ...c, color: newColorClass } : c));
+    setStatusColumns(cols => cols.map(c => c.id === colId ? { ...c, color: newColorClass } : c));
   };
 
   const handleReorderStatusColumns = (fromIndex: number, toIndex: number) => {
-    setStatusColumns((cols: any[]) => {
+    setStatusColumns(cols => {
       const copy = [...cols];
       const [moved] = copy.splice(fromIndex, 1);
       copy.splice(toIndex, 0, moved);
@@ -1177,8 +951,12 @@ function App() {
   };
 
   const handleAddStatusColumn = (col: { id?: string; title: string; color?: string }) => {
-    const newCol = { id: col.id || Date.now().toString(), title: col.title, color: col.color || '#9ca3af' };
-    setStatusColumns((cols: any[]) => [...cols, newCol]);
+    const newCol: StatusColumnState = {
+      id: (col.id || Date.now().toString()) as TaskStatus,
+      title: col.title,
+      color: col.color || '#9ca3af',
+    };
+    setStatusColumns(cols => [...cols, newCol]);
   };
 
   const handleDeleteStatusColumn = (colId: string) => {
@@ -1194,7 +972,7 @@ function App() {
         )
       );
     }
-    setStatusColumns((cols: any[]) => cols.filter(c => c.id !== colId));
+    setStatusColumns(cols => cols.filter(c => c.id !== colId));
   };
 
   const handleNukeLocalData = async () => {
@@ -1440,7 +1218,7 @@ function App() {
 
   useEffect(() => {
     const validPeople = new Set(people.filter(person => person.kind === 'agentic').map(person => person.id));
-    const validStatuses = new Set(statusColumns.map(column => column.id));
+    const validStatuses = new Set<string>(statusColumns.map(column => column.id));
 
     setAgentWatchConfigs(prev => prev.filter(config => validPeople.has(config.personId) && validStatuses.has(config.statusId)));
   }, [people, statusColumns]);

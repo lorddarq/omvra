@@ -225,11 +225,23 @@ Phase 1 (Foundation)
 - Keep Phase 1 strictly read-only; do not introduce broad mutation primitives early.
 - Treat Kanban/Timeline as projections over the same canonical task entity IDs.
 - Current implementation uses Electron IPC MCP bridge + workspace snapshot service.
-- MCP HTTP endpoint is available at `http://127.0.0.1:3456/mcp` from Electron main and defaults to read-only.
-- MCP HTTP endpoint now exposes gated safe write tools when capability profile is `task_write` or `admin` (`tasks.transition_under_review`, `tasks.update_agent_summary`).
+- MCP HTTP endpoint is available at `http://127.0.0.1:3456/mcp` from Electron main and defaults to local loopback.
+- MCP HTTP endpoint now exposes gated safe write tools when capability profile is `task_write` or `admin`:
+  - `tasks.transition_under_review`
+  - `tasks.update_agent_summary`
+  - `tasks.update_completion_description`
+  - `tasks.move_to_status`
+  - `tasks.move_to_ready_for_human_review`
+  - `tasks.move_to_requires_human_review`
+  - `tasks.assign`
+  - `tasks.add_comment`
+  - `tasks.add_activity_entry`
 - MCP token auth now supports TTL (`mcpAccessTokenTtlMinutes`) with expiry enforcement (`mcpAccessTokenIssuedAt`).
 - Renderer now mirrors writes for `tasks`, `people`, `projects/swimlanes`, `statusColumns`, and `preferences` into `electron-store` via preload bridge.
 - Source-of-truth is still not fully unified (renderer reads remain localStorage-first and repository adapters are still pending); keep Phase 0 open.
 - Renderer now includes a dev MCP health validator (tools availability, snapshot count/key parity, and MV.2-style median logical-call helper).
 - Renderer MCP read service now attempts `resources/read` (`plumy://workspace`, `plumy://cards/kanban`, `plumy://cards/timeline`) and falls back to read tools when resources are not exposed.
-- Automated MCP contract/parity tests added: `npm run test:mcp` (`electron/services/workspace-service.test.cjs`).
+- Renderer now supports agent watcher configuration in the People panel, backed by `boards.watch.poll` and persisted watcher state.
+- Preferences now expose listener status, generated MCP commands, health diagnostics, and MCP audit log copy/export.
+- Structured task comments are now part of the task model and flow through workspace backup/import.
+- Automated MCP contract/parity tests added: `npm run test:mcp` (`electron/services/workspace-service.test.cjs`), including watcher, comment, activity, auth, and audit coverage.

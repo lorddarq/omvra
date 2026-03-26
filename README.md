@@ -101,10 +101,12 @@ This runs `electron/scripts/generate-icons.cjs` and:
 
 Core task/workspace types live in `src/app/types.ts`.
 
-Desktop persistence is currently local-first:
+Desktop persistence is now canonical-store aware:
 
-- renderer state uses local storage helpers
-- Electron process uses `electron-store` for settings/MCP server config and bridge-related state
+- renderer state is mirrored through storage helpers
+- Electron process uses `electron-store` as the canonical desktop persistence surface
+- renderer/localStorage remains a portability and backup-friendly layer
+- dev and packaged builds use separate Electron stores to avoid workspace collisions
 
 Key storage namespaces use versioned keys (`*.v1`) to support future migrations.
 
@@ -113,6 +115,28 @@ Key storage namespaces use versioned keys (`*.v1`) to support future migrations.
 - `TimelineView`: date-positioned task blocks with swimlane tracks
 - `SwimlanesView`/`KanbanView`: status columns with reorder/move behavior
 - markdown rendering is used for task details preview surfaces
+- `PeoplePanel`: human and agentic team-member management, load visualization, and agent board-watch configuration
+- `PreferencesPanel`: MCP configuration, diagnostics, audit log export, backup/import, and storage usage
+
+### Backup and portability
+
+Plumy supports full workspace backup/import from the Preferences panel.
+
+Backups now include:
+
+- tasks
+- structured task comments
+- people
+- projects/swimlanes
+- status columns
+- preferences
+- MCP settings
+- timeline and kanban UI state
+- timeline layout metadata
+- portable local storage snapshot
+- mirrored Electron store snapshot
+
+This is intended to make workspace moves and recovery seamless rather than exporting only partial task data.
 
 ## MCP Integration (Desktop)
 
@@ -124,11 +148,18 @@ Current capabilities include:
   - `workspace.get_snapshot`
   - `tasks.list`, `tasks.get`
   - `cards.kanban.list`, `cards.timeline.list`
+  - `boards.watch.poll`
   - resources under `plumy://...`
 - gated safe write tools (capability-profile dependent):
   - `tasks.transition_under_review`
   - `tasks.update_agent_summary`
-  - additional task-completion workflow tools may be present depending on current branch/runtime
+  - `tasks.update_completion_description`
+  - `tasks.move_to_status`
+  - `tasks.move_to_ready_for_human_review`
+  - `tasks.move_to_requires_human_review`
+  - `tasks.assign`
+  - `tasks.add_comment`
+  - `tasks.add_activity_entry`
 
 Security controls include:
 
@@ -136,19 +167,33 @@ Security controls include:
 - capability profiles (`read_only`, `task_write`, `admin`)
 - optional token auth with TTL
 - local-loopback default binding
+- audit logging for MCP writes
+- listener status and bind-error reporting in Preferences
 
 Recommended workflow:
 
 - agents should start with `workspace.get_snapshot` or `plumy://workspace`
 - use `tasks.list`, `tasks.get`, `cards.kanban.list`, and `cards.timeline.list` for targeted reads
+- use `boards.watch.poll` when an agent needs to monitor a specific status/board without duplicate processing
 - use revision-protected write tools only after reading the current task revision
+- keep the task description focused on the problem statement and use:
+  - `agentSummary` for brief execution summary
+  - comments for human-readable conversation
+  - activity entries for structured machine-side progress notes
 - when work is complete, update the description briefly and move the task into the review board if human review is required
 
 Operational checks:
 
 - `npm run test:mcp` runs the workspace contract tests
 - `npm run mcp:smoke` runs a one-command local MCP smoke test against `MCP_ENDPOINT` or the default local endpoint
-- In the Preferences panel, the MCP section shows connection status, auth mode, token expiry, and the latest health check errors
+- `npm run mcp:stdio` starts the local stdio MCP server entrypoint
+- In the Preferences panel, the MCP section shows:
+  - connection status
+  - auth mode and token expiry
+  - listener/bind status
+  - generated curl/localtunnel/stdio commands
+  - MCP activity audit log with copy/export support
+  - latest health check errors
 
 Recommended local setup:
 
@@ -199,9 +244,42 @@ Workflow: `.github/workflows/packaging.yml`
 
 ```bash
 npm run test:mcp
+npm run mcp:smoke
+npm run mcp:stdio
 ```
 
-Runs MCP/workspace contract tests in `electron/services/workspace-service.test.cjs`.
+These commands cover:
+
+- MCP/workspace contract tests
+- a local MCP smoke test
+- local stdio MCP server startup
+
+## Current Agent Workflow Support
+
+Plumy now supports an agent-oriented desktop workflow:
+
+- people can be marked as `human` or `agentic`
+- tasks can be assigned to agentic people
+- agentic people can be configured to watch a specific kanban board/status
+- watcher settings live in the People panel and include:
+  - watched board
+  - action mode
+  - optional project filter
+  - optional search filter
+  - poll interval
+- watcher state keeps duplicate processing suppression on the MCP side
+- agents can move work into human-review boards and leave structured comments/activity entries
+
+## Comments and Task Context
+
+Tasks now support:
+
+- markdown description/details
+- structured comments
+- structured MCP activity entries
+- parsed project/repo hints from the task description for agent routing
+
+Comments are part of the task payload and are included in backup/import flows.
 
 ## Contributor Notes
 

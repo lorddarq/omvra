@@ -262,6 +262,49 @@ function getPortableStorageSnapshot(): Record<string, string> {
   return snapshot;
 }
 
+function flattenPortableStoreEntries(
+  value: unknown,
+  prefix = '',
+  out: Record<string, unknown> = {}
+): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    if (prefix) {
+      out[prefix] = value;
+    }
+    return out;
+  }
+
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    const nextPrefix = prefix ? `${prefix}.${key}` : key;
+    if (child && typeof child === 'object' && !Array.isArray(child)) {
+      flattenPortableStoreEntries(child, nextPrefix, out);
+    } else {
+      out[nextPrefix] = child;
+    }
+  }
+
+  return out;
+}
+
+function getPortableStoreValue<T = unknown>(
+  exported: Record<string, unknown>,
+  key: string
+): T | undefined {
+  if (Object.prototype.hasOwnProperty.call(exported, key)) {
+    return exported[key] as T;
+  }
+
+  const segments = key.split('.');
+  let current: unknown = exported;
+  for (const segment of segments) {
+    if (!current || typeof current !== 'object' || Array.isArray(current) || !(segment in (current as Record<string, unknown>))) {
+      return undefined;
+    }
+    current = (current as Record<string, unknown>)[segment];
+  }
+  return current as T;
+}
+
 async function getPortableElectronStoreSnapshot(): Promise<Record<string, unknown>> {
   try {
     const exported = await window.electron?.storeExport?.();
@@ -269,8 +312,9 @@ async function getPortableElectronStoreSnapshot(): Promise<Record<string, unknow
       return {};
     }
 
+    const flattened = flattenPortableStoreEntries(exported);
     return Object.fromEntries(
-      Object.entries(exported).filter(([key]) => isPortableStorageKey(key))
+      Object.entries(flattened).filter(([key]) => isPortableStorageKey(key))
     );
   } catch (err) {
     return {};
@@ -297,6 +341,23 @@ function clearPortableStorageKeys(): void {
   }
 }
 
+function hasAnyPortableLocalStorageData(): boolean {
+  if (typeof window === 'undefined') return false;
+
+  try {
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index);
+      if (key && isPortableStorageKey(key)) {
+        return true;
+      }
+    }
+  } catch (err) {
+    return false;
+  }
+
+  return false;
+}
+
 async function clearPortableElectronStoreKeys(): Promise<void> {
   if (typeof window === 'undefined') return;
 
@@ -304,7 +365,7 @@ async function clearPortableElectronStoreKeys(): Promise<void> {
     const exported = await window.electron?.storeExport?.();
     if (!exported || typeof exported !== 'object') return;
 
-    const keys = Object.keys(exported).filter(isPortableStorageKey);
+    const keys = Object.keys(flattenPortableStoreEntries(exported)).filter(isPortableStorageKey);
     await Promise.all(keys.map(key => deleteStoredValue(key).catch(() => undefined)));
   } catch (err) {
     // ignore
@@ -665,34 +726,74 @@ function App() {
           const exported = await window.electron?.storeExport?.();
           if (cancelled || !exported || typeof exported !== 'object') return;
 
-          const hasTasks = Object.prototype.hasOwnProperty.call(exported, TASKS_KEY);
-          const hasProjects = Object.prototype.hasOwnProperty.call(exported, SWIMLANES_KEY);
-          const hasPeople = Object.prototype.hasOwnProperty.call(exported, PEOPLE_KEY);
-          const hasStatusColumns = Object.prototype.hasOwnProperty.call(exported, STATUS_COLUMNS_KEY);
-          const hasPreferences = Object.prototype.hasOwnProperty.call(exported, PREFERENCES_KEY);
-          const hasAgentWatchConfigs = Object.prototype.hasOwnProperty.call(exported, MCP_AGENT_WATCH_CONFIGS_KEY);
+          const exportedTasks = getPortableStoreValue<Task[]>(exported, TASKS_KEY);
+          const exportedProjects = getPortableStoreValue<TimelineSwimlane[]>(exported, SWIMLANES_KEY);
+          const exportedPeople = getPortableStoreValue<Person[]>(exported, PEOPLE_KEY);
+          const exportedStatusColumns = getPortableStoreValue<StatusColumnState[]>(exported, STATUS_COLUMNS_KEY);
+          const exportedPreferences = getPortableStoreValue<Partial<AppPreferences>>(exported, PREFERENCES_KEY);
+          const exportedAgentWatchConfigs = getPortableStoreValue<AgentWatchConfig[]>(exported, MCP_AGENT_WATCH_CONFIGS_KEY);
+          const hasTasks = exportedTasks !== undefined;
+          const hasProjects = exportedProjects !== undefined;
+          const hasPeople = exportedPeople !== undefined;
+          const hasStatusColumns = exportedStatusColumns !== undefined;
+          const hasPreferences = exportedPreferences !== undefined;
+          const hasAgentWatchConfigs = exportedAgentWatchConfigs !== undefined;
+          const hasCanonicalWorkspaceData = hasTasks || hasProjects || hasPeople || hasStatusColumns || hasPreferences;
+
+          if (!hasCanonicalWorkspaceData && hasAnyPortableLocalStorageData()) {
+            const migratedProjects = sanitizeTimelineSwimlanes(
+              safeReadLocalStorageJSON<TimelineSwimlane[]>(SWIMLANES_KEY, initialTimelineSwimlanes)
+            );
+            const migratedPeople = sanitizePeople(
+              safeReadLocalStorageJSON<Person[]>(PEOPLE_KEY, initialPeople)
+            );
+            const migratedStatusColumns = sanitizeStatusColumns(
+              safeReadLocalStorageJSON<StatusColumnState[]>(STATUS_COLUMNS_KEY, defaultSwimlanes),
+              defaultSwimlanes
+            );
+            const migratedPreferences = sanitizePreferences(
+              safeReadLocalStorageJSON<Partial<AppPreferences>>(PREFERENCES_KEY, {}),
+              migratedStatusColumns,
+              preferences
+            );
+            const migratedAgentWatchConfigs = sanitizeAgentWatchConfigs(
+              safeReadLocalStorageJSON<AgentWatchConfig[]>(MCP_AGENT_WATCH_CONFIGS_KEY, [])
+            );
+            const migratedTasks = sanitizeTasks(
+              safeReadLocalStorageJSON<Task[]>(TASKS_KEY, initialTasks),
+              migratedProjects
+            );
+
+            setTimelineSwimlanes(migratedProjects);
+            setPeople(migratedPeople);
+            setStatusColumns(migratedStatusColumns);
+            setPreferences(migratedPreferences);
+            setAgentWatchConfigs(migratedAgentWatchConfigs);
+            setTasks(migratedTasks);
+            return;
+          }
 
           const canonicalProjects = hasProjects
-            ? sanitizeTimelineSwimlanes(exported[SWIMLANES_KEY])
+            ? sanitizeTimelineSwimlanes(exportedProjects)
             : timelineSwimlanes;
           const canonicalPeople = hasPeople
-            ? sanitizePeople(exported[PEOPLE_KEY])
+            ? sanitizePeople(exportedPeople)
             : people;
           const canonicalStatusColumns = hasStatusColumns
-            ? sanitizeStatusColumns(exported[STATUS_COLUMNS_KEY], defaultSwimlanes)
+            ? sanitizeStatusColumns(exportedStatusColumns, defaultSwimlanes)
             : statusColumns;
 
           if (hasProjects) setTimelineSwimlanes(canonicalProjects);
           if (hasPeople) setPeople(canonicalPeople);
           if (hasStatusColumns) setStatusColumns(canonicalStatusColumns);
           if (hasPreferences) {
-            setPreferences(prev => sanitizePreferences(exported[PREFERENCES_KEY], canonicalStatusColumns, prev));
+            setPreferences(prev => sanitizePreferences(exportedPreferences, canonicalStatusColumns, prev));
           }
           if (hasAgentWatchConfigs) {
-            setAgentWatchConfigs(sanitizeAgentWatchConfigs(exported[MCP_AGENT_WATCH_CONFIGS_KEY]));
+            setAgentWatchConfigs(sanitizeAgentWatchConfigs(exportedAgentWatchConfigs));
           }
           if (hasTasks) {
-            const canonicalTasks = sanitizeTasks(exported[TASKS_KEY], canonicalProjects);
+            const canonicalTasks = sanitizeTasks(exportedTasks, canonicalProjects);
             setTasks(canonicalTasks);
           }
         } finally {

@@ -92,6 +92,11 @@ import { swimlanes as defaultSwimlanes } from './constants/swimlanes';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 
+const ENABLE_SAMPLE_WORKSPACE = Boolean(import.meta.env.DEV);
+const DEFAULT_TASKS_SEED = ENABLE_SAMPLE_WORKSPACE ? initialTasks : [];
+const DEFAULT_SWIMLANES_SEED = ENABLE_SAMPLE_WORKSPACE ? initialTimelineSwimlanes : [];
+const DEFAULT_PEOPLE_SEED = ENABLE_SAMPLE_WORKSPACE ? initialPeople : [];
+
 interface AppPreferences {
   executionLoadStatusId: TaskStatus;
   pipelineLoadStatusId: TaskStatus;
@@ -445,7 +450,7 @@ function deriveStatusColumnsFromTasks(
 }
 
 function sanitizeTimelineSwimlanes(value: unknown): TimelineSwimlane[] {
-  if (!Array.isArray(value)) return initialTimelineSwimlanes;
+  if (!Array.isArray(value)) return DEFAULT_SWIMLANES_SEED;
 
   const sanitized = value
     .filter(item => item && typeof item === 'object')
@@ -467,7 +472,7 @@ function sanitizeTimelineSwimlanes(value: unknown): TimelineSwimlane[] {
 }
 
 function sanitizePeople(value: unknown): Person[] {
-  if (!Array.isArray(value)) return initialPeople;
+  if (!Array.isArray(value)) return DEFAULT_PEOPLE_SEED;
 
   const defaultColors = ['#ec4899', '#f97316', '#eab308', '#06b6d4', '#8b5cf6', '#10b981'];
   const sanitized = value
@@ -492,7 +497,7 @@ function sanitizePeople(value: unknown): Person[] {
 }
 
 function sanitizeTasks(value: unknown, swimlanes: TimelineSwimlane[]): Task[] {
-  if (!Array.isArray(value)) return initialTasks.map(task => normalizeTask(task, swimlanes));
+  if (!Array.isArray(value)) return DEFAULT_TASKS_SEED.map(task => normalizeTask(task, swimlanes));
 
   return value
     .filter(item => item && typeof item === 'object')
@@ -616,15 +621,15 @@ function App() {
   });
 
   const [tasks, setTasks] = useState<Task[]>(() => {
-    const stored = readInitialWorkspaceJSON<Task[]>(TASKS_KEY, initialTasks);
-    const swimlanes = readInitialWorkspaceJSON<TimelineSwimlane[]>(SWIMLANES_KEY, initialTimelineSwimlanes);
+    const stored = readInitialWorkspaceJSON<Task[]>(TASKS_KEY, DEFAULT_TASKS_SEED);
+    const swimlanes = readInitialWorkspaceJSON<TimelineSwimlane[]>(SWIMLANES_KEY, DEFAULT_SWIMLANES_SEED);
 
     // Migrate: Ensure project names and multi-project ids are present.
     return stored.map(task => normalizeTask(task, swimlanes));
   });
   
   const [timelineSwimlanes, setTimelineSwimlanes] = useState<TimelineSwimlane[]>(() => {
-    const stored = readInitialWorkspaceJSON<TimelineSwimlane[]>(SWIMLANES_KEY, initialTimelineSwimlanes);
+    const stored = readInitialWorkspaceJSON<TimelineSwimlane[]>(SWIMLANES_KEY, DEFAULT_SWIMLANES_SEED);
     
     // Migrate: Ensure all swimlanes have colors
     return stored.map(swimlane => ({
@@ -634,7 +639,7 @@ function App() {
   });
   
   const [people, setPeople] = useState<Person[]>(() => {
-    const stored = readInitialWorkspaceJSON<Person[]>(PEOPLE_KEY, initialPeople);
+    const stored = readInitialWorkspaceJSON<Person[]>(PEOPLE_KEY, DEFAULT_PEOPLE_SEED);
     
     // Migrate: Ensure all people have colors
     const defaultColors = ['#ec4899', '#f97316', '#eab308', '#06b6d4', '#8b5cf6', '#10b981'];
@@ -742,10 +747,10 @@ function App() {
 
           if (!hasCanonicalWorkspaceData && hasAnyPortableLocalStorageData()) {
             const migratedProjects = sanitizeTimelineSwimlanes(
-              safeReadLocalStorageJSON<TimelineSwimlane[]>(SWIMLANES_KEY, initialTimelineSwimlanes)
+              safeReadLocalStorageJSON<TimelineSwimlane[]>(SWIMLANES_KEY, DEFAULT_SWIMLANES_SEED)
             );
             const migratedPeople = sanitizePeople(
-              safeReadLocalStorageJSON<Person[]>(PEOPLE_KEY, initialPeople)
+              safeReadLocalStorageJSON<Person[]>(PEOPLE_KEY, DEFAULT_PEOPLE_SEED)
             );
             const migratedStatusColumns = sanitizeStatusColumns(
               safeReadLocalStorageJSON<StatusColumnState[]>(STATUS_COLUMNS_KEY, defaultSwimlanes),
@@ -760,7 +765,7 @@ function App() {
               safeReadLocalStorageJSON<AgentWatchConfig[]>(MCP_AGENT_WATCH_CONFIGS_KEY, [])
             );
             const migratedTasks = sanitizeTasks(
-              safeReadLocalStorageJSON<Task[]>(TASKS_KEY, initialTasks),
+              safeReadLocalStorageJSON<Task[]>(TASKS_KEY, DEFAULT_TASKS_SEED),
               migratedProjects
             );
 

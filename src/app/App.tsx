@@ -96,6 +96,8 @@ interface StorageMeterState {
   sourceLabel: string;
 }
 
+type StatusColumnState = { id: TaskStatus; title: string; color?: string };
+
 interface StatusColumnBackup {
   id: string;
   title: string;
@@ -267,8 +269,8 @@ async function restorePortableStorageSnapshot(
 
 function sanitizeStatusColumns(
   columns: unknown,
-  fallback: Array<{ id: TaskStatus; title: string; color?: string }>
-): Array<{ id: TaskStatus; title: string; color?: string }> {
+  fallback: StatusColumnState[]
+): StatusColumnState[] {
   if (!Array.isArray(columns)) return fallback;
 
   const sanitized = columns
@@ -284,15 +286,15 @@ function sanitizeStatusColumns(
         color: typeof candidate.color === 'string' ? candidate.color : '#9ca3af',
       };
     })
-    .filter((column): column is { id: TaskStatus; title: string; color?: string } => Boolean(column));
+    .filter((column): column is StatusColumnState & { color: string } => Boolean(column));
 
   return sanitized.length > 0 ? sanitized : fallback;
 }
 
 function deriveStatusColumnsFromTasks(
   taskList: Task[],
-  currentColumns: Array<{ id: TaskStatus; title: string; color?: string }>
-): Array<{ id: TaskStatus; title: string; color?: string }> {
+  currentColumns: StatusColumnState[]
+): StatusColumnState[] {
   const columns = [...currentColumns];
   const knownIds = new Set(columns.map(column => column.id));
 
@@ -405,7 +407,9 @@ function App() {
     }));
   });
 
-  const [statusColumns, setStatusColumns] = useState(() => safeReadJSON(STATUS_COLUMNS_KEY, defaultSwimlanes));
+  const [statusColumns, setStatusColumns] = useState<StatusColumnState[]>(() =>
+    safeReadJSON<StatusColumnState[]>(STATUS_COLUMNS_KEY, defaultSwimlanes)
+  );
   const [preferences, setPreferences] = useState<AppPreferences>(() => {
     const stored = safeReadJSON<Partial<AppPreferences>>(PREFERENCES_KEY, {});
     const executionDefault = getDefaultStatusId(defaultSwimlanes, 'in-progress');
@@ -831,13 +835,13 @@ function App() {
         .filter(task => task && typeof task.id === 'string' && typeof task.title === 'string')
         .map(task => normalizeTask(task, importedProjects));
 
-      const importedPeople = Array.isArray(parsed.people)
+      const importedPeople: Person[] = Array.isArray(parsed.people)
         ? parsed.people
             .filter(person => person && typeof person.id === 'string' && typeof person.name === 'string')
             .map(person => ({
               ...person,
               role: person.role || 'Team Member',
-              kind: person.kind === 'agentic' ? 'agentic' : 'human',
+              kind: (person.kind === 'agentic' ? 'agentic' : 'human') as Person['kind'],
             }))
         : people;
 

@@ -1,0 +1,49 @@
+{
+  "plumy.preferences.v1": {
+    "mcpAgentAccessEnabled": true,
+    "mcpCapabilityProfile": "read_only",
+    "mcpAccessToken": "secret-token",
+    "mcpAccessTokenIssuedAt": "2026-03-26T10:00:00.000Z",
+    "mcpAccessTokenTtlMinutes": 60
+  },
+  "plumy.swimlanes.v1": [
+    { "id": "lane-1", "name": "Plumy", "color": "#80ffe5" },
+    { "id": "lane-2", "name": "Grazy Plugin", "color": "#ff0000" }
+  ],
+  "plumy.statusColumns.v1": [
+    { "id": "ideas", "title": "Ideas", "color": "#ae00ff" },
+    { "id": "open", "title": "Backlog", "color": "#89919f" },
+    { "id": "in-progress", "title": "In Progress", "color": "#004c94" },
+    { "id": "ready-human", "title": "Ready for human review", "color": "#ffb61a" },
+    { "id": "done", "title": "Done", "color": "#a2b67c" }
+  ],
+  "plumy.people.v1": [
+    { "id": "agent-1", "name": "Codex", "kind": "agentic", "role": "Agent", "color": "#f97316" }
+  ],
+  "plumy.tasks.v1": [
+    {
+      "id": "task-custom-1",
+      "title": "Support Figma Components",
+      "notes": "Investigate canonical components and metadata support.",
+      "status": "ideas",
+      "assigneeId": "agent-1",
+      "swimlaneId": "lane-2",
+      "startDate": "2026-03-02",
+      "endDate": "2026-04-02",
+      "projectIds": ["lane-2"],
+      "priority": "normal"
+    },
+    {
+      "id": "task-custom-2",
+      "title": "MCP Support for Plumy",
+      "notes": "Add support for MCP and agent handoff.",
+      "status": "ready-human",
+      "assigneeId": "agent-1",
+      "swimlaneId": "lane-1",
+      "startDate": "2026-03-16",
+      "endDate": "2026-03-20",
+      "projectIds": ["lane-1"],
+      "priority": "urgent"
+    }
+  ]
+}

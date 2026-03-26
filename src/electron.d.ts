@@ -35,12 +35,19 @@ declare global {
   interface McpCapabilities {
     enabled: boolean;
     readOnly: boolean;
+    protocolVersion?: string;
+    serverInfo?: {
+      name: string;
+      version: string;
+    };
     capabilityProfile?: 'read_only' | 'task_write' | 'admin';
     capabilityProfiles?: Array<'read_only' | 'task_write' | 'admin'>;
+    transportModes?: Array<'http' | 'stdio'>;
     capabilities: {
       workspaceSnapshot: boolean;
       resourcesRead?: boolean;
       writeTools?: boolean;
+      initialize?: boolean;
     };
     writeBoundary?: {
       enforced: boolean;
@@ -78,10 +85,62 @@ declare global {
     error?: McpBridgeError;
   }
 
+  interface McpTokenStatus {
+    configured: boolean;
+    status: 'none' | 'active' | 'expired' | 'invalid-issued-at';
+    expired: boolean;
+    issuedAt: string | null;
+    expiresAt: string | null;
+    remainingMinutes: number | null;
+    ttlMinutes: number;
+  }
+
+  interface McpListenerStatus {
+    enabled: boolean;
+    status: 'disabled' | 'starting' | 'running' | 'stopped' | 'error';
+    listening: boolean;
+    host: string;
+    port: number;
+    path: string;
+    expectedAddress: string;
+    boundAddress: string | null;
+    boundUrl: string | null;
+    capabilityProfile: 'read_only' | 'task_write' | 'admin';
+    authMode: 'none' | 'token';
+    token: McpTokenStatus;
+    error: string | null;
+    lastStartedAt: string | null;
+    lastStoppedAt: string | null;
+    lastUpdatedAt: string | null;
+    restartRequired: boolean;
+  }
+
+  interface McpAuditEntry {
+    auditId: string;
+    timestamp: string;
+    type?: string;
+    outcome?: string;
+    reason?: string;
+    toolName?: string;
+    taskId?: string;
+    nextRevision?: number;
+    targetStatusId?: string;
+    targetStatusTitle?: string;
+    assigneeId?: string;
+    assigneeName?: string;
+    method?: string;
+    origin?: string;
+    transport?: string;
+    remoteAddress?: string;
+    capabilityProfile?: string;
+    [key: string]: unknown;
+  }
+
   interface Window {
     electron: {
       storeGet: (key: string) => Promise<any>;
       storeSet: (key: string, value: any) => Promise<void>;
+      storeDelete: (key: string) => Promise<void>;
       storeExport: () => Promise<Record<string, any>>;
       attachments: {
         pick: () => Promise<string[]>;
@@ -91,8 +150,10 @@ declare global {
       openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
       mcp: {
         getCapabilities: () => Promise<McpBridgeResult<McpCapabilities>>;
+        getListenerStatus: () => Promise<McpBridgeResult<McpListenerStatus>>;
+        getAuditLog: (options?: { limit?: number }) => Promise<McpBridgeResult<McpAuditEntry[]>>;
         getWorkspaceSnapshot: () => Promise<McpBridgeResult<McpWorkspaceSnapshot>>;
-        restartServer: () => Promise<{ success: boolean; error?: string }>;
+        restartServer: () => Promise<{ success: boolean; error?: string; listenerStatus?: McpListenerStatus }>;
       };
     };
   }

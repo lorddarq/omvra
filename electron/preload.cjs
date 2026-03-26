@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('electron', {
   // Store
   storeGet: (key) => ipcRenderer.invoke('store/get', key),
   storeSet: (key, value) => ipcRenderer.invoke('store/set', key, value),
+  storeDelete: (key) => ipcRenderer.invoke('store/delete', key),
   storeExport: () => ipcRenderer.invoke('store/export'),
 
   // Attachments
@@ -19,6 +20,8 @@ contextBridge.exposeInMainWorld('electron', {
   // MCP bridge (read-only, gated by mcpAgentAccessEnabled preference)
   mcp: {
     getCapabilities: () => ipcRenderer.invoke('mcp/get-capabilities'),
+    getListenerStatus: () => ipcRenderer.invoke('mcp/get-listener-status'),
+    getAuditLog: (options) => ipcRenderer.invoke('mcp/get-audit-log', options),
     getWorkspaceSnapshot: () => ipcRenderer.invoke('mcp/workspace/snapshot'),
     restartServer: () => ipcRenderer.invoke('mcp/restart-server'),
   },

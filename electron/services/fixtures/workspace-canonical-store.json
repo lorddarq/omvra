@@ -1,0 +1,70 @@
+{
+  "plumy.tasks.v1": [
+    {
+      "id": "task-canonical-1",
+      "title": "Canonical store task",
+      "status": "in-progress",
+      "notes": "Keep reads aligned to the canonical electron-store snapshot.",
+      "startDate": "2026-03-01",
+      "endDate": "2026-03-03",
+      "swimlaneId": "lane-canonical",
+      "project": "Canonical Project",
+      "projectIds": ["lane-canonical"],
+      "assigneeId": "person-canonical",
+      "size": "m",
+      "complexity": "medium",
+      "blocked": false,
+      "priority": "normal"
+    }
+  ],
+  "plumy.people.v1": [
+    {
+      "id": "person-canonical",
+      "name": "Alpha Bot",
+      "role": "Agent",
+      "kind": "agentic",
+      "color": "#3b82f6"
+    }
+  ],
+  "plumy.swimlanes.v1": [
+    {
+      "id": "lane-canonical",
+      "name": "Canonical Project",
+      "color": "#3b82f6"
+    }
+  ],
+  "plumy.statusColumns.v1": [
+    {
+      "id": "open",
+      "title": "Open",
+      "color": "#06b6d4"
+    },
+    {
+      "id": "in-progress",
+      "title": "In Progress",
+      "color": "#3b82f6"
+    },
+    {
+      "id": "under-review",
+      "title": "Under Review",
+      "color": "#ec4899"
+    },
+    {
+      "id": "done",
+      "title": "Done",
+      "color": "#a855f7"
+    }
+  ],
+  "plumy.preferences.v1": {
+    "executionLoadStatusId": "in-progress",
+    "pipelineLoadStatusId": "open",
+    "mcpAgentAccessEnabled": true,
+    "mcpCapabilityProfile": "read_only",
+    "mcpBindHost": "127.0.0.1",
+    "mcpPort": 3456,
+    "mcpServerAddress": "http://127.0.0.1:3456/mcp",
+    "mcpAccessToken": "",
+    "mcpAccessTokenTtlMinutes": 60
+  },
+  "legacy.localStorageOnly": "{\"should-not\":\"be-read\"}"
+}

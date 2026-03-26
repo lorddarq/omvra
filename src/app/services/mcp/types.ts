@@ -11,6 +11,18 @@ export interface McpToolDescriptor {
   inputSchema?: unknown;
 }
 
+export interface McpServerInfo {
+  name?: string;
+  version?: string;
+}
+
+export interface McpInitializeResult {
+  protocolVersion?: string;
+  serverInfo?: McpServerInfo;
+  capabilities?: Record<string, unknown>;
+  instructions?: string;
+}
+
 export interface McpResourceResponse {
   uri: string;
   mimeType?: string;
@@ -23,13 +35,16 @@ export type McpReadToolName =
   | 'tasks.list'
   | 'tasks.get'
   | 'cards.kanban.list'
-  | 'cards.timeline.list';
+  | 'cards.timeline.list'
+  | 'boards.watch.poll';
 
 export interface McpDiagnosticsResult {
   ok: boolean;
   endpoint: string;
   latencyMs?: number;
   toolCount?: number;
+  authMode?: 'none' | 'token';
+  connectionStatus?: 'disabled' | 'local-ready' | 'remote-ready' | 'auth-error' | 'handshake-error' | 'unknown';
   error?: string;
 }
 
@@ -49,6 +64,8 @@ export interface McpHealthCheckResult {
   ok: boolean;
   endpoint: string;
   latencyMs?: number;
+  authMode?: 'none' | 'token';
+  connectionStatus?: 'disabled' | 'local-ready' | 'remote-ready' | 'auth-error' | 'handshake-error' | 'unknown';
   toolsAvailable: string[];
   missingTools: string[];
   resourceReadSupported: boolean;
@@ -102,4 +119,32 @@ export interface McpTaskSummary {
 export interface McpCard {
   id: string;
   [key: string]: unknown;
+}
+
+export interface McpBoardWatchChangeSet {
+  newTasks: McpTaskSummary[];
+  updatedTasks: McpTaskSummary[];
+  removedTaskIds: string[];
+}
+
+export interface McpBoardWatchState {
+  watcherId: string;
+  statusId: string;
+  filters?: Record<string, unknown>;
+  lastSeenTaskIds?: string[];
+  lastSeenRevisions?: Record<string, number>;
+  lastProcessedAt?: string;
+}
+
+export interface McpBoardWatchResult {
+  ok: boolean;
+  watcherState?: McpBoardWatchState;
+  board?: {
+    id: string;
+    taskCount: number;
+    currentTaskIds: string[];
+  };
+  changes?: McpBoardWatchChangeSet;
+  error?: string;
+  message?: string;
 }

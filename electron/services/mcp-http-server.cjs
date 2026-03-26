@@ -3,19 +3,30 @@ const {
   isMcpAgentAccessEnabled,
   getMcpServerConfig,
   getMcpCapabilityProfile,
+  buildMcpCapabilitySnapshot,
+  buildMcpInitializeResult,
   appendMcpAuditLog,
   getWorkspaceSnapshot,
   listTasks,
   getTaskById,
   listKanbanCards,
   listTimelineCards,
+  pollBoardWatcher,
   transitionTaskToUnderReview,
   updateTaskAgentSummary,
+  addTaskComment,
+  addTaskActivityEntry,
   updateTaskCompletionDescription,
   moveTasksToRequiresHumanReviewBoard,
+  moveTaskToStatus,
+  moveTaskToReadyForHumanReview,
+  assignTaskToPerson,
+  isMcpAccessTokenExpired,
 } = require('./workspace-service.cjs');
 
 const MAX_BODY_BYTES = 1024 * 1024;
+const ALLOWED_CORS_HEADERS = 'Content-Type, Accept, Authorization, X-MCP-Token';
+const ALLOWED_CORS_METHODS = 'POST, OPTIONS';
 
 const JSON_RPC_ERROR = {
   PARSE_ERROR: -32700,
@@ -91,6 +102,23 @@ const READ_TOOL_DEFINITIONS = [
       },
     },
   },
+  {
+    name: 'boards.watch.poll',
+    description: 'Polls a kanban board/status for new or changed tasks and persists the watcher state for duplicate suppression.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        watcherId: { type: 'string' },
+        statusId: { type: 'string' },
+        assigneeId: { type: 'string' },
+        projectId: { type: 'string' },
+        search: { type: 'string' },
+        persist: { type: 'boolean' },
+      },
+      required: ['statusId'],
+    },
+  },
 ];
 
 // Write tools are intentionally not exposed in tools/list while the backend remains read-only.
@@ -120,6 +148,36 @@ const WRITE_TOOL_DEFINITIONS = [
         expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
       },
       required: ['taskId', 'summary', 'expectedRevision'],
+    },
+  },
+  {
+    name: 'tasks.add_comment',
+    description: 'Adds a structured comment to a task.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        taskId: { type: 'string' },
+        comment: { type: 'string' },
+        author: { type: 'string' },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+      },
+      required: ['taskId', 'comment', 'expectedRevision'],
+    },
+  },
+  {
+    name: 'tasks.add_activity_entry',
+    description: 'Adds a structured activity entry to a task.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        taskId: { type: 'string' },
+        message: { type: 'string' },
+        type: { type: 'string' },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+      },
+      required: ['taskId', 'message', 'expectedRevision'],
     },
   },
   {
@@ -153,6 +211,50 @@ const WRITE_TOOL_DEFINITIONS = [
           additionalProperties: { anyOf: [{ type: 'string' }, { type: 'number' }] },
         },
       },
+    },
+  },
+  {
+    name: 'tasks.move_to_status',
+    description: 'Moves a task to a named board/status after validating the target exists.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        taskId: { type: 'string' },
+        statusId: { type: 'string' },
+        statusTitle: { type: 'string' },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+      },
+      required: ['taskId', 'expectedRevision'],
+    },
+  },
+  {
+    name: 'tasks.move_to_ready_for_human_review',
+    description: 'Moves a task to Ready for human review, creating the board if needed.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        taskId: { type: 'string' },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+      },
+      required: ['taskId', 'expectedRevision'],
+    },
+  },
+  {
+    name: 'tasks.assign',
+    description: 'Assigns a task to a human or agent person by id or name.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        taskId: { type: 'string' },
+        assigneeId: { type: 'string' },
+        assigneeName: { type: 'string' },
+        assigneeKind: { type: 'string' },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+      },
+      required: ['taskId', 'expectedRevision'],
     },
   },
 ];
@@ -213,8 +315,62 @@ function makeToolResult(structuredContent) {
   };
 }
 
+function makeWriteToolResult(action, payload = {}) {
+  const structuredContent = {
+    ok: true,
+    action,
+    changed: Boolean(payload.changed),
+    auditId: typeof payload.auditId === 'string' && payload.auditId ? payload.auditId : null,
+  };
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'revision')) {
+    structuredContent.revision = payload.revision;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'task')) {
+    structuredContent.task = payload.task;
+    if (!Object.prototype.hasOwnProperty.call(structuredContent, 'revision')) {
+      structuredContent.revision = payload.task && typeof payload.task === 'object'
+        ? payload.task.__mcpRevision ?? null
+        : null;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'result')) {
+    structuredContent.result = payload.result;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'statusId')) {
+    structuredContent.statusId = payload.statusId;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'statusCreated')) {
+    structuredContent.statusCreated = payload.statusCreated;
+  }
+
+  return makeToolResult(structuredContent);
+}
+
 function normalizeObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function hasResponseId(request) {
+  return Boolean(request) && Object.prototype.hasOwnProperty.call(request, 'id');
+}
+
+function getRequestMeta(req) {
+  const headers = req?.headers || {};
+  const remoteAddress = req?.transport === 'stdio'
+    ? 'stdio'
+    : req?.socket?.remoteAddress || req?.remoteAddress || null;
+
+  return {
+    remoteAddress,
+    userAgent: typeof headers['user-agent'] === 'string' ? headers['user-agent'] : null,
+    tokenProvided: Boolean(extractBearerToken(req)),
+    transport: req?.transport || 'http',
+  };
 }
 
 function sanitizeForAudit(value, depth = 0) {
@@ -290,29 +446,6 @@ function isKnownWriteToolName(name) {
   return /^tasks\.(create|update|delete|write|set|transition)/.test(name);
 }
 
-function getCapabilities(store) {
-  const enabled = isMcpAgentAccessEnabled(store);
-  const profile = getMcpCapabilityProfile(store);
-  const writeToolsEnabled = profile === 'task_write' || profile === 'admin';
-  return {
-    enabled,
-    readOnly: true,
-    capabilityProfile: profile,
-    capabilityProfiles: ['read_only', 'task_write', 'admin'],
-    capabilities: {
-      workspaceSnapshot: enabled,
-      resourcesRead: enabled,
-      toolCalls: enabled,
-      writeTools: writeToolsEnabled,
-    },
-    writeBoundary: {
-      writeToolsEnabled,
-      enforced: true,
-      exposedWriteTools: writeToolsEnabled ? WRITE_TOOL_DEFINITIONS.map(tool => tool.name) : [],
-    },
-  };
-}
-
 function getResourceForUri(store, uri, requestParams) {
   if (uri === 'plumy://workspace') {
     return { uri, data: getWorkspaceSnapshot(store) };
@@ -364,11 +497,9 @@ function makeResourceReadResult(resourceUri, data) {
 }
 
 function recordWriteAttempt(store, req, details) {
-  appendMcpAuditLog(store, {
+  return appendMcpAuditLog(store, {
     type: 'mcp_write_attempt',
-    remoteAddress: req.socket?.remoteAddress || null,
-    userAgent: typeof req.headers?.['user-agent'] === 'string' ? req.headers['user-agent'] : null,
-    tokenProvided: Boolean(extractBearerToken(req)),
+    ...getRequestMeta(req),
     ...sanitizeForAudit(details),
   });
 }
@@ -385,25 +516,25 @@ function handleToolCall(store, req, params) {
     const profile = getMcpCapabilityProfile(store);
     const writeToolsEnabled = profile === 'task_write' || profile === 'admin';
     if (!writeToolsEnabled) {
-    recordWriteAttempt(store, req, {
-      outcome: 'denied',
-      reason: 'write_tools_unavailable',
-      capabilityProfile: profile,
-      toolName: name,
-      arguments: args,
-    });
+      recordWriteAttempt(store, req, {
+        outcome: 'denied',
+        reason: 'write_tools_unavailable',
+        capabilityProfile: profile,
+        toolName: name,
+        arguments: args,
+      });
 
-    return {
-      error: createJsonRpcError(
-        JSON_RPC_ERROR.MCP_WRITE_FORBIDDEN,
-        `Write tool "${name}" is not available. MCP is currently read-only by default.`,
-        {
-          capabilityProfile: profile,
-          allowedProfiles: ['task_write', 'admin'],
-          writeToolsEnabled,
-        }
-      ),
-    };
+      return {
+        error: createJsonRpcError(
+          JSON_RPC_ERROR.MCP_WRITE_FORBIDDEN,
+          `Write tool "${name}" is not available. MCP is currently read-only by default.`,
+          {
+            capabilityProfile: profile,
+            allowedProfiles: ['task_write', 'admin'],
+            writeToolsEnabled,
+          }
+        ),
+      };
     }
   }
 
@@ -436,6 +567,21 @@ function handleToolCall(store, req, params) {
     case 'cards.timeline.list':
       return { result: makeToolResult(listTimelineCards(store, args)) };
 
+    case 'boards.watch.poll': {
+      const result = pollBoardWatcher(store, {
+        watcherId: args.watcherId,
+        statusId: args.statusId,
+        assigneeId: args.assigneeId,
+        projectId: args.projectId,
+        search: args.search,
+        persist: args.persist !== false,
+      });
+      if (!result.ok) {
+        return { error: invalidParams(result.message, result) };
+      }
+      return { result: makeToolResult(result) };
+    }
+
     case 'tasks.transition_under_review': {
       const taskId = parseTaskId(args);
       if (!taskId) {
@@ -455,13 +601,20 @@ function handleToolCall(store, req, params) {
         });
         return { error: invalidParams(result.message, result) };
       }
-      recordWriteAttempt(store, req, {
+      const audit = recordWriteAttempt(store, req, {
         outcome: 'allowed',
         toolName: name,
         taskId,
         nextRevision: result.task?.__mcpRevision,
       });
-      return { result: makeToolResult({ task: result.task }) };
+      return {
+        result: makeWriteToolResult(name, {
+          changed: true,
+          auditId: audit?.auditId,
+          task: result.task,
+          revision: result.task?.__mcpRevision,
+        }),
+      };
     }
 
     case 'tasks.update_agent_summary': {
@@ -484,13 +637,94 @@ function handleToolCall(store, req, params) {
         });
         return { error: invalidParams(result.message, result) };
       }
-      recordWriteAttempt(store, req, {
+      const audit = recordWriteAttempt(store, req, {
         outcome: 'allowed',
         toolName: name,
         taskId,
         nextRevision: result.task?.__mcpRevision,
       });
-      return { result: makeToolResult({ task: result.task }) };
+      return {
+        result: makeWriteToolResult(name, {
+          changed: true,
+          auditId: audit?.auditId,
+          task: result.task,
+          revision: result.task?.__mcpRevision,
+        }),
+      };
+    }
+
+    case 'tasks.add_comment': {
+      const taskId = parseTaskId(args);
+      if (!taskId) {
+        return { error: invalidParams('Invalid params: "taskId" is required.') };
+      }
+      const result = addTaskComment(store, {
+        taskId,
+        comment: args.comment,
+        author: args.author || 'mcp-agent',
+        expectedRevision: args.expectedRevision,
+        actor: 'mcp-agent',
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, {
+          outcome: 'denied',
+          reason: result.error,
+          toolName: name,
+          taskId,
+        });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        taskId,
+        nextRevision: result.task?.__mcpRevision,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: true,
+          auditId: audit?.auditId,
+          task: result.task,
+          revision: result.task?.__mcpRevision,
+        }),
+      };
+    }
+
+    case 'tasks.add_activity_entry': {
+      const taskId = parseTaskId(args);
+      if (!taskId) {
+        return { error: invalidParams('Invalid params: "taskId" is required.') };
+      }
+      const result = addTaskActivityEntry(store, {
+        taskId,
+        message: args.message,
+        type: args.type,
+        expectedRevision: args.expectedRevision,
+        actor: 'mcp-agent',
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, {
+          outcome: 'denied',
+          reason: result.error,
+          toolName: name,
+          taskId,
+        });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        taskId,
+        nextRevision: result.task?.__mcpRevision,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: true,
+          auditId: audit?.auditId,
+          task: result.task,
+          revision: result.task?.__mcpRevision,
+        }),
+      };
     }
 
     case 'tasks.move_to_requires_human_review': {
@@ -500,13 +734,21 @@ function handleToolCall(store, req, params) {
         includeDone: Boolean(args.includeDone),
         expectedRevisions: args.expectedRevisions,
       });
-      recordWriteAttempt(store, req, {
+      const audit = recordWriteAttempt(store, req, {
         outcome: 'allowed',
         toolName: name,
         movedTaskIds: result.movedTaskIds,
         skipped: result.skipped,
       });
-      return { result: makeToolResult(result) };
+      return {
+        result: makeWriteToolResult(name, {
+          changed: result.totalMoved > 0,
+          auditId: audit?.auditId,
+          result,
+          statusId: result.statusId,
+          statusCreated: result.statusCreated,
+        }),
+      };
     }
 
     case 'tasks.update_completion_description': {
@@ -529,13 +771,144 @@ function handleToolCall(store, req, params) {
         });
         return { error: invalidParams(result.message, result) };
       }
-      recordWriteAttempt(store, req, {
+      const audit = recordWriteAttempt(store, req, {
         outcome: 'allowed',
         toolName: name,
         taskId,
         nextRevision: result.task?.__mcpRevision,
       });
-      return { result: makeToolResult({ task: result.task }) };
+      return {
+        result: makeWriteToolResult(name, {
+          changed: true,
+          auditId: audit?.auditId,
+          task: result.task,
+          revision: result.task?.__mcpRevision,
+        }),
+      };
+    }
+
+    case 'tasks.move_to_status': {
+      const taskId = parseTaskId(args);
+      if (!taskId) {
+        return { error: invalidParams('Invalid params: "taskId" is required.') };
+      }
+
+      const result = moveTaskToStatus(store, {
+        taskId,
+        statusId: args.statusId,
+        statusTitle: args.statusTitle,
+        expectedRevision: args.expectedRevision,
+        actor: 'mcp-agent',
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, {
+          outcome: 'denied',
+          reason: result.error,
+          toolName: name,
+          taskId,
+          targetStatusId: args.statusId,
+          targetStatusTitle: args.statusTitle,
+        });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        taskId,
+        targetStatusId: args.statusId,
+        targetStatusTitle: args.statusTitle,
+        nextRevision: result.task?.__mcpRevision ?? result.currentRevision,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: result.changed !== false,
+          auditId: audit?.auditId,
+          task: result.task,
+          revision: result.task?.__mcpRevision ?? result.currentRevision,
+        }),
+      };
+    }
+
+    case 'tasks.move_to_ready_for_human_review': {
+      const taskId = parseTaskId(args);
+      if (!taskId) {
+        return { error: invalidParams('Invalid params: "taskId" is required.') };
+      }
+
+      const result = moveTaskToReadyForHumanReview(store, {
+        taskId,
+        expectedRevision: args.expectedRevision,
+        actor: 'mcp-agent',
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, {
+          outcome: 'denied',
+          reason: result.error,
+          toolName: name,
+          taskId,
+        });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        taskId,
+        targetStatusId: result.statusId,
+        nextRevision: result.task?.__mcpRevision ?? result.currentRevision,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: result.changed !== false,
+          auditId: audit?.auditId,
+          task: result.task,
+          revision: result.task?.__mcpRevision ?? result.currentRevision,
+          statusId: result.statusId,
+          statusCreated: result.statusCreated,
+        }),
+      };
+    }
+
+    case 'tasks.assign': {
+      const taskId = parseTaskId(args);
+      if (!taskId) {
+        return { error: invalidParams('Invalid params: "taskId" is required.') };
+      }
+
+      const result = assignTaskToPerson(store, {
+        taskId,
+        assigneeId: args.assigneeId,
+        assigneeName: args.assigneeName,
+        assigneeKind: args.assigneeKind,
+        expectedRevision: args.expectedRevision,
+        actor: 'mcp-agent',
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, {
+          outcome: 'denied',
+          reason: result.error,
+          toolName: name,
+          taskId,
+          assigneeId: args.assigneeId,
+          assigneeName: args.assigneeName,
+        });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        taskId,
+        assigneeId: args.assigneeId,
+        assigneeName: args.assigneeName,
+        nextRevision: result.task?.__mcpRevision ?? result.currentRevision,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: result.changed !== false,
+          auditId: audit?.auditId,
+          task: result.task,
+          revision: result.task?.__mcpRevision ?? result.currentRevision,
+        }),
+      };
     }
 
     default:
@@ -554,13 +927,37 @@ function extractBearerToken(req) {
   return typeof fallbackToken === 'string' ? fallbackToken.trim() : '';
 }
 
-function isTokenExpired(serverConfig) {
-  if (!serverConfig.accessToken) return false;
-  if (!serverConfig.accessTokenIssuedAt) return true;
-  const issuedAtMs = Date.parse(serverConfig.accessTokenIssuedAt);
-  if (!Number.isFinite(issuedAtMs)) return true;
-  const ttlMs = Math.max(1, Number(serverConfig.accessTokenTtlMinutes || 60)) * 60 * 1000;
-  return Date.now() > issuedAtMs + ttlMs;
+function buildAuthErrorData(serverConfig, reason, req, extra = {}) {
+  return {
+    reason,
+    authMode: serverConfig.accessToken ? 'token' : 'none',
+    tokenConfigured: Boolean(serverConfig.accessToken),
+    tokenStatus: serverConfig.accessToken
+      ? (isMcpAccessTokenExpired(serverConfig) ? 'expired' : 'active')
+      : 'none',
+    endpoint: serverConfig.publicUrl,
+    host: serverConfig.host,
+    port: serverConfig.port,
+    path: serverConfig.path,
+    transport: req?.transport || 'http',
+    ...extra,
+  };
+}
+
+function createAuthError(serverConfig, req, reason, message, extra = {}) {
+  return createJsonRpcError(
+    JSON_RPC_ERROR.MCP_UNAUTHORIZED,
+    message,
+    buildAuthErrorData(serverConfig, reason, req, extra)
+  );
+}
+
+function createAccessDisabledError(serverConfig, req) {
+  return createJsonRpcError(
+    JSON_RPC_ERROR.MCP_ACCESS_DISABLED,
+    'MCP agent access is disabled. Enable mcpAgentAccessEnabled in Preferences.',
+    buildAuthErrorData(serverConfig, 'access_disabled', req)
+  );
 }
 
 function createRequestDispatcher(store) {
@@ -587,9 +984,16 @@ function createRequestDispatcher(store) {
       );
     }
 
+    const canRespond = hasResponseId(request);
+    const respond = payload => (canRespond ? makeJsonRpcResponse(id, payload) : null);
     const normalizedMethod = method.trim();
     const toolPayload = normalizedMethod === 'tools/call' ? getToolCallPayload(params) : null;
     const isWriteAttempt = normalizedMethod === 'tools/call' && !toolPayload?.error && isKnownWriteToolName(toolPayload.name);
+    const currentServerConfig = getMcpServerConfig(store);
+
+    if (normalizedMethod === 'notifications/initialized') {
+      return null;
+    }
 
     if (!isMcpAgentAccessEnabled(store)) {
       if (isWriteAttempt) {
@@ -601,30 +1005,23 @@ function createRequestDispatcher(store) {
           arguments: toolPayload.args,
         });
       }
-      return makeJsonRpcResponse(
-        id,
-        {
-          error: createJsonRpcError(
-            JSON_RPC_ERROR.MCP_ACCESS_DISABLED,
-            'MCP agent access is disabled. Enable mcpAgentAccessEnabled in Preferences.'
-          ),
-        }
-      );
+      return respond({
+        error: createAccessDisabledError(currentServerConfig, req),
+      });
     }
 
-    const currentServerConfig = getMcpServerConfig(store);
     const token = currentServerConfig.accessToken;
-    if (token) {
-      if (isTokenExpired(currentServerConfig)) {
-        return makeJsonRpcResponse(
-          id,
-          {
-            error: createJsonRpcError(
-              JSON_RPC_ERROR.MCP_UNAUTHORIZED,
-              'MCP token expired. Rotate token in Preferences.'
-            ),
-          }
-        );
+    const isStdioTransport = req?.transport === 'stdio';
+    if (token && !isStdioTransport) {
+      if (isMcpAccessTokenExpired(currentServerConfig)) {
+        return respond({
+          error: createAuthError(
+            currentServerConfig,
+            req,
+            'token_expired',
+            'MCP token expired. Rotate token in Preferences.'
+          ),
+        });
       }
       const providedToken = extractBearerToken(req);
       if (!providedToken || providedToken !== token) {
@@ -637,31 +1034,42 @@ function createRequestDispatcher(store) {
             arguments: toolPayload.args,
           });
         }
-        return makeJsonRpcResponse(
-          id,
-          {
-            error: createJsonRpcError(
-              JSON_RPC_ERROR.MCP_UNAUTHORIZED,
-              'Unauthorized MCP request. Provide a valid Bearer token.'
-            ),
-          }
-        );
+        return respond({
+          error: createAuthError(
+            currentServerConfig,
+            req,
+            'unauthorized',
+            'Unauthorized MCP request. Provide a valid Bearer token.',
+            {
+              tokenProvided: Boolean(providedToken),
+            }
+          ),
+        });
       }
     }
 
+    if (normalizedMethod === 'initialize') {
+      if (params !== undefined && (typeof params !== 'object' || params === null || Array.isArray(params))) {
+        return respond({
+          error: invalidParams('Invalid params: initialize expects an object when params are provided.'),
+        });
+      }
+      return respond({ result: buildMcpInitializeResult(store) });
+    }
+
     if (normalizedMethod === 'mcp/capabilities') {
-      return makeJsonRpcResponse(id, { result: getCapabilities(store) });
+      return respond({ result: buildMcpCapabilitySnapshot(store) });
     }
 
     if (normalizedMethod === 'tools/list') {
       if (params !== undefined && (typeof params !== 'object' || params === null || Array.isArray(params))) {
-        return makeJsonRpcResponse(id, {
+        return respond({
           error: invalidParams('Invalid params: tools/list expects an object when params are provided.'),
         });
       }
       const profile = getMcpCapabilityProfile(store);
       const writeToolsEnabled = profile === 'task_write' || profile === 'admin';
-      return makeJsonRpcResponse(id, {
+      return respond({
         result: {
           tools: writeToolsEnabled
             ? [...READ_TOOL_DEFINITIONS, ...WRITE_TOOL_DEFINITIONS]
@@ -673,55 +1081,101 @@ function createRequestDispatcher(store) {
     if (normalizedMethod === 'tools/call') {
       const toolResponse = handleToolCall(store, req, params);
       if (toolResponse.error) {
-        return makeJsonRpcResponse(id, { error: toolResponse.error });
+        return respond({ error: toolResponse.error });
       }
-      return makeJsonRpcResponse(id, { result: toolResponse.result });
+      return respond({ result: toolResponse.result });
     }
 
     if (normalizedMethod === 'resources/list') {
       if (params !== undefined && (typeof params !== 'object' || params === null || Array.isArray(params))) {
-        return makeJsonRpcResponse(id, {
+        return respond({
           error: invalidParams('Invalid params: resources/list expects an object when params are provided.'),
         });
       }
-      return makeJsonRpcResponse(id, { result: { resources: RESOURCE_DEFINITIONS } });
+      return respond({ result: { resources: RESOURCE_DEFINITIONS } });
     }
 
     if (normalizedMethod === 'resources/read') {
       const normalized = normalizeObject(params);
       const uri = typeof normalized.uri === 'string' ? normalized.uri.trim() : '';
       if (!uri) {
-        return makeJsonRpcResponse(id, {
+        return respond({
           error: invalidParams('Invalid params: "uri" is required for resources/read.'),
         });
       }
 
       const resourceResponse = getResourceForUri(store, uri, normalized);
       if (resourceResponse.error) {
-        return makeJsonRpcResponse(id, { error: resourceResponse.error });
+        return respond({ error: resourceResponse.error });
       }
 
-      return makeJsonRpcResponse(id, {
+      return respond({
         result: makeResourceReadResult(resourceResponse.uri, resourceResponse.data),
       });
     }
 
-    return makeJsonRpcResponse(
-      id,
-      { error: createJsonRpcError(JSON_RPC_ERROR.METHOD_NOT_FOUND, `Method not found: ${normalizedMethod}`) }
-    );
+    return respond({
+      error: createJsonRpcError(JSON_RPC_ERROR.METHOD_NOT_FOUND, `Method not found: ${normalizedMethod}`),
+    });
   };
 }
 
-function startMcpHttpServer(store, { logger = console } = {}) {
+function applyCorsHeaders(req, res) {
+  const requestOrigin = typeof req?.headers?.origin === 'string' ? req.headers.origin.trim() : '';
+  const allowOrigin = requestOrigin || '*';
+
+  res.setHeader('Access-Control-Allow-Origin', allowOrigin);
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Methods', ALLOWED_CORS_METHODS);
+  res.setHeader('Access-Control-Allow-Headers', ALLOWED_CORS_HEADERS);
+  res.setHeader('Access-Control-Max-Age', '600');
+}
+
+function startMcpHttpServer(store, { logger = console, onStatusChange } = {}) {
   const dispatch = createRequestDispatcher(store);
   const serverConfig = getMcpServerConfig(store);
+  const emitStatus = (status) => {
+    if (typeof onStatusChange !== 'function') return;
+    onStatusChange({
+      ...status,
+      host: serverConfig.host,
+      port: serverConfig.port,
+      path: serverConfig.path,
+      expectedAddress: serverConfig.publicUrl,
+      capabilityProfile: getMcpCapabilityProfile(store),
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
+  emitStatus({
+    status: isMcpAgentAccessEnabled(store) ? 'starting' : 'disabled',
+    listening: false,
+    error: null,
+    boundAddress: null,
+    boundUrl: null,
+    restartRequired: false,
+  });
 
   const server = http.createServer((req, res) => {
-    if (!req || req.method !== 'POST' || req.url !== serverConfig.path) {
+    applyCorsHeaders(req, res);
+
+    if (!req || req.url !== serverConfig.path) {
       res.statusCode = 404;
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.end(JSON.stringify({ error: 'Not Found' }));
+      return;
+    }
+
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      res.end();
+      return;
+    }
+
+    if (req.method !== 'POST') {
+      res.statusCode = 405;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: 'Method Not Allowed' }));
       return;
     }
 
@@ -773,7 +1227,22 @@ function startMcpHttpServer(store, { logger = console } = {}) {
         );
       }
 
-      res.statusCode = 200;
+      if (responsePayload === null) {
+        res.statusCode = 204;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end();
+        return;
+      }
+
+      const responseCode = responsePayload?.error?.code;
+      if (responseCode === JSON_RPC_ERROR.MCP_UNAUTHORIZED) {
+        res.statusCode = 401;
+        res.setHeader('WWW-Authenticate', 'Bearer realm="Plumy MCP", error="invalid_token"');
+      } else if (responseCode === JSON_RPC_ERROR.MCP_ACCESS_DISABLED) {
+        res.statusCode = 403;
+      } else {
+        res.statusCode = 200;
+      }
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.end(JSON.stringify(responsePayload));
     });
@@ -790,10 +1259,38 @@ function startMcpHttpServer(store, { logger = console } = {}) {
 
   server.on('error', error => {
     logger.error(`[mcp] HTTP server error on ${serverConfig.host}:${serverConfig.port}${serverConfig.path}:`, error);
+    emitStatus({
+      status: 'error',
+      listening: false,
+      error: error?.message || String(error),
+      boundAddress: null,
+      boundUrl: null,
+      restartRequired: true,
+    });
+  });
+
+  server.on('close', () => {
+    emitStatus({
+      status: 'stopped',
+      listening: false,
+      error: null,
+      boundAddress: null,
+      boundUrl: null,
+      restartRequired: false,
+    });
   });
 
   server.listen(serverConfig.port, serverConfig.host, () => {
     logger.info(`[mcp] Listening on http://${serverConfig.host}:${serverConfig.port}${serverConfig.path}`);
+    emitStatus({
+      status: 'running',
+      listening: true,
+      error: null,
+      boundAddress: `${serverConfig.host}:${serverConfig.port}`,
+      boundUrl: `http://${serverConfig.host}:${serverConfig.port}${serverConfig.path}`,
+      lastStartedAt: new Date().toISOString(),
+      restartRequired: false,
+    });
     // TODO(next-phase): add client authentication and session binding before exposing beyond local development.
     // TODO(next-phase): enable write tools only after safe-write implementation is complete.
   });
@@ -803,4 +1300,5 @@ function startMcpHttpServer(store, { logger = console } = {}) {
 
 module.exports = {
   startMcpHttpServer,
+  createRequestDispatcher,
 };

@@ -1,7 +1,15 @@
 import { normalizeMcpServerAddress } from '../../constants/mcp';
-import { McpClientConfig, McpReadToolName, McpResourceResponse, McpToolDescriptor } from './types';
+import {
+  McpClientConfig,
+  McpInitializeResult,
+  McpReadToolName,
+  McpResourceResponse,
+  McpToolDescriptor,
+} from './types';
 
 const DEFAULT_TIMEOUT_MS = 4000;
+const MCP_PROTOCOL_VERSION = '2024-11-05';
+const MCP_CLIENT_NAME = 'Plumy';
 
 interface JsonRpcSuccess<T> {
   jsonrpc?: '2.0';
@@ -30,6 +38,7 @@ export class McpClientDisabledError extends Error {
 
 export class McpClient {
   private readonly config: McpClientConfig;
+  private initializePromise: Promise<McpInitializeResult> | null = null;
 
   constructor(config: McpClientConfig) {
     this.config = {
@@ -47,45 +56,50 @@ export class McpClient {
     return this.config.enabled;
   }
 
+  async initialize(): Promise<McpInitializeResult> {
+    return this.ensureInitialized();
+  }
+
   async listTools(): Promise<McpToolDescriptor[]> {
-    if (typeof window !== 'undefined' && window.electron?.mcp?.getCapabilities) {
-      const capabilities = await window.electron.mcp.getCapabilities();
-      if (!capabilities?.ok) {
-        throw new Error(capabilities?.error?.message || 'MCP capabilities unavailable');
-      }
-
-      const tools: McpToolDescriptor[] = [];
-      if (capabilities.data?.capabilities?.workspaceSnapshot) {
-        tools.push({
-          name: 'workspace.get_snapshot',
-          description: 'Returns a read-only workspace snapshot (tasks, people, projects, status columns).',
-        });
-      }
-      return tools;
-    }
-
+    await this.ensureInitialized();
     const result = await this.rpcCall<{ tools?: McpToolDescriptor[] }>('tools/list', {});
     return Array.isArray(result.tools) ? result.tools : [];
   }
 
   async readResource(uri: string): Promise<McpResourceResponse[]> {
+    await this.ensureInitialized();
     const result = await this.rpcCall<{ contents?: McpResourceResponse[] }>('resources/read', { uri });
     return Array.isArray(result.contents) ? result.contents : [];
   }
 
   async callReadTool<T = unknown>(name: McpReadToolName, args?: Record<string, unknown>): Promise<T> {
-    if (typeof window !== 'undefined' && window.electron?.mcp?.getWorkspaceSnapshot) {
-      if (name !== 'workspace.get_snapshot') {
-        throw new Error(`Read tool "${name}" is not exposed by the current Electron MCP bridge yet.`);
+    await this.ensureInitialized();
+    const result = await this.rpcCall<{ content?: Array<{ text?: string }>; structuredContent?: unknown }>(
+      'tools/call',
+      {
+        name,
+        arguments: args ?? {},
       }
+    );
 
-      const result = await window.electron.mcp.getWorkspaceSnapshot();
-      if (!result?.ok) {
-        throw new Error(result?.error?.message || 'Workspace snapshot unavailable');
-      }
-      return result.data as T;
+    if (result.structuredContent !== undefined) {
+      return result.structuredContent as T;
     }
 
+    const firstText = result.content?.find(entry => typeof entry.text === 'string')?.text;
+    if (typeof firstText === 'string' && firstText.trim()) {
+      try {
+        return JSON.parse(firstText) as T;
+      } catch {
+        return firstText as T;
+      }
+    }
+
+    return {} as T;
+  }
+
+  async callTool<T = unknown>(name: string, args?: Record<string, unknown>): Promise<T> {
+    await this.ensureInitialized();
     const result = await this.rpcCall<{ content?: Array<{ text?: string }>; structuredContent?: unknown }>(
       'tools/call',
       {
@@ -116,6 +130,10 @@ export class McpClient {
       throw new McpClientDisabledError();
     }
 
+    if (method !== 'initialize' && method !== 'notifications/initialized') {
+      await this.ensureInitialized();
+    }
+
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), this.config.timeoutMs);
 
@@ -136,11 +154,22 @@ export class McpClient {
         signal: controller.signal,
       });
 
-      if (!response.ok) {
-        throw new Error(`MCP request failed (${response.status})`);
+      let payload: JsonRpcResponse<T> | null = null;
+      try {
+        payload = (await response.json()) as JsonRpcResponse<T>;
+      } catch {
+        payload = null;
       }
 
-      const payload = (await response.json()) as JsonRpcResponse<T>;
+      if (!response.ok) {
+        const responseError = payload && 'error' in payload ? payload.error : null;
+        throw new Error(responseError?.message || `MCP request failed (${response.status})`);
+      }
+
+      if (!payload) {
+        throw new Error('MCP request failed');
+      }
+
       if ('error' in payload) {
         throw new Error(payload.error.message || 'MCP request failed');
       }
@@ -149,5 +178,25 @@ export class McpClient {
     } finally {
       window.clearTimeout(timeout);
     }
+  }
+
+  private async ensureInitialized(): Promise<McpInitializeResult> {
+    if (this.initializePromise) {
+      return this.initializePromise;
+    }
+
+    this.initializePromise = this.rpcCall<McpInitializeResult>('initialize', {
+      protocolVersion: MCP_PROTOCOL_VERSION,
+      clientInfo: {
+        name: MCP_CLIENT_NAME,
+        version: '0.0.1',
+      },
+      capabilities: {},
+    }).catch(error => {
+      this.initializePromise = null;
+      throw error;
+    });
+
+    return this.initializePromise;
   }
 }

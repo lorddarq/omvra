@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Task, TaskStatus, TimelineSwimlane, Person } from './types';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Task, TaskStatus, TimelineSwimlane, Person, TaskComment } from './types';
 import { initialTasks, initialTimelineSwimlanes } from './data/sampleData';
 import { initialPeople } from './data/samplePeople';
 import { TimelineView } from './components/TimelineView';
@@ -10,6 +10,8 @@ import { useSharedHorizontalScroll } from './hooks/useSharedHorizontalScroll';
 import { useVirtualizedTimeline } from './hooks/useVirtualizedTimeline';
 import { useMcpDiagnostics } from './hooks/useMcpDiagnostics';
 import { useMcpHealthValidation } from './hooks/useMcpHealthValidation';
+import { createMcpReadService } from './services/mcp/service';
+import { McpBoardWatchResult } from './services/mcp/types';
 import {
   DEFAULT_MCP_BIND_HOST,
   DEFAULT_MCP_PORT,
@@ -19,7 +21,8 @@ import {
   normalizeMcpPort,
   normalizeMcpServerAddress,
 } from './constants/mcp';
-import { persistJSONWithElectronMirror } from './utils/storage';
+import { shouldBootstrapFromLocalStorage } from './utils/canonicalHydration.js';
+import { deleteStoredValue, persistJSONWithElectronMirror, persistRawWithElectronMirror } from './utils/storage';
 
 // LocalStorage keys
 const TASKS_KEY = 'plumy.tasks.v1';
@@ -31,6 +34,7 @@ const TIMELINE_VIEW_STATE_KEY = 'plumy_viewstate_timeline';
 const KANBAN_VIEW_STATE_KEY = 'plumy_viewstate_kanban';
 const MONTH_WIDTHS_KEY = 'plumy.monthWidths.v1';
 const LEFT_COL_WIDTH_KEY = 'plumy.leftColWidth.v1';
+const MCP_AGENT_WATCH_CONFIGS_KEY = 'plumy.mcp.agentWatchConfigs.v1';
 const BACKUP_SCHEMA_VERSION = 2;
 
 function safeReadJSON<T>(key: string, fallback: T): T {
@@ -42,6 +46,18 @@ function safeReadJSON<T>(key: string, fallback: T): T {
   } catch (err) {
     return fallback;
   }
+}
+
+function generateMcpAccessToken(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return `mcp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function readInitialWorkspaceJSON<T>(key: string, fallback: T): T {
+  return shouldBootstrapFromLocalStorage() ? safeReadJSON(key, fallback) : fallback;
 }
 
 function normalizeTask(task: Task, swimlanes: TimelineSwimlane[]): Task {
@@ -96,6 +112,11 @@ interface StorageMeterState {
   sourceLabel: string;
 }
 
+interface McpAuditSummaryEntry extends McpAuditEntry {
+  auditId: string;
+  timestamp: string;
+}
+
 type StatusColumnState = { id: TaskStatus; title: string; color?: string };
 
 interface StatusColumnBackup {
@@ -127,6 +148,45 @@ interface BackupFile {
   ui?: UiBackupState;
   storage?: Record<string, string>;
   electronStore?: Record<string, unknown>;
+}
+
+type AgentWatchAction =
+  | 'inspect_only'
+  | 'inspect_and_work'
+  | 'move_to_ready_for_human_review';
+
+interface AgentWatchConfig {
+  personId: string;
+  enabled: boolean;
+  statusId: string;
+  projectId?: string;
+  search?: string;
+  action: AgentWatchAction;
+  intervalSeconds: number;
+}
+
+interface AgentWatchRuntimeState {
+  personId: string;
+  watcherId?: string;
+  lastCheckedAt?: string;
+  newTaskCount: number;
+  updatedTaskCount: number;
+  removedTaskCount: number;
+  latestTaskTitles: string[];
+  error?: string;
+}
+
+function getMcpSettingsSignature(preferences: AppPreferences): string {
+  return JSON.stringify({
+    enabled: preferences.mcpAgentAccessEnabled,
+    profile: preferences.mcpCapabilityProfile,
+    bindHost: preferences.mcpBindHost,
+    port: preferences.mcpPort,
+    address: preferences.mcpServerAddress,
+    token: preferences.mcpAccessToken,
+    tokenIssuedAt: preferences.mcpAccessTokenIssuedAt,
+    tokenTtlMinutes: preferences.mcpAccessTokenTtlMinutes,
+  });
 }
 
 function getDefaultStatusId(
@@ -165,12 +225,7 @@ function safeReadRaw(key: string): string | null {
 }
 
 function safeWriteRaw(key: string, value: string): void {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(key, value);
-  } catch (err) {
-    // ignore
-  }
+  persistRawWithElectronMirror(key, value);
 }
 
 function safeReadLocalStorageJSON<T>(key: string, fallback: T): T {
@@ -242,11 +297,26 @@ function clearPortableStorageKeys(): void {
   }
 }
 
+async function clearPortableElectronStoreKeys(): Promise<void> {
+  if (typeof window === 'undefined') return;
+
+  try {
+    const exported = await window.electron?.storeExport?.();
+    if (!exported || typeof exported !== 'object') return;
+
+    const keys = Object.keys(exported).filter(isPortableStorageKey);
+    await Promise.all(keys.map(key => deleteStoredValue(key).catch(() => undefined)));
+  } catch (err) {
+    // ignore
+  }
+}
+
 async function restorePortableStorageSnapshot(
   storageSnapshot?: Record<string, string>,
   electronStoreSnapshot?: Record<string, unknown>
 ): Promise<void> {
   clearPortableStorageKeys();
+  await clearPortableElectronStoreKeys();
 
   if (storageSnapshot && typeof storageSnapshot === 'object') {
     Object.entries(storageSnapshot).forEach(([key, value]) => {
@@ -313,6 +383,68 @@ function deriveStatusColumnsFromTasks(
   return columns;
 }
 
+function sanitizeTimelineSwimlanes(value: unknown): TimelineSwimlane[] {
+  if (!Array.isArray(value)) return initialTimelineSwimlanes;
+
+  const sanitized = value
+    .filter(item => item && typeof item === 'object')
+    .map(item => {
+      const candidate = item as Record<string, unknown>;
+      if (typeof candidate.id !== 'string' || typeof candidate.name !== 'string') {
+        return null;
+      }
+      return {
+        id: candidate.id,
+        name: candidate.name,
+        subtitle: typeof candidate.subtitle === 'string' ? candidate.subtitle : undefined,
+        color: typeof candidate.color === 'string' ? candidate.color : '#3b82f6',
+      };
+    })
+    .filter((item): item is TimelineSwimlane => Boolean(item));
+
+  return sanitized;
+}
+
+function sanitizePeople(value: unknown): Person[] {
+  if (!Array.isArray(value)) return initialPeople;
+
+  const defaultColors = ['#ec4899', '#f97316', '#eab308', '#06b6d4', '#8b5cf6', '#10b981'];
+  const sanitized = value
+    .filter(item => item && typeof item === 'object')
+    .map((item, index) => {
+      const candidate = item as Record<string, unknown>;
+      if (typeof candidate.id !== 'string' || typeof candidate.name !== 'string') {
+        return null;
+      }
+      return {
+        id: candidate.id,
+        name: candidate.name,
+        role: typeof candidate.role === 'string' ? candidate.role : 'Team Member',
+        kind: candidate.kind === 'agentic' ? 'agentic' : 'human',
+        avatar: typeof candidate.avatar === 'string' ? candidate.avatar : undefined,
+        color: typeof candidate.color === 'string' ? candidate.color : defaultColors[index % defaultColors.length],
+      };
+    })
+    .filter((item): item is Person => Boolean(item));
+
+  return sanitized;
+}
+
+function sanitizeTasks(value: unknown, swimlanes: TimelineSwimlane[]): Task[] {
+  if (!Array.isArray(value)) return initialTasks.map(task => normalizeTask(task, swimlanes));
+
+  return value
+    .filter(item => item && typeof item === 'object')
+    .map(item => {
+      const candidate = item as Task;
+      if (typeof candidate.id !== 'string' || typeof candidate.title !== 'string') {
+        return null;
+      }
+      return normalizeTask(candidate, swimlanes);
+    })
+    .filter((item): item is Task => Boolean(item));
+}
+
 function sanitizePreferences(
   preferences: Partial<AppPreferences> | undefined,
   statusColumns: Array<{ id: TaskStatus; title: string; color?: string }>,
@@ -363,6 +495,51 @@ function sanitizePreferences(
   };
 }
 
+function sanitizeAgentWatchConfigs(value: unknown): AgentWatchConfig[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter(item => item && typeof item === 'object')
+    .map(item => {
+      const candidate = item as Record<string, unknown>;
+      if (typeof candidate.personId !== 'string' || typeof candidate.statusId !== 'string') {
+        return null;
+      }
+      return {
+        personId: candidate.personId,
+        enabled: candidate.enabled !== false,
+        statusId: candidate.statusId,
+        projectId: typeof candidate.projectId === 'string' && candidate.projectId.trim() ? candidate.projectId.trim() : undefined,
+        search: typeof candidate.search === 'string' && candidate.search.trim() ? candidate.search.trim() : undefined,
+        action:
+          candidate.action === 'inspect_only' || candidate.action === 'move_to_ready_for_human_review'
+            ? candidate.action
+            : 'inspect_and_work',
+        intervalSeconds: Number.isFinite(Number(candidate.intervalSeconds))
+          ? Math.max(15, Math.min(3600, Math.floor(Number(candidate.intervalSeconds))))
+          : 60,
+      };
+    })
+    .filter((item): item is AgentWatchConfig => Boolean(item));
+}
+
+function syncLocalMcpServerAddress(
+  previousPreferences: AppPreferences,
+  nextHost: string,
+  nextPort: number
+): string {
+  const previousLocalAddress = buildLocalMcpAddress(
+    previousPreferences.mcpBindHost,
+    previousPreferences.mcpPort
+  );
+  const nextLocalAddress = buildLocalMcpAddress(nextHost, nextPort);
+  const previousAddress = normalizeMcpServerAddress(previousPreferences.mcpServerAddress);
+
+  return previousAddress === previousLocalAddress
+    ? nextLocalAddress
+    : previousAddress;
+}
+
 function App() {
   // Initialize hooks for view management
   const viewState = useViewState('timeline');
@@ -378,15 +555,15 @@ function App() {
   });
 
   const [tasks, setTasks] = useState<Task[]>(() => {
-    const stored = safeReadJSON<Task[]>(TASKS_KEY, initialTasks);
-    const swimlanes = safeReadJSON<TimelineSwimlane[]>(SWIMLANES_KEY, initialTimelineSwimlanes);
+    const stored = readInitialWorkspaceJSON<Task[]>(TASKS_KEY, initialTasks);
+    const swimlanes = readInitialWorkspaceJSON<TimelineSwimlane[]>(SWIMLANES_KEY, initialTimelineSwimlanes);
 
     // Migrate: Ensure project names and multi-project ids are present.
     return stored.map(task => normalizeTask(task, swimlanes));
   });
   
   const [timelineSwimlanes, setTimelineSwimlanes] = useState<TimelineSwimlane[]>(() => {
-    const stored = safeReadJSON<TimelineSwimlane[]>(SWIMLANES_KEY, initialTimelineSwimlanes);
+    const stored = readInitialWorkspaceJSON<TimelineSwimlane[]>(SWIMLANES_KEY, initialTimelineSwimlanes);
     
     // Migrate: Ensure all swimlanes have colors
     return stored.map(swimlane => ({
@@ -396,7 +573,7 @@ function App() {
   });
   
   const [people, setPeople] = useState<Person[]>(() => {
-    const stored = safeReadJSON<Person[]>(PEOPLE_KEY, initialPeople);
+    const stored = readInitialWorkspaceJSON<Person[]>(PEOPLE_KEY, initialPeople);
     
     // Migrate: Ensure all people have colors
     const defaultColors = ['#ec4899', '#f97316', '#eab308', '#06b6d4', '#8b5cf6', '#10b981'];
@@ -408,10 +585,13 @@ function App() {
   });
 
   const [statusColumns, setStatusColumns] = useState<StatusColumnState[]>(() =>
-    safeReadJSON<StatusColumnState[]>(STATUS_COLUMNS_KEY, defaultSwimlanes)
+    readInitialWorkspaceJSON<StatusColumnState[]>(STATUS_COLUMNS_KEY, defaultSwimlanes)
+  );
+  const [agentWatchConfigs, setAgentWatchConfigs] = useState<AgentWatchConfig[]>(() =>
+    readInitialWorkspaceJSON<AgentWatchConfig[]>(MCP_AGENT_WATCH_CONFIGS_KEY, [])
   );
   const [preferences, setPreferences] = useState<AppPreferences>(() => {
-    const stored = safeReadJSON<Partial<AppPreferences>>(PREFERENCES_KEY, {});
+    const stored = readInitialWorkspaceJSON<Partial<AppPreferences>>(PREFERENCES_KEY, {});
     const executionDefault = getDefaultStatusId(defaultSwimlanes, 'in-progress');
     const pipelineDefault = getDefaultStatusId(defaultSwimlanes, 'open');
     const bindHost = normalizeMcpBindHost(stored.mcpBindHost);
@@ -437,6 +617,9 @@ function App() {
         : 60,
     };
   });
+  const [hasHydratedCanonicalWorkspace, setHasHydratedCanonicalWorkspace] = useState<boolean>(
+    () => shouldBootstrapFromLocalStorage()
+  );
   const [storageMeter, setStorageMeter] = useState<StorageMeterState>({
     usedBytes: 0,
     totalBytes: 5 * 1024 * 1024,
@@ -444,21 +627,90 @@ function App() {
     sourceLabel: 'Estimated localStorage capacity',
   });
 
-  useEffect(() => { persistJSONWithElectronMirror(STATUS_COLUMNS_KEY, statusColumns); }, [statusColumns]);
-  useEffect(() => { persistJSONWithElectronMirror(PREFERENCES_KEY, preferences); }, [preferences]);
+  useEffect(() => {
+    if (!hasHydratedCanonicalWorkspace) return;
+    persistJSONWithElectronMirror(STATUS_COLUMNS_KEY, statusColumns);
+  }, [hasHydratedCanonicalWorkspace, statusColumns]);
+  useEffect(() => {
+    if (!hasHydratedCanonicalWorkspace) return;
+    persistJSONWithElectronMirror(PREFERENCES_KEY, preferences);
+  }, [hasHydratedCanonicalWorkspace, preferences]);
+  useEffect(() => {
+    if (!hasHydratedCanonicalWorkspace) return;
+    persistJSONWithElectronMirror(MCP_AGENT_WATCH_CONFIGS_KEY, agentWatchConfigs);
+  }, [agentWatchConfigs, hasHydratedCanonicalWorkspace]);
 
   // Persist tasks and swimlanes to localStorage whenever they change
   useEffect(() => {
+    if (!hasHydratedCanonicalWorkspace) return;
     persistJSONWithElectronMirror(TASKS_KEY, tasks);
-  }, [tasks]);
+  }, [hasHydratedCanonicalWorkspace, tasks]);
 
   useEffect(() => {
+    if (!hasHydratedCanonicalWorkspace) return;
     persistJSONWithElectronMirror(SWIMLANES_KEY, timelineSwimlanes);
-  }, [timelineSwimlanes]);
+  }, [hasHydratedCanonicalWorkspace, timelineSwimlanes]);
 
   useEffect(() => {
+    if (!hasHydratedCanonicalWorkspace) return;
     persistJSONWithElectronMirror(PEOPLE_KEY, people);
-  }, [people]);
+  }, [hasHydratedCanonicalWorkspace, people]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const hydrateFromCanonicalStore = async () => {
+      if (typeof window !== 'undefined') {
+        try {
+          const exported = await window.electron?.storeExport?.();
+          if (cancelled || !exported || typeof exported !== 'object') return;
+
+          const hasTasks = Object.prototype.hasOwnProperty.call(exported, TASKS_KEY);
+          const hasProjects = Object.prototype.hasOwnProperty.call(exported, SWIMLANES_KEY);
+          const hasPeople = Object.prototype.hasOwnProperty.call(exported, PEOPLE_KEY);
+          const hasStatusColumns = Object.prototype.hasOwnProperty.call(exported, STATUS_COLUMNS_KEY);
+          const hasPreferences = Object.prototype.hasOwnProperty.call(exported, PREFERENCES_KEY);
+          const hasAgentWatchConfigs = Object.prototype.hasOwnProperty.call(exported, MCP_AGENT_WATCH_CONFIGS_KEY);
+
+          const canonicalProjects = hasProjects
+            ? sanitizeTimelineSwimlanes(exported[SWIMLANES_KEY])
+            : timelineSwimlanes;
+          const canonicalPeople = hasPeople
+            ? sanitizePeople(exported[PEOPLE_KEY])
+            : people;
+          const canonicalStatusColumns = hasStatusColumns
+            ? sanitizeStatusColumns(exported[STATUS_COLUMNS_KEY], defaultSwimlanes)
+            : statusColumns;
+
+          if (hasProjects) setTimelineSwimlanes(canonicalProjects);
+          if (hasPeople) setPeople(canonicalPeople);
+          if (hasStatusColumns) setStatusColumns(canonicalStatusColumns);
+          if (hasPreferences) {
+            setPreferences(prev => sanitizePreferences(exported[PREFERENCES_KEY], canonicalStatusColumns, prev));
+          }
+          if (hasAgentWatchConfigs) {
+            setAgentWatchConfigs(sanitizeAgentWatchConfigs(exported[MCP_AGENT_WATCH_CONFIGS_KEY]));
+          }
+          if (hasTasks) {
+            const canonicalTasks = sanitizeTasks(exported[TASKS_KEY], canonicalProjects);
+            setTasks(canonicalTasks);
+          }
+        } finally {
+          if (!cancelled) {
+            setHasHydratedCanonicalWorkspace(true);
+          }
+        }
+      } else if (!cancelled) {
+        setHasHydratedCanonicalWorkspace(true);
+      }
+    };
+
+    void hydrateFromCanonicalStore();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isTaskDetailsOpen, setIsTaskDetailsOpen] = useState(false);
@@ -474,8 +726,125 @@ function App() {
   const [defaultSwimlaneId, setDefaultSwimlaneId] = useState<string | undefined>(undefined);
   const [defaultAssigneeId, setDefaultAssigneeId] = useState<string | undefined>(undefined);
   const [viewRefreshKey, setViewRefreshKey] = useState(0);
+  const [appliedMcpSettingsSignature, setAppliedMcpSettingsSignature] = useState(() =>
+    getMcpSettingsSignature(preferences)
+  );
+  const [mcpListenerStatus, setMcpListenerStatus] = useState<McpListenerStatus | null>(null);
+  const [mcpAuditLog, setMcpAuditLog] = useState<McpAuditSummaryEntry[]>([]);
+  const [agentWatchRuntime, setAgentWatchRuntime] = useState<Record<string, AgentWatchRuntimeState>>({});
 
   const detailsTask = detailsTaskId ? tasks.find(t => t.id === detailsTaskId) ?? null : null;
+  const mcpReadService = useMemo(() => createMcpReadService({
+    enabled: preferences.mcpAgentAccessEnabled,
+    endpoint: preferences.mcpServerAddress,
+    headers: preferences.mcpAccessToken
+      ? { Authorization: `Bearer ${preferences.mcpAccessToken}` }
+      : undefined,
+  }), [preferences.mcpAccessToken, preferences.mcpAgentAccessEnabled, preferences.mcpServerAddress]);
+
+  const refreshMcpListenerStatus = useCallback(async () => {
+    try {
+      if (window.electron?.mcp?.getListenerStatus) {
+        const result = await window.electron.mcp.getListenerStatus();
+        if (result?.ok) {
+          setMcpListenerStatus(result.data);
+        }
+      }
+    } catch (error) {
+      // Keep the last known listener state if the bridge is temporarily unavailable.
+    }
+  }, []);
+
+  const refreshMcpAuditLog = useCallback(async () => {
+    try {
+      if (window.electron?.mcp?.getAuditLog) {
+        const result = await window.electron.mcp.getAuditLog({ limit: 25 });
+        if (result?.ok && Array.isArray(result.data)) {
+          setMcpAuditLog(
+            result.data.filter(
+              (entry): entry is McpAuditSummaryEntry =>
+                Boolean(entry && typeof entry.auditId === 'string' && typeof entry.timestamp === 'string')
+            )
+          );
+        }
+      }
+    } catch (error) {
+      // Keep the last known audit log if the bridge is temporarily unavailable.
+    }
+  }, []);
+
+  const pollAgentWatcher = useCallback(async (config: AgentWatchConfig) => {
+    try {
+      const result = await mcpReadService.pollBoardWatcher({
+        watcherId: `agent:${config.personId}`,
+        statusId: config.statusId,
+        assigneeId: config.personId,
+        projectId: config.projectId,
+        search: config.search,
+        persist: true,
+      });
+      const watchResult = result as McpBoardWatchResult;
+      const changes = watchResult.changes || { newTasks: [], updatedTasks: [], removedTaskIds: [] };
+      setAgentWatchRuntime(prev => ({
+        ...prev,
+        [config.personId]: {
+          personId: config.personId,
+          watcherId: watchResult.watcherState?.watcherId,
+          lastCheckedAt: watchResult.watcherState?.lastProcessedAt || new Date().toISOString(),
+          newTaskCount: Array.isArray(changes.newTasks) ? changes.newTasks.length : 0,
+          updatedTaskCount: Array.isArray(changes.updatedTasks) ? changes.updatedTasks.length : 0,
+          removedTaskCount: Array.isArray(changes.removedTaskIds) ? changes.removedTaskIds.length : 0,
+          latestTaskTitles: [
+            ...(Array.isArray(changes.newTasks) ? changes.newTasks : []),
+            ...(Array.isArray(changes.updatedTasks) ? changes.updatedTasks : []),
+          ]
+            .map(task => String(task?.title || '').trim())
+            .filter(Boolean)
+            .slice(0, 4),
+        },
+      }));
+      return watchResult;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setAgentWatchRuntime(prev => ({
+        ...prev,
+        [config.personId]: {
+          personId: config.personId,
+          newTaskCount: 0,
+          updatedTaskCount: 0,
+          removedTaskCount: 0,
+          latestTaskTitles: [],
+          lastCheckedAt: new Date().toISOString(),
+          error: message,
+        },
+      }));
+      return null;
+    }
+  }, [mcpReadService]);
+
+  const upsertAgentWatchConfig = useCallback((nextConfig: AgentWatchConfig) => {
+    setAgentWatchConfigs(prev => {
+      const sanitized = sanitizeAgentWatchConfigs([nextConfig])[0];
+      if (!sanitized) return prev;
+      const existingIndex = prev.findIndex(config => config.personId === sanitized.personId);
+      if (existingIndex < 0) {
+        return [...prev, sanitized];
+      }
+      const next = [...prev];
+      next[existingIndex] = sanitized;
+      return next;
+    });
+  }, []);
+
+  const removeAgentWatchConfig = useCallback((personId: string) => {
+    setAgentWatchConfigs(prev => prev.filter(config => config.personId !== personId));
+    setAgentWatchRuntime(prev => {
+      if (!prev[personId]) return prev;
+      const next = { ...prev };
+      delete next[personId];
+      return next;
+    });
+  }, []);
 
   const handleTaskClick = (task: Task) => {
     setDetailsTaskId(task.id);
@@ -540,9 +909,28 @@ function App() {
         swimlaneOnly: taskData.swimlaneOnly,
         swimlaneId: taskData.swimlaneId,
         assigneeId: taskData.assigneeId,
+        comments: taskData.comments || [],
       };
       setTasks(prevTasks => [...prevTasks, newTask]);
     }
+  };
+
+  const handleAddTaskComment = (taskId: string, content: string) => {
+    const trimmed = content.trim();
+    if (!trimmed) return;
+
+    const nextComment: TaskComment = {
+      id: `comment-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      author: 'You',
+      content: trimmed,
+      createdAt: new Date().toISOString(),
+    };
+
+    setTasks(prevTasks => prevTasks.map(task => (
+      task.id === taskId
+        ? { ...task, comments: [...(task.comments || []), nextComment] }
+        : task
+    )));
   };
 
   const handleDeleteTask = (taskId: string) => {
@@ -645,6 +1033,7 @@ function App() {
   const handleDeletePerson = (personId: string) => {
     setPeople(prevPeople => prevPeople.filter(p => p.id !== personId));
     setTasks(prevTasks => prevTasks.map(t => (t.assigneeId === personId ? { ...t, assigneeId: undefined } : t)));
+    removeAgentWatchConfig(personId);
   };
 
   const handleUpdatePerson = (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind'>) => {
@@ -702,7 +1091,7 @@ function App() {
     setStatusColumns((cols: any[]) => cols.filter(c => c.id !== colId));
   };
 
-  const handleNukeLocalData = () => {
+  const handleNukeLocalData = async () => {
     if (typeof window === 'undefined') return;
     const confirmed = window.confirm(
       'This will clear local storage data for this app and reset your workspace. Continue?'
@@ -711,6 +1100,7 @@ function App() {
 
     try {
       window.localStorage.clear();
+      await clearPortableElectronStoreKeys();
     } catch (err) {
       // ignore
     }
@@ -739,11 +1129,28 @@ function App() {
         const result = await window.electron.mcp.restartServer();
         if (!result?.success) {
           window.alert(`Could not restart MCP server: ${result?.error || 'Unknown error'}`);
+          return;
         }
+        if (result.listenerStatus) {
+          setMcpListenerStatus(result.listenerStatus);
+        } else {
+          void refreshMcpListenerStatus();
+        }
+        void refreshMcpAuditLog();
+        setAppliedMcpSettingsSignature(getMcpSettingsSignature(preferences));
+        void mcpHealth.runHealthCheck();
       }
     } catch (err) {
       window.alert('Could not restart MCP server.');
     }
+  };
+
+  const handleRotateMcpAccessToken = () => {
+    setPreferences(prev => ({
+      ...prev,
+      mcpAccessToken: generateMcpAccessToken(),
+      mcpAccessTokenIssuedAt: new Date().toISOString(),
+    }));
   };
 
   const handleExportTasksAndProjects = async () => {
@@ -926,6 +1333,13 @@ function App() {
   }, [statusColumns]);
 
   useEffect(() => {
+    const validPeople = new Set(people.filter(person => person.kind === 'agentic').map(person => person.id));
+    const validStatuses = new Set(statusColumns.map(column => column.id));
+
+    setAgentWatchConfigs(prev => prev.filter(config => validPeople.has(config.personId) && validStatuses.has(config.statusId)));
+  }, [people, statusColumns]);
+
+  useEffect(() => {
     if (!isPreferencesOpen || typeof window === 'undefined') return;
     let cancelled = false;
 
@@ -973,6 +1387,42 @@ function App() {
     preferences,
   ]);
 
+  useEffect(() => {
+    if (!isPreferencesOpen) return;
+    void refreshMcpListenerStatus();
+    void refreshMcpAuditLog();
+  }, [isPreferencesOpen, refreshMcpAuditLog, refreshMcpListenerStatus]);
+
+  useEffect(() => {
+    const enabledConfigs = agentWatchConfigs.filter(config => config.enabled);
+    if (!preferences.mcpAgentAccessEnabled || enabledConfigs.length === 0) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const intervalMs = Math.max(
+      15000,
+      ...enabledConfigs.map(config => Math.max(15, config.intervalSeconds) * 1000)
+    );
+
+    const run = async () => {
+      for (const config of enabledConfigs) {
+        if (cancelled) return;
+        await pollAgentWatcher(config);
+      }
+    };
+
+    void run();
+    const timer = window.setInterval(() => {
+      void run();
+    }, intervalMs);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [agentWatchConfigs, pollAgentWatcher, preferences.mcpAgentAccessEnabled]);
+
   useMcpDiagnostics({
     enabled: preferences.mcpAgentAccessEnabled,
     endpoint: preferences.mcpServerAddress,
@@ -996,6 +1446,11 @@ function App() {
   const mcpHealth = useMcpHealthValidation({
     enabled: preferences.mcpAgentAccessEnabled,
     endpoint: preferences.mcpServerAddress,
+    headers: preferences.mcpAccessToken
+      ? {
+          Authorization: `Bearer ${preferences.mcpAccessToken}`,
+        }
+      : undefined,
     expectation: mcpHealthExpectation,
   });
 
@@ -1123,6 +1578,7 @@ function App() {
         onClose={() => setIsTaskDetailsOpen(false)}
         onEdit={handleEditTaskFromDetails}
         onMoveAgentTaskToReview={handleMoveAgentTaskToReview}
+        onAddComment={handleAddTaskComment}
         task={detailsTask}
         swimlanes={timelineSwimlanes}
         people={people}
@@ -1147,9 +1603,24 @@ function App() {
         statusColumns={statusColumns}
         executionLoadStatusId={preferences.executionLoadStatusId}
         pipelineLoadStatusId={preferences.pipelineLoadStatusId}
+        agentWatchConfigs={agentWatchConfigs}
+        agentWatchRuntime={agentWatchRuntime}
         onAddPerson={handleAddPerson}
         onUpdatePerson={handleUpdatePerson}
         onDeletePerson={handleDeletePerson}
+        onSaveAgentWatchConfig={upsertAgentWatchConfig}
+        onRemoveAgentWatchConfig={removeAgentWatchConfig}
+        onPollAgentWatch={(personId) => {
+          const config = agentWatchConfigs.find(item => item.personId === personId) || {
+            personId,
+            enabled: true,
+            statusId: statusColumns[0]?.id || 'open',
+            action: 'inspect_and_work' as const,
+            intervalSeconds: 60,
+          };
+          if (!config) return;
+          void pollAgentWatcher(config);
+        }}
       />
 
       {/* Preferences Panel */}
@@ -1174,8 +1645,11 @@ function App() {
         mcpBindHost={preferences.mcpBindHost}
         mcpPort={preferences.mcpPort}
         mcpAccessToken={preferences.mcpAccessToken}
+        mcpAccessTokenIssuedAt={preferences.mcpAccessTokenIssuedAt}
         mcpAccessTokenTtlMinutes={preferences.mcpAccessTokenTtlMinutes}
         mcpCapabilityProfile={preferences.mcpCapabilityProfile}
+        mcpListenerStatus={mcpListenerStatus}
+        mcpAuditLog={mcpAuditLog}
         onMcpAgentAccessToggle={(enabled) =>
           setPreferences(prev => ({ ...prev, mcpAgentAccessEnabled: enabled }))
         }
@@ -1183,10 +1657,24 @@ function App() {
           setPreferences(prev => ({ ...prev, mcpServerAddress: normalizeMcpServerAddress(address) }))
         }
         onMcpBindHostChange={(host) =>
-          setPreferences(prev => ({ ...prev, mcpBindHost: normalizeMcpBindHost(host) }))
+          setPreferences(prev => {
+            const nextHost = normalizeMcpBindHost(host);
+            return {
+              ...prev,
+              mcpBindHost: nextHost,
+              mcpServerAddress: syncLocalMcpServerAddress(prev, nextHost, prev.mcpPort),
+            };
+          })
         }
         onMcpPortChange={(port) =>
-          setPreferences(prev => ({ ...prev, mcpPort: normalizeMcpPort(port) }))
+          setPreferences(prev => {
+            const nextPort = normalizeMcpPort(port);
+            return {
+              ...prev,
+              mcpPort: nextPort,
+              mcpServerAddress: syncLocalMcpServerAddress(prev, prev.mcpBindHost, nextPort),
+            };
+          })
         }
         onMcpAccessTokenChange={(token) =>
           setPreferences(prev => ({
@@ -1195,6 +1683,7 @@ function App() {
             mcpAccessTokenIssuedAt: token ? new Date().toISOString() : undefined,
           }))
         }
+        onMcpAccessTokenRotate={handleRotateMcpAccessToken}
         onMcpAccessTokenTtlMinutesChange={(ttl) =>
           setPreferences(prev => ({ ...prev, mcpAccessTokenTtlMinutes: Math.max(1, Math.min(1440, ttl || 60)) }))
         }
@@ -1206,6 +1695,8 @@ function App() {
         mcpHealthResult={mcpHealth.result}
         mcpHealthCheckRunning={mcpHealth.isRunning}
         onRunMcpHealthCheck={mcpHealth.runHealthCheck}
+        mcpRestartPending={getMcpSettingsSignature(preferences) !== appliedMcpSettingsSignature}
+        onRefreshMcpAuditLog={refreshMcpAuditLog}
       />
     </div>
   );

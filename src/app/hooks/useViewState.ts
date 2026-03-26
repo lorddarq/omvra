@@ -20,7 +20,8 @@
  *   const savedState = viewState.getViewState('timeline');
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useEffect, useCallback, useRef, useState } from 'react';
+import { deleteStoredValue, getJSON, persistJSONWithElectronMirror } from '../utils/storage';
 
 export type ViewType = 'timeline' | 'kanban';
 
@@ -69,6 +70,39 @@ export function useViewState(initialView: ViewType = 'timeline') {
     kanban: { ...DEFAULT_STATES.kanban },
   });
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const hydrateStoredViewStates = async () => {
+      const [timelineState, kanbanState] = await Promise.all([
+        getJSON<Record<string, any>>('plumy_viewstate_timeline', null),
+        getJSON<Record<string, any>>('plumy_viewstate_kanban', null),
+      ]);
+
+      if (cancelled) return;
+
+      if (timelineState) {
+        viewStatesRef.current.timeline = {
+          ...DEFAULT_STATES.timeline,
+          ...timelineState,
+        };
+      }
+
+      if (kanbanState) {
+        viewStatesRef.current.kanban = {
+          ...DEFAULT_STATES.kanban,
+          ...kanbanState,
+        };
+      }
+    };
+
+    void hydrateStoredViewStates();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   /**
    * Get the current view.
    */
@@ -109,16 +143,7 @@ export function useViewState(initialView: ViewType = 'timeline') {
         ...state,
       };
 
-      // Optionally persist to localStorage (debounced)
-      // This allows recovery across page reloads
-      try {
-        localStorage.setItem(
-          `plumy_viewstate_${view}`,
-          JSON.stringify(viewStatesRef.current[view])
-        );
-      } catch (e) {
-        // Storage quota exceeded or disabled; silently fail
-      }
+      void persistJSONWithElectronMirror(`plumy_viewstate_${view}`, viewStatesRef.current[view]);
     },
     []
   );
@@ -170,11 +195,7 @@ export function useViewState(initialView: ViewType = 'timeline') {
    * @param view - View to clear storage for
    */
   const clearStoredViewState = useCallback((view: ViewType) => {
-    try {
-      localStorage.removeItem(`plumy_viewstate_${view}`);
-    } catch (e) {
-      // Storage unavailable; silently fail
-    }
+    void deleteStoredValue(`plumy_viewstate_${view}`);
   }, []);
 
   return {

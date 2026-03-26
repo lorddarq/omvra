@@ -1,8 +1,9 @@
 const {
   getWorkspaceSnapshot,
   isMcpAgentAccessEnabled,
-  getMcpCapabilityProfile,
-  MCP_CAPABILITY_PROFILES,
+  buildMcpCapabilitySnapshot,
+  buildMcpListenerStatus,
+  listMcpAuditLog,
 } = require('../services/workspace-service.cjs');
 
 function deniedResponse() {
@@ -15,33 +16,18 @@ function deniedResponse() {
   };
 }
 
-function registerMcpIpcHandlers({ ipcMain, store }) {
+function registerMcpIpcHandlers({ ipcMain, store, getListenerStatus }) {
   ipcMain.handle('mcp/get-capabilities', async () => {
-    const enabled = isMcpAgentAccessEnabled(store);
-    const capabilityProfile = getMcpCapabilityProfile(store);
-    const writeToolsEnabled = capabilityProfile === 'task_write' || capabilityProfile === 'admin';
     return {
       ok: true,
-      data: {
-        enabled,
-        readOnly: !writeToolsEnabled,
-        capabilityProfile,
-        capabilityProfiles: MCP_CAPABILITY_PROFILES,
-        capabilities: {
-          workspaceSnapshot: enabled,
-          resourcesRead: enabled,
-          writeTools: writeToolsEnabled,
-        },
-        writeBoundary: {
-          enforced: true,
-          writeToolsEnabled,
-          exposedWriteTools: writeToolsEnabled
-            ? ['tasks.transition_under_review', 'tasks.update_agent_summary']
-            : [],
-        },
-        // TODO(next-phase): include per-client auth token claims here.
-        // TODO(next-phase): enforce local-only transport identity checks.
-      },
+      data: buildMcpCapabilitySnapshot(store),
+    };
+  });
+
+  ipcMain.handle('mcp/get-listener-status', async () => {
+    return {
+      ok: true,
+      data: buildMcpListenerStatus(store, typeof getListenerStatus === 'function' ? getListenerStatus() : {}),
     };
   });
 
@@ -53,6 +39,13 @@ function registerMcpIpcHandlers({ ipcMain, store }) {
     return {
       ok: true,
       data: getWorkspaceSnapshot(store),
+    };
+  });
+
+  ipcMain.handle('mcp/get-audit-log', async (_event, { limit } = {}) => {
+    return {
+      ok: true,
+      data: listMcpAuditLog(store, { limit }),
     };
   });
 }

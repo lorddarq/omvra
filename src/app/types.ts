@@ -4,6 +4,13 @@ export type TaskComplexity = 'routine' | 'medium' | 'hard';
 export type TaskPriority = 'urgent' | 'moderate' | 'normal' | 'low';
 export type PersonKind = 'human' | 'agentic';
 
+export interface TaskComment {
+  id: string;
+  author: string;
+  content: string;
+  createdAt: string;
+}
+
 export interface Person {
   id: string;
   name: string;
@@ -30,6 +37,7 @@ export interface Task {
   projectIds?: string[]; // Projects this task belongs to
   assigneeId?: string; // Person assigned to this task
   project?: string; // Project this task belongs to
+  comments?: TaskComment[];
 }
 
 export interface Swimlane {

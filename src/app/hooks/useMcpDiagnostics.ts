@@ -14,8 +14,9 @@ export function useMcpDiagnostics({ enabled, endpoint }: UseMcpDiagnosticsOption
     if (!isLocalDevHost) return;
 
     let cancelled = false;
+    let retryTimer: number | null = null;
 
-    const run = async () => {
+    const run = async (attempt = 0) => {
       const mcp = createMcpReadService({
         enabled,
         endpoint,
@@ -36,15 +37,26 @@ export function useMcpDiagnostics({ enabled, endpoint }: UseMcpDiagnosticsOption
         return;
       }
 
+      const reason = result.error || 'unknown';
+      if (attempt < 2 && (reason.includes('Failed to fetch') || reason.includes('ERR_CONNECTION_REFUSED'))) {
+        retryTimer = window.setTimeout(() => {
+          void run(attempt + 1);
+        }, 600);
+        return;
+      }
+
       console.warn(
-        `[MCP diagnostics] unavailable endpoint=${result.endpoint} reason=${result.error || 'unknown'}`
+        `[MCP diagnostics] unavailable endpoint=${result.endpoint} reason=${reason}`
       );
     };
 
-    run();
+    void run();
 
     return () => {
       cancelled = true;
+      if (retryTimer !== null) {
+        window.clearTimeout(retryTimer);
+      }
     };
   }, [enabled, endpoint]);
 }

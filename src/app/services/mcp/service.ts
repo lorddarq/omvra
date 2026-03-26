@@ -1,6 +1,7 @@
 import { McpClient, McpClientDisabledError } from './client';
 import {
   McpCard,
+  McpBoardWatchResult,
   McpClientConfig,
   McpDiagnosticsResult,
   McpHealthCheckResult,
@@ -32,6 +33,7 @@ export interface McpReadService {
   getTask: (taskId: string) => Promise<McpTaskSummary | null>;
   listKanbanCards: (filters?: Record<string, unknown>) => Promise<McpCard[]>;
   listTimelineCards: (filters?: Record<string, unknown>) => Promise<McpCard[]>;
+  pollBoardWatcher: (filters: Record<string, unknown>) => Promise<McpBoardWatchResult>;
 }
 
 function normalizeWorkspaceSnapshot(payload: unknown): McpWorkspaceSnapshot | null {
@@ -110,6 +112,57 @@ function median(values: number[]): number | undefined {
   return sorted[mid];
 }
 
+function getEndpointMode(endpoint: string): 'local' | 'remote' | 'unknown' {
+  try {
+    const parsed = new URL(endpoint);
+    const host = parsed.hostname.toLowerCase();
+    if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return 'local';
+    return 'remote';
+  } catch {
+    return 'unknown';
+  }
+}
+
+function getAuthMode(headers?: Record<string, string>): 'none' | 'token' {
+  if (!headers) return 'none';
+  const hasBearer = typeof headers.Authorization === 'string' && headers.Authorization.trim().length > 0;
+  const hasTokenHeader = typeof headers['x-mcp-token'] === 'string' && headers['x-mcp-token'].trim().length > 0;
+  return hasBearer || hasTokenHeader ? 'token' : 'none';
+}
+
+function classifyConnectionStatus(
+  enabled: boolean,
+  endpoint: string,
+  errors: string[],
+  toolsAvailable: string[]
+): 'disabled' | 'local-ready' | 'remote-ready' | 'auth-error' | 'handshake-error' | 'unknown' {
+  if (!enabled) return 'disabled';
+
+  const errorText = errors.join(' ').toLowerCase();
+  if (errorText.includes('unauthorized') || errorText.includes('token expired') || errorText.includes('authentication')) {
+    return 'auth-error';
+  }
+  if (errorText.includes('access is disabled') || errorText.includes('mcp agent access is disabled')) {
+    return 'auth-error';
+  }
+
+  if (
+    errorText.includes('tools/list failed') ||
+    errorText.includes('resources/read failed') ||
+    errorText.includes('workspace.get_snapshot failed') ||
+    errorText.includes('missing mcp tools') ||
+    errorText.includes('snapshot payload is missing')
+  ) {
+    return 'handshake-error';
+  }
+
+  if (toolsAvailable.length > 0 && errors.length === 0) {
+    return getEndpointMode(endpoint) === 'local' ? 'local-ready' : 'remote-ready';
+  }
+
+  return 'unknown';
+}
+
 export function createMcpReadService(config: McpClientConfig): McpReadService {
   const client = new McpClient(config);
 
@@ -174,12 +227,15 @@ export function createMcpReadService(config: McpClientConfig): McpReadService {
         return {
           ok: false,
           endpoint: client.endpoint,
+          authMode: getAuthMode(config.headers),
+          connectionStatus: 'disabled',
           error: 'disabled',
         };
       }
 
       const startedAt = performance.now();
       try {
+        await client.initialize();
         const tools = await client.listTools();
         const latencyMs = Math.round(performance.now() - startedAt);
         return {
@@ -187,13 +243,18 @@ export function createMcpReadService(config: McpClientConfig): McpReadService {
           endpoint: client.endpoint,
           latencyMs,
           toolCount: tools.length,
+          authMode: getAuthMode(config.headers),
+          connectionStatus: classifyConnectionStatus(client.enabled, client.endpoint, [], tools.map(tool => tool.name).filter(Boolean)),
         };
       } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
         return {
           ok: false,
           endpoint: client.endpoint,
           latencyMs: Math.round(performance.now() - startedAt),
-          error: error instanceof Error ? error.message : String(error),
+          authMode: getAuthMode(config.headers),
+          connectionStatus: classifyConnectionStatus(client.enabled, client.endpoint, [message], []),
+          error: message,
         };
       }
     },
@@ -211,6 +272,8 @@ export function createMcpReadService(config: McpClientConfig): McpReadService {
         return {
           ok: false,
           endpoint: client.endpoint,
+          authMode: getAuthMode(config.headers),
+          connectionStatus: 'disabled',
           toolsAvailable: [],
           missingTools: [...CORE_READ_TOOLS],
           resourceReadSupported: false,
@@ -223,10 +286,11 @@ export function createMcpReadService(config: McpClientConfig): McpReadService {
       }
 
       try {
+        await client.initialize();
         const tools = await client.listTools();
         toolsAvailable = tools.map(tool => tool.name).filter(Boolean);
       } catch (error) {
-        errors.push(`tools/list failed: ${error instanceof Error ? error.message : String(error)}`);
+        errors.push(`initialize/tools/list failed: ${error instanceof Error ? error.message : String(error)}`);
       }
       missingTools = CORE_READ_TOOLS.filter(name => !toolsAvailable.includes(name));
 
@@ -318,6 +382,8 @@ export function createMcpReadService(config: McpClientConfig): McpReadService {
         ok: errors.length === 0,
         endpoint: client.endpoint,
         latencyMs,
+        authMode: getAuthMode(config.headers),
+        connectionStatus: classifyConnectionStatus(client.enabled, client.endpoint, errors, toolsAvailable),
         toolsAvailable,
         missingTools,
         resourceReadSupported,
@@ -427,6 +493,10 @@ export function createMcpReadService(config: McpClientConfig): McpReadService {
           status: task.status,
         }));
     },
+
+    pollBoardWatcher: async (filters = {}) => (
+      client.callTool<McpBoardWatchResult>('boards.watch.poll', filters)
+    ),
 
     // TODO(phase-2): expose write operations once auth scopes and audit log are implemented.
   };

@@ -1,4 +1,5 @@
 import { Task, TimelineSwimlane, Person, TaskStatus } from '../types';
+import { useMemo, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -8,6 +9,7 @@ import {
   DialogFooter,
 } from '@/app/components/ui/dialog';
 import { Button } from '@/app/components/ui/button';
+import { Textarea } from '@/app/components/ui/textarea';
 import { MarkdownContent } from './MarkdownContent';
 import { getTaskLoadContributionPercent, getTaskLoadPoints, PERSON_CAPACITY_POINTS } from '../utils/taskLoad';
 
@@ -16,6 +18,7 @@ interface TaskDetailsDialogProps {
   onClose: () => void;
   onEdit?: (task: Task) => void;
   onMoveAgentTaskToReview?: (taskId: string) => void;
+  onAddComment?: (taskId: string, content: string) => void;
   task?: Task | null;
   swimlanes: TimelineSwimlane[];
   people: Person[];
@@ -34,11 +37,13 @@ export function TaskDetailsDialog({
   onClose,
   onEdit,
   onMoveAgentTaskToReview,
+  onAddComment,
   task,
   swimlanes,
   people,
   statusColumns,
 }: TaskDetailsDialogProps) {
+  const [newComment, setNewComment] = useState('');
   const primaryTimelineProject = task?.swimlaneId
     ? swimlanes.find(s => s.id === task.swimlaneId)?.name ?? 'Unknown swimlane'
     : 'No timeline project';
@@ -72,6 +77,16 @@ export function TaskDetailsDialog({
     assignee.kind === 'agentic' &&
     task.status === 'in-progress'
   );
+  const sortedComments = useMemo(
+    () => [...(task?.comments || [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    [task?.comments]
+  );
+
+  const handleAddComment = () => {
+    if (!task || !onAddComment || !newComment.trim()) return;
+    onAddComment(task.id, newComment);
+    setNewComment('');
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -157,6 +172,43 @@ export function TaskDetailsDialog({
                   <div className="text-sm text-gray-500">No description provided.</div>
                 )}
               </div>
+            </div>
+
+            <div className="space-y-3 rounded-md border bg-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold text-gray-900">Comments</div>
+                <div className="text-xs text-gray-500">{sortedComments.length} total</div>
+              </div>
+
+              <div className="space-y-2">
+                <Textarea
+                  value={newComment}
+                  onChange={(event) => setNewComment(event.target.value)}
+                  placeholder="Add a comment..."
+                  className="min-h-[96px] resize-y"
+                />
+                <div className="flex justify-end">
+                  <Button variant="outline" onClick={handleAddComment} disabled={!newComment.trim() || !task}>
+                    Add comment
+                  </Button>
+                </div>
+              </div>
+
+              {sortedComments.length > 0 ? (
+                <div className="space-y-2">
+                  {sortedComments.map((comment) => (
+                    <div key={comment.id} className="rounded-md border border-gray-100 bg-gray-50 px-3 py-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-medium text-gray-900">{comment.author}</div>
+                        <div className="text-xs text-gray-500">{formatDate(comment.createdAt)}</div>
+                      </div>
+                      <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">{comment.content}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500">No comments yet.</div>
+              )}
             </div>
           </div>
         )}

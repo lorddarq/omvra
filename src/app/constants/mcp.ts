@@ -1,6 +1,7 @@
 export const DEFAULT_MCP_BIND_HOST = '127.0.0.1';
 export const DEFAULT_MCP_PORT = 3456;
 export const DEFAULT_MCP_SERVER_ADDRESS = 'http://127.0.0.1:3456/mcp';
+export const MCP_PROTOCOL_VERSION = '2024-11-05';
 
 export function normalizeMcpServerAddress(address?: string): string {
   const trimmed = address?.trim();

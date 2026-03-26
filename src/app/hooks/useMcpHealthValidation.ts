@@ -5,12 +5,14 @@ import { McpHealthCheckResult, McpSnapshotExpectation } from '../services/mcp/ty
 interface UseMcpHealthValidationOptions {
   enabled: boolean;
   endpoint: string;
+  headers?: Record<string, string>;
   expectation: McpSnapshotExpectation;
 }
 
 export function useMcpHealthValidation({
   enabled,
   endpoint,
+  headers,
   expectation,
 }: UseMcpHealthValidationOptions) {
   const [isRunning, setIsRunning] = useState(false);
@@ -27,6 +29,7 @@ export function useMcpHealthValidation({
       const service = createMcpReadService({
         enabled,
         endpoint,
+        headers,
       });
       const nextResult = await service.validateHealth(expectation);
       setResult(nextResult);
@@ -34,7 +37,7 @@ export function useMcpHealthValidation({
     } finally {
       setIsRunning(false);
     }
-  }, [enabled, endpoint, expectation]);
+  }, [enabled, endpoint, headers, expectation]);
 
   return {
     isDevEnvironment,

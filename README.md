@@ -137,6 +137,34 @@ Security controls include:
 - optional token auth with TTL
 - local-loopback default binding
 
+Recommended workflow:
+
+- agents should start with `workspace.get_snapshot` or `plumy://workspace`
+- use `tasks.list`, `tasks.get`, `cards.kanban.list`, and `cards.timeline.list` for targeted reads
+- use revision-protected write tools only after reading the current task revision
+- when work is complete, update the description briefly and move the task into the review board if human review is required
+
+Operational checks:
+
+- `npm run test:mcp` runs the workspace contract tests
+- `npm run mcp:smoke` runs a one-command local MCP smoke test against `MCP_ENDPOINT` or the default local endpoint
+- In the Preferences panel, the MCP section shows connection status, auth mode, token expiry, and the latest health check errors
+
+Recommended local setup:
+
+1. Keep the MCP listener bound to `127.0.0.1` and enable agent access only when needed.
+2. Use the generated `curl` command in Preferences to verify the HTTP endpoint.
+3. Use the generated `node electron/scripts/mcp-stdio.cjs` command when your MCP client supports `stdio`.
+4. After changing host, port, token, or capability profile, restart the MCP listener from Preferences.
+
+Recommended remote setup:
+
+1. Prefer a managed tunnel or remote forwarding solution when an agent cannot reach localhost directly.
+2. `cloudflared`, `ngrok`, or an equivalent managed tunnel is preferred over ad hoc sharing.
+3. Keep the access token enabled for any remote URL.
+4. Close `localtunnel` with `Ctrl + C`, or `pkill -f localtunnel` if it was backgrounded.
+5. Revoke or rotate the token after sharing a remote endpoint.
+
 ## GitHub Pages Site Deployment
 
 The marketing/docs site is built from `pages/` and emitted to `dist-pages/`.

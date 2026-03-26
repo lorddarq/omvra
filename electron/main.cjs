@@ -4,12 +4,34 @@ const fs = require('fs');
 const Store = require('electron-store');
 const { registerMcpIpcHandlers } = require('./ipc/mcp.cjs');
 const { startMcpHttpServer } = require('./services/mcp-http-server.cjs');
-const { isMcpAgentAccessEnabled } = require('./services/workspace-service.cjs');
+const {
+  isMcpAgentAccessEnabled,
+  buildMcpListenerStatus,
+} = require('./services/workspace-service.cjs');
 
 // Consider the app to be in dev mode when it's not packaged. This avoids trying to load a dev server in packaged builds.
 const isDev = !app.isPackaged;
-const store = new Store({ name: 'plumy-store' });
+const storeName = isDev ? 'plumy-store-dev' : 'plumy-store';
+const store = new Store({ name: storeName });
 let mcpHttpServer = null;
+let mcpRuntimeState = {
+  status: 'stopped',
+  listening: false,
+  error: null,
+  boundAddress: null,
+  boundUrl: null,
+  lastStartedAt: null,
+  lastStoppedAt: null,
+  lastUpdatedAt: null,
+  restartRequired: false,
+};
+
+function setMcpRuntimeState(nextState) {
+  mcpRuntimeState = {
+    ...mcpRuntimeState,
+    ...nextState,
+  };
+}
 
 function shouldStartMcpServer() {
   // Explicit runtime overrides for troubleshooting enterprise endpoint controls.
@@ -25,9 +47,22 @@ function restartMcpServer() {
   }
   if (!shouldStartMcpServer()) {
     console.log('[mcp] Startup skipped (disabled by preferences or environment)');
+    setMcpRuntimeState({
+      status: 'disabled',
+      listening: false,
+      error: null,
+      boundAddress: null,
+      boundUrl: null,
+      restartRequired: false,
+      lastStoppedAt: new Date().toISOString(),
+      lastUpdatedAt: new Date().toISOString(),
+    });
     return;
   }
-  mcpHttpServer = startMcpHttpServer(store, { logger: console });
+  mcpHttpServer = startMcpHttpServer(store, {
+    logger: console,
+    onStatusChange: setMcpRuntimeState,
+  });
 }
 
 function createWindow() {
@@ -175,6 +210,7 @@ app.on('before-quit', () => {
 // =====================
 ipcMain.handle('store/get', (_, key) => store.get(key));
 ipcMain.handle('store/set', (_, key, value) => store.set(key, value));
+ipcMain.handle('store/delete', (_, key) => store.delete(key));
 ipcMain.handle('store/export', () => store.store);
 ipcMain.handle('mcp/restart-server', () => {
   try {
@@ -185,7 +221,10 @@ ipcMain.handle('mcp/restart-server', () => {
         error: 'MCP server is disabled. Enable mcpAgentAccessEnabled or set PLUMY_ENABLE_MCP_SERVER=1.',
       };
     }
-    return { success: true };
+    return {
+      success: true,
+      listenerStatus: buildMcpListenerStatus(store, mcpRuntimeState),
+    };
   } catch (err) {
     return {
       success: false,
@@ -243,4 +282,8 @@ ipcMain.handle('open-external', async (_, urlStr) => {
 // =====================
 // IPC: MCP bridge (read-only, gated)
 // =====================
-registerMcpIpcHandlers({ ipcMain, store });
+registerMcpIpcHandlers({
+  ipcMain,
+  store,
+  getListenerStatus: () => mcpRuntimeState,
+});

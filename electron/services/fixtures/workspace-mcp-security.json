@@ -1,0 +1,16 @@
+{
+  "plumy.tasks.v1": [],
+  "plumy.people.v1": [],
+  "plumy.swimlanes.v1": [],
+  "plumy.statusColumns.v1": [],
+  "plumy.preferences.v1": {
+    "mcpAgentAccessEnabled": true,
+    "mcpCapabilityProfile": "task_write",
+    "mcpBindHost": "127.0.0.1",
+    "mcpPort": 3456,
+    "mcpServerAddress": "http://127.0.0.1:3456/mcp",
+    "mcpAccessToken": "fixture-token",
+    "mcpAccessTokenIssuedAt": "2099-03-26T09:00:00.000Z",
+    "mcpAccessTokenTtlMinutes": 60
+  }
+}

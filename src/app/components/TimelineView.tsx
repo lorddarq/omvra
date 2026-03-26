@@ -22,6 +22,8 @@ import { DraggableSwimlaneRow } from './DraggableSwimlaneRow';
 import { allocateTasksToTracks, calculateSwimlaneHeight } from '../utils/trackAllocation';
 import { getReadableTextClassFor } from '../utils/contrast';
 import { parseISODateLocal, toLocalISODate } from '../utils/date';
+import { getJSON, persistRawWithElectronMirror } from '../utils/storage';
+import { shouldBootstrapFromLocalStorage } from '../utils/canonicalHydration.js';
 
 const PAD_DAYS = 7;
 const DEFAULT_ROW_HEIGHT = 48;
@@ -67,7 +69,7 @@ export function TimelineView({
 }: TimelineViewProps) {
   // Left column width state
   const [leftColWidth, setLeftColWidth] = useState<number>(() => {
-    if (typeof window === 'undefined') return 200;
+    if (!shouldBootstrapFromLocalStorage()) return 200;
     const raw = window.localStorage.getItem(LEFT_COL_WIDTH_KEY);
     const parsed = raw ? Number(raw) : NaN;
     return Number.isFinite(parsed) ? Math.max(120, Math.min(480, parsed)) : 200;
@@ -119,6 +121,33 @@ export function TimelineView({
   const startupScrollRafRef = useRef<number | null>(null);
   const [isHeaderScrubbing, setIsHeaderScrubbing] = useState(false);
   const [needsStartupTodayScroll, setNeedsStartupTodayScroll] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const hydrateTimelineLayout = async () => {
+      const [storedLeftColWidth, storedMonthWidths] = await Promise.all([
+        getJSON<number>('plumy.leftColWidth.v1', null),
+        getJSON<Record<string, number>>('plumy.monthWidths.v1', null),
+      ]);
+
+      if (cancelled) return;
+
+      if (Number.isFinite(Number(storedLeftColWidth))) {
+        setLeftColWidth(Math.max(120, Math.min(480, Number(storedLeftColWidth))));
+      }
+
+      if (storedMonthWidths && typeof storedMonthWidths === 'object') {
+        setMonthWidths(prev => ({ ...prev, ...storedMonthWidths }));
+      }
+    };
+
+    void hydrateTimelineLayout();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // State for task resizing
   const [resizingTask, setResizingTask] = useState<{
@@ -229,7 +258,7 @@ export function TimelineView({
     Object.entries(allDatesByMonth).forEach(([k, monthDates]) => {
       defaults[k] = monthDates.length * DEFAULT_DAY_WIDTH;
     });
-    if (typeof window === 'undefined') return defaults;
+    if (!shouldBootstrapFromLocalStorage()) return defaults;
     try {
       const raw = window.localStorage.getItem(MONTH_WIDTHS_KEY);
       if (!raw) return defaults;
@@ -267,12 +296,12 @@ export function TimelineView({
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    window.localStorage.setItem(LEFT_COL_WIDTH_KEY, String(leftColWidth));
+    persistRawWithElectronMirror(LEFT_COL_WIDTH_KEY, String(leftColWidth));
   }, [leftColWidth]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    window.localStorage.setItem(MONTH_WIDTHS_KEY, JSON.stringify(monthWidths));
+    persistRawWithElectronMirror(MONTH_WIDTHS_KEY, JSON.stringify(monthWidths));
   }, [monthWidths]);
 
   useEffect(() => {

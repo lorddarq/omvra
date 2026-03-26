@@ -1,11 +1,16 @@
+const { randomUUID } = require('crypto');
+
 const PREFERENCES_KEY = 'plumy.preferences.v1';
 const TASKS_KEY = 'plumy.tasks.v1';
 const PEOPLE_KEY = 'plumy.people.v1';
 const SWIMLANES_KEY = 'plumy.swimlanes.v1';
 const STATUS_COLUMNS_KEY = 'plumy.statusColumns.v1';
+const MCP_BOARD_WATCHERS_KEY = 'plumy.mcp.boardWatchers.v1';
 const REQUIRES_HUMAN_REVIEW_STATUS_ID = 'requires-human-review';
 const REQUIRES_HUMAN_REVIEW_STATUS_TITLE = 'Requires human review';
 const REQUIRES_HUMAN_REVIEW_STATUS_COLOR = '#f97316';
+const MCP_PROTOCOL_VERSION = '2024-11-05';
+const MCP_SERVER_NAME = 'Plumy';
 const DEFAULT_MCP_HOST = '127.0.0.1';
 const DEFAULT_MCP_PORT = 3456;
 const DEFAULT_MCP_PATH = '/mcp';
@@ -14,6 +19,9 @@ const MCP_CAPABILITY_PROFILES = ['read_only', 'task_write', 'admin'];
 const MCP_AUDIT_LOG_KEY = 'plumy.mcp.audit.v1';
 const MCP_AUDIT_LOG_MAX_ENTRIES = 200;
 const MCP_TASK_REV_FIELD = '__mcpRevision';
+const TASK_ACTIVITY_LOG_MAX_ENTRIES = 50;
+
+let appVersionCache = null;
 
 function readObject(store, key) {
   const value = store.get(key);
@@ -23,6 +31,201 @@ function readObject(store, key) {
 function readArray(store, key) {
   const value = store.get(key);
   return Array.isArray(value) ? value : [];
+}
+
+function normalizeString(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizeTaskIdList(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  const ids = [];
+  for (const item of value) {
+    const id = normalizeString(item);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+  }
+  return ids;
+}
+
+function normalizeRevisionMap(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const out = {};
+  for (const [taskId, rawRevision] of Object.entries(value)) {
+    const taskKey = normalizeString(taskId);
+    if (!taskKey) continue;
+    const revision = Number(rawRevision);
+    if (!Number.isFinite(revision)) continue;
+    out[taskKey] = Math.max(0, Math.floor(revision));
+  }
+  return out;
+}
+
+function normalizeWatcherFilters(value) {
+  const raw = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const filters = {};
+  const assigneeId = normalizeString(raw.assigneeId);
+  const projectId = normalizeString(raw.projectId);
+  const search = normalizeString(raw.search);
+  if (assigneeId) filters.assigneeId = assigneeId;
+  if (projectId) filters.projectId = projectId;
+  if (search) filters.search = search;
+  return filters;
+}
+
+function normalizeBoardWatcherState(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const watcherId = normalizeString(value.watcherId || value.id);
+  const statusId = normalizeString(value.statusId);
+  if (!watcherId || !statusId) return null;
+
+  const lastProcessedAt = typeof value.lastProcessedAt === 'string' ? value.lastProcessedAt : undefined;
+  return {
+    watcherId,
+    statusId,
+    filters: normalizeWatcherFilters(value.filters),
+    lastSeenTaskIds: normalizeTaskIdList(value.lastSeenTaskIds),
+    lastSeenRevisions: normalizeRevisionMap(value.lastSeenRevisions),
+    lastProcessedAt,
+  };
+}
+
+function readBoardWatcherStates(store) {
+  return readArray(store, MCP_BOARD_WATCHERS_KEY)
+    .map(normalizeBoardWatcherState)
+    .filter(Boolean);
+}
+
+function listBoardWatcherStates(store) {
+  return readBoardWatcherStates(store);
+}
+
+function saveBoardWatcherStates(store, watcherStates) {
+  const normalized = Array.isArray(watcherStates)
+    ? watcherStates.map(normalizeBoardWatcherState).filter(Boolean)
+    : [];
+  store.set(MCP_BOARD_WATCHERS_KEY, normalized);
+  return normalized;
+}
+
+function getBoardWatcherState(store, watcherId) {
+  const normalizedWatcherId = normalizeString(watcherId);
+  if (!normalizedWatcherId) return null;
+  return readBoardWatcherStates(store).find(state => state.watcherId === normalizedWatcherId) || null;
+}
+
+function upsertBoardWatcherState(store, nextState) {
+  const normalized = normalizeBoardWatcherState(nextState);
+  if (!normalized) {
+    return { ok: false, error: 'INVALID_WATCHER_STATE', message: 'watcherId and statusId are required.' };
+  }
+
+  const states = readBoardWatcherStates(store);
+  const nextStates = states.filter(state => state.watcherId !== normalized.watcherId).concat(normalized);
+  saveBoardWatcherStates(store, nextStates);
+  return { ok: true, watcherState: normalized };
+}
+
+function buildBoardWatcherStorageKey({ statusId, assigneeId, projectId, search }) {
+  return [
+    `status:${normalizeString(statusId) || 'any'}`,
+    `assignee:${normalizeString(assigneeId) || 'any'}`,
+    `project:${normalizeString(projectId) || 'any'}`,
+    `search:${normalizeString(search) || 'any'}`,
+  ].join('|');
+}
+
+function pollBoardWatcher(store, {
+  watcherId,
+  statusId,
+  assigneeId,
+  projectId,
+  search,
+  persist = true,
+} = {}) {
+  const normalizedStatusId = normalizeString(statusId);
+  if (!normalizedStatusId) {
+    return {
+      ok: false,
+      error: 'STATUS_ID_REQUIRED',
+      message: 'statusId is required to poll a board.',
+    };
+  }
+
+  const normalizedWatcherId = normalizeString(watcherId) || buildBoardWatcherStorageKey({
+    statusId: normalizedStatusId,
+    assigneeId,
+    projectId,
+    search,
+  });
+  const nextFilters = normalizeWatcherFilters({ assigneeId, projectId, search });
+  const previousState = getBoardWatcherState(store, normalizedWatcherId) || {
+    watcherId: normalizedWatcherId,
+    statusId: normalizedStatusId,
+    filters: nextFilters,
+    lastSeenTaskIds: [],
+    lastSeenRevisions: {},
+  };
+
+  const tasks = listTasks(store, {
+    status: normalizedStatusId,
+    ...nextFilters,
+  });
+  const currentTaskIds = tasks.map(task => task.id);
+  const currentTaskIdSet = new Set(currentTaskIds);
+  const previousTaskIdSet = new Set(previousState.lastSeenTaskIds || []);
+  const previousRevisionMap = normalizeRevisionMap(previousState.lastSeenRevisions);
+  const currentRevisionMap = {};
+
+  const newTasks = [];
+  const updatedTasks = [];
+
+  for (const task of tasks) {
+    const currentRevision = Number.isFinite(Number(task[MCP_TASK_REV_FIELD]))
+      ? Math.max(0, Math.floor(Number(task[MCP_TASK_REV_FIELD])))
+      : 0;
+    currentRevisionMap[task.id] = currentRevision;
+
+    if (!previousTaskIdSet.has(task.id)) {
+      newTasks.push(task);
+      continue;
+    }
+
+    if ((previousRevisionMap[task.id] || 0) !== currentRevision) {
+      updatedTasks.push(task);
+    }
+  }
+
+  const removedTaskIds = (previousState.lastSeenTaskIds || []).filter(taskId => !currentTaskIdSet.has(taskId));
+  const nextWatcherState = {
+    watcherId: normalizedWatcherId,
+    statusId: normalizedStatusId,
+    filters: nextFilters,
+    lastSeenTaskIds: currentTaskIds,
+    lastSeenRevisions: currentRevisionMap,
+    lastProcessedAt: new Date().toISOString(),
+  };
+
+  if (persist) {
+    upsertBoardWatcherState(store, nextWatcherState);
+  }
+
+  return {
+    ok: true,
+    watcherState: nextWatcherState,
+    board: {
+      id: normalizedStatusId,
+      taskCount: tasks.length,
+      currentTaskIds,
+    },
+    changes: {
+      newTasks,
+      updatedTasks,
+      removedTaskIds,
+    },
+  };
 }
 
 function isMcpAgentAccessEnabled(store) {
@@ -62,6 +265,103 @@ function getMcpServerConfig(store) {
   };
 }
 
+function isMcpAccessTokenExpired(serverConfig, now = Date.now()) {
+  if (!serverConfig?.accessToken) return false;
+  if (!serverConfig.accessTokenIssuedAt) return true;
+
+  const issuedAtMs = Date.parse(serverConfig.accessTokenIssuedAt);
+  if (!Number.isFinite(issuedAtMs)) return true;
+
+  const ttlMinutes = Number.isFinite(Number(serverConfig.accessTokenTtlMinutes))
+    ? Math.max(1, Math.min(1440, Number(serverConfig.accessTokenTtlMinutes)))
+    : 60;
+  return now > issuedAtMs + (ttlMinutes * 60 * 1000);
+}
+
+function getMcpAccessTokenStatus(serverConfig, now = Date.now()) {
+  const accessToken = typeof serverConfig?.accessToken === 'string' ? serverConfig.accessToken : '';
+  if (!accessToken) {
+    return {
+      configured: false,
+      status: 'none',
+      expired: false,
+      issuedAt: null,
+      expiresAt: null,
+      remainingMinutes: null,
+      ttlMinutes: Number.isFinite(Number(serverConfig?.accessTokenTtlMinutes))
+        ? Math.max(1, Math.min(1440, Number(serverConfig.accessTokenTtlMinutes)))
+        : 60,
+    };
+  }
+
+  const ttlMinutes = Number.isFinite(Number(serverConfig?.accessTokenTtlMinutes))
+    ? Math.max(1, Math.min(1440, Number(serverConfig.accessTokenTtlMinutes)))
+    : 60;
+  const issuedAt = typeof serverConfig?.accessTokenIssuedAt === 'string' ? serverConfig.accessTokenIssuedAt : null;
+  const issuedAtMs = issuedAt ? Date.parse(issuedAt) : Number.NaN;
+
+  if (!Number.isFinite(issuedAtMs)) {
+    return {
+      configured: true,
+      status: 'invalid-issued-at',
+      expired: true,
+      issuedAt,
+      expiresAt: null,
+      remainingMinutes: null,
+      ttlMinutes,
+    };
+  }
+
+  const expiresAtMs = issuedAtMs + (ttlMinutes * 60 * 1000);
+  const remainingMinutes = Math.ceil((expiresAtMs - now) / 60000);
+  const expired = now > expiresAtMs;
+
+  return {
+    configured: true,
+    status: expired ? 'expired' : 'active',
+    expired,
+    issuedAt,
+    expiresAt: new Date(expiresAtMs).toISOString(),
+    remainingMinutes: expired ? Math.min(0, remainingMinutes) : Math.max(1, remainingMinutes),
+    ttlMinutes,
+  };
+}
+
+function buildMcpListenerStatus(store, runtimeState = {}) {
+  const serverConfig = getMcpServerConfig(store);
+  const tokenStatus = getMcpAccessTokenStatus(serverConfig);
+  const enabled = isMcpAgentAccessEnabled(store);
+  const runtimeStatus = typeof runtimeState.status === 'string' ? runtimeState.status : null;
+  const listening = Boolean(runtimeState.listening);
+  const status = !enabled
+    ? 'disabled'
+    : runtimeStatus || (listening ? 'running' : 'stopped');
+
+  return {
+    enabled,
+    status,
+    listening,
+    host: serverConfig.host,
+    port: serverConfig.port,
+    path: serverConfig.path,
+    expectedAddress: serverConfig.publicUrl,
+    boundAddress: typeof runtimeState.boundAddress === 'string' && runtimeState.boundAddress.trim()
+      ? runtimeState.boundAddress.trim()
+      : (listening ? `${serverConfig.host}:${serverConfig.port}` : null),
+    boundUrl: typeof runtimeState.boundUrl === 'string' && runtimeState.boundUrl.trim()
+      ? runtimeState.boundUrl.trim()
+      : (listening ? `http://${serverConfig.host}:${serverConfig.port}${serverConfig.path}` : null),
+    capabilityProfile: getMcpCapabilityProfile(store),
+    authMode: tokenStatus.configured ? 'token' : 'none',
+    token: tokenStatus,
+    error: typeof runtimeState.error === 'string' && runtimeState.error.trim() ? runtimeState.error.trim() : null,
+    lastStartedAt: typeof runtimeState.lastStartedAt === 'string' ? runtimeState.lastStartedAt : null,
+    lastStoppedAt: typeof runtimeState.lastStoppedAt === 'string' ? runtimeState.lastStoppedAt : null,
+    lastUpdatedAt: typeof runtimeState.lastUpdatedAt === 'string' ? runtimeState.lastUpdatedAt : null,
+    restartRequired: Boolean(runtimeState.restartRequired),
+  };
+}
+
 function getMcpCapabilityProfile(store) {
   const preferences = readObject(store, PREFERENCES_KEY);
   const value = typeof preferences.mcpCapabilityProfile === 'string'
@@ -70,16 +370,101 @@ function getMcpCapabilityProfile(store) {
   return MCP_CAPABILITY_PROFILES.includes(value) ? value : DEFAULT_MCP_CAPABILITY_PROFILE;
 }
 
+function getAppVersion() {
+  if (appVersionCache) return appVersionCache;
+  try {
+    // Package version is a better server identifier than a hard-coded string.
+    // eslint-disable-next-line global-require
+    const packageJson = require('../../package.json');
+    appVersionCache = typeof packageJson.version === 'string' ? packageJson.version : '0.0.0';
+  } catch (err) {
+    appVersionCache = '0.0.0';
+  }
+  return appVersionCache;
+}
+
+function buildMcpCapabilitySnapshot(store) {
+  const enabled = isMcpAgentAccessEnabled(store);
+  const profile = getMcpCapabilityProfile(store);
+  const writeToolsEnabled = profile === 'task_write' || profile === 'admin';
+
+  return {
+    enabled,
+    readOnly: !writeToolsEnabled,
+    protocolVersion: MCP_PROTOCOL_VERSION,
+    serverInfo: {
+      name: MCP_SERVER_NAME,
+      version: getAppVersion(),
+    },
+    capabilityProfile: profile,
+    capabilityProfiles: MCP_CAPABILITY_PROFILES,
+    transportModes: ['http', 'stdio'],
+    capabilities: {
+      workspaceSnapshot: enabled,
+      resourcesRead: enabled,
+      initialize: enabled,
+      toolCalls: enabled,
+      writeTools: writeToolsEnabled,
+    },
+    writeBoundary: {
+    writeToolsEnabled,
+    enforced: true,
+    exposedWriteTools: writeToolsEnabled
+        ? [
+            'tasks.transition_under_review',
+            'tasks.update_agent_summary',
+            'tasks.update_completion_description',
+            'tasks.move_to_requires_human_review',
+            'tasks.move_to_status',
+            'tasks.move_to_ready_for_human_review',
+            'tasks.assign',
+            'tasks.add_comment',
+            'tasks.add_activity_entry',
+          ]
+        : [],
+    },
+  };
+}
+
+function buildMcpInitializeResult(store) {
+  const snapshot = buildMcpCapabilitySnapshot(store);
+  return {
+    protocolVersion: MCP_PROTOCOL_VERSION,
+    serverInfo: snapshot.serverInfo,
+    capabilities: {
+      resources: {
+        listChanged: false,
+      },
+      tools: {
+        listChanged: false,
+      },
+      logging: {},
+    },
+  };
+}
+
 function appendMcpAuditLog(store, entry) {
   const safeEntry = entry && typeof entry === 'object' ? entry : {};
   const existing = readArray(store, MCP_AUDIT_LOG_KEY);
   const nextEntry = {
+    auditId: `audit-${randomUUID()}`,
     timestamp: new Date().toISOString(),
     ...safeEntry,
   };
   const nextLog = existing.concat(nextEntry).slice(-MCP_AUDIT_LOG_MAX_ENTRIES);
   store.set(MCP_AUDIT_LOG_KEY, nextLog);
   return nextEntry;
+}
+
+function listMcpAuditLog(store, { limit } = {}) {
+  const maxEntries = Number.isFinite(Number(limit))
+    ? Math.max(1, Math.min(MCP_AUDIT_LOG_MAX_ENTRIES, Math.floor(Number(limit))))
+    : MCP_AUDIT_LOG_MAX_ENTRIES;
+
+  return readArray(store, MCP_AUDIT_LOG_KEY)
+    .filter(entry => entry && typeof entry === 'object')
+    .slice(-maxEntries)
+    .reverse();
 }
 
 function getWorkspaceSnapshot(store) {
@@ -270,6 +655,63 @@ function findPersonById(store, personId) {
   return people.find(person => person && person.id === personId) || null;
 }
 
+function normalizeName(value) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+function findPersonByName(store, personName) {
+  const normalized = normalizeName(personName);
+  if (!normalized) return null;
+  const people = readArray(store, PEOPLE_KEY);
+  return people.find(person => person && normalizeName(person.name) === normalized) || null;
+}
+
+function findPersonByReference(store, { assigneeId, assigneeName }) {
+  if (typeof assigneeId === 'string' && assigneeId.trim()) {
+    const person = findPersonById(store, assigneeId.trim());
+    if (person) return person;
+  }
+
+  if (typeof assigneeName === 'string' && assigneeName.trim()) {
+    return findPersonByName(store, assigneeName);
+  }
+
+  return null;
+}
+
+function findStatusColumnByReference(store, { statusId, statusTitle }) {
+  const columns = readArray(store, STATUS_COLUMNS_KEY);
+  const normalizedTitle = normalizeName(statusTitle);
+  const normalizedId = normalizeName(statusId);
+
+  return columns.find(column => {
+    if (!column || typeof column !== 'object') return false;
+    const idMatches = typeof statusId === 'string' && column.id === statusId.trim();
+    const titleMatches = normalizedTitle && normalizeName(column.title) === normalizedTitle;
+    const fallbackMatches = normalizedId && normalizeName(column.title) === normalizedId;
+    return idMatches || titleMatches || fallbackMatches;
+  }) || null;
+}
+
+function ensureReadyForHumanReviewStatusColumn(store) {
+  const existing = findStatusColumnByReference(store, {
+    statusId: REQUIRES_HUMAN_REVIEW_STATUS_ID,
+    statusTitle: 'Ready for human review',
+  });
+  if (existing) {
+    return { created: false, statusColumn: existing };
+  }
+
+  const columns = readArray(store, STATUS_COLUMNS_KEY);
+  const statusColumn = {
+    id: 'ready-human',
+    title: 'Ready for human review',
+    color: '#ffb61a',
+  };
+  store.set(STATUS_COLUMNS_KEY, columns.concat(statusColumn));
+  return { created: true, statusColumn };
+}
+
 function updateTaskWithRevision(store, taskId, expectedRevision, updater) {
   const tasks = readArray(store, TASKS_KEY);
   const taskIndex = tasks.findIndex(task => task && task.id === taskId);
@@ -331,6 +773,150 @@ function transitionTaskToUnderReview(store, { taskId, expectedRevision, actor = 
   });
 }
 
+function moveTaskToStatus(store, {
+  taskId,
+  statusId,
+  statusTitle,
+  expectedRevision,
+  actor = 'agent',
+}) {
+  const target = findStatusColumnByReference(store, { statusId, statusTitle });
+  if (!target) {
+    return {
+      ok: false,
+      error: 'STATUS_NOT_FOUND',
+      message: 'Target status/board not found.',
+    };
+  }
+
+  const tasks = readArray(store, TASKS_KEY);
+  const task = tasks.find(item => item && item.id === taskId) || null;
+  const currentTask = normalizeTaskForMcp(task);
+  if (!currentTask) {
+    return {
+      ok: false,
+      error: 'TASK_NOT_FOUND',
+      message: `Task "${taskId}" not found.`,
+    };
+  }
+
+  const currentRevision = currentTask[MCP_TASK_REV_FIELD] || 0;
+  if (!Number.isFinite(Number(expectedRevision))) {
+    return {
+      ok: false,
+      error: 'EXPECTED_REVISION_REQUIRED',
+      message: 'expectedRevision is required and must be a finite number.',
+      currentRevision,
+    };
+  }
+
+  const expected = Math.max(0, Math.floor(Number(expectedRevision)));
+  if (expected !== currentRevision) {
+    return {
+      ok: false,
+      error: 'REVISION_MISMATCH',
+      message: 'Task revision mismatch.',
+      currentRevision,
+      expectedRevision: expected,
+    };
+  }
+
+  if (currentTask.status === target.id) {
+    return { ok: true, changed: false, task: currentTask, currentRevision };
+  }
+
+  return updateTaskWithRevision(store, taskId, expectedRevision, (nextTask) => ({
+    ...nextTask,
+    status: target.id,
+    mcpLastActor: actor,
+  }));
+}
+
+function moveTaskToReadyForHumanReview(store, { taskId, expectedRevision, actor = 'agent' }) {
+  const ensured = ensureReadyForHumanReviewStatusColumn(store);
+  const result = moveTaskToStatus(store, {
+    taskId,
+    statusId: ensured.statusColumn.id,
+    statusTitle: ensured.statusColumn.title,
+    expectedRevision,
+    actor,
+  });
+
+  return {
+    ...result,
+    statusCreated: ensured.created,
+    statusId: ensured.statusColumn.id,
+  };
+}
+
+function assignTaskToPerson(store, {
+  taskId,
+  assigneeId,
+  assigneeName,
+  assigneeKind,
+  expectedRevision,
+  actor = 'agent',
+}) {
+  const assignee = findPersonByReference(store, { assigneeId, assigneeName });
+  if (!assignee) {
+    return {
+      ok: false,
+      error: 'ASSIGNEE_NOT_FOUND',
+      message: 'Assignee not found.',
+    };
+  }
+
+  if (typeof assigneeKind === 'string' && assigneeKind.trim() && assignee.kind !== assigneeKind.trim()) {
+    return {
+      ok: false,
+      error: 'ASSIGNEE_KIND_MISMATCH',
+      message: 'Assignee kind does not match the selected person.',
+    };
+  }
+
+  const tasks = readArray(store, TASKS_KEY);
+  const task = tasks.find(item => item && item.id === taskId) || null;
+  const currentTask = normalizeTaskForMcp(task);
+  if (!currentTask) {
+    return {
+      ok: false,
+      error: 'TASK_NOT_FOUND',
+      message: `Task "${taskId}" not found.`,
+    };
+  }
+
+  const currentRevision = currentTask[MCP_TASK_REV_FIELD] || 0;
+  if (!Number.isFinite(Number(expectedRevision))) {
+    return {
+      ok: false,
+      error: 'EXPECTED_REVISION_REQUIRED',
+      message: 'expectedRevision is required and must be a finite number.',
+      currentRevision,
+    };
+  }
+
+  const expected = Math.max(0, Math.floor(Number(expectedRevision)));
+  if (expected !== currentRevision) {
+    return {
+      ok: false,
+      error: 'REVISION_MISMATCH',
+      message: 'Task revision mismatch.',
+      currentRevision,
+      expectedRevision: expected,
+    };
+  }
+
+  if (currentTask.assigneeId === assignee.id) {
+    return { ok: true, changed: false, task: currentTask, currentRevision };
+  }
+
+  return updateTaskWithRevision(store, taskId, expectedRevision, (nextTask) => ({
+    ...nextTask,
+    assigneeId: assignee.id,
+    mcpLastActor: actor,
+  }));
+}
+
 function updateTaskAgentSummary(store, { taskId, summary, expectedRevision, actor = 'agent' }) {
   const normalizedSummary = typeof summary === 'string' ? summary.trim() : '';
   if (!normalizedSummary) {
@@ -346,6 +932,87 @@ function updateTaskAgentSummary(store, { taskId, summary, expectedRevision, acto
     agentSummaryUpdatedAt: new Date().toISOString(),
     mcpLastActor: actor,
   }));
+}
+
+function sanitizeTaskActivityMessage(message) {
+  if (typeof message !== 'string') return '';
+  const normalized = message.replace(/\s+/g, ' ').trim();
+  if (!normalized) return '';
+  return normalized.length > 400 ? `${normalized.slice(0, 400).trim()}...` : normalized;
+}
+
+function normalizeTaskActivityType(type) {
+  const normalized = normalizeString(type).toLowerCase();
+  if (normalized === 'comment') return 'comment';
+  return 'activity';
+}
+
+function addTaskActivityEntry(store, {
+  taskId,
+  message,
+  type = 'activity',
+  expectedRevision,
+  actor = 'agent',
+}) {
+  const sanitizedMessage = sanitizeTaskActivityMessage(message);
+  if (!sanitizedMessage) {
+    return {
+      ok: false,
+      error: 'INVALID_ACTIVITY_MESSAGE',
+      message: 'message is required.',
+    };
+  }
+
+  return updateTaskWithRevision(store, taskId, expectedRevision, (task) => {
+    const existingEntries = Array.isArray(task.activityLog) ? task.activityLog : [];
+    const nextEntry = {
+      id: `activity-${randomUUID()}`,
+      type: normalizeTaskActivityType(type),
+      message: sanitizedMessage,
+      actor,
+      createdAt: new Date().toISOString(),
+    };
+
+    return {
+      ...task,
+      activityLog: existingEntries.concat(nextEntry).slice(-TASK_ACTIVITY_LOG_MAX_ENTRIES),
+      mcpLastActor: actor,
+    };
+  });
+}
+
+function addTaskComment(store, {
+  taskId,
+  comment,
+  author = 'agent',
+  expectedRevision,
+  actor = 'agent',
+}) {
+  const sanitizedComment = sanitizeTaskActivityMessage(comment);
+  const sanitizedAuthor = normalizeString(author) || 'agent';
+  if (!sanitizedComment) {
+    return {
+      ok: false,
+      error: 'INVALID_COMMENT',
+      message: 'comment is required.',
+    };
+  }
+
+  return updateTaskWithRevision(store, taskId, expectedRevision, (task) => {
+    const existingComments = Array.isArray(task.comments) ? task.comments : [];
+    const nextComment = {
+      id: `comment-${randomUUID()}`,
+      author: sanitizedAuthor,
+      content: sanitizedComment,
+      createdAt: new Date().toISOString(),
+    };
+
+    return {
+      ...task,
+      comments: existingComments.concat(nextComment).slice(-TASK_ACTIVITY_LOG_MAX_ENTRIES),
+      mcpLastActor: actor,
+    };
+  });
 }
 
 function sanitizeCompletionText(completion) {
@@ -497,26 +1164,43 @@ function moveTasksToRequiresHumanReviewBoard(store, {
 
 module.exports = {
   PREFERENCES_KEY,
+  MCP_PROTOCOL_VERSION,
+  MCP_SERVER_NAME,
   DEFAULT_MCP_HOST,
   DEFAULT_MCP_PORT,
   DEFAULT_MCP_PATH,
   DEFAULT_MCP_CAPABILITY_PROFILE,
   MCP_CAPABILITY_PROFILES,
   MCP_AUDIT_LOG_KEY,
+  MCP_BOARD_WATCHERS_KEY,
   isMcpAgentAccessEnabled,
   getMcpServerConfig,
+  isMcpAccessTokenExpired,
+  getMcpAccessTokenStatus,
+  buildMcpListenerStatus,
   getMcpCapabilityProfile,
+  buildMcpCapabilitySnapshot,
+  buildMcpInitializeResult,
   appendMcpAuditLog,
+  listMcpAuditLog,
   MCP_TASK_REV_FIELD,
   getWorkspaceSnapshot,
   listTasks,
   getTaskById,
   listKanbanCards,
   listTimelineCards,
+  listBoardWatcherStates,
+  getBoardWatcherState,
+  pollBoardWatcher,
   transitionTaskToUnderReview,
   updateTaskAgentSummary,
+  addTaskComment,
+  addTaskActivityEntry,
   updateTaskCompletionDescription,
   moveTasksToRequiresHumanReviewBoard,
+  moveTaskToStatus,
+  moveTaskToReadyForHumanReview,
+  assignTaskToPerson,
   REQUIRES_HUMAN_REVIEW_STATUS_ID,
   REQUIRES_HUMAN_REVIEW_STATUS_TITLE,
 };

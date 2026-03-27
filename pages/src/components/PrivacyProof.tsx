@@ -8,7 +8,7 @@ const PrivacyProof = () => {
     {
       title: 'Local-only task data',
       description:
-        'Tasks, people, and settings are stored locally on your machine using browser localStorage and Electron local store APIs.',
+        'Tasks, comments, people, settings, and workspace backups are stored locally on your machine using browser localStorage and Electron local store APIs.',
     },
     {
       title: 'No account or sign-in flow',
@@ -18,7 +18,7 @@ const PrivacyProof = () => {
     {
       title: 'No background data upload',
       description:
-        'Outbound network behavior is limited to user-initiated external links (for example release download links), not hidden telemetry.',
+        'Outbound network behavior is limited to user-initiated actions such as release download links or explicitly enabled MCP access, not hidden telemetry.',
     },
   ];
 

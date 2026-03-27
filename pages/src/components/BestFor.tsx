@@ -15,6 +15,11 @@ const BestFor = () => {
       description:
         'Coordinate multiple clients or streams, assign people across projects, and monitor task-based workload balance.',
     },
+    {
+      title: 'AI-Assisted Teams',
+      description:
+        'Use MCP-connected agents to inspect assigned work, follow guided handoff flows, and keep human review explicit.',
+    },
   ];
 
   return (
@@ -28,7 +33,7 @@ const BestFor = () => {
             Teams that need visual planning, fast execution, and practical workload clarity without extra tooling overhead.
           </p>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-8">
             {groups.map((group) => (
               <div key={group.title} className="rounded-2xl border border-nordic-gray-200 bg-white p-7">
                 <h3 className="text-2xl font-light text-nordic-gray-800 mb-3">{group.title}</h3>

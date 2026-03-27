@@ -2,7 +2,7 @@ const Features = () => {
   const features = [
     {
       title: 'Dual-View System',
-      description: 'Switch between full Timeline planning and Kanban execution, with task details available from both views.',
+      description: 'Switch between full Timeline planning and Kanban execution, with dedicated task detail viewing, review handoff, and cleaner edit flows.',
       icon: (
         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
@@ -38,7 +38,7 @@ const Features = () => {
     },
     {
       title: 'Markdown Details',
-      description: 'Write rich task notes and descriptions in markdown, then review them in a dedicated details panel.',
+      description: 'Write rich task notes and descriptions in markdown, review them in a dedicated details panel, and keep structured comments attached to each task.',
       icon: (
         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
@@ -56,7 +56,7 @@ const Features = () => {
     },
     {
       title: 'Preferences and Backups',
-      description: 'Use the settings flyover to configure load calculation columns, export tasks/projects/people, import backups, or reset local data.',
+      description: 'Use the settings flyover to configure load calculation columns, inspect storage usage, export full workspace backups, import them cleanly, or reset local data.',
       icon: (
         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.757.426 1.757 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.757-2.924 1.757-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.757-.426-1.757-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.607 2.296.07 2.572-1.065z" />
@@ -66,7 +66,7 @@ const Features = () => {
     },
     {
       title: 'MCP Support',
-      description: 'Connect AI assistants through Model Context Protocol (MCP) to query and update Plumy project data in a structured, tool-friendly way.',
+      description: 'Connect AI assistants through Model Context Protocol (MCP) with discoverable tools, resources, templates, prompts, and safe review-handoff workflows.',
       icon: (
         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7.5 12h9m-9 0a3 3 0 110-6h9a3 3 0 010 6m-9 0a3 3 0 100 6h9a3 3 0 100-6" />
@@ -83,7 +83,7 @@ const Features = () => {
             Everything you need
           </h2>
           <p className="text-xl text-nordic-gray-600 font-light mb-20 text-center max-w-2xl mx-auto">
-            Plan on timelines, execute in Kanban, tune load metrics, and keep private backups in one local-first desktop app
+            Plan on timelines, execute in Kanban, tune load metrics, collaborate with structured task context, and keep private backups in one local-first desktop app
           </p>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-16">
@@ -109,10 +109,10 @@ const Features = () => {
                 Dedicated Model Context Protocol support
               </h3>
               <p className="text-lg text-nordic-gray-600 font-light leading-relaxed mb-6">
-                Plumy supports Model Context Protocol so AI tools can work with your plans using structured context instead of brittle copy-paste. This makes task updates, timeline checks, and workflow automation more reliable.
+                Plumy supports Model Context Protocol so AI tools can work with your plans using structured context instead of brittle copy-paste. Agents can now discover guide resources, lookup templates, prompts, and safer workflow tools before making changes.
               </p>
               <p className="text-base text-nordic-gray-600 font-light leading-relaxed">
-                MCP integration is designed to keep humans in control while giving assistants a safer, typed interface for reading project state and helping with execution.
+                MCP integration is designed to keep humans in control while giving assistants a safer, typed interface for reading project state, finding assigned work, leaving concise completion notes, and handing tasks off for human review.
               </p>
             </div>
           </div>

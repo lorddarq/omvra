@@ -26,7 +26,7 @@ const Hero = () => {
             <span className="text-nordic-blue">simplified</span>
           </h1>
           <p className="text-xl md:text-2xl text-nordic-gray-600 font-light mb-16 leading-relaxed max-w-2xl mx-auto">
-            A local-first desktop planner with Timeline and Kanban views, markdown task details, multi-project assignment, and people workload visibility.
+            A local-first desktop planner with Timeline and Kanban views, markdown task details, comments, full-workspace backups, and MCP support for guided AI agent workflows.
           </p>
           <a
             href="#download"

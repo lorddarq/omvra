@@ -6,6 +6,7 @@ import { Button } from '../components/ui/button';
 import { DraggableTimelineTask, TIMELINE_TASK_TYPE } from '../components/DraggableTimelineTask';
 import { allocateTasksToTracks } from '../utils/trackAllocation';
 import { parseISODateLocal, toLocalISODate } from '../utils/date';
+import { canDropTimelineTaskInRow } from '../utils/timelineTaskDrop';
 
 const ITEM_TYPE = 'SWIMLANE_ROW';
 
@@ -230,8 +231,12 @@ export function DraggableSwimlaneRow({
   // Drop zone for timeline tasks — row handles task drops and repositioning
   const [{ isOver: isTaskOver, canDrop, dropLinePosition }, dropTask] = useDrop({
     accept: TIMELINE_TASK_TYPE,
+    canDrop: (item: TaskDragItem) => canDropTimelineTaskInRow(item.task, swimlane.id, mode),
     drop: (item: TaskDragItem, monitor) => {
       const task = item.task;
+      if (!canDropTimelineTaskInRow(task, swimlane.id, mode)) {
+        return;
+      }
       if (!timelineRef.current) {
         onMoveTaskToSwimlane(task.id, swimlane.id);
         return;

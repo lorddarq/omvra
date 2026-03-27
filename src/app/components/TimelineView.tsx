@@ -24,6 +24,7 @@ import { getReadableTextClassFor } from '../utils/contrast';
 import { parseISODateLocal, toLocalISODate } from '../utils/date';
 import { getJSON, persistRawWithElectronMirror } from '../utils/storage';
 import { shouldBootstrapFromLocalStorage } from '../utils/canonicalHydration.js';
+import { applyTimelineTaskDrop } from '../utils/timelineTaskDrop';
 
 const PAD_DAYS = 7;
 const DEFAULT_ROW_HEIGHT = 48;
@@ -1134,17 +1135,18 @@ export function TimelineView({
                       onMoveTaskToSwimlane={(taskId, swimlaneId, newStartDate, newEndDate) => {
                         const task = tasks.find(t => t.id === taskId);
                         if (task) {
-                          // Update swimlane/assignee and dates if provided
-                          const updated = { ...task };
-                          if (mode === 'people') {
-                            updated.assigneeId = swimlaneId;
-                          } else {
-                            updated.swimlaneId = swimlaneId;
-                          }
-                          if (newStartDate) updated.startDate = newStartDate;
-                          if (newEndDate) updated.endDate = newEndDate;
+                          const updated = applyTimelineTaskDrop(
+                            task,
+                            swimlaneId,
+                            mode,
+                            newStartDate,
+                            newEndDate
+                          );
                           
-                          // Update the task in the state
+                          if (updated === task) {
+                            return;
+                          }
+
                           onReorderTasks(tasks.map(t => (t.id === taskId ? updated : t)));
                         }
                       }}

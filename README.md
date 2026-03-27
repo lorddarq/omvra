@@ -149,11 +149,24 @@ Current capabilities include:
   - `tasks.list`, `tasks.get`
   - `cards.kanban.list`, `cards.timeline.list`
   - `boards.watch.poll`
-  - resources under `plumy://...`
+  - prompts:
+    - `agent.find_assigned_work`
+    - `agent.execute_task`
+    - `agent.complete_and_handoff`
+  - resources under `plumy://...`, including:
+    - `plumy://workspace`
+    - `plumy://agent/guide`
+    - `plumy://schema/task-execution`
+  - resource templates via `resources/templates/list`, including:
+    - `plumy://tasks/{taskId}`
+    - `plumy://agents/{personId}/assigned`
+    - `plumy://projects/{projectId}/tasks`
+    - `plumy://boards/{statusId}/tasks`
 - gated safe write tools (capability-profile dependent):
   - `tasks.transition_under_review`
   - `tasks.update_agent_summary`
   - `tasks.update_completion_description`
+  - `tasks.complete_and_request_review`
   - `tasks.move_to_status`
   - `tasks.move_to_ready_for_human_review`
   - `tasks.move_to_requires_human_review`
@@ -172,7 +185,11 @@ Security controls include:
 
 Recommended workflow:
 
-- agents should start with `workspace.get_snapshot` or `plumy://workspace`
+- agents should start with `plumy://agent/guide` and `plumy://schema/task-execution`
+- use `resources/templates/list` to discover stable lookup URIs before guessing paths
+- use `prompts/list` and `prompts/get` when the MCP client supports prompt-driven workflows
+- use `workspace.get_snapshot` or `plumy://workspace` for the canonical top-level read
+- use `plumy://agents/{personId}/assigned` to find assigned work without guessing filter shapes
 - use `tasks.list`, `tasks.get`, `cards.kanban.list`, and `cards.timeline.list` for targeted reads
 - use `boards.watch.poll` when an agent needs to monitor a specific status/board without duplicate processing
 - use revision-protected write tools only after reading the current task revision
@@ -180,7 +197,8 @@ Recommended workflow:
   - `agentSummary` for brief execution summary
   - comments for human-readable conversation
   - activity entries for structured machine-side progress notes
-- when work is complete, update the description briefly and move the task into the review board if human review is required
+- when work is complete, prefer `tasks.complete_and_request_review` for a single safe handoff path
+- if a more manual flow is needed, update the description briefly and move the task into the review board explicitly
 
 Operational checks:
 
@@ -269,6 +287,7 @@ Plumy now supports an agent-oriented desktop workflow:
   - poll interval
 - watcher state keeps duplicate processing suppression on the MCP side
 - agents can move work into human-review boards and leave structured comments/activity entries
+- agents can discover assigned work through MCP resources/templates and use a single review-handoff workflow tool
 
 ## Comments and Task Context
 
@@ -277,6 +296,7 @@ Tasks now support:
 - markdown description/details
 - structured comments
 - structured MCP activity entries
+- brief agent completion blocks for review handoff
 - parsed project/repo hints from the task description for agent routing
 
 Comments are part of the task payload and are included in backup/import flows.

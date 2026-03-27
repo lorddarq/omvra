@@ -13,6 +13,7 @@ const {
 const isDev = !app.isPackaged;
 const storeName = isDev ? 'plumy-store-dev' : 'plumy-store';
 const store = new Store({ name: storeName });
+const STORE_DID_CHANGE_CHANNEL = 'store/did-change';
 let mcpHttpServer = null;
 let mcpRuntimeState = {
   status: 'stopped',
@@ -63,6 +64,18 @@ function restartMcpServer() {
     logger: console,
     onStatusChange: setMcpRuntimeState,
   });
+}
+
+function broadcastStoreDidChange() {
+  const payload = {
+    updatedAt: new Date().toISOString(),
+  };
+
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) {
+      window.webContents.send(STORE_DID_CHANGE_CHANNEL, payload);
+    }
+  }
 }
 
 function createWindow() {
@@ -186,6 +199,9 @@ function createWindow() {
 
 app.whenReady().then(() => {
   // Bind MCP endpoint to localhost only; no external interface exposure.
+  store.onDidAnyChange(() => {
+    broadcastStoreDidChange();
+  });
   restartMcpServer();
   createWindow();
 });

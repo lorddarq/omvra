@@ -112,6 +112,29 @@ interface AgentWatchRuntimeState {
   error?: string;
 }
 
+function areSerializedValuesEqual(left: unknown, right: unknown): boolean {
+  try {
+    return JSON.stringify(left) === JSON.stringify(right);
+  } catch (error) {
+    return false;
+  }
+}
+
+function mirrorCanonicalJsonToLocalStorage(key: string, value: unknown): void {
+  if (typeof window === 'undefined') return;
+
+  try {
+    if (value === undefined) {
+      window.localStorage.removeItem(key);
+      return;
+    }
+
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    // Ignore local mirroring failures so MCP-driven updates stay non-blocking.
+  }
+}
+
 function App() {
   // Initialize hooks for view management
   const viewState = useViewState('timeline');
@@ -192,6 +215,37 @@ function App() {
   const [hasHydratedCanonicalWorkspace, setHasHydratedCanonicalWorkspace] = useState<boolean>(
     () => shouldBootstrapFromLocalStorage()
   );
+  const tasksRef = useRef(tasks);
+  const timelineSwimlanesRef = useRef(timelineSwimlanes);
+  const peopleRef = useRef(people);
+  const statusColumnsRef = useRef(statusColumns);
+  const preferencesRef = useRef(preferences);
+  const agentWatchConfigsRef = useRef(agentWatchConfigs);
+
+  useEffect(() => {
+    tasksRef.current = tasks;
+  }, [tasks]);
+
+  useEffect(() => {
+    timelineSwimlanesRef.current = timelineSwimlanes;
+  }, [timelineSwimlanes]);
+
+  useEffect(() => {
+    peopleRef.current = people;
+  }, [people]);
+
+  useEffect(() => {
+    statusColumnsRef.current = statusColumns;
+  }, [statusColumns]);
+
+  useEffect(() => {
+    preferencesRef.current = preferences;
+  }, [preferences]);
+
+  useEffect(() => {
+    agentWatchConfigsRef.current = agentWatchConfigs;
+  }, [agentWatchConfigs]);
+
   useEffect(() => {
     if (!hasHydratedCanonicalWorkspace) return;
     persistJSONWithElectronMirror(STATUS_COLUMNS_KEY, statusColumns);
@@ -220,6 +274,70 @@ function App() {
     if (!hasHydratedCanonicalWorkspace) return;
     persistJSONWithElectronMirror(PEOPLE_KEY, people);
   }, [hasHydratedCanonicalWorkspace, people]);
+
+  const syncCanonicalWorkspaceFromExport = useCallback((exported: Record<string, unknown>) => {
+    const exportedTasks = getPortableStoreValue<Task[]>(exported, TASKS_KEY);
+    const exportedProjects = getPortableStoreValue<TimelineSwimlane[]>(exported, SWIMLANES_KEY);
+    const exportedPeople = getPortableStoreValue<Person[]>(exported, PEOPLE_KEY);
+    const exportedStatusColumns = getPortableStoreValue<StatusColumnState[]>(exported, STATUS_COLUMNS_KEY);
+    const exportedPreferences = getPortableStoreValue<Partial<AppPreferences>>(exported, PREFERENCES_KEY);
+    const exportedAgentWatchConfigs = getPortableStoreValue<AgentWatchConfig[]>(exported, MCP_AGENT_WATCH_CONFIGS_KEY);
+
+    let nextProjects = timelineSwimlanesRef.current;
+    let nextStatusColumns = statusColumnsRef.current;
+
+    if (exportedProjects !== undefined) {
+      nextProjects = sanitizeTimelineSwimlanes(exportedProjects, DEFAULT_SWIMLANES_SEED);
+      mirrorCanonicalJsonToLocalStorage(SWIMLANES_KEY, nextProjects);
+      setTimelineSwimlanes(previous =>
+        areSerializedValuesEqual(previous, nextProjects) ? previous : nextProjects
+      );
+    }
+
+    if (exportedPeople !== undefined) {
+      const nextPeople = sanitizePeople(exportedPeople, DEFAULT_PEOPLE_SEED);
+      mirrorCanonicalJsonToLocalStorage(PEOPLE_KEY, nextPeople);
+      setPeople(previous =>
+        areSerializedValuesEqual(previous, nextPeople) ? previous : nextPeople
+      );
+    }
+
+    if (exportedStatusColumns !== undefined) {
+      nextStatusColumns = sanitizeStatusColumns(exportedStatusColumns, defaultSwimlanes);
+      mirrorCanonicalJsonToLocalStorage(STATUS_COLUMNS_KEY, nextStatusColumns);
+      setStatusColumns(previous =>
+        areSerializedValuesEqual(previous, nextStatusColumns) ? previous : nextStatusColumns
+      );
+    }
+
+    if (exportedPreferences !== undefined) {
+      const nextPreferences = sanitizePreferences(
+        exportedPreferences,
+        nextStatusColumns,
+        preferencesRef.current
+      );
+      mirrorCanonicalJsonToLocalStorage(PREFERENCES_KEY, nextPreferences);
+      setPreferences(previous =>
+        areSerializedValuesEqual(previous, nextPreferences) ? previous : nextPreferences
+      );
+    }
+
+    if (exportedAgentWatchConfigs !== undefined) {
+      const nextAgentWatchConfigs = sanitizeAgentWatchConfigs(exportedAgentWatchConfigs, []);
+      mirrorCanonicalJsonToLocalStorage(MCP_AGENT_WATCH_CONFIGS_KEY, nextAgentWatchConfigs);
+      setAgentWatchConfigs(previous =>
+        areSerializedValuesEqual(previous, nextAgentWatchConfigs) ? previous : nextAgentWatchConfigs
+      );
+    }
+
+    if (exportedTasks !== undefined) {
+      const nextTasks = sanitizeTasks(exportedTasks, nextProjects, DEFAULT_TASKS_SEED);
+      mirrorCanonicalJsonToLocalStorage(TASKS_KEY, nextTasks);
+      setTasks(previous =>
+        areSerializedValuesEqual(previous, nextTasks) ? previous : nextTasks
+      );
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -281,28 +399,8 @@ function App() {
             return;
           }
 
-          const canonicalProjects = hasProjects
-            ? sanitizeTimelineSwimlanes(exportedProjects, DEFAULT_SWIMLANES_SEED)
-            : timelineSwimlanes;
-          const canonicalPeople = hasPeople
-            ? sanitizePeople(exportedPeople, DEFAULT_PEOPLE_SEED)
-            : people;
-          const canonicalStatusColumns = hasStatusColumns
-            ? sanitizeStatusColumns(exportedStatusColumns, defaultSwimlanes)
-            : statusColumns;
-
-          if (hasProjects) setTimelineSwimlanes(canonicalProjects);
-          if (hasPeople) setPeople(canonicalPeople);
-          if (hasStatusColumns) setStatusColumns(canonicalStatusColumns);
-          if (hasPreferences) {
-            setPreferences(prev => sanitizePreferences(exportedPreferences, canonicalStatusColumns, prev));
-          }
-          if (hasAgentWatchConfigs) {
-            setAgentWatchConfigs(sanitizeAgentWatchConfigs(exportedAgentWatchConfigs, []));
-          }
-          if (hasTasks) {
-            const canonicalTasks = sanitizeTasks(exportedTasks, canonicalProjects, DEFAULT_TASKS_SEED);
-            setTasks(canonicalTasks);
+          if (hasProjects || hasPeople || hasStatusColumns || hasPreferences || hasAgentWatchConfigs || hasTasks) {
+            syncCanonicalWorkspaceFromExport(exported);
           }
         } finally {
           if (!cancelled) {
@@ -319,7 +417,24 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [syncCanonicalWorkspaceFromExport]);
+
+  useEffect(() => {
+    if (!hasHydratedCanonicalWorkspace) return;
+
+    const unsubscribe = window.electron?.onStoreChanged?.(() => {
+      void window.electron?.storeExport?.().then(exported => {
+        if (!exported || typeof exported !== 'object') return;
+        syncCanonicalWorkspaceFromExport(exported);
+      }).catch(() => {
+        // Ignore external sync failures; the app remains usable with current state.
+      });
+    });
+
+    return () => {
+      unsubscribe?.();
+    };
+  }, [hasHydratedCanonicalWorkspace, syncCanonicalWorkspaceFromExport]);
 
   const [viewRefreshKey, setViewRefreshKey] = useState(0);
   const {

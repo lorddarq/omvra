@@ -435,6 +435,9 @@ function buildMcpInitializeResult(store) {
       resources: {
         listChanged: false,
       },
+      prompts: {
+        listChanged: false,
+      },
       tools: {
         listChanged: false,
       },
@@ -538,6 +541,94 @@ function getTaskById(store, taskId) {
   return task ? normalizeTaskForMcp(task) : null;
 }
 
+function summarizeAssignedTasks(tasks) {
+  const byStatus = {};
+  const byProjectId = {};
+
+  for (const task of tasks) {
+    if (!task || typeof task !== 'object') continue;
+    const statusKey = normalizeString(task.status) || 'unknown';
+    byStatus[statusKey] = (byStatus[statusKey] || 0) + 1;
+
+    const projectIds = Array.isArray(task.projectIds) ? task.projectIds : [];
+    if (projectIds.length === 0 && task.swimlaneId) {
+      const laneKey = normalizeString(task.swimlaneId);
+      if (laneKey) {
+        byProjectId[laneKey] = (byProjectId[laneKey] || 0) + 1;
+      }
+      continue;
+    }
+
+    for (const projectId of projectIds) {
+      const key = normalizeString(projectId);
+      if (!key) continue;
+      byProjectId[key] = (byProjectId[key] || 0) + 1;
+    }
+  }
+
+  return {
+    totalTasks: tasks.length,
+    byStatus,
+    byProjectId,
+  };
+}
+
+function listAssignedWorkForAgent(store, {
+  personId,
+  personName,
+  status,
+  projectId,
+  search,
+} = {}) {
+  const person = findPersonByReference(store, {
+    assigneeId: personId,
+    assigneeName: personName,
+  });
+
+  if (!person) {
+    return {
+      ok: false,
+      error: 'PERSON_NOT_FOUND',
+      message: 'Assigned person not found.',
+    };
+  }
+
+  if (person.kind !== 'agentic') {
+    return {
+      ok: false,
+      error: 'PERSON_NOT_AGENTIC',
+      message: 'Assigned person is not an agentic persona.',
+    };
+  }
+
+  const filters = {
+    assigneeId: person.id,
+    status: normalizeString(status),
+    projectId: normalizeString(projectId),
+    search: normalizeString(search),
+  };
+
+  const tasks = listTasks(store, filters);
+  const summary = summarizeAssignedTasks(tasks);
+
+  return {
+    ok: true,
+    person: {
+      id: person.id,
+      name: person.name,
+      role: person.role,
+      kind: person.kind,
+    },
+    filters: {
+      status: filters.status || null,
+      projectId: filters.projectId || null,
+      search: filters.search || null,
+    },
+    summary,
+    tasks,
+  };
+}
+
 function listKanbanCards(store, filters = {}) {
   const tasks = listTasks(store, filters);
 
@@ -577,6 +668,206 @@ function listTimelineCards(store, filters = {}) {
       assigneeId: task.assigneeId,
       status: task.status,
     }));
+}
+
+function buildMcpAgentGuide() {
+  return {
+    schemaVersion: '1',
+    resource: 'plumy://agent/guide',
+    title: 'Plumy MCP agent guide',
+    summary: 'Discovery-first workflow for agents using the Plumy MCP server.',
+    recommendedDiscoveryOrder: [
+      'initialize',
+      'resources/list',
+      'resources/templates/list',
+      'resources/read plumy://agent/guide',
+      'resources/read plumy://schema/task-execution',
+      'resources/read plumy://workspace',
+      'resources/read plumy://agents/{personId}/assigned',
+    ],
+    commonResources: [
+      'plumy://workspace',
+      'plumy://schema/task-execution',
+      'plumy://agent/guide',
+    ],
+    commonResourceTemplates: [
+      'plumy://tasks/{taskId}',
+      'plumy://agents/{personId}/assigned',
+      'plumy://projects/{projectId}/tasks',
+      'plumy://boards/{statusId}/tasks',
+    ],
+    commonTools: [
+      'tasks.list',
+      'tasks.get',
+      'cards.kanban.list',
+      'cards.timeline.list',
+      'boards.watch.poll',
+      'tasks.add_comment',
+      'tasks.update_completion_description',
+      'tasks.move_to_status',
+      'tasks.move_to_ready_for_human_review',
+      'tasks.assign',
+    ],
+    workflow: [
+      'Read the guide and task-execution schema before taking action.',
+      'Use resources/templates/list to discover stable lookup URIs.',
+      'Inspect plumy://workspace for the overall state, then read the assigned task resource.',
+      'Read current task data before writing, and pass expectedRevision on every write.',
+      'Keep completion notes brief, then move the task to the appropriate review board.',
+    ],
+    handoffChecklist: [
+      'Task context inspected',
+      'Relevant board/project/person context read',
+      'Brief completion note recorded',
+      'Task moved to review when work is ready',
+    ],
+  };
+}
+
+function buildMcpTaskExecutionSchema() {
+  return {
+    schemaVersion: '1',
+    resource: 'plumy://schema/task-execution',
+    title: 'Plumy task execution schema',
+    summary: 'Expected agent task lifecycle and write sequence.',
+    lifecycle: [
+      'discover',
+      'inspect',
+      'work',
+      'summarize',
+      'handoff',
+      'review',
+    ],
+    writeRules: [
+      'Read the task first.',
+      'Always pass expectedRevision on writes.',
+      'Write a brief completion summary before moving the task to review.',
+      'Prefer the narrowest write tool that matches the action.',
+    ],
+    recommendedWriteSequence: [
+      'tasks.add_comment',
+      'tasks.update_completion_description',
+      'tasks.move_to_status or tasks.move_to_ready_for_human_review',
+      'tasks.assign when handing off to another person',
+    ],
+    reviewTargets: [
+      'under-review',
+      'ready-human',
+      'requires-human-review',
+    ],
+    lookupHints: [
+      'Use tasks.list with assigneeId to find assigned work.',
+      'Use boards.watch.poll to watch a board for changes.',
+      'Use cards.kanban.list for board-friendly projections.',
+    ],
+  };
+}
+
+function buildMcpPromptCatalog() {
+  return [
+    {
+      name: 'agent.find_assigned_work',
+      description: 'Find the tasks assigned to a specific agentic person and summarize what is actionable now.',
+      arguments: [
+        {
+          name: 'personId',
+          description: 'The id of the agentic person whose assigned work should be inspected.',
+          required: true,
+        },
+      ],
+    },
+    {
+      name: 'agent.execute_task',
+      description: 'Inspect a task, gather the needed context, and prepare a safe execution plan before making write calls.',
+      arguments: [
+        {
+          name: 'taskId',
+          description: 'The task id to inspect and execute.',
+          required: true,
+        },
+      ],
+    },
+    {
+      name: 'agent.complete_and_handoff',
+      description: 'Summarize a completed task briefly, then hand it off for human review using the safe write tool.',
+      arguments: [
+        {
+          name: 'taskId',
+          description: 'The task id to hand off for review.',
+          required: true,
+        },
+        {
+          name: 'completion',
+          description: 'A brief completion summary that will be written into the task.',
+          required: true,
+        },
+      ],
+    },
+  ];
+}
+
+function buildPromptMessages(description, steps) {
+  return [
+    {
+      role: 'user',
+      content: {
+        type: 'text',
+        text: [description, '', ...steps.map((step, index) => `${index + 1}. ${step}`)].join('\n'),
+      },
+    },
+  ];
+}
+
+function getMcpPrompt(promptName, args = {}) {
+  const normalizedName = normalizeString(promptName);
+  const normalizedArgs = args && typeof args === 'object' && !Array.isArray(args) ? args : {};
+
+  if (normalizedName === 'agent.find_assigned_work') {
+    const personId = normalizeString(normalizedArgs.personId);
+    return {
+      description: 'Find and summarize the assigned work for one agentic person.',
+      messages: buildPromptMessages(
+        `Find the current assigned work for agent "${personId || '{personId}'}".`,
+        [
+          'Call resources/read for the agent-assigned resource template using the provided person id.',
+          'Summarize the current tasks, grouped by status or project when helpful.',
+          'If no work is assigned, say that clearly instead of guessing.',
+        ]
+      ),
+    };
+  }
+
+  if (normalizedName === 'agent.execute_task') {
+    const taskId = normalizeString(normalizedArgs.taskId);
+    return {
+      description: 'Inspect one task and gather enough context to execute it safely.',
+      messages: buildPromptMessages(
+        `Prepare to execute task "${taskId || '{taskId}'}".`,
+        [
+          'Read plumy://schema/task-execution before making changes.',
+          'Read the task by id and inspect any assigned project, person, and description context.',
+          'Use read tools/resources first; only use write tools after you understand the task and have the current revision.',
+        ]
+      ),
+    };
+  }
+
+  if (normalizedName === 'agent.complete_and_handoff') {
+    const taskId = normalizeString(normalizedArgs.taskId);
+    return {
+      description: 'Complete a task handoff for human review using the high-level workflow tool.',
+      messages: buildPromptMessages(
+        `Complete and hand off task "${taskId || '{taskId}'}" for human review.`,
+        [
+          'Read the latest task state and capture its expected revision.',
+          'Write a brief completion summary only.',
+          'Call tasks.complete_and_request_review with the current revision and completion summary.',
+        ]
+      ),
+    };
+  }
+
+  return null;
 }
 
 function normalizeTaskForMcp(task) {
@@ -841,6 +1132,36 @@ function moveTaskToReadyForHumanReview(store, { taskId, expectedRevision, actor 
     expectedRevision,
     actor,
   });
+
+  return {
+    ...result,
+    statusCreated: ensured.created,
+    statusId: ensured.statusColumn.id,
+  };
+}
+
+function completeTaskAndRequestReview(store, {
+  taskId,
+  completion,
+  expectedRevision,
+  actor = 'agent',
+}) {
+  const completionText = sanitizeCompletionText(completion);
+  if (!completionText) {
+    return {
+      ok: false,
+      error: 'INVALID_COMPLETION',
+      message: 'completion is required.',
+    };
+  }
+
+  const ensured = ensureReadyForHumanReviewStatusColumn(store);
+  const result = updateTaskWithRevision(store, taskId, expectedRevision, (task) => ({
+    ...task,
+    notes: upsertCompletionSection(task.notes, completionText),
+    status: ensured.statusColumn.id,
+    mcpLastActor: actor,
+  }));
 
   return {
     ...result,
@@ -1186,9 +1507,14 @@ module.exports = {
   MCP_TASK_REV_FIELD,
   getWorkspaceSnapshot,
   listTasks,
+  listAssignedWorkForAgent,
   getTaskById,
   listKanbanCards,
   listTimelineCards,
+  buildMcpAgentGuide,
+  buildMcpTaskExecutionSchema,
+  buildMcpPromptCatalog,
+  getMcpPrompt,
   listBoardWatcherStates,
   getBoardWatcherState,
   pollBoardWatcher,
@@ -1197,6 +1523,7 @@ module.exports = {
   addTaskComment,
   addTaskActivityEntry,
   updateTaskCompletionDescription,
+  completeTaskAndRequestReview,
   moveTasksToRequiresHumanReviewBoard,
   moveTaskToStatus,
   moveTaskToReadyForHumanReview,

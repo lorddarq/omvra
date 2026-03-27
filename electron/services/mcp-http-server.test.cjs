@@ -41,6 +41,7 @@ test('initialize returns MCP server identity and capabilities', () => {
   assert.ok(response.result.capabilities);
   assert.ok(response.result.capabilities.resources);
   assert.ok(response.result.capabilities.tools);
+  assert.ok(response.result.capabilities.prompts);
 });
 
 test('notifications/initialized is accepted without a JSON-RPC response payload', () => {
@@ -70,9 +71,218 @@ test('tools/list remains available after initialize handshake', () => {
   assert.ok(response.result.tools.some(tool => tool.name === 'boards.watch.poll'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks.move_to_status'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks.move_to_ready_for_human_review'));
+  assert.ok(response.result.tools.some(tool => tool.name === 'tasks.complete_and_request_review'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks.assign'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks.add_comment'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks.add_activity_entry'));
+});
+
+test('resources/list exposes the guide, schema, and lookup templates', () => {
+  const dispatch = createRequestDispatcher(makeStoreFromFixture('workspace-basic'));
+  const response = dispatch({
+    jsonrpc: '2.0',
+    id: '2.1',
+    method: 'resources/list',
+    params: {},
+  }, makeReq());
+
+  assert.equal(response.jsonrpc, '2.0');
+  assert.equal(response.id, '2.1');
+  assert.ok(Array.isArray(response.result.resources));
+  assert.ok(Array.isArray(response.result.resourceTemplates));
+  assert.ok(response.result.resources.some(resource => resource.uri === 'plumy://agent/guide'));
+  assert.ok(response.result.resources.some(resource => resource.uri === 'plumy://schema/task-execution'));
+  assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'plumy://agents/{personId}/assigned'));
+  assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'plumy://projects/{projectId}/tasks'));
+  assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'plumy://boards/{statusId}/tasks'));
+});
+
+test('resources/templates/list returns the same lookup templates for clients that query them directly', () => {
+  const dispatch = createRequestDispatcher(makeStoreFromFixture('workspace-basic'));
+  const response = dispatch({
+    jsonrpc: '2.0',
+    id: '2.2',
+    method: 'resources/templates/list',
+    params: {},
+  }, makeReq());
+
+  assert.equal(response.jsonrpc, '2.0');
+  assert.equal(response.id, '2.2');
+  assert.ok(Array.isArray(response.result.resourceTemplates));
+  assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'plumy://tasks/{taskId}'));
+  assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'plumy://agents/{personId}/assigned'));
+  assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'plumy://projects/{projectId}/tasks'));
+  assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'plumy://boards/{statusId}/tasks'));
+});
+
+test('prompts/list and prompts/get expose guided agent workflows', () => {
+  const dispatch = createRequestDispatcher(makeStoreFromFixture('workspace-basic'));
+
+  const listResponse = dispatch({
+    jsonrpc: '2.0',
+    id: '2.2.1',
+    method: 'prompts/list',
+    params: {},
+  }, makeReq());
+
+  assert.ok(Array.isArray(listResponse.result.prompts));
+  assert.ok(listResponse.result.prompts.some(prompt => prompt.name === 'agent.find_assigned_work'));
+  assert.ok(listResponse.result.prompts.some(prompt => prompt.name === 'agent.complete_and_handoff'));
+
+  const getResponse = dispatch({
+    jsonrpc: '2.0',
+    id: '2.2.2',
+    method: 'prompts/get',
+    params: {
+      name: 'agent.complete_and_handoff',
+      arguments: {
+        taskId: 'task-1',
+      },
+    },
+  }, makeReq());
+
+  assert.match(getResponse.result.description, /human review/i);
+  assert.ok(Array.isArray(getResponse.result.messages));
+  assert.match(getResponse.result.messages[0].content.text, /tasks\.complete_and_request_review/);
+});
+
+test('guide and execution schema resources explain the task workflow', () => {
+  const dispatch = createRequestDispatcher(makeStoreFromFixture('workspace-basic'));
+  const req = makeReq();
+
+  const guideResponse = dispatch({
+    jsonrpc: '2.0',
+    id: '2.3',
+    method: 'resources/read',
+    params: {
+      uri: 'plumy://agent/guide',
+    },
+  }, req);
+
+  assert.match(guideResponse.result.contents[0].text, /plumy:\/\/agent\/guide/);
+  assert.match(guideResponse.result.contents[0].text, /resources\/templates\/list/);
+  assert.match(guideResponse.result.contents[0].text, /tasks\.move_to_ready_for_human_review/);
+
+  const schemaResponse = dispatch({
+    jsonrpc: '2.0',
+    id: '2.4',
+    method: 'resources/read',
+    params: {
+      uri: 'plumy://schema/task-execution',
+    },
+  }, req);
+
+  assert.match(schemaResponse.result.contents[0].text, /task execution schema/i);
+  assert.match(schemaResponse.result.contents[0].text, /expectedRevision/);
+  assert.match(schemaResponse.result.contents[0].text, /handoff/);
+});
+
+test('template resources resolve assigned work, project work, and board work', () => {
+  const dispatch = createRequestDispatcher(makeStoreFromFixture('workspace-basic'));
+  const req = makeReq();
+
+  const agentResponse = dispatch({
+    jsonrpc: '2.0',
+    id: '2.5',
+    method: 'resources/read',
+    params: {
+      uri: 'plumy://agents/agent-1/assigned',
+    },
+  }, req);
+
+  assert.ok(Array.isArray(agentResponse.result.contents));
+  const assignedWork = JSON.parse(agentResponse.result.contents[0].text);
+  assert.deepEqual(assignedWork.person, {
+    id: 'agent-1',
+    name: 'Codex',
+    role: 'Agent',
+    kind: 'agentic',
+  });
+  assert.equal(assignedWork.summary.totalTasks, 2);
+  assert.deepEqual(
+    assignedWork.tasks.map(task => task.id).sort(),
+    ['task-1', 'task-3']
+  );
+  assert.equal(assignedWork.filters.status, null);
+
+  const projectResponse = dispatch({
+    jsonrpc: '2.0',
+    id: '2.6',
+    method: 'resources/read',
+    params: {
+      uri: 'plumy://projects/lane-1/tasks',
+    },
+  }, req);
+
+  assert.ok(Array.isArray(projectResponse.result.contents));
+  assert.match(projectResponse.result.contents[0].text, /lane-1/);
+
+  const boardResponse = dispatch({
+    jsonrpc: '2.0',
+    id: '2.7',
+    method: 'resources/read',
+    params: {
+      uri: 'plumy://boards/in-progress/tasks',
+    },
+  }, req);
+
+  assert.ok(Array.isArray(boardResponse.result.contents));
+  assert.match(boardResponse.result.contents[0].text, /in-progress/);
+});
+
+test('reading a literal template URI returns a guided validation error', () => {
+  const dispatch = createRequestDispatcher(makeStoreFromFixture('workspace-basic'));
+  const response = dispatch({
+    jsonrpc: '2.0',
+    id: '2.7.1',
+    method: 'resources/read',
+    params: {
+      uri: 'plumy://agents/{personId}/assigned',
+    },
+  }, makeReq());
+
+  assert.ok(response.error);
+  assert.match(response.error.message, /is a template/i);
+});
+
+test('complete_and_request_review updates the completion note and moves the task to review', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  store.set(PREFERENCES_KEY, {
+    mcpAgentAccessEnabled: true,
+    mcpCapabilityProfile: 'task_write',
+    mcpAccessToken: 'secret-token',
+    mcpAccessTokenIssuedAt: new Date().toISOString(),
+    mcpAccessTokenTtlMinutes: 60,
+  });
+
+  const dispatch = createRequestDispatcher(store);
+  const req = makeReq({ authorization: 'Bearer secret-token' }, 'http');
+
+  const response = dispatch({
+    jsonrpc: '2.0',
+    id: '2.8',
+    method: 'tools/call',
+    params: {
+      name: 'tasks.complete_and_request_review',
+      arguments: {
+        taskId: 'task-1',
+        completion: 'Completed the timeline handoff.',
+        expectedRevision: 0,
+      },
+    },
+  }, req);
+
+  assert.equal(response.jsonrpc, '2.0');
+  assert.equal(response.id, '2.8');
+  assert.equal(response.result.structuredContent.action, 'tasks.complete_and_request_review');
+  assert.ok(response.result.structuredContent.auditId);
+  assert.equal(response.result.structuredContent.changed, true);
+  assert.equal(response.result.structuredContent.statusId, 'ready-human');
+  assert.equal(response.result.structuredContent.statusCreated, true);
+  assert.equal(response.result.structuredContent.task.status, 'ready-human');
+  assert.match(response.result.structuredContent.task.notes, /Agent Completion/);
+  assert.match(response.result.structuredContent.task.notes, /Completed the timeline handoff/);
+  assert.equal(response.result.structuredContent.revision, 1);
 });
 
 test('stdio transport bypasses HTTP token gating and still initializes', () => {

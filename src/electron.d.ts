@@ -142,6 +142,7 @@ declare global {
       storeSet: (key: string, value: any) => Promise<void>;
       storeDelete: (key: string) => Promise<void>;
       storeExport: () => Promise<Record<string, any>>;
+      onStoreChanged: (listener: (payload: { updatedAt: string }) => void) => () => void;
       attachments: {
         pick: () => Promise<string[]>;
         verify: (path: string) => Promise<any>;

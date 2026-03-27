@@ -1,4 +1,5 @@
 const { contextBridge, ipcRenderer } = require('electron');
+const STORE_DID_CHANGE_CHANNEL = 'store/did-change';
 
 contextBridge.exposeInMainWorld('electron', {
   // Store
@@ -6,6 +7,20 @@ contextBridge.exposeInMainWorld('electron', {
   storeSet: (key, value) => ipcRenderer.invoke('store/set', key, value),
   storeDelete: (key) => ipcRenderer.invoke('store/delete', key),
   storeExport: () => ipcRenderer.invoke('store/export'),
+  onStoreChanged: (listener) => {
+    if (typeof listener !== 'function') {
+      return () => {};
+    }
+
+    const wrappedListener = (_event, payload) => {
+      listener(payload);
+    };
+    ipcRenderer.on(STORE_DID_CHANGE_CHANNEL, wrappedListener);
+
+    return () => {
+      ipcRenderer.removeListener(STORE_DID_CHANGE_CHANNEL, wrappedListener);
+    };
+  },
 
   // Attachments
   attachments: {

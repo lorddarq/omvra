@@ -7,8 +7,13 @@ const {
   buildMcpInitializeResult,
   appendMcpAuditLog,
   getWorkspaceSnapshot,
+  buildMcpAgentGuide,
+  buildMcpTaskExecutionSchema,
+  buildMcpPromptCatalog,
+  getMcpPrompt,
   listTasks,
   getTaskById,
+  listAssignedWorkForAgent,
   listKanbanCards,
   listTimelineCards,
   pollBoardWatcher,
@@ -17,6 +22,7 @@ const {
   addTaskComment,
   addTaskActivityEntry,
   updateTaskCompletionDescription,
+  completeTaskAndRequestReview,
   moveTasksToRequiresHumanReviewBoard,
   moveTaskToStatus,
   moveTaskToReadyForHumanReview,
@@ -42,7 +48,7 @@ const JSON_RPC_ERROR = {
 const READ_TOOL_DEFINITIONS = [
   {
     name: 'workspace.get_snapshot',
-    description: 'Returns a read-only workspace snapshot (tasks, people, projects, status columns).',
+    description: 'Returns the full read-only workspace snapshot. Use this after initialize when you need the canonical task, person, project, and board state.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -78,7 +84,7 @@ const READ_TOOL_DEFINITIONS = [
   },
   {
     name: 'cards.kanban.list',
-    description: 'Lists cards for the kanban view.',
+    description: 'Lists cards for the kanban view. Use this when you want a board-shaped projection with task status, assignee, and notes.',
     inputSchema: {
       type: 'object',
       additionalProperties: true,
@@ -91,7 +97,7 @@ const READ_TOOL_DEFINITIONS = [
   },
   {
     name: 'cards.timeline.list',
-    description: 'Lists cards for the timeline view.',
+    description: 'Lists cards for the timeline view. Use this when you need date-bounded task cards for scheduling or planning.',
     inputSchema: {
       type: 'object',
       additionalProperties: true,
@@ -104,7 +110,7 @@ const READ_TOOL_DEFINITIONS = [
   },
   {
     name: 'boards.watch.poll',
-    description: 'Polls a kanban board/status for new or changed tasks and persists the watcher state for duplicate suppression.',
+    description: 'Polls a kanban board/status for new or changed tasks and persists watcher state for duplicate suppression. Call this repeatedly to watch a board for incoming work.',
     inputSchema: {
       type: 'object',
       additionalProperties: true,
@@ -152,7 +158,7 @@ const WRITE_TOOL_DEFINITIONS = [
   },
   {
     name: 'tasks.add_comment',
-    description: 'Adds a structured comment to a task.',
+    description: 'Adds a structured comment to a task. Use this before handing work off or when you need to leave a concise status note.',
     inputSchema: {
       type: 'object',
       additionalProperties: true,
@@ -182,7 +188,21 @@ const WRITE_TOOL_DEFINITIONS = [
   },
   {
     name: 'tasks.update_completion_description',
-    description: 'Updates task description with a brief completion note.',
+    description: 'Updates a task description with a brief completion note. Use this to summarize what the agent completed before handing off.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        taskId: { type: 'string' },
+        completion: { type: 'string' },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+      },
+      required: ['taskId', 'completion', 'expectedRevision'],
+    },
+  },
+  {
+    name: 'tasks.complete_and_request_review',
+    description: 'Adds a brief completion note and moves the task to Ready for human review using the next safe revision.',
     inputSchema: {
       type: 'object',
       additionalProperties: true,
@@ -196,7 +216,7 @@ const WRITE_TOOL_DEFINITIONS = [
   },
   {
     name: 'tasks.move_to_requires_human_review',
-    description: 'Creates "Requires human review" board (if missing) and moves completed review-required tasks there.',
+    description: 'Creates "Requires human review" board if needed and moves completed review-required tasks there. Use this as a final agent handoff step.',
     inputSchema: {
       type: 'object',
       additionalProperties: true,
@@ -215,7 +235,7 @@ const WRITE_TOOL_DEFINITIONS = [
   },
   {
     name: 'tasks.move_to_status',
-    description: 'Moves a task to a named board/status after validating the target exists.',
+    description: 'Moves a task to a named board/status after validating the target exists. Use this when the destination board is already known.',
     inputSchema: {
       type: 'object',
       additionalProperties: true,
@@ -230,7 +250,7 @@ const WRITE_TOOL_DEFINITIONS = [
   },
   {
     name: 'tasks.move_to_ready_for_human_review',
-    description: 'Moves a task to Ready for human review, creating the board if needed.',
+    description: 'Moves a task to Ready for human review, creating the board if needed. Use this after completing work and writing a brief completion note.',
     inputSchema: {
       type: 'object',
       additionalProperties: true,
@@ -243,7 +263,7 @@ const WRITE_TOOL_DEFINITIONS = [
   },
   {
     name: 'tasks.assign',
-    description: 'Assigns a task to a human or agent person by id or name.',
+    description: 'Assigns a task to a human or agent person by id or name. Use this to hand work to a specific person before or after execution.',
     inputSchema: {
       type: 'object',
       additionalProperties: true,
@@ -267,6 +287,18 @@ const RESOURCE_DEFINITIONS = [
     mimeType: 'application/json',
   },
   {
+    uri: 'plumy://agent/guide',
+    name: 'Agent guide',
+    description: 'Workflow guide for agents using the Plumy MCP server',
+    mimeType: 'application/json',
+  },
+  {
+    uri: 'plumy://schema/task-execution',
+    name: 'Task execution schema',
+    description: 'Task execution lifecycle and handoff schema',
+    mimeType: 'application/json',
+  },
+  {
     uri: 'plumy://cards/kanban',
     name: 'Kanban cards',
     description: 'Read-only kanban card projection',
@@ -285,6 +317,35 @@ const RESOURCE_DEFINITIONS = [
     mimeType: 'application/json',
   },
 ];
+
+const RESOURCE_TEMPLATE_DEFINITIONS = [
+  {
+    uriTemplate: 'plumy://tasks/{taskId}',
+    name: 'Task by id',
+    description: 'Resolve a task by id',
+    mimeType: 'application/json',
+  },
+  {
+    uriTemplate: 'plumy://agents/{personId}/assigned',
+    name: 'Assigned tasks by person',
+    description: 'Resolve tasks assigned to a person',
+    mimeType: 'application/json',
+  },
+  {
+    uriTemplate: 'plumy://projects/{projectId}/tasks',
+    name: 'Tasks by project',
+    description: 'Resolve tasks in a project',
+    mimeType: 'application/json',
+  },
+  {
+    uriTemplate: 'plumy://boards/{statusId}/tasks',
+    name: 'Tasks by board',
+    description: 'Resolve tasks in a board/status',
+    mimeType: 'application/json',
+  },
+];
+
+const PROMPT_DEFINITIONS = buildMcpPromptCatalog();
 
 function createJsonRpcError(code, message, data) {
   const error = { code, message };
@@ -443,12 +504,29 @@ function isKnownWriteToolName(name) {
   if (WRITE_TOOL_DEFINITIONS.some(tool => tool.name === name)) {
     return true;
   }
-  return /^tasks\.(create|update|delete|write|set|transition)/.test(name);
+  return /^tasks\.(create|update|delete|write|set|transition|complete)/.test(name);
 }
 
 function getResourceForUri(store, uri, requestParams) {
   if (uri === 'plumy://workspace') {
     return { uri, data: getWorkspaceSnapshot(store) };
+  }
+
+  if (uri === 'plumy://agent/guide') {
+    return { uri, data: buildMcpAgentGuide() };
+  }
+
+  if (uri === 'plumy://schema/task-execution') {
+    return { uri, data: buildMcpTaskExecutionSchema() };
+  }
+
+  if (uri === 'plumy://tasks/{taskId}'
+    || uri === 'plumy://agents/{personId}/assigned'
+    || uri === 'plumy://projects/{projectId}/tasks'
+    || uri === 'plumy://boards/{statusId}/tasks') {
+    return {
+      error: invalidParams(`Resource URI "${uri}" is a template. Use resources/templates/list and substitute the path parameter before calling resources/read.`, { uri }),
+    };
   }
 
   if (uri.startsWith('plumy://tasks/')) {
@@ -459,6 +537,67 @@ function getResourceForUri(store, uri, requestParams) {
       };
     }
     return { uri, data: getTaskById(store, taskId) };
+  }
+
+  if (uri.startsWith('plumy://agents/') && uri.endsWith('/assigned')) {
+    const personId = decodeURIComponent(uri.slice('plumy://agents/'.length, -'/assigned'.length));
+    if (!personId) {
+      return {
+        error: invalidParams('Invalid params: agent resource URI must include person id.', { uri }),
+      };
+    }
+    const filters = normalizeObject(requestParams);
+    const payload = listAssignedWorkForAgent(store, {
+      personId,
+      search: filters.search,
+      status: filters.status,
+      projectId: filters.projectId,
+    });
+    if (!payload.ok) {
+      return { error: invalidParams(payload.message, payload) };
+    }
+    return {
+      uri,
+      data: payload,
+    };
+  }
+
+  if (uri.startsWith('plumy://projects/') && uri.endsWith('/tasks')) {
+    const projectId = decodeURIComponent(uri.slice('plumy://projects/'.length, -'/tasks'.length));
+    if (!projectId) {
+      return {
+        error: invalidParams('Invalid params: project resource URI must include project id.', { uri }),
+      };
+    }
+    const filters = normalizeObject(requestParams);
+    return {
+      uri,
+      data: listTasks(store, {
+        projectId,
+        search: filters.search,
+        assigneeId: filters.assigneeId,
+        status: filters.status,
+      }),
+    };
+  }
+
+  if (uri.startsWith('plumy://boards/') && uri.endsWith('/tasks')) {
+    const statusId = decodeURIComponent(uri.slice('plumy://boards/'.length, -'/tasks'.length));
+    if (!statusId) {
+      return {
+        error: invalidParams('Invalid params: board resource URI must include status id.', { uri }),
+      };
+    }
+    const filters = normalizeObject(requestParams);
+    return {
+      uri,
+      data: listTasks(store, {
+        status: statusId,
+        search: filters.search,
+        assigneeId: filters.assigneeId,
+        projectId: filters.projectId,
+      }),
+    };
   }
 
   if (uri.startsWith('plumy://cards/kanban')) {
@@ -787,6 +926,45 @@ function handleToolCall(store, req, params) {
       };
     }
 
+    case 'tasks.complete_and_request_review': {
+      const taskId = parseTaskId(args);
+      if (!taskId) {
+        return { error: invalidParams('Invalid params: "taskId" is required.') };
+      }
+      const result = completeTaskAndRequestReview(store, {
+        taskId,
+        completion: args.completion,
+        expectedRevision: args.expectedRevision,
+        actor: 'mcp-agent',
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, {
+          outcome: 'denied',
+          reason: result.error,
+          toolName: name,
+          taskId,
+        });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        taskId,
+        targetStatusId: result.statusId,
+        nextRevision: result.task?.__mcpRevision ?? result.currentRevision,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: result.changed !== false,
+          auditId: audit?.auditId,
+          task: result.task,
+          revision: result.task?.__mcpRevision ?? result.currentRevision,
+          statusId: result.statusId,
+          statusCreated: result.statusCreated,
+        }),
+      };
+    }
+
     case 'tasks.move_to_status': {
       const taskId = parseTaskId(args);
       if (!taskId) {
@@ -1061,6 +1239,45 @@ function createRequestDispatcher(store) {
       return respond({ result: buildMcpCapabilitySnapshot(store) });
     }
 
+    if (normalizedMethod === 'prompts/list') {
+      if (params !== undefined && (typeof params !== 'object' || params === null || Array.isArray(params))) {
+        return respond({
+          error: invalidParams('Invalid params: prompts/list expects an object when params are provided.'),
+        });
+      }
+      return respond({
+        result: {
+          prompts: PROMPT_DEFINITIONS,
+        },
+      });
+    }
+
+    if (normalizedMethod === 'prompts/get') {
+      const normalized = normalizeObject(params);
+      const name = typeof normalized.name === 'string' ? normalized.name.trim() : '';
+      if (!name) {
+        return respond({
+          error: invalidParams('Invalid params: "name" is required for prompts/get.'),
+        });
+      }
+      const prompt = getMcpPrompt(name, normalizeObject(normalized.arguments));
+      if (!prompt) {
+        return respond({
+          error: createJsonRpcError(
+            JSON_RPC_ERROR.INVALID_PARAMS,
+            `Prompt "${name}" not found.`,
+            { name }
+          ),
+        });
+      }
+      return respond({
+        result: {
+          description: prompt.description,
+          messages: prompt.messages,
+        },
+      });
+    }
+
     if (normalizedMethod === 'tools/list') {
       if (params !== undefined && (typeof params !== 'object' || params === null || Array.isArray(params))) {
         return respond({
@@ -1092,7 +1309,26 @@ function createRequestDispatcher(store) {
           error: invalidParams('Invalid params: resources/list expects an object when params are provided.'),
         });
       }
-      return respond({ result: { resources: RESOURCE_DEFINITIONS } });
+      return respond({
+        result: {
+          resources: RESOURCE_DEFINITIONS,
+          resourceTemplates: RESOURCE_TEMPLATE_DEFINITIONS,
+        },
+      });
+    }
+
+    if (normalizedMethod === 'resources/templates/list') {
+      if (params !== undefined && (typeof params !== 'object' || params === null || Array.isArray(params))) {
+        return respond({
+          error: invalidParams('Invalid params: resources/templates/list expects an object when params are provided.'),
+        });
+      }
+      return respond({
+        result: {
+          resourceTemplates: RESOURCE_TEMPLATE_DEFINITIONS,
+          templates: RESOURCE_TEMPLATE_DEFINITIONS,
+        },
+      });
     }
 
     if (normalizedMethod === 'resources/read') {

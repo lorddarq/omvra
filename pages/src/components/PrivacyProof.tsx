@@ -1,36 +1,36 @@
 const PrivacyProof = () => {
   const proofPoints = [
     {
-      title: 'No analytics SDKs',
+      title: 'Your plans stay on your machine',
       description:
-        'No Google Analytics, Mixpanel, Segment, PostHog, Sentry, or similar tracking libraries are integrated in the app runtime.',
+        'Tasks, comments, people, settings, and workspace backups are stored locally through the desktop app instead of being pushed into a hosted planning service.',
     },
     {
-      title: 'Local-only task data',
+      title: 'No account required',
       description:
-        'Tasks, comments, people, settings, and workspace backups are stored locally on your machine using browser localStorage and Electron local store APIs.',
+        'You can download Plumy and start using it without sign-up flows, user profiles, or another shared admin surface to manage.',
     },
     {
-      title: 'No account or sign-in flow',
+      title: 'No hidden telemetry',
       description:
-        'There is no authentication layer, user account creation, or profile sync endpoint in the desktop application.',
+        'There are no embedded analytics SDKs silently tracking routine product usage in the app runtime.',
     },
     {
-      title: 'No background data upload',
+      title: 'Network access stays explicit',
       description:
-        'Outbound network behavior is limited to user-initiated actions such as release download links or explicitly enabled MCP access, not hidden telemetry.',
+        'Outbound traffic is limited to user-initiated actions such as release downloads or MCP access you explicitly enable, not background surprise uploads.',
     },
-  ];
+  ]
 
   return (
     <section id="privacy" className="py-28 bg-white">
       <div className="container mx-auto px-6">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-5xl font-light text-nordic-gray-800 mb-6 text-center">
-            No Data Collection
+            Local by design
           </h2>
           <p className="text-xl text-nordic-gray-600 font-light mb-16 text-center max-w-3xl mx-auto">
-            Plumy is built as a local-first desktop app. Your planning data stays on your computer and is not sent to analytics platforms.
+            Plumy is designed for teams that want more control, fewer surprises, and a planning tool that does not treat their work like a source of telemetry.
           </p>
 
           <div className="grid md:grid-cols-2 gap-8">
@@ -48,7 +48,7 @@ const PrivacyProof = () => {
         </div>
       </div>
     </section>
-  );
-};
+  )
+}
 
-export default PrivacyProof;
+export default PrivacyProof

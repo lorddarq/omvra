@@ -1,4 +1,6 @@
 const Hero = () => {
+  const trustPills = ['Open source', 'Local-first', 'No account required', 'Cross-platform']
+
   return (
     <section className="relative overflow-hidden">
       {/* Navigation */}
@@ -9,10 +11,11 @@ const Hero = () => {
             <span className="text-2xl font-light text-nordic-gray-800">Plumy</span>
           </div>
           <div className="hidden md:flex space-x-12">
-            <a href="#features" className="text-nordic-gray-600 hover:text-nordic-gray-800 transition-colors text-sm font-light">Features</a>
-            <a href="#best-for" className="text-nordic-gray-600 hover:text-nordic-gray-800 transition-colors text-sm font-light">Best For</a>
-            <a href="#privacy" className="text-nordic-gray-600 hover:text-nordic-gray-800 transition-colors text-sm font-light">Privacy</a>
-            <a href="#download" className="text-nordic-gray-600 hover:text-nordic-gray-800 transition-colors text-sm font-light">Download</a>
+            <a href="#why-plumy" className="text-sm font-light text-nordic-gray-600 transition-colors hover:text-nordic-gray-800">Why Plumy</a>
+            <a href="#features" className="text-sm font-light text-nordic-gray-600 transition-colors hover:text-nordic-gray-800">Features</a>
+            <a href="#how-it-works" className="text-sm font-light text-nordic-gray-600 transition-colors hover:text-nordic-gray-800">How it works</a>
+            <a href="#privacy" className="text-sm font-light text-nordic-gray-600 transition-colors hover:text-nordic-gray-800">Privacy</a>
+            <a href="#download" className="text-sm font-light text-nordic-gray-600 transition-colors hover:text-nordic-gray-800">Download</a>
           </div>
         </div>
       </nav>
@@ -20,25 +23,47 @@ const Hero = () => {
       {/* Hero Content */}
       <div className="container mx-auto px-6 pt-24 pb-32">
         <div className="max-w-4xl mx-auto text-center">
+          <p className="mb-6 text-sm font-light uppercase tracking-[0.25em] text-nordic-blue">
+            Local-first project planning for teams
+          </p>
           <h1 className="text-6xl md:text-7xl font-light text-nordic-gray-800 mb-8 tracking-tight leading-tight">
-            Project management,
+            Plan work visually.
             <br />
-            <span className="text-nordic-blue">simplified</span>
+            <span className="text-nordic-blue">Keep it local.</span>
           </h1>
           <p className="text-xl md:text-2xl text-nordic-gray-600 font-light mb-16 leading-relaxed max-w-2xl mx-auto">
-            A local-first desktop planner with Timeline and Kanban views, markdown task details, comments, full-workspace backups, and MCP support for guided AI agent workflows.
+            Plumy is an open-source desktop planner for teams that want clear timelines, fast Kanban execution,
+            and helpful AI workflows without accounts, hidden telemetry, or extra process.
           </p>
-          <a
-            href="#download"
-            className="inline-flex items-center gap-3 rounded-xl bg-[linear-gradient(148deg,#323232_-9.84%,#151515_97.2%)] px-8 py-4 text-lg font-medium text-white shadow-lg shadow-black/30 transition-all hover:brightness-110 hover:shadow-xl hover:shadow-black/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Download for macOS
-          </a>
-          <p className="mt-6 text-sm text-nordic-gray-500 font-light">
-            Also available for Windows and Linux
+          <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <a
+              href="#download"
+              className="inline-flex items-center gap-3 rounded-xl bg-[linear-gradient(148deg,#323232_-9.84%,#151515_97.2%)] px-8 py-4 text-lg font-medium text-white shadow-lg shadow-black/30 transition-all hover:brightness-110 hover:shadow-xl hover:shadow-black/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+            >
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Download Plumy
+            </a>
+            <a
+              href="https://github.com/lorddarq/Plumy"
+              className="inline-flex items-center gap-3 rounded-xl border border-nordic-gray-200 bg-white px-8 py-4 text-lg font-medium text-nordic-gray-800 shadow-sm transition-all hover:border-nordic-gray-300 hover:bg-nordic-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+            >
+              View on GitHub
+            </a>
+          </div>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            {trustPills.map((pill) => (
+              <span
+                key={pill}
+                className="rounded-full border border-nordic-gray-200 bg-white/90 px-4 py-2 text-sm font-light text-nordic-gray-700 shadow-sm"
+              >
+                {pill}
+              </span>
+            ))}
+          </div>
+          <p className="mt-6 text-sm font-light text-nordic-gray-500">
+            Free to download. Available for macOS, Windows, and Linux.
           </p>
         </div>
 

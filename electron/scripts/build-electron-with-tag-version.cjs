@@ -38,6 +38,22 @@ function getVersionFromTag() {
   return null;
 }
 
+function hasExplicitMacSigningConfiguration(env) {
+  const signingKeys = [
+    'CSC_LINK',
+    'CSC_KEY_PASSWORD',
+    'CSC_NAME',
+    'APPLE_ID',
+    'APPLE_APP_SPECIFIC_PASSWORD',
+    'APPLE_TEAM_ID',
+    'APPLE_API_KEY',
+    'APPLE_API_KEY_ID',
+    'APPLE_API_ISSUER',
+  ];
+
+  return signingKeys.some(key => Boolean(env[key]));
+}
+
 function run() {
   const packageVersion = readPackageVersion();
   const tagVersion = getVersionFromTag();
@@ -51,7 +67,21 @@ function run() {
     : path.resolve(process.cwd(), 'node_modules', '.bin', 'electron-builder');
 
   const args = ['--config.extraMetadata.version=' + resolvedVersion];
-  const result = spawnSync(bin, args, { stdio: 'inherit' });
+  const buildEnv = { ...process.env };
+
+  // On macOS, electron-builder may auto-discover a locally installed signing
+  // identity. Disable that unless signing was configured explicitly so local
+  // builds do not accidentally embed a contributor's personal certificate info.
+  if (
+    process.platform === 'darwin'
+    && !buildEnv.CSC_IDENTITY_AUTO_DISCOVERY
+    && !hasExplicitMacSigningConfiguration(buildEnv)
+  ) {
+    buildEnv.CSC_IDENTITY_AUTO_DISCOVERY = 'false';
+    console.log('[build-electron] mac signing auto-discovery disabled (no explicit signing credentials configured)');
+  }
+
+  const result = spawnSync(bin, args, { stdio: 'inherit', env: buildEnv });
   process.exit(result.status || 0);
 }
 

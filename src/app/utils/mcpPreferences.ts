@@ -1,8 +1,8 @@
 import {
   buildLocalMcpAddress,
   normalizeMcpServerAddress,
-} from '../constants/mcp';
-import { TaskStatus } from '../types';
+} from '../constants/mcp.ts';
+import type { StatusColumn, TaskStatus } from '../types.ts';
 
 export interface McpPreferencesShape {
   mcpAgentAccessEnabled: boolean;
@@ -37,12 +37,12 @@ export function getMcpSettingsSignature(preferences: McpPreferencesShape): strin
 }
 
 export function getDefaultStatusId(
-  columns: Array<{ id: TaskStatus; title: string; color?: string }>,
+  columns: StatusColumn[],
   preferred: TaskStatus
 ): TaskStatus {
   const preferredCol = columns.find(col => col.id === preferred);
-  if (preferredCol) return preferredCol.id;
-  return columns[0]?.id || preferred;
+  if (preferredCol) return preferredCol.id as TaskStatus;
+  return (columns[0]?.id as TaskStatus | undefined) || preferred;
 }
 
 export function syncLocalMcpServerAddress(

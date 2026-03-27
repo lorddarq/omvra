@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { Plus, GripVertical } from 'lucide-react';
-import { Task, TaskStatus } from '../types';
+import { Task, TaskStatus, StatusColumn } from '../types';
 import { DroppableColumn } from './DroppableColumn';
 
 const SWIMLANE_COLUMN = 'SWIMLANE_COLUMN';
@@ -25,7 +25,7 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
   swimlane: T;
   index: number;
   swimlaneTasks: Task[];
-  swimlanes: Array<{ id: TaskStatus; title: string; color?: string }>;
+  swimlanes: StatusColumn[];
   onTaskClick: (task: Task) => void;
   onEditTask?: (task: Task) => void;
   onAddTask: (status: TaskStatus) => void;
@@ -80,7 +80,7 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
 
 interface SwimlanesViewProps {
   tasks: Task[];
-  swimlanes: Array<{ id: TaskStatus; title: string; color?: string }>;
+  swimlanes: StatusColumn[];
   searchQuery?: string;
   onTaskClick: (task: Task) => void;
   onEditTask?: (task: Task) => void;
@@ -117,11 +117,11 @@ export function SwimlanesView({
     return haystack.includes(trimmedSearch);
   };
 
-  const getTasksByStatus = (status: TaskStatus) => {
+  const getTasksByStatus = (status: string) => {
     return tasks.filter(task => task.status === status);
   };
 
-  const getVisibleTasksByStatus = (status: TaskStatus) => {
+  const getVisibleTasksByStatus = (status: string) => {
     return getTasksByStatus(status).filter(matchesTaskSearch);
   };
 

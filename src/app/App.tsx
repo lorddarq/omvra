@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Task, TaskStatus, TimelineSwimlane, Person, TaskComment } from './types';
+import { Task, TaskStatus, TimelineSwimlane, Person } from './types';
 import { initialTasks, initialTimelineSwimlanes } from './data/sampleData';
 import { initialPeople } from './data/samplePeople';
 import { TimelineView } from './components/TimelineView';
@@ -10,20 +10,25 @@ import { useSharedHorizontalScroll } from './hooks/useSharedHorizontalScroll';
 import { useVirtualizedTimeline } from './hooks/useVirtualizedTimeline';
 import { useMcpDiagnostics } from './hooks/useMcpDiagnostics';
 import { useMcpHealthValidation } from './hooks/useMcpHealthValidation';
+import { useAgentWatchRuntime } from './hooks/useAgentWatchRuntime';
+import { useMcpPanelState } from './hooks/useMcpPanelState';
+import { usePeopleActions } from './hooks/usePeopleActions';
+import { useProjectActions } from './hooks/useProjectActions';
+import { useStorageMeter } from './hooks/useStorageMeter';
+import { useStatusColumnActions } from './hooks/useStatusColumnActions';
+import { useTaskActions } from './hooks/useTaskActions';
+import { useWorkspaceDialogs } from './hooks/useWorkspaceDialogs';
 import { createMcpReadService } from './services/mcp/service';
-import { McpBoardWatchResult } from './services/mcp/types';
-import { SwimlanesView } from './components/SwimlanesView';
-import { TaskDialog } from './components/TaskDialog';
-import { SwimlaneDialog } from './components/SwimlaneDialog';
-import { PeoplePanel } from './components/PeoplePanel';
-import { PreferencesPanel } from './components/PreferencesPanel';
-import { TaskDetailsDialog } from './components/TaskDetailsDialog';
-import logo from './images/logo.svg';
-import { Button } from './components/ui/button';
-import { Settings, User } from 'lucide-react';
+import {
+  buildWorkspaceBackupPayload,
+  parseWorkspaceBackupJson,
+  repairWorkspaceBackupPayload,
+  WORKSPACE_BACKUP_SCHEMA_VERSION,
+} from './services/workspaceBackup';
+import { AppHeader } from './components/AppHeader';
+import { AppMainViews } from './components/AppMainViews';
+import { AppPanels } from './components/AppPanels';
 import { swimlanes as defaultSwimlanes } from './constants/swimlanes';
-import { DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
 import {
   DEFAULT_MCP_BIND_HOST,
   DEFAULT_MCP_PORT,
@@ -53,6 +58,18 @@ import {
   safeReadRaw,
   safeWriteRaw,
 } from './utils/storage';
+import {
+  type AgentWatchConfig,
+  deriveStatusColumnsFromTasks,
+  normalizeTask,
+  sanitizeAgentWatchConfigs,
+  sanitizePeople,
+  sanitizePreferences,
+  sanitizeStatusColumns,
+  sanitizeTasks,
+  sanitizeTimelineSwimlanes,
+  type StatusColumnState,
+} from './utils/workspaceSanitizers';
 
 // LocalStorage keys
 const TASKS_KEY = 'plumy.tasks.v1';
@@ -65,27 +82,6 @@ const KANBAN_VIEW_STATE_KEY = 'plumy_viewstate_kanban';
 const MONTH_WIDTHS_KEY = 'plumy.monthWidths.v1';
 const LEFT_COL_WIDTH_KEY = 'plumy.leftColWidth.v1';
 const MCP_AGENT_WATCH_CONFIGS_KEY = 'plumy.mcp.agentWatchConfigs.v1';
-const BACKUP_SCHEMA_VERSION = 2;
-
-function normalizeTask(task: Task, swimlanes: TimelineSwimlane[]): Task {
-  const projectIds = task.projectIds?.length
-    ? task.projectIds
-    : (task.swimlaneId ? [task.swimlaneId] : []);
-  const projectName = projectIds
-    .map(projectId => swimlanes.find(s => s.id === projectId)?.name)
-    .filter(Boolean)
-    .join(', ');
-
-  return {
-    ...task,
-    projectIds,
-    project: projectName || task.project,
-    size: task.size || 'm',
-    complexity: task.complexity || 'medium',
-    blocked: Boolean(task.blocked),
-    priority: task.priority || 'normal',
-  };
-}
 
 const ENABLE_SAMPLE_WORKSPACE = Boolean(import.meta.env.DEV);
 const DEFAULT_TASKS_SEED = ENABLE_SAMPLE_WORKSPACE ? initialTasks : [];
@@ -105,66 +101,6 @@ interface AppPreferences {
   mcpAccessTokenTtlMinutes: number;
 }
 
-interface StorageMeterState {
-  usedBytes: number;
-  totalBytes: number;
-  usagePercent: number;
-  sourceLabel: string;
-}
-
-interface McpAuditSummaryEntry extends McpAuditEntry {
-  auditId: string;
-  timestamp: string;
-}
-
-type StatusColumnState = { id: TaskStatus; title: string; color?: string };
-
-interface StatusColumnBackup {
-  id: string;
-  title: string;
-  color?: string;
-}
-
-interface UiBackupState {
-  currentView?: ViewType;
-  viewState?: {
-    timeline?: Record<string, unknown>;
-    kanban?: Record<string, unknown>;
-  };
-  timeline?: {
-    leftColWidth?: number;
-    monthWidths?: Record<string, number>;
-  };
-}
-
-interface BackupFile {
-  version: number;
-  exportedAt: string;
-  tasks?: Task[];
-  projects?: TimelineSwimlane[];
-  people?: Person[];
-  statusColumns?: StatusColumnBackup[];
-  preferences?: Partial<AppPreferences>;
-  ui?: UiBackupState;
-  storage?: Record<string, string>;
-  electronStore?: Record<string, unknown>;
-}
-
-type AgentWatchAction =
-  | 'inspect_only'
-  | 'inspect_and_work'
-  | 'move_to_ready_for_human_review';
-
-interface AgentWatchConfig {
-  personId: string;
-  enabled: boolean;
-  statusId: string;
-  projectId?: string;
-  search?: string;
-  action: AgentWatchAction;
-  intervalSeconds: number;
-}
-
 interface AgentWatchRuntimeState {
   personId: string;
   watcherId?: string;
@@ -174,210 +110,6 @@ interface AgentWatchRuntimeState {
   removedTaskCount: number;
   latestTaskTitles: string[];
   error?: string;
-}
-
-function getLocalStorageUsageBytes(): number {
-  if (typeof window === 'undefined') return 0;
-  try {
-    let totalChars = 0;
-    for (let i = 0; i < window.localStorage.length; i += 1) {
-      const key = window.localStorage.key(i);
-      if (!key) continue;
-      const value = window.localStorage.getItem(key) || '';
-      totalChars += key.length + value.length;
-    }
-    // localStorage strings are UTF-16 in browsers, so ~2 bytes/char.
-    return totalChars * 2;
-  } catch (err) {
-    return 0;
-  }
-}
-
-function sanitizeStatusColumns(
-  columns: unknown,
-  fallback: StatusColumnState[]
-): StatusColumnState[] {
-  if (!Array.isArray(columns)) return fallback;
-
-  const sanitized = columns
-    .filter(column => column && typeof column === 'object')
-    .map(column => {
-      const candidate = column as Record<string, unknown>;
-      if (typeof candidate.id !== 'string' || typeof candidate.title !== 'string') {
-        return null;
-      }
-      return {
-        id: candidate.id as TaskStatus,
-        title: candidate.title,
-        color: typeof candidate.color === 'string' ? candidate.color : '#9ca3af',
-      };
-    })
-    .filter((column): column is StatusColumnState & { color: string } => Boolean(column));
-
-  return sanitized.length > 0 ? sanitized : fallback;
-}
-
-function deriveStatusColumnsFromTasks(
-  taskList: Task[],
-  currentColumns: StatusColumnState[]
-): StatusColumnState[] {
-  const columns = [...currentColumns];
-  const knownIds = new Set(columns.map(column => column.id));
-
-  taskList.forEach(task => {
-    if (!task.status || knownIds.has(task.status)) {
-      return;
-    }
-    knownIds.add(task.status);
-    columns.push({
-      id: task.status as TaskStatus,
-      title: `Imported column ${columns.length + 1}`,
-      color: '#9ca3af',
-    });
-  });
-
-  return columns;
-}
-
-function sanitizeTimelineSwimlanes(value: unknown): TimelineSwimlane[] {
-  if (!Array.isArray(value)) return DEFAULT_SWIMLANES_SEED;
-
-  const sanitized = value
-    .filter(item => item && typeof item === 'object')
-    .map(item => {
-      const candidate = item as Record<string, unknown>;
-      if (typeof candidate.id !== 'string' || typeof candidate.name !== 'string') {
-        return null;
-      }
-      return {
-        id: candidate.id,
-        name: candidate.name,
-        subtitle: typeof candidate.subtitle === 'string' ? candidate.subtitle : undefined,
-        color: typeof candidate.color === 'string' ? candidate.color : '#3b82f6',
-      };
-    })
-    .filter((item): item is NonNullable<typeof item> => item !== null);
-
-  return sanitized;
-}
-
-function sanitizePeople(value: unknown): Person[] {
-  if (!Array.isArray(value)) return DEFAULT_PEOPLE_SEED;
-
-  const defaultColors = ['#ec4899', '#f97316', '#eab308', '#06b6d4', '#8b5cf6', '#10b981'];
-  const sanitized = value
-    .filter(item => item && typeof item === 'object')
-    .map((item, index) => {
-      const candidate = item as Record<string, unknown>;
-      if (typeof candidate.id !== 'string' || typeof candidate.name !== 'string') {
-        return null;
-      }
-      return {
-        id: candidate.id,
-        name: candidate.name,
-        role: typeof candidate.role === 'string' ? candidate.role : 'Team Member',
-        kind: (candidate.kind === 'agentic' ? 'agentic' : 'human') as Person['kind'],
-        avatar: typeof candidate.avatar === 'string' ? candidate.avatar : undefined,
-        color: typeof candidate.color === 'string' ? candidate.color : defaultColors[index % defaultColors.length],
-      };
-    })
-    .filter((item): item is NonNullable<typeof item> => item !== null);
-
-  return sanitized;
-}
-
-function sanitizeTasks(value: unknown, swimlanes: TimelineSwimlane[]): Task[] {
-  if (!Array.isArray(value)) return DEFAULT_TASKS_SEED.map(task => normalizeTask(task, swimlanes));
-
-  return value
-    .filter(item => item && typeof item === 'object')
-    .map(item => {
-      const candidate = item as Task;
-      if (typeof candidate.id !== 'string' || typeof candidate.title !== 'string') {
-        return null;
-      }
-      return normalizeTask(candidate, swimlanes);
-    })
-    .filter((item): item is Task => Boolean(item));
-}
-
-function sanitizePreferences(
-  preferences: Partial<AppPreferences> | undefined,
-  statusColumns: Array<{ id: TaskStatus; title: string; color?: string }>,
-  fallback: AppPreferences
-): AppPreferences {
-  if (!preferences) {
-    return {
-      ...fallback,
-      executionLoadStatusId: statusColumns.some(col => col.id === fallback.executionLoadStatusId)
-        ? fallback.executionLoadStatusId
-        : getDefaultStatusId(statusColumns, 'in-progress'),
-      pipelineLoadStatusId: statusColumns.some(col => col.id === fallback.pipelineLoadStatusId)
-        ? fallback.pipelineLoadStatusId
-        : getDefaultStatusId(statusColumns, 'open'),
-    };
-  }
-
-  const bindHost = normalizeMcpBindHost(preferences.mcpBindHost || fallback.mcpBindHost);
-  const port = normalizeMcpPort(preferences.mcpPort || fallback.mcpPort);
-  const executionLoadStatusId =
-    preferences.executionLoadStatusId && statusColumns.some(col => col.id === preferences.executionLoadStatusId)
-      ? preferences.executionLoadStatusId
-      : getDefaultStatusId(statusColumns, 'in-progress');
-  const pipelineLoadStatusId =
-    preferences.pipelineLoadStatusId && statusColumns.some(col => col.id === preferences.pipelineLoadStatusId)
-      ? preferences.pipelineLoadStatusId
-      : getDefaultStatusId(statusColumns, 'open');
-
-  return {
-    executionLoadStatusId,
-    pipelineLoadStatusId,
-    mcpAgentAccessEnabled: Boolean(preferences.mcpAgentAccessEnabled),
-    mcpCapabilityProfile:
-      preferences.mcpCapabilityProfile === 'task_write' || preferences.mcpCapabilityProfile === 'admin'
-        ? preferences.mcpCapabilityProfile
-        : 'read_only',
-    mcpBindHost: bindHost,
-    mcpPort: port,
-    mcpServerAddress: normalizeMcpServerAddress(
-      preferences.mcpServerAddress || buildLocalMcpAddress(bindHost, port)
-    ),
-    mcpAccessToken: typeof preferences.mcpAccessToken === 'string' ? preferences.mcpAccessToken : '',
-    mcpAccessTokenIssuedAt:
-      typeof preferences.mcpAccessTokenIssuedAt === 'string' ? preferences.mcpAccessTokenIssuedAt : undefined,
-    mcpAccessTokenTtlMinutes: Number.isFinite(Number(preferences.mcpAccessTokenTtlMinutes))
-      ? Math.max(1, Math.min(1440, Number(preferences.mcpAccessTokenTtlMinutes)))
-      : fallback.mcpAccessTokenTtlMinutes,
-  };
-}
-
-function sanitizeAgentWatchConfigs(value: unknown): AgentWatchConfig[] {
-  if (!Array.isArray(value)) return [];
-
-  return value
-    .filter(item => item && typeof item === 'object')
-    .map(item => {
-      const candidate = item as Record<string, unknown>;
-      if (typeof candidate.personId !== 'string' || typeof candidate.statusId !== 'string') {
-        return null;
-      }
-      return {
-        personId: candidate.personId,
-        enabled: candidate.enabled !== false,
-        statusId: candidate.statusId,
-        projectId: typeof candidate.projectId === 'string' && candidate.projectId.trim() ? candidate.projectId.trim() : undefined,
-        search: typeof candidate.search === 'string' && candidate.search.trim() ? candidate.search.trim() : undefined,
-        action: (
-          candidate.action === 'inspect_only' || candidate.action === 'move_to_ready_for_human_review'
-            ? candidate.action
-            : 'inspect_and_work'
-        ) as AgentWatchAction,
-        intervalSeconds: Number.isFinite(Number(candidate.intervalSeconds))
-          ? Math.max(15, Math.min(3600, Math.floor(Number(candidate.intervalSeconds))))
-          : 60,
-      };
-    })
-    .filter((item): item is NonNullable<typeof item> => item !== null);
 }
 
 function App() {
@@ -460,13 +192,6 @@ function App() {
   const [hasHydratedCanonicalWorkspace, setHasHydratedCanonicalWorkspace] = useState<boolean>(
     () => shouldBootstrapFromLocalStorage()
   );
-  const [storageMeter, setStorageMeter] = useState<StorageMeterState>({
-    usedBytes: 0,
-    totalBytes: 5 * 1024 * 1024,
-    usagePercent: 0,
-    sourceLabel: 'Estimated localStorage capacity',
-  });
-
   useEffect(() => {
     if (!hasHydratedCanonicalWorkspace) return;
     persistJSONWithElectronMirror(STATUS_COLUMNS_KEY, statusColumns);
@@ -521,10 +246,12 @@ function App() {
 
           if (!hasCanonicalWorkspaceData && hasAnyPortableLocalStorageData()) {
             const migratedProjects = sanitizeTimelineSwimlanes(
-              safeReadLocalStorageJSON<TimelineSwimlane[]>(SWIMLANES_KEY, DEFAULT_SWIMLANES_SEED)
+              safeReadLocalStorageJSON<TimelineSwimlane[]>(SWIMLANES_KEY, DEFAULT_SWIMLANES_SEED),
+              DEFAULT_SWIMLANES_SEED
             );
             const migratedPeople = sanitizePeople(
-              safeReadLocalStorageJSON<Person[]>(PEOPLE_KEY, DEFAULT_PEOPLE_SEED)
+              safeReadLocalStorageJSON<Person[]>(PEOPLE_KEY, DEFAULT_PEOPLE_SEED),
+              DEFAULT_PEOPLE_SEED
             );
             const migratedStatusColumns = sanitizeStatusColumns(
               safeReadLocalStorageJSON<StatusColumnState[]>(STATUS_COLUMNS_KEY, defaultSwimlanes),
@@ -536,11 +263,13 @@ function App() {
               preferences
             );
             const migratedAgentWatchConfigs = sanitizeAgentWatchConfigs(
-              safeReadLocalStorageJSON<AgentWatchConfig[]>(MCP_AGENT_WATCH_CONFIGS_KEY, [])
+              safeReadLocalStorageJSON<AgentWatchConfig[]>(MCP_AGENT_WATCH_CONFIGS_KEY, []),
+              []
             );
             const migratedTasks = sanitizeTasks(
               safeReadLocalStorageJSON<Task[]>(TASKS_KEY, DEFAULT_TASKS_SEED),
-              migratedProjects
+              migratedProjects,
+              DEFAULT_TASKS_SEED
             );
 
             setTimelineSwimlanes(migratedProjects);
@@ -553,10 +282,10 @@ function App() {
           }
 
           const canonicalProjects = hasProjects
-            ? sanitizeTimelineSwimlanes(exportedProjects)
+            ? sanitizeTimelineSwimlanes(exportedProjects, DEFAULT_SWIMLANES_SEED)
             : timelineSwimlanes;
           const canonicalPeople = hasPeople
-            ? sanitizePeople(exportedPeople)
+            ? sanitizePeople(exportedPeople, DEFAULT_PEOPLE_SEED)
             : people;
           const canonicalStatusColumns = hasStatusColumns
             ? sanitizeStatusColumns(exportedStatusColumns, defaultSwimlanes)
@@ -569,10 +298,10 @@ function App() {
             setPreferences(prev => sanitizePreferences(exportedPreferences, canonicalStatusColumns, prev));
           }
           if (hasAgentWatchConfigs) {
-            setAgentWatchConfigs(sanitizeAgentWatchConfigs(exportedAgentWatchConfigs));
+            setAgentWatchConfigs(sanitizeAgentWatchConfigs(exportedAgentWatchConfigs, []));
           }
           if (hasTasks) {
-            const canonicalTasks = sanitizeTasks(exportedTasks, canonicalProjects);
+            const canonicalTasks = sanitizeTasks(exportedTasks, canonicalProjects, DEFAULT_TASKS_SEED);
             setTasks(canonicalTasks);
           }
         } finally {
@@ -592,28 +321,79 @@ function App() {
     };
   }, []);
 
-  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
-  const [isTaskDetailsOpen, setIsTaskDetailsOpen] = useState(false);
-  const [isSwimlaneDialogOpen, setIsSwimlaneDialogOpen] = useState(false);
-  const [isPeoplePanelOpen, setIsPeoplePanelOpen] = useState(false);
-  const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [detailsTaskId, setDetailsTaskId] = useState<string | null>(null);
-  const [selectedSwimlane, setSelectedSwimlane] = useState<TimelineSwimlane | null>(null);
-  const [defaultStatus, setDefaultStatus] = useState<TaskStatus>('open');
-  const [defaultDate, setDefaultDate] = useState<Date | undefined>(undefined);
-  const [defaultEndDate, setDefaultEndDate] = useState<Date | undefined>(undefined);
-  const [defaultSwimlaneId, setDefaultSwimlaneId] = useState<string | undefined>(undefined);
-  const [defaultAssigneeId, setDefaultAssigneeId] = useState<string | undefined>(undefined);
   const [viewRefreshKey, setViewRefreshKey] = useState(0);
-  const [appliedMcpSettingsSignature, setAppliedMcpSettingsSignature] = useState(() =>
-    getMcpSettingsSignature(preferences)
-  );
-  const [mcpListenerStatus, setMcpListenerStatus] = useState<McpListenerStatus | null>(null);
-  const [mcpAuditLog, setMcpAuditLog] = useState<McpAuditSummaryEntry[]>([]);
-  const [agentWatchRuntime, setAgentWatchRuntime] = useState<Record<string, AgentWatchRuntimeState>>({});
+  const {
+    isTaskDialogOpen,
+    isTaskDetailsOpen,
+    setIsTaskDetailsOpen,
+    isSwimlaneDialogOpen,
+    isPeoplePanelOpen,
+    setIsPeoplePanelOpen,
+    isPreferencesOpen,
+    setIsPreferencesOpen,
+    selectedTask,
+    detailsTask,
+    selectedSwimlane,
+    defaultStatus,
+    defaultDate,
+    defaultEndDate,
+    defaultSwimlaneId,
+    defaultAssigneeId,
+    handleTaskClick,
+    handleEditTaskFromKanban,
+    handleEditTaskFromDetails,
+    handleAddTaskFromTimeline,
+    handleAddTaskFromSwimlane,
+    handleCloseTaskDialog,
+    handleEditSwimlane,
+    handleAddSwimlane,
+    handleCloseSwimlaneDialog,
+  } = useWorkspaceDialogs(tasks);
 
-  const detailsTask = detailsTaskId ? tasks.find(t => t.id === detailsTaskId) ?? null : null;
+  const storageMeter = useStorageMeter({
+    enabled: isPreferencesOpen,
+    dependencies: [
+      tasks,
+      timelineSwimlanes,
+      people,
+      statusColumns,
+      preferences,
+    ],
+  });
+
+  const {
+    saveTask: handleSaveTask,
+    addTaskComment: handleAddTaskComment,
+    deleteTask: handleDeleteTask,
+    moveTask: handleMoveTask,
+    moveAgentTaskToReview: handleMoveAgentTaskToReview,
+    updateTaskDates: handleUpdateTaskDates,
+  } = useTaskActions({
+    people,
+    setTasks,
+  });
+  const {
+    saveSwimlane: handleSaveSwimlane,
+    deleteSwimlane: handleDeleteSwimlane,
+    reorderSwimlanes: handleReorderSwimlanes,
+  } = useProjectActions({
+    timelineSwimlanes,
+    setTimelineSwimlanes,
+    setTasks,
+  });
+  const {
+    renameStatusColumn: handleRenameStatusColumn,
+    changeStatusColumnColor: handleChangeStatusColumnColor,
+    reorderStatusColumns: handleReorderStatusColumns,
+    addStatusColumn: handleAddStatusColumn,
+    deleteStatusColumn: handleDeleteStatusColumn,
+  } = useStatusColumnActions({
+    statusColumns,
+    tasks,
+    setStatusColumns,
+    setTasks,
+  });
+
   const mcpReadService = useMemo(() => createMcpReadService({
     enabled: preferences.mcpAgentAccessEnabled,
     endpoint: preferences.mcpServerAddress,
@@ -621,358 +401,99 @@ function App() {
       ? { Authorization: `Bearer ${preferences.mcpAccessToken}` }
       : undefined,
   }), [preferences.mcpAccessToken, preferences.mcpAgentAccessEnabled, preferences.mcpServerAddress]);
-
-  const refreshMcpListenerStatus = useCallback(async () => {
-    try {
-      if (window.electron?.mcp?.getListenerStatus) {
-        const result = await window.electron.mcp.getListenerStatus();
-        if (result?.ok) {
-          setMcpListenerStatus(result.data);
+  const mcpHealth = useMcpHealthValidation({
+    enabled: preferences.mcpAgentAccessEnabled,
+    endpoint: preferences.mcpServerAddress,
+    headers: preferences.mcpAccessToken
+      ? {
+          Authorization: `Bearer ${preferences.mcpAccessToken}`,
         }
-      }
-    } catch (error) {
-      // Keep the last known listener state if the bridge is temporarily unavailable.
-    }
+      : undefined,
+    expectation: {
+      counts: {
+        tasks: tasks.length,
+        people: people.length,
+        swimlanes: timelineSwimlanes.length,
+        statusColumns: statusColumns.length,
+      },
+      requiredTaskKeys: ['id', 'title', 'status'],
+      requiredPersonKeys: ['id', 'name'],
+      requiredStatusColumnKeys: ['id', 'title'],
+    },
+  });
+  const {
+    appliedMcpSettingsSignature,
+    mcpListenerStatus,
+    mcpAuditLog,
+    refreshMcpListenerStatus,
+    refreshMcpAuditLog,
+    handleRestartMcpServer,
+    handleRotateMcpAccessToken,
+    isMcpRestartPending,
+  } = useMcpPanelState({
+    preferences,
+    setPreferences,
+    runHealthCheck: mcpHealth.runHealthCheck,
+  });
+  const {
+    agentWatchRuntime,
+    pollAgentWatcher,
+    upsertAgentWatchConfig,
+    removeAgentWatchConfig,
+  } = useAgentWatchRuntime({
+    mcpReadService,
+    enabled: preferences.mcpAgentAccessEnabled,
+    agentWatchConfigs,
+    setAgentWatchConfigs,
+  });
+
+  const handleOpenPreferences = useCallback(() => {
+    setIsPreferencesOpen(true);
   }, []);
 
-  const refreshMcpAuditLog = useCallback(async () => {
-    try {
-      if (window.electron?.mcp?.getAuditLog) {
-        const result = await window.electron.mcp.getAuditLog({ limit: 25 });
-        if (result?.ok && Array.isArray(result.data)) {
-          setMcpAuditLog(
-            result.data.filter(
-              (entry): entry is McpAuditSummaryEntry =>
-                Boolean(entry && typeof entry.auditId === 'string' && typeof entry.timestamp === 'string')
-            )
-          );
-        }
-      }
-    } catch (error) {
-      // Keep the last known audit log if the bridge is temporarily unavailable.
-    }
+  const handleClosePreferences = useCallback(() => {
+    setIsPreferencesOpen(false);
   }, []);
 
-  const pollAgentWatcher = useCallback(async (config: AgentWatchConfig) => {
-    try {
-      const result = await mcpReadService.pollBoardWatcher({
-        watcherId: `agent:${config.personId}`,
-        statusId: config.statusId,
-        assigneeId: config.personId,
-        projectId: config.projectId,
-        search: config.search,
-        persist: true,
-      });
-      const watchResult = result as McpBoardWatchResult;
-      const changes = watchResult.changes || { newTasks: [], updatedTasks: [], removedTaskIds: [] };
-      setAgentWatchRuntime(prev => ({
-        ...prev,
-        [config.personId]: {
-          personId: config.personId,
-          watcherId: watchResult.watcherState?.watcherId,
-          lastCheckedAt: watchResult.watcherState?.lastProcessedAt || new Date().toISOString(),
-          newTaskCount: Array.isArray(changes.newTasks) ? changes.newTasks.length : 0,
-          updatedTaskCount: Array.isArray(changes.updatedTasks) ? changes.updatedTasks.length : 0,
-          removedTaskCount: Array.isArray(changes.removedTaskIds) ? changes.removedTaskIds.length : 0,
-          latestTaskTitles: [
-            ...(Array.isArray(changes.newTasks) ? changes.newTasks : []),
-            ...(Array.isArray(changes.updatedTasks) ? changes.updatedTasks : []),
-          ]
-            .map(task => String(task?.title || '').trim())
-            .filter(Boolean)
-            .slice(0, 4),
-        },
-      }));
-      return watchResult;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      setAgentWatchRuntime(prev => ({
-        ...prev,
-        [config.personId]: {
-          personId: config.personId,
-          newTaskCount: 0,
-          updatedTaskCount: 0,
-          removedTaskCount: 0,
-          latestTaskTitles: [],
-          lastCheckedAt: new Date().toISOString(),
-          error: message,
-        },
-      }));
-      return null;
-    }
-  }, [mcpReadService]);
-
-  const upsertAgentWatchConfig = useCallback((nextConfig: AgentWatchConfig) => {
-    setAgentWatchConfigs(prev => {
-      const sanitized = sanitizeAgentWatchConfigs([nextConfig])[0];
-      if (!sanitized) return prev;
-      const existingIndex = prev.findIndex(config => config.personId === sanitized.personId);
-      if (existingIndex < 0) {
-        return [...prev, sanitized];
-      }
-      const next = [...prev];
-      next[existingIndex] = sanitized;
-      return next;
-    });
+  const handleOpenPeoplePanel = useCallback(() => {
+    setIsPeoplePanelOpen(true);
   }, []);
 
-  const removeAgentWatchConfig = useCallback((personId: string) => {
-    setAgentWatchConfigs(prev => prev.filter(config => config.personId !== personId));
-    setAgentWatchRuntime(prev => {
-      if (!prev[personId]) return prev;
-      const next = { ...prev };
-      delete next[personId];
-      return next;
-    });
+  const handleClosePeoplePanel = useCallback(() => {
+    setIsPeoplePanelOpen(false);
   }, []);
 
-  const handleTaskClick = (task: Task) => {
-    setDetailsTaskId(task.id);
-    setIsTaskDetailsOpen(true);
-  };
-
-  const handleEditTaskFromKanban = (task: Task) => {
-    setSelectedTask(task);
-    setDefaultStatus(task.status);
-    setDefaultDate(undefined);
-    setDefaultSwimlaneId(task.swimlaneId);
-    setIsTaskDialogOpen(true);
-  };
-
-  const handleEditTaskFromDetails = (task: Task) => {
+  const handleCloseTaskDetails = useCallback(() => {
     setIsTaskDetailsOpen(false);
-    handleEditTaskFromKanban(task);
-  };
+  }, []);
 
-  const handleAddTaskFromTimeline = (date: Date, swimlaneId: string, endDate?: Date, mode?: 'projects' | 'people') => {
-    setSelectedTask(null);
-    setDefaultStatus('open');
-    setDefaultDate(date);
-    setDefaultEndDate(endDate);
-    if (mode === 'people') {
-      setDefaultSwimlaneId(undefined);
-      setDefaultAssigneeId(swimlaneId);
-    } else {
-      setDefaultSwimlaneId(swimlaneId);
-      setDefaultAssigneeId(undefined);
-    }
-    setIsTaskDialogOpen(true);
-  };
+  const handleTimelineScroll = useCallback((state: { scrollLeft: number; scrollTop: number }) => {
+    timelineScrollStateRef.current = state;
+  }, []);
 
-  const handleAddTaskFromSwimlane = (status: TaskStatus) => {
-    setSelectedTask(null);
-    setDefaultStatus(status);
-    setDefaultDate(undefined);
-    setDefaultSwimlaneId(undefined);
-    setIsTaskDialogOpen(true);
-  };
-
-  const handleSaveTask = (taskData: Partial<Task>) => {
-    if (taskData.id) {
-      // Update existing task
-      setTasks(prevTasks => prevTasks.map(t => (t.id === taskData.id ? { ...t, ...taskData } : t)));
-    } else {
-      // Create new task
-      const newTask: Task = {
-        id: Date.now().toString(),
-        title: taskData.title!,
-        status: taskData.status || 'open',
-        notes: taskData.notes,
-        size: taskData.size || 'm',
-        complexity: taskData.complexity || 'medium',
-        blocked: Boolean(taskData.blocked),
-        priority: taskData.priority || 'normal',
-        startDate: taskData.startDate,
-        endDate: taskData.endDate,
-        projectIds: taskData.projectIds || [],
-        project: taskData.project,
-        swimlaneOnly: taskData.swimlaneOnly,
-        swimlaneId: taskData.swimlaneId,
-        assigneeId: taskData.assigneeId,
-        comments: taskData.comments || [],
-      };
-      setTasks(prevTasks => [...prevTasks, newTask]);
-    }
-  };
-
-  const handleAddTaskComment = (taskId: string, content: string) => {
-    const trimmed = content.trim();
-    if (!trimmed) return;
-
-    const nextComment: TaskComment = {
-      id: `comment-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-      author: 'You',
-      content: trimmed,
-      createdAt: new Date().toISOString(),
+  const handlePollAgentWatchFromPanel = useCallback((personId: string) => {
+    const config = agentWatchConfigs.find(item => item.personId === personId) || {
+      personId,
+      enabled: true,
+      statusId: statusColumns[0]?.id || 'open',
+      action: 'inspect_and_work' as const,
+      intervalSeconds: 60,
     };
-
-    setTasks(prevTasks => prevTasks.map(task => (
-      task.id === taskId
-        ? { ...task, comments: [...(task.comments || []), nextComment] }
-        : task
-    )));
-  };
-
-  const handleDeleteTask = (taskId: string) => {
-    setTasks(prevTasks => prevTasks.filter(t => t.id !== taskId));
-  };
-
-  const handleMoveTask = (taskId: string, newStatus: TaskStatus) => {
-    setTasks(prevTasks => prevTasks.map(t => (t.id === taskId ? { ...t, status: newStatus } : t)));
-  };
-
-  const handleMoveAgentTaskToReview = (taskId: string) => {
-    setTasks(prevTasks =>
-      prevTasks.map(task => {
-        if (task.id !== taskId) return task;
-        if (task.status !== 'in-progress') return task;
-        const assignee = task.assigneeId ? people.find(person => person.id === task.assigneeId) : null;
-        if (!assignee || assignee.kind !== 'agentic') return task;
-        return { ...task, status: 'under-review' };
-      })
-    );
-  };
-
-  const handleUpdateTaskDates = (taskId: string, startDate: string, endDate: string) => {
-    setTasks(prevTasks => prevTasks.map(t => (t.id === taskId ? { ...t, startDate, endDate } : t)));
-  };
-
-  const handleCloseTaskDialog = () => {
-    setIsTaskDialogOpen(false);
-    setSelectedTask(null);
-    setDefaultDate(undefined);
-    setDefaultSwimlaneId(undefined);
-    setDefaultAssigneeId(undefined);
-  };
-
-  const handleEditSwimlane = (swimlane: TimelineSwimlane) => {
-    setSelectedSwimlane(swimlane);
-    setIsSwimlaneDialogOpen(true);
-  };
-
-  const handleAddSwimlane = () => {
-    setSelectedSwimlane(null);
-    setIsSwimlaneDialogOpen(true);
-  };
-
-  const handleSaveSwimlane = (swimlaneData: Partial<TimelineSwimlane>) => {
-    if (swimlaneData.id) {
-      // Update existing swimlane
-      setTimelineSwimlanes(
-        timelineSwimlanes.map(s => (s.id === swimlaneData.id ? { ...s, ...swimlaneData } : s))
-      );
-    } else {
-      // Create new swimlane
-      const newSwimlane: TimelineSwimlane = {
-        id: Date.now().toString(),
-        name: swimlaneData.name!,
-      };
-      setTimelineSwimlanes([...timelineSwimlanes, newSwimlane]);
-    }
-  };
-
-  const handleDeleteSwimlane = (swimlaneId: string) => {
-    // Remove swimlane
-    const remainingSwimlanes = timelineSwimlanes.filter(s => s.id !== swimlaneId);
-    setTimelineSwimlanes(remainingSwimlanes);
-
-    // Update tasks to remove swimlane references and deleted project membership
-    setTasks(prevTasks => prevTasks.map(task => {
-      const nextProjectIds = (task.projectIds || []).filter(id => id !== swimlaneId);
-      const nextProject = nextProjectIds
-        .map(projectId => remainingSwimlanes.find(s => s.id === projectId)?.name)
-        .filter(Boolean)
-        .join(', ') || undefined;
-
-      return {
-        ...task,
-        swimlaneId: task.swimlaneId === swimlaneId ? undefined : task.swimlaneId,
-        projectIds: nextProjectIds,
-        project: nextProject,
-        swimlaneOnly: nextProjectIds.length === 0 || !task.swimlaneId || task.swimlaneId === swimlaneId,
-      };
-    }));
-  };
-
-  const handleCloseSwimlaneDialog = () => {
-    setIsSwimlaneDialogOpen(false);
-    setSelectedSwimlane(null);
-  };
-
-  const handleAddPerson = (personData: Omit<Person, 'id'>) => {
-    const newPerson: Person = {
-      id: Date.now().toString(),
-      name: personData.name,
-      role: personData.role,
-      kind: personData.kind === 'agentic' ? 'agentic' : 'human',
-      avatar: personData.avatar,
-    };
-    setPeople(prevPeople => [...prevPeople, newPerson]);
-  };
-
-  const handleDeletePerson = (personId: string) => {
-    setPeople(prevPeople => prevPeople.filter(p => p.id !== personId));
-    setTasks(prevTasks => prevTasks.map(t => (t.assigneeId === personId ? { ...t, assigneeId: undefined } : t)));
-    removeAgentWatchConfig(personId);
-  };
-
-  const handleUpdatePerson = (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind'>) => {
-    setPeople(prevPeople => prevPeople.map(p => (p.id === personId ? { ...p, ...updates } : p)));
-  };
-
-  const handleReorderSwimlanes = (reorderedSwimlanes: TimelineSwimlane[]) => {
-    setTimelineSwimlanes(reorderedSwimlanes);
-  };
-
-  const handleReorderPeople = (reorderedPeople: Person[]) => {
-    setPeople(reorderedPeople);
-  };
+    void pollAgentWatcher(config);
+  }, [agentWatchConfigs, pollAgentWatcher, statusColumns]);
+  const {
+    addPerson: handleAddPerson,
+    deletePerson: handleDeletePerson,
+    updatePerson: handleUpdatePerson,
+    reorderPeople: handleReorderPeople,
+  } = usePeopleActions({
+    setPeople,
+    setTasks,
+    onDeleteAgentWatchConfig: removeAgentWatchConfig,
+  });
 
   const handleReorderTasks = (reorderedTasks: Task[]) => {
     setTasks(reorderedTasks);
-  };
-
-  // Status columns management (kanban/swimlane columns)
-  const handleRenameStatusColumn = (colId: string, newTitle: string) => {
-    setStatusColumns(cols => cols.map(c => c.id === colId ? { ...c, title: newTitle } : c));
-  };
-
-  const handleChangeStatusColumnColor = (colId: string, newColorClass: string) => {
-    setStatusColumns(cols => cols.map(c => c.id === colId ? { ...c, color: newColorClass } : c));
-  };
-
-  const handleReorderStatusColumns = (fromIndex: number, toIndex: number) => {
-    setStatusColumns(cols => {
-      const copy = [...cols];
-      const [moved] = copy.splice(fromIndex, 1);
-      copy.splice(toIndex, 0, moved);
-      return copy;
-    });
-  };
-
-  const handleAddStatusColumn = (col: { id?: string; title: string; color?: string }) => {
-    const newCol: StatusColumnState = {
-      id: (col.id || Date.now().toString()) as TaskStatus,
-      title: col.title,
-      color: col.color || '#9ca3af',
-    };
-    setStatusColumns(cols => [...cols, newCol]);
-  };
-
-  const handleDeleteStatusColumn = (colId: string) => {
-    // Check if any tasks use this status
-    const tasksUsingStatus = tasks.filter(t => t.status === colId);
-    if (tasksUsingStatus.length > 0) {
-      // Move tasks to first remaining column, or mark as 'open'
-      const remainingCols = statusColumns.filter(c => c.id !== colId);
-      const fallbackStatus = remainingCols.length > 0 ? remainingCols[0].id : 'open';
-      setTasks(prevTasks =>
-        prevTasks.map(t =>
-          t.status === colId ? { ...t, status: fallbackStatus as TaskStatus } : t
-        )
-      );
-    }
-    setStatusColumns(cols => cols.filter(c => c.id !== colId));
   };
 
   const handleNukeLocalData = async () => {
@@ -1007,36 +528,6 @@ function App() {
     });
   };
 
-  const handleRestartMcpServer = async () => {
-    try {
-      if (window.electron?.mcp?.restartServer) {
-        const result = await window.electron.mcp.restartServer();
-        if (!result?.success) {
-          window.alert(`Could not restart MCP server: ${result?.error || 'Unknown error'}`);
-          return;
-        }
-        if (result.listenerStatus) {
-          setMcpListenerStatus(result.listenerStatus);
-        } else {
-          void refreshMcpListenerStatus();
-        }
-        void refreshMcpAuditLog();
-        setAppliedMcpSettingsSignature(getMcpSettingsSignature(preferences));
-        void mcpHealth.runHealthCheck();
-      }
-    } catch (err) {
-      window.alert('Could not restart MCP server.');
-    }
-  };
-
-  const handleRotateMcpAccessToken = () => {
-    setPreferences(prev => ({
-      ...prev,
-      mcpAccessToken: generateMcpAccessToken(),
-      mcpAccessTokenIssuedAt: new Date().toISOString(),
-    }));
-  };
-
   const handleExportTasksAndProjects = async () => {
     if (typeof window === 'undefined') return;
     if (viewState.currentView === 'timeline') {
@@ -1069,9 +560,7 @@ function App() {
             scrollTop: kanbanContainerRef.current?.scrollTop || 0,
           }
         : safeReadLocalStorageJSON<Record<string, unknown>>(KANBAN_VIEW_STATE_KEY, viewState.getViewState('kanban'));
-    const payload: BackupFile = {
-      version: BACKUP_SCHEMA_VERSION,
-      exportedAt: new Date().toISOString(),
+    const payload = buildWorkspaceBackupPayload({
       tasks,
       projects: timelineSwimlanes,
       people,
@@ -1090,7 +579,9 @@ function App() {
       },
       storage: getPortableStorageSnapshot(),
       electronStore: await getPortableElectronStoreSnapshot(),
-    };
+      version: WORKSPACE_BACKUP_SCHEMA_VERSION,
+      exportedAt: new Date().toISOString(),
+    });
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -1106,88 +597,55 @@ function App() {
   const handleImportTasksAndProjects = async (file: File) => {
     try {
       const text = await file.text();
-      const parsed = JSON.parse(text) as BackupFile;
+      const parsed = parseWorkspaceBackupJson(text);
+      if (!parsed.ok || !parsed.payload) {
+        window.alert(parsed.error || 'Could not import backup. Please select a valid JSON export file.');
+        return;
+      }
 
-      if (!Array.isArray(parsed.tasks) || !Array.isArray(parsed.projects)) {
+      const parsedPayload = parsed.payload as Record<string, unknown>;
+
+      if (!Array.isArray(parsedPayload.tasks) || !Array.isArray(parsedPayload.projects)) {
         window.alert('Invalid backup format. Expected "tasks" and "projects" arrays.');
         return;
       }
 
-      const importedProjects = parsed.projects
-        .filter(project => project && typeof project.id === 'string' && typeof project.name === 'string')
-        .map(project => ({
-          id: project.id,
-          name: project.name,
-          color: project.color || '#3b82f6',
-          subtitle: project.subtitle,
-        }));
-
-      const importedTasks = parsed.tasks
-        .filter(task => task && typeof task.id === 'string' && typeof task.title === 'string')
-        .map(task => normalizeTask(task, importedProjects));
-
-      const importedPeople: Person[] = Array.isArray(parsed.people)
-        ? parsed.people
-            .filter(person => person && typeof person.id === 'string' && typeof person.name === 'string')
-            .map(person => ({
-              ...person,
-              role: person.role || 'Team Member',
-              kind: (person.kind === 'agentic' ? 'agentic' : 'human') as Person['kind'],
-            }))
-        : people;
-
-      const importedStatusColumns = deriveStatusColumnsFromTasks(
-        importedTasks,
-        sanitizeStatusColumns(parsed.statusColumns, statusColumns)
-      );
-      const projectIds = new Set(importedProjects.map(project => project.id));
-      const personIds = new Set(importedPeople.map(person => person.id));
-      const statusIds = new Set(importedStatusColumns.map(column => column.id));
-      const fallbackStatusId = importedStatusColumns[0]?.id || 'open';
-
-      const repairedTasks = importedTasks.map(task => {
-        const nextProjectIds = (task.projectIds || []).filter(projectId => projectIds.has(projectId));
-        const nextSwimlaneId = task.swimlaneId && projectIds.has(task.swimlaneId) ? task.swimlaneId : undefined;
-        const nextAssigneeId = task.assigneeId && personIds.has(task.assigneeId) ? task.assigneeId : undefined;
-        const project = nextProjectIds
-          .map(projectId => importedProjects.find(item => item.id === projectId)?.name)
-          .filter(Boolean)
-          .join(', ');
-
-        return {
-          ...task,
-          status: (statusIds.has(task.status) ? task.status : fallbackStatusId) as TaskStatus,
-          projectIds: nextProjectIds,
-          project: project || undefined,
-          swimlaneId: nextSwimlaneId,
-          assigneeId: nextAssigneeId,
-        };
+      const repaired = repairWorkspaceBackupPayload(parsedPayload, {
+        fallbackProjects: timelineSwimlanes,
+        fallbackPeople: people,
+        fallbackStatusColumns: statusColumns,
+        fallbackPreferences: preferences,
+        fallbackTasks: tasks,
+        allowFallbackForMissingArrays: false,
       });
 
-      const importedPreferences = sanitizePreferences(parsed.preferences, importedStatusColumns, preferences);
+      if (!repaired.ok) {
+        window.alert(repaired.error || 'Could not import backup. Please select a valid JSON export file.');
+        return;
+      }
 
-      await restorePortableStorageSnapshot(parsed.storage, parsed.electronStore);
+      await restorePortableStorageSnapshot(repaired.storageSnapshot, repaired.electronStoreSnapshot);
 
-      setTimelineSwimlanes(importedProjects);
-      setTasks(repairedTasks);
-      setPeople(importedPeople);
-      setStatusColumns(importedStatusColumns);
-      setPreferences(importedPreferences);
+      setTimelineSwimlanes(repaired.projects);
+      setTasks(repaired.tasks);
+      setPeople(repaired.people);
+      setStatusColumns(repaired.statusColumns);
+      setPreferences(repaired.preferences);
 
-      if (parsed.ui?.viewState?.timeline) {
-        viewState.saveViewState('timeline', parsed.ui.viewState.timeline);
+      if (repaired.ui?.viewState?.timeline) {
+        viewState.saveViewState('timeline', repaired.ui.viewState.timeline);
       }
-      if (parsed.ui?.viewState?.kanban) {
-        viewState.saveViewState('kanban', parsed.ui.viewState.kanban);
+      if (repaired.ui?.viewState?.kanban) {
+        viewState.saveViewState('kanban', repaired.ui.viewState.kanban);
       }
-      if (parsed.ui?.timeline?.monthWidths && typeof parsed.ui.timeline.monthWidths === 'object') {
-        safeWriteRaw(MONTH_WIDTHS_KEY, JSON.stringify(parsed.ui.timeline.monthWidths));
+      if (repaired.ui?.timeline?.monthWidths && typeof repaired.ui.timeline.monthWidths === 'object') {
+        safeWriteRaw(MONTH_WIDTHS_KEY, JSON.stringify(repaired.ui.timeline.monthWidths));
       }
-      if (Number.isFinite(Number(parsed.ui?.timeline?.leftColWidth))) {
-        safeWriteRaw(LEFT_COL_WIDTH_KEY, String(parsed.ui?.timeline?.leftColWidth));
+      if (Number.isFinite(Number(repaired.ui?.timeline?.leftColWidth))) {
+        safeWriteRaw(LEFT_COL_WIDTH_KEY, String(repaired.ui?.timeline?.leftColWidth));
       }
-      if (parsed.ui?.currentView === 'timeline' || parsed.ui?.currentView === 'kanban') {
-        viewState.switchView(parsed.ui.currentView);
+      if (repaired.ui?.currentView === 'timeline' || repaired.ui?.currentView === 'kanban') {
+        viewState.switchView(repaired.ui.currentView as ViewType);
       }
       setViewRefreshKey(prev => prev + 1);
     } catch (err) {
@@ -1224,306 +682,104 @@ function App() {
   }, [people, statusColumns]);
 
   useEffect(() => {
-    if (!isPreferencesOpen || typeof window === 'undefined') return;
-    let cancelled = false;
-
-    const refreshStorageMeter = async () => {
-      const usedBytes = getLocalStorageUsageBytes();
-      let totalBytes = 5 * 1024 * 1024;
-      let sourceLabel = 'Estimated localStorage capacity';
-
-      try {
-        if (navigator.storage?.estimate) {
-          const estimate = await navigator.storage.estimate();
-          if (typeof estimate.quota === 'number' && estimate.quota > 0) {
-            totalBytes = estimate.quota;
-            sourceLabel = 'Browser storage estimate';
-          }
-        }
-      } catch (err) {
-        // Keep fallback values.
-      }
-
-      const usagePercent = totalBytes > 0
-        ? Math.max(0, Math.min(100, Math.round((usedBytes / totalBytes) * 100)))
-        : 0;
-
-      if (!cancelled) {
-        setStorageMeter({
-          usedBytes,
-          totalBytes,
-          usagePercent,
-          sourceLabel,
-        });
-      }
-    };
-
-    refreshStorageMeter();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    isPreferencesOpen,
-    tasks,
-    timelineSwimlanes,
-    people,
-    statusColumns,
-    preferences,
-  ]);
-
-  useEffect(() => {
     if (!isPreferencesOpen) return;
     void refreshMcpListenerStatus();
     void refreshMcpAuditLog();
   }, [isPreferencesOpen, refreshMcpAuditLog, refreshMcpListenerStatus]);
-
-  useEffect(() => {
-    const enabledConfigs = agentWatchConfigs.filter(config => config.enabled);
-    if (!preferences.mcpAgentAccessEnabled || enabledConfigs.length === 0) {
-      return undefined;
-    }
-
-    let cancelled = false;
-    const intervalMs = Math.max(
-      15000,
-      ...enabledConfigs.map(config => Math.max(15, config.intervalSeconds) * 1000)
-    );
-
-    const run = async () => {
-      for (const config of enabledConfigs) {
-        if (cancelled) return;
-        await pollAgentWatcher(config);
-      }
-    };
-
-    void run();
-    const timer = window.setInterval(() => {
-      void run();
-    }, intervalMs);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [agentWatchConfigs, pollAgentWatcher, preferences.mcpAgentAccessEnabled]);
 
   useMcpDiagnostics({
     enabled: preferences.mcpAgentAccessEnabled,
     endpoint: preferences.mcpServerAddress,
   });
 
-  const mcpHealthExpectation = useMemo(
-    () => ({
-      counts: {
-        tasks: tasks.length,
-        people: people.length,
-        swimlanes: timelineSwimlanes.length,
-        statusColumns: statusColumns.length,
-      },
-      requiredTaskKeys: ['id', 'title', 'status'],
-      requiredPersonKeys: ['id', 'name'],
-      requiredStatusColumnKeys: ['id', 'title'],
-    }),
-    [tasks.length, people.length, timelineSwimlanes.length, statusColumns.length]
-  );
-
-  const mcpHealth = useMcpHealthValidation({
-    enabled: preferences.mcpAgentAccessEnabled,
-    endpoint: preferences.mcpServerAddress,
-    headers: preferences.mcpAccessToken
-      ? {
-          Authorization: `Bearer ${preferences.mcpAccessToken}`,
-        }
-      : undefined,
-    expectation: mcpHealthExpectation,
-  });
-
   return (
     <div className="h-screen flex flex-col bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <img src={logo} alt="Plumy" className="h-10 w-auto antialiased" />
-            <p className="text-lg font-semibold">plumy</p>
-          </div>
-          {/* View Toggle */}
-          <ViewToggle
-            currentView={viewState.currentView}
-            onViewChange={(view) => {
-              // Save current view state before switching
-              if (viewState.currentView === 'timeline') {
-                viewState.saveViewState('timeline', {
-                  scrollLeft: timelineScrollStateRef.current.scrollLeft,
-                  scrollTop: timelineScrollStateRef.current.scrollTop,
-                  collapsedSwimlanes: [],
-                  mode: 'projects',
-                });
-              } else if (viewState.currentView === 'kanban') {
-                viewState.saveViewState('kanban', {
-                  scrollLeft: kanbanContainerRef.current?.scrollLeft || 0,
-                  scrollTop: kanbanContainerRef.current?.scrollTop || 0,
-                });
-              }
-              // Switch to new view
-              viewState.switchView(view);
+      <AppHeader
+        currentView={viewState.currentView}
+        onViewChange={(view) => {
+          if (viewState.currentView === 'timeline') {
+            viewState.saveViewState('timeline', {
+              scrollLeft: timelineScrollStateRef.current.scrollLeft,
+              scrollTop: timelineScrollStateRef.current.scrollTop,
+              collapsedSwimlanes: [],
+              mode: 'projects',
+            });
+          } else if (viewState.currentView === 'kanban') {
+            viewState.saveViewState('kanban', {
+              scrollLeft: kanbanContainerRef.current?.scrollLeft || 0,
+              scrollTop: kanbanContainerRef.current?.scrollTop || 0,
+            });
+          }
 
-              // Restore scroll position for the new view
-              setTimeout(() => {
-                const savedState = viewState.getViewState(view);
-                if (view === 'kanban' && kanbanContainerRef.current) {
-                  kanbanContainerRef.current.scrollLeft = savedState.scrollLeft || 0;
-                  kanbanContainerRef.current.scrollTop = savedState.scrollTop || 0;
-                }
-              }, 0);
-            }}
-          />
-        </div>
+          viewState.switchView(view);
 
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => setIsPreferencesOpen(true)}>
-            <Settings className="w-5 h-5" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={() => setIsPeoplePanelOpen(true)}>
-            <User className="w-5 h-5" />
-          </Button>
-        </div>
-      </header>
+          setTimeout(() => {
+            const savedState = viewState.getViewState(view);
+            if (view === 'kanban' && kanbanContainerRef.current) {
+              kanbanContainerRef.current.scrollLeft = savedState.scrollLeft || 0;
+              kanbanContainerRef.current.scrollTop = savedState.scrollTop || 0;
+            }
+          }, 0);
+        }}
+        onOpenPreferences={handleOpenPreferences}
+        onOpenPeople={handleOpenPeoplePanel}
+      />
 
-      {/* Main Content Area */}
-      <div className="flex-1 overflow-hidden">
-        {/* Timeline View */}
-        {viewState.currentView === 'timeline' && (
-          <div key={`timeline-${viewRefreshKey}`} ref={timelineContainerRef} className="h-full w-full">
-            <TimelineView
-              tasks={tasks}
-              swimlanes={timelineSwimlanes}
-              people={people}
-              statusColumns={statusColumns}
-              initialScrollLeft={viewState.getViewState('timeline').scrollLeft || 0}
-              onTaskClick={handleTaskClick}
-              onAddTask={handleAddTaskFromTimeline}
-              onUpdateTaskDates={handleUpdateTaskDates}
-              onEditSwimlane={handleEditSwimlane}
-              onAddSwimlane={handleAddSwimlane}
-              onReorderSwimlanes={handleReorderSwimlanes}
-              onReorderPeople={handleReorderPeople}
-              onReorderTasks={handleReorderTasks}
-              onTimelineScroll={(state) => {
-                timelineScrollStateRef.current = state;
-              }}
-            />
-          </div>
-        )}
+      <AppMainViews
+        currentView={viewState.currentView}
+        viewRefreshKey={viewRefreshKey}
+        timelineContainerRef={timelineContainerRef}
+        kanbanContainerRef={kanbanContainerRef}
+        timelineScrollStateRef={timelineScrollStateRef}
+        tasks={tasks}
+        timelineSwimlanes={timelineSwimlanes}
+        people={people}
+        statusColumns={statusColumns}
+        timelineInitialScrollLeft={viewState.getViewState('timeline').scrollLeft || 0}
+        onTimelineTaskClick={handleTaskClick}
+        onTimelineAddTask={handleAddTaskFromTimeline}
+        onTimelineUpdateTaskDates={handleUpdateTaskDates}
+        onTimelineEditSwimlane={handleEditSwimlane}
+        onTimelineAddSwimlane={handleAddSwimlane}
+        onTimelineReorderSwimlanes={handleReorderSwimlanes}
+        onTimelineReorderPeople={handleReorderPeople}
+        onTimelineReorderTasks={handleReorderTasks}
+        onTimelineScroll={handleTimelineScroll}
+        onKanbanTaskClick={handleTaskClick}
+        onKanbanEditTask={handleEditTaskFromKanban}
+        onKanbanAddTask={handleAddTaskFromSwimlane}
+        onKanbanMoveTask={handleMoveTask}
+        onKanbanReorderTasks={handleReorderTasks}
+        onKanbanReorderColumns={handleReorderStatusColumns}
+        onKanbanRenameColumn={handleRenameStatusColumn}
+        onKanbanChangeColumnColor={handleChangeStatusColumnColor}
+        onKanbanAddColumn={handleAddStatusColumn}
+        onKanbanDeleteColumn={handleDeleteStatusColumn}
+      />
 
-        {/* Kanban View */}
-        {viewState.currentView === 'kanban' && (
-          <div key={`kanban-${viewRefreshKey}`} ref={kanbanContainerRef} className="h-full w-full">
-            <DndProvider backend={HTML5Backend}>
-              <KanbanView
-                tasks={tasks}
-                swimlanes={statusColumns}
-                onTaskClick={handleTaskClick}
-                onEditTask={handleEditTaskFromKanban}
-                onAddTask={handleAddTaskFromSwimlane}
-                onMoveTask={handleMoveTask}
-                onReorderTasks={handleReorderTasks}
-                onReorderColumns={handleReorderStatusColumns}
-                onRenameColumn={handleRenameStatusColumn}
-                onChangeColumnColor={handleChangeStatusColumnColor}
-                onAddColumn={handleAddStatusColumn}
-                onDeleteColumn={handleDeleteStatusColumn}
-              />
-            </DndProvider>
-          </div>
-        )}
-      </div>
-
-      {/* Task Dialog */}
-      <TaskDialog
-        isOpen={isTaskDialogOpen}
-        onClose={handleCloseTaskDialog}
-        onSave={handleSaveTask}
-        onDelete={handleDeleteTask}
-        task={selectedTask}
+      <AppPanels
+        isTaskDialogOpen={isTaskDialogOpen}
+        isTaskDetailsOpen={isTaskDetailsOpen}
+        isSwimlaneDialogOpen={isSwimlaneDialogOpen}
+        isPeoplePanelOpen={isPeoplePanelOpen}
+        isPreferencesOpen={isPreferencesOpen}
+        selectedTask={selectedTask}
+        detailsTask={detailsTask}
+        selectedSwimlane={selectedSwimlane}
         defaultStatus={defaultStatus}
         defaultDate={defaultDate}
         defaultEndDate={defaultEndDate}
         defaultSwimlaneId={defaultSwimlaneId}
         defaultAssigneeId={defaultAssigneeId}
-        swimlanes={timelineSwimlanes}
-        statusColumns={statusColumns}
-        people={people}
-      />
-
-      {/* Task Details Dialog */}
-      <TaskDetailsDialog
-        isOpen={isTaskDetailsOpen}
-        onClose={() => setIsTaskDetailsOpen(false)}
-        onEdit={handleEditTaskFromDetails}
-        onMoveAgentTaskToReview={handleMoveAgentTaskToReview}
-        onAddComment={handleAddTaskComment}
-        task={detailsTask}
-        swimlanes={timelineSwimlanes}
-        people={people}
-        statusColumns={statusColumns}
-      />
-
-      {/* Swimlane Dialog */}
-      <SwimlaneDialog
-        isOpen={isSwimlaneDialogOpen}
-        onClose={handleCloseSwimlaneDialog}
-        onSave={handleSaveSwimlane}
-        onDelete={handleDeleteSwimlane}
-        swimlane={selectedSwimlane}
-      />
-
-      {/* People Panel */}
-      <PeoplePanel
-        isOpen={isPeoplePanelOpen}
-        onClose={() => setIsPeoplePanelOpen(false)}
-        people={people}
         tasks={tasks}
+        timelineSwimlanes={timelineSwimlanes}
+        people={people}
         statusColumns={statusColumns}
         executionLoadStatusId={preferences.executionLoadStatusId}
         pipelineLoadStatusId={preferences.pipelineLoadStatusId}
         agentWatchConfigs={agentWatchConfigs}
         agentWatchRuntime={agentWatchRuntime}
-        onAddPerson={handleAddPerson}
-        onUpdatePerson={handleUpdatePerson}
-        onDeletePerson={handleDeletePerson}
-        onSaveAgentWatchConfig={upsertAgentWatchConfig}
-        onRemoveAgentWatchConfig={removeAgentWatchConfig}
-        onPollAgentWatch={(personId) => {
-          const config = agentWatchConfigs.find(item => item.personId === personId) || {
-            personId,
-            enabled: true,
-            statusId: statusColumns[0]?.id || 'open',
-            action: 'inspect_and_work' as const,
-            intervalSeconds: 60,
-          };
-          if (!config) return;
-          void pollAgentWatcher(config);
-        }}
-      />
-
-      {/* Preferences Panel */}
-      <PreferencesPanel
-        isOpen={isPreferencesOpen}
-        onClose={() => setIsPreferencesOpen(false)}
-        statusColumns={statusColumns}
-        executionLoadStatusId={preferences.executionLoadStatusId}
-        pipelineLoadStatusId={preferences.pipelineLoadStatusId}
         storageMeter={storageMeter}
-        onNukeLocalData={handleNukeLocalData}
-        onExportTasksAndProjects={handleExportTasksAndProjects}
-        onImportTasksAndProjects={handleImportTasksAndProjects}
-        onExecutionLoadStatusChange={(statusId) =>
-          setPreferences(prev => ({ ...prev, executionLoadStatusId: statusId }))
-        }
-        onPipelineLoadStatusChange={(statusId) =>
-          setPreferences(prev => ({ ...prev, pipelineLoadStatusId: statusId }))
-        }
         mcpAgentAccessEnabled={preferences.mcpAgentAccessEnabled}
         mcpAddress={preferences.mcpServerAddress}
         mcpBindHost={preferences.mcpBindHost}
@@ -1534,6 +790,37 @@ function App() {
         mcpCapabilityProfile={preferences.mcpCapabilityProfile}
         mcpListenerStatus={mcpListenerStatus}
         mcpAuditLog={mcpAuditLog}
+        mcpHealthResult={mcpHealth.result}
+        mcpHealthCheckRunning={mcpHealth.isRunning}
+        showMcpHealthDiagnostics={mcpHealth.isDevEnvironment}
+        mcpRestartPending={isMcpRestartPending}
+        onCloseTaskDialog={handleCloseTaskDialog}
+        onSaveTask={handleSaveTask}
+        onDeleteTask={handleDeleteTask}
+        onCloseTaskDetails={handleCloseTaskDetails}
+        onEditTaskFromDetails={handleEditTaskFromDetails}
+        onMoveAgentTaskToReview={handleMoveAgentTaskToReview}
+        onAddTaskComment={handleAddTaskComment}
+        onCloseSwimlaneDialog={handleCloseSwimlaneDialog}
+        onSaveSwimlane={handleSaveSwimlane}
+        onDeleteSwimlane={handleDeleteSwimlane}
+        onClosePeoplePanel={handleClosePeoplePanel}
+        onAddPerson={handleAddPerson}
+        onUpdatePerson={handleUpdatePerson}
+        onDeletePerson={handleDeletePerson}
+        onSaveAgentWatchConfig={upsertAgentWatchConfig}
+        onRemoveAgentWatchConfig={removeAgentWatchConfig}
+        onPollAgentWatch={handlePollAgentWatchFromPanel}
+        onClosePreferences={handleClosePreferences}
+        onNukeLocalData={handleNukeLocalData}
+        onExportTasksAndProjects={handleExportTasksAndProjects}
+        onImportTasksAndProjects={handleImportTasksAndProjects}
+        onExecutionLoadStatusChange={(statusId) =>
+          setPreferences(prev => ({ ...prev, executionLoadStatusId: statusId }))
+        }
+        onPipelineLoadStatusChange={(statusId) =>
+          setPreferences(prev => ({ ...prev, pipelineLoadStatusId: statusId }))
+        }
         onMcpAgentAccessToggle={(enabled) =>
           setPreferences(prev => ({ ...prev, mcpAgentAccessEnabled: enabled }))
         }
@@ -1575,11 +862,7 @@ function App() {
           setPreferences(prev => ({ ...prev, mcpCapabilityProfile: profile }))
         }
         onRestartMcpServer={handleRestartMcpServer}
-        showMcpHealthDiagnostics={mcpHealth.isDevEnvironment}
-        mcpHealthResult={mcpHealth.result}
-        mcpHealthCheckRunning={mcpHealth.isRunning}
         onRunMcpHealthCheck={mcpHealth.runHealthCheck}
-        mcpRestartPending={getMcpSettingsSignature(preferences) !== appliedMcpSettingsSignature}
         onRefreshMcpAuditLog={refreshMcpAuditLog}
       />
     </div>

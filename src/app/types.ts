@@ -4,6 +4,12 @@ export type TaskComplexity = 'routine' | 'medium' | 'hard';
 export type TaskPriority = 'urgent' | 'moderate' | 'normal' | 'low';
 export type PersonKind = 'human' | 'agentic';
 
+export interface StatusColumn {
+  id: string;
+  title: string;
+  color?: string;
+}
+
 export interface TaskComment {
   id: string;
   author: string;
@@ -40,15 +46,18 @@ export interface Task {
   comments?: TaskComment[];
 }
 
-export interface Swimlane {
-  id: TaskStatus;
-  title: string;
-  color?: string;
-}
+export type Swimlane = StatusColumn;
 
 export interface TimelineSwimlane {
   id: string;
   name: string;
   subtitle?: string;
   color?: string;
+}
+
+export interface StorageMeter {
+  usedBytes: number;
+  totalBytes: number;
+  usagePercent: number;
+  sourceLabel: string;
 }

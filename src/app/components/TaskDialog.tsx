@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Briefcase, CalendarDays, User } from 'lucide-react';
-import { Task, TaskStatus, TimelineSwimlane, Person, TaskSize, TaskComplexity, TaskPriority } from '../types';
+import { Task, TaskStatus, TimelineSwimlane, Person, TaskSize, TaskComplexity, TaskPriority, StatusColumn } from '../types';
 import { toLocalISODate } from '../utils/date';
 import {
   Dialog,
@@ -34,7 +34,7 @@ interface TaskDialogProps {
   defaultSwimlaneId?: string;
   defaultAssigneeId?: string;
   swimlanes: TimelineSwimlane[];
-  statusColumns?: Array<{ id: TaskStatus; title: string; color?: string }>;
+  statusColumns?: StatusColumn[];
   people?: Person[];
 }
 

@@ -1,4 +1,4 @@
-import { Task, TimelineSwimlane, Person, TaskStatus } from '../types';
+import { Task, TimelineSwimlane, Person, TaskStatus, StatusColumn } from '../types';
 import { useMemo, useState } from 'react';
 import {
   Dialog,
@@ -22,7 +22,7 @@ interface TaskDetailsDialogProps {
   task?: Task | null;
   swimlanes: TimelineSwimlane[];
   people: Person[];
-  statusColumns: Array<{ id: TaskStatus; title: string; color?: string }>;
+  statusColumns: StatusColumn[];
 }
 
 function formatDate(dateValue?: string): string {

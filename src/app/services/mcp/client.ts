@@ -1,11 +1,11 @@
-import { normalizeMcpServerAddress } from '../../constants/mcp';
-import {
+import { normalizeMcpServerAddress } from '../../constants/mcp.ts';
+import type {
   McpClientConfig,
   McpInitializeResult,
   McpReadToolName,
   McpResourceResponse,
   McpToolDescriptor,
-} from './types';
+} from './types.ts';
 
 const DEFAULT_TIMEOUT_MS = 4000;
 const MCP_PROTOCOL_VERSION = '2024-11-05';

@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
-import { Task, TaskStatus } from '../types';
+import { Task, TaskStatus, StatusColumn } from '../types';
 import { Button } from '@/app/components/ui/button';
 import { TaskCard } from './TaskCard';
 
@@ -13,7 +13,7 @@ interface DraggableTaskCardProps {
   onEditTask?: (task: Task) => void;
   onMoveTask: (taskId: string, newStatus: TaskStatus) => void;
   onReorderTask: (dragIndex: number, hoverIndex: number, status: TaskStatus) => void;
-  swimlanes: Array<{ id: TaskStatus; title: string }>;
+  swimlanes: StatusColumn[];
 }
 
 interface DragItem {

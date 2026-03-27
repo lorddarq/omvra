@@ -9,7 +9,7 @@
  */
 
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { Task, TaskStatus } from '../types';
+import { Task, TaskStatus, StatusColumn } from '../types';
 import { SwimlanesView } from './SwimlanesView';
 import { useViewState } from '../hooks/useViewState';
 import { Input } from './ui/input';
@@ -17,7 +17,7 @@ import { Search } from 'lucide-react';
 
 interface KanbanViewProps {
   tasks: Task[];
-  swimlanes: Array<{ id: TaskStatus; title: string; color?: string }>;
+  swimlanes: StatusColumn[];
   onTaskClick: (task: Task) => void;
   onEditTask?: (task: Task) => void;
   onAddTask: (status: TaskStatus) => void;

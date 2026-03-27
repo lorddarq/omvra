@@ -1,5 +1,5 @@
-import { McpClient, McpClientDisabledError } from './client';
-import {
+import { McpClient, McpClientDisabledError } from './client.ts';
+import type {
   McpCard,
   McpBoardWatchResult,
   McpClientConfig,
@@ -9,7 +9,7 @@ import {
   McpSnapshotExpectation,
   McpTaskSummary,
   McpWorkspaceSnapshot,
-} from './types';
+} from './types.ts';
 
 const CORE_READ_TOOLS = [
   'workspace.get_snapshot',

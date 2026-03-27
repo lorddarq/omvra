@@ -12,7 +12,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
-import { Task, TimelineSwimlane, TaskStatus, Person } from '../types';
+import { Task, TimelineSwimlane, TaskStatus, Person, StatusColumn } from '../types';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { Plus } from 'lucide-react';
@@ -38,7 +38,7 @@ interface TimelineViewProps {
   tasks: Task[];
   swimlanes: TimelineSwimlane[];
   people?: Person[];
-  statusColumns?: Array<{ id: TaskStatus; title: string; color?: string }>;
+  statusColumns?: StatusColumn[];
   initialScrollLeft?: number;
   onTaskClick: (task: Task) => void;
   onAddTask: (date: Date, swimlaneId: string, endDate?: Date, mode?: 'projects' | 'people') => void;

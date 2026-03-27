@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Swimlane } from '../types';
+import { StatusColumn } from '../types';
 import {
   Dialog,
   DialogContent,
@@ -17,7 +17,7 @@ interface ColumnDialogProps {
   onClose: () => void;
   onSave: (title: string, color: string) => void;
   onDelete?: () => void;
-  column?: Swimlane | null;
+  column?: StatusColumn | null;
 }
 
 export function ColumnDialog({

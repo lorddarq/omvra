@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { TaskStatus } from '../types';
+import { StorageMeter, TaskStatus, StatusColumn } from '../types';
 import {
   Sheet,
   SheetContent,
@@ -14,17 +14,10 @@ import { Input } from './ui/input';
 import { Copy, Download, RefreshCcw } from 'lucide-react';
 import { McpHealthCheckResult } from '../services/mcp/types';
 
-interface StorageMeter {
-  usedBytes: number;
-  totalBytes: number;
-  usagePercent: number;
-  sourceLabel: string;
-}
-
 interface PreferencesPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  statusColumns: Array<{ id: TaskStatus; title: string; color?: string }>;
+  statusColumns: StatusColumn[];
   executionLoadStatusId: TaskStatus;
   pipelineLoadStatusId: TaskStatus;
   onExecutionLoadStatusChange: (statusId: TaskStatus) => void;

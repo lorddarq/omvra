@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Person, Task, TaskStatus } from '../types';
+import { Person, Task, TaskStatus, StatusColumn } from '../types';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from './ui/sheet';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -14,7 +14,7 @@ interface PeoplePanelProps {
   onClose: () => void;
   people: Person[];
   tasks: Task[];
-  statusColumns: Array<{ id: TaskStatus; title: string; color?: string }>;
+  statusColumns: StatusColumn[];
   executionLoadStatusId: TaskStatus;
   pipelineLoadStatusId: TaskStatus;
   agentWatchConfigs: Array<{
@@ -101,7 +101,7 @@ export function PeoplePanel({
     return 'Inspect and work the task';
   }
 
-  function getTaskCountForPerson(personId: string, status?: TaskStatus): number {
+  function getTaskCountForPerson(personId: string, status?: string): number {
     return tasks.filter(t => {
       const matchesPerson = t.assigneeId === personId;
       const matchesStatus = status ? t.status === status : true;
@@ -109,7 +109,7 @@ export function PeoplePanel({
     }).length;
   }
 
-  function getLoadPercentageForPerson(personId: string, statusId: TaskStatus): number {
+  function getLoadPercentageForPerson(personId: string, statusId: string): number {
     const personTasks = tasks.filter(t => t.assigneeId === personId && t.status === statusId);
     return getLoadPercentageForTasks(personTasks);
   }

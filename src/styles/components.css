@@ -299,19 +299,6 @@
   background-color: #f9fafb;
 }
 
-.plumy-markdown-editor-content ul,
-.plumy-markdown-editor-content ol {
-  padding-left: 1.5rem;
-}
-
-.plumy-markdown-editor-content li {
-  margin-left: 0.125rem;
-}
-
-.plumy-markdown-editor-content input[type='checkbox'] {
-  margin-right: 0.5rem;
-}
-
 .plumy-markdown-editor .mdxeditor-rich-text-editor {
   background-color: #f9fafb;
 }

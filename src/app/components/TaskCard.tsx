@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
 import { Badge } from './ui/badge';
 import { TaskPriority } from '../types';
+import { extractTaskCardContent } from '../utils/taskNotes';
 
 const PRIORITY_STYLES: Record<TaskPriority, { label: string; className: string }> = {
   urgent: { label: 'Urgent', className: 'bg-red-500 text-white border-white/10' },
@@ -19,48 +20,12 @@ interface TaskCardProps {
   onEdit?: () => void;
 }
 
-interface ChecklistPreviewItem {
-  text: string;
-  checked: boolean;
-}
-
-function extractCardContent(notes?: string): { bodyPreview: string; checklistItems: ChecklistPreviewItem[] } {
-  if (!notes?.trim()) {
-    return { bodyPreview: '', checklistItems: [] };
-  }
-
-  const checklistItems: ChecklistPreviewItem[] = [];
-  const bodyChunks: string[] = [];
-  const checklistRegex = /^\s*[-*]\s+\[( |x|X)\]\s+(.*)$/;
-
-  notes.split(/\r?\n/).forEach(line => {
-    const match = line.match(checklistRegex);
-    if (match) {
-      const text = match[2].trim();
-      if (text) {
-        checklistItems.push({ text, checked: match[1].toLowerCase() === 'x' });
-      }
-      return;
-    }
-
-    const normalized = line.replace(/^#{1,6}\s*/, '').trim();
-    if (normalized) {
-      bodyChunks.push(normalized);
-    }
-  });
-
-  return {
-    bodyPreview: bodyChunks.join(' ').replace(/\s+/g, ' ').trim(),
-    checklistItems,
-  };
-}
-
 function TaskCardComponent({ title, notes, color, project, priority = 'normal', onClick, onEdit }: TaskCardProps) {
   const projectLabels = project
     ? project.split(',').map(label => label.trim()).filter(Boolean)
     : [];
   const priorityStyle = PRIORITY_STYLES[priority];
-  const { bodyPreview, checklistItems } = extractCardContent(notes);
+  const { bodyPreview, checklistItems } = extractTaskCardContent(notes);
   const checklistPreview = checklistItems.slice(0, 3);
   const remainingChecklistCount = Math.max(0, checklistItems.length - checklistPreview.length);
 

@@ -8,9 +8,14 @@ interface MarkdownContentProps {
 
 type CodeComponentProps = ComponentPropsWithoutRef<'code'> & {
   inline?: boolean;
+  node?: {
+    properties?: {
+      className?: string[] | string;
+    };
+  };
 };
 
-const markdownComponents: Components = {
+export const markdownComponents: Components = {
   h1: ({ children }) => <h1 className="text-xl font-semibold text-gray-900">{children}</h1>,
   h2: ({ children }) => <h2 className="text-lg font-semibold text-gray-900">{children}</h2>,
   h3: ({ children }) => <h3 className="text-base font-semibold text-gray-900">{children}</h3>,
@@ -43,19 +48,28 @@ const markdownComponents: Components = {
   blockquote: ({ children }) => (
     <blockquote className="border-l-2 border-gray-300 pl-3 text-sm text-gray-700">{children}</blockquote>
   ),
-  code: ({ inline, className, children }: CodeComponentProps) => {
-    if (inline) {
+  pre: ({ children }) => (
+    <pre className="overflow-x-auto rounded-md bg-gray-100 p-3 text-xs text-gray-900">
+      {children}
+    </pre>
+  ),
+  code: ({ inline, className, children, node }: CodeComponentProps) => {
+    const nodeClassName = node?.properties?.className;
+    const normalizedClassName = Array.isArray(nodeClassName)
+      ? nodeClassName.join(' ')
+      : (nodeClassName || className || '');
+    const childText = typeof children === 'string' ? children : String(children ?? '');
+    const isBlockCode = Boolean(inline === false || normalizedClassName || childText.includes('\n'));
+
+    if (!isBlockCode) {
       return (
         <code className="rounded bg-gray-100 px-1 py-0.5 text-xs font-mono text-gray-800">
           {children}
         </code>
       );
     }
-    return (
-      <pre className="overflow-x-auto rounded-md bg-gray-100 p-3 text-xs text-gray-900">
-        <code className={className}>{children}</code>
-      </pre>
-    );
+
+    return <code className={normalizedClassName}>{children}</code>;
   },
   a: ({ href, children }) => {
     const safeHref = href || '';

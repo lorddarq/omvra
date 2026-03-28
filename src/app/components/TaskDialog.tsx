@@ -13,7 +13,6 @@ import {
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
-import { Textarea } from '@/app/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -21,6 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/app/components/ui/select';
+import { MarkdownEditor } from './MarkdownEditor';
+import { normalizeTaskNotesForSave } from '../utils/taskNotes';
 
 interface TaskDialogProps {
   isOpen: boolean;
@@ -121,7 +122,7 @@ export function TaskDialog({
       ...(task && { id: task.id }),
       title: title.trim(),
       status,
-      notes: notes.trim(),
+      notes: normalizeTaskNotesForSave(notes),
       size,
       complexity,
       priority,
@@ -402,12 +403,10 @@ export function TaskDialog({
                 {task ? 'Edit the task details below.' : 'Enter the task details below.'}
               </p>
             </div>
-            <Textarea
+            <MarkdownEditor
               id="notes"
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder=""
-              className="min-h-[240px] rounded-xl border-0 bg-gray-100 p-4"
+              onChange={setNotes}
             />
           </div>
         </div>

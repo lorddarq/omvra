@@ -239,6 +239,100 @@
   cursor: grabbing;
 }
 
+.plumy-markdown-editor {
+  --accentBase: #020329;
+  --accentBgSubtle: rgba(2, 3, 41, 0.06);
+  --accentBgActive: rgba(2, 3, 41, 0.12);
+  --accentLine: rgba(2, 3, 41, 0.08);
+  --baseBg: #f3f4f6;
+  --basePageBg: #ffffff;
+  --baseTextContrast: #111827;
+  --baseTextMed: #6b7280;
+  --baseBorder: rgba(2, 3, 41, 0.08);
+  background-color: #ffffff;
+}
+
+.plumy-markdown-editor .mdxeditor-toolbar,
+.plumy-markdown-toolbar {
+  border-bottom: 1px solid var(--accentLine);
+  background-color: #eef2f7;
+  padding: 0.5rem 0.75rem;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.plumy-markdown-editor .mdxeditor-toolbar button,
+.plumy-markdown-editor .mdxeditor-toolbar [role='button'],
+.plumy-markdown-editor .mdxeditor-toolbar [role='combobox'],
+.plumy-markdown-toolbar button,
+.plumy-markdown-toolbar [role='button'],
+.plumy-markdown-toolbar [role='combobox'] {
+  border-radius: 0.625rem;
+}
+
+.plumy-markdown-editor .mdxeditor-toolbar button:hover,
+.plumy-markdown-editor .mdxeditor-toolbar button:focus-visible,
+.plumy-markdown-editor .mdxeditor-toolbar [role='button']:hover,
+.plumy-markdown-editor .mdxeditor-toolbar [role='button']:focus-visible,
+.plumy-markdown-toolbar button:hover,
+.plumy-markdown-toolbar button:focus-visible,
+.plumy-markdown-toolbar [role='button']:hover,
+.plumy-markdown-toolbar [role='button']:focus-visible {
+  background-color: rgba(2, 3, 41, 0.08);
+}
+
+.plumy-markdown-editor-root {
+  background-color: #ffffff;
+}
+
+.plumy-markdown-editor-content,
+.plumy-markdown-editor .mdxeditor-rich-text-editor,
+.plumy-markdown-editor .mdxeditor-source-editor {
+  min-height: 320px;
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+.plumy-markdown-editor-content {
+  padding: 1rem 1rem 1.25rem;
+  color: #111827;
+  background-color: #f9fafb;
+}
+
+.plumy-markdown-editor-content ul,
+.plumy-markdown-editor-content ol {
+  padding-left: 1.5rem;
+}
+
+.plumy-markdown-editor-content li {
+  margin-left: 0.125rem;
+}
+
+.plumy-markdown-editor-content input[type='checkbox'] {
+  margin-right: 0.5rem;
+}
+
+.plumy-markdown-editor .mdxeditor-rich-text-editor {
+  background-color: #f9fafb;
+}
+
+.plumy-markdown-editor .cm-editor,
+.plumy-markdown-editor .cm-scroller,
+.plumy-markdown-editor .cm-content {
+  min-height: 320px;
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+.plumy-markdown-editor .cm-editor {
+  border-top: 1px solid var(--baseBorder);
+}
+
+.plumy-markdown-editor .cm-scroller {
+  padding: 1rem 1rem 1.25rem;
+  background-color: #f9fafb;
+}
+
 .day-cell {
   display: flex;
   align-items: center;

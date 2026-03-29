@@ -17,6 +17,7 @@ const {
   listMcpAuditLog,
   listBoardWatcherStates,
   pollBoardWatcher,
+  createTask,
   transitionTaskToUnderReview,
   updateTaskAgentSummary,
   addTaskComment,
@@ -166,6 +167,44 @@ test('moveTaskToReadyForHumanReview creates the board and moves the task', () =>
   assert.equal(result.statusCreated, true);
   assert.equal(result.task.status, 'ready-human');
   assert.equal(result.task[MCP_TASK_REV_FIELD], revision + 1);
+});
+
+test('createTask stores task metadata, assignment, and timeline allocation', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+
+  const created = createTask(store, {
+    title: 'Investigate flaky hover state',
+    notes: 'Found during automated bug hunt',
+    statusTitle: 'In Progress',
+    assigneeName: 'Codex',
+    assigneeKind: 'agentic',
+    projectIds: ['lane-1'],
+    swimlaneId: 'lane-1',
+    startDate: '2026-03-22',
+    endDate: '2026-03-24',
+    size: 's',
+    complexity: 'routine',
+    priority: 'moderate',
+    blocked: false,
+  });
+
+  assert.equal(created.ok, true);
+  assert.equal(created.task.title, 'Investigate flaky hover state');
+  assert.equal(created.task.status, 'in-progress');
+  assert.equal(created.task.assigneeId, 'agent-1');
+  assert.deepEqual(created.task.projectIds, ['lane-1']);
+  assert.equal(created.task.swimlaneId, 'lane-1');
+  assert.equal(created.task.project, 'Project A');
+  assert.equal(created.task.startDate, '2026-03-22');
+  assert.equal(created.task.endDate, '2026-03-24');
+  assert.equal(created.task.size, 's');
+  assert.equal(created.task.complexity, 'routine');
+  assert.equal(created.task.priority, 'moderate');
+  assert.equal(created.task[MCP_TASK_REV_FIELD], 0);
+
+  const storedTasks = store.get(TASKS_KEY);
+  assert.ok(Array.isArray(storedTasks));
+  assert.ok(storedTasks.some(task => task.id === created.task.id));
 });
 
 test('assignTaskToPerson resolves assignees by name and id', () => {

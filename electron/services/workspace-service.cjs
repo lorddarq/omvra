@@ -702,6 +702,7 @@ function buildMcpAgentGuide() {
       'cards.kanban.list',
       'cards.timeline.list',
       'boards.watch.poll',
+      'task_write',
       'tasks.add_comment',
       'tasks.update_completion_description',
       'tasks.move_to_status',
@@ -745,6 +746,7 @@ function buildMcpTaskExecutionSchema() {
       'Prefer the narrowest write tool that matches the action.',
     ],
     recommendedWriteSequence: [
+      'task_write when new follow-up work must be logged',
       'tasks.add_comment',
       'tasks.update_completion_description',
       'tasks.move_to_status or tasks.move_to_ready_for_human_review',
@@ -757,6 +759,7 @@ function buildMcpTaskExecutionSchema() {
     ],
     lookupHints: [
       'Use tasks.list with assigneeId to find assigned work.',
+      'Use task_write to log new bug-hunting or follow-up tasks with metadata.',
       'Use boards.watch.poll to watch a board for changes.',
       'Use cards.kanban.list for board-friendly projections.',
     ],
@@ -982,6 +985,167 @@ function findStatusColumnByReference(store, { statusId, statusTitle }) {
     const fallbackMatches = normalizedId && normalizeName(column.title) === normalizedId;
     return idMatches || titleMatches || fallbackMatches;
   }) || null;
+}
+
+function findProjectById(store, projectId) {
+  const normalizedProjectId = normalizeString(projectId).trim();
+  if (!normalizedProjectId) return null;
+  const projects = readArray(store, SWIMLANES_KEY);
+  return projects.find(project => project && project.id === normalizedProjectId) || null;
+}
+
+function normalizeBoolean(value) {
+  return value === true;
+}
+
+function normalizeOptionalDate(value) {
+  const normalized = normalizeString(value).trim();
+  if (!normalized) return undefined;
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : undefined;
+}
+
+function normalizeOptionalEnum(value, allowedValues, fallback) {
+  const normalized = normalizeString(value).trim();
+  return allowedValues.includes(normalized) ? normalized : fallback;
+}
+
+function createTask(store, {
+  title,
+  notes,
+  statusId,
+  statusTitle,
+  assigneeId,
+  assigneeName,
+  assigneeKind,
+  projectId,
+  projectIds,
+  swimlaneId,
+  startDate,
+  endDate,
+  size,
+  complexity,
+  priority,
+  blocked,
+  swimlaneOnly,
+  actor = 'agent',
+} = {}) {
+  const normalizedTitle = normalizeString(title).trim();
+  if (!normalizedTitle) {
+    return {
+      ok: false,
+      error: 'INVALID_TITLE',
+      message: 'title is required.',
+    };
+  }
+
+  const targetStatus = (statusId || statusTitle)
+    ? findStatusColumnByReference(store, { statusId, statusTitle })
+    : null;
+  if ((statusId || statusTitle) && !targetStatus) {
+    return {
+      ok: false,
+      error: 'STATUS_NOT_FOUND',
+      message: 'Target status/board not found.',
+    };
+  }
+
+  const assignee = (assigneeId || assigneeName)
+    ? findPersonByReference(store, { assigneeId, assigneeName })
+    : null;
+  if ((assigneeId || assigneeName) && !assignee) {
+    return {
+      ok: false,
+      error: 'ASSIGNEE_NOT_FOUND',
+      message: 'Assignee not found.',
+    };
+  }
+
+  if (assignee && typeof assigneeKind === 'string' && assigneeKind.trim() && assignee.kind !== assigneeKind.trim()) {
+    return {
+      ok: false,
+      error: 'ASSIGNEE_KIND_MISMATCH',
+      message: 'Assignee kind does not match the selected person.',
+    };
+  }
+
+  const requestedProjectIds = normalizeTaskIdList(
+    Array.isArray(projectIds)
+      ? projectIds.concat(projectId ? [projectId] : [])
+      : (projectId ? [projectId] : [])
+  );
+  const resolvedProjects = [];
+  for (const id of requestedProjectIds) {
+    const project = findProjectById(store, id);
+    if (!project) {
+      return {
+        ok: false,
+        error: 'PROJECT_NOT_FOUND',
+        message: `Project "${id}" not found.`,
+      };
+    }
+    resolvedProjects.push(project);
+  }
+
+  const normalizedSwimlaneId = normalizeString(swimlaneId).trim();
+  const primaryTimelineProject = normalizedSwimlaneId ? findProjectById(store, normalizedSwimlaneId) : null;
+  if (normalizedSwimlaneId && !primaryTimelineProject) {
+    return {
+      ok: false,
+      error: 'TIMELINE_PROJECT_NOT_FOUND',
+      message: `Timeline project "${normalizedSwimlaneId}" not found.`,
+    };
+  }
+
+  const finalProjectIds = resolvedProjects.map(project => project.id);
+  const finalSwimlaneId = primaryTimelineProject?.id || finalProjectIds[0] || undefined;
+  if (finalSwimlaneId && !finalProjectIds.includes(finalSwimlaneId)) {
+    finalProjectIds.unshift(finalSwimlaneId);
+  }
+
+  const normalizedStartDate = normalizeOptionalDate(startDate);
+  const normalizedEndDate = normalizeOptionalDate(endDate) || normalizedStartDate;
+  if (normalizedStartDate && normalizedEndDate && normalizedEndDate < normalizedStartDate) {
+    return {
+      ok: false,
+      error: 'INVALID_DATE_RANGE',
+      message: 'endDate cannot be earlier than startDate.',
+    };
+  }
+
+  const nextTask = {
+    id: `task-${randomUUID()}`,
+    title: normalizedTitle,
+    status: targetStatus?.id || 'open',
+    notes: typeof notes === 'string' ? notes : '',
+    size: normalizeOptionalEnum(size, ['xs', 's', 'm', 'l'], 'm'),
+    complexity: normalizeOptionalEnum(complexity, ['routine', 'medium', 'hard'], 'medium'),
+    priority: normalizeOptionalEnum(priority, ['urgent', 'moderate', 'normal', 'low'], 'normal'),
+    blocked: normalizeBoolean(blocked),
+    startDate: normalizedStartDate,
+    endDate: normalizedEndDate,
+    projectIds: finalProjectIds,
+    swimlaneId: finalSwimlaneId,
+    swimlaneOnly: typeof swimlaneOnly === 'boolean'
+      ? swimlaneOnly
+      : (finalProjectIds.length === 0 || !finalSwimlaneId),
+    project: finalProjectIds
+      .map(id => findProjectById(store, id)?.name)
+      .filter(Boolean)
+      .join(', ') || undefined,
+    assigneeId: assignee?.id,
+    comments: [],
+    [MCP_TASK_REV_FIELD]: 0,
+    mcpUpdatedAt: new Date().toISOString(),
+    mcpLastActor: actor,
+  };
+
+  const tasks = readArray(store, TASKS_KEY);
+  store.set(TASKS_KEY, tasks.concat(nextTask));
+
+  return {
+    ok: true,
+    task: normalizeTaskForMcp(nextTask),
+  };
 }
 
 function ensureReadyForHumanReviewStatusColumn(store) {
@@ -1518,6 +1682,7 @@ module.exports = {
   listBoardWatcherStates,
   getBoardWatcherState,
   pollBoardWatcher,
+  createTask,
   transitionTaskToUnderReview,
   updateTaskAgentSummary,
   addTaskComment,

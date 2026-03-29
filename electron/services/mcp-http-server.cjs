@@ -17,6 +17,7 @@ const {
   listKanbanCards,
   listTimelineCards,
   pollBoardWatcher,
+  createTask,
   transitionTaskToUnderReview,
   updateTaskAgentSummary,
   addTaskComment,
@@ -127,8 +128,69 @@ const READ_TOOL_DEFINITIONS = [
   },
 ];
 
-// Write tools are intentionally not exposed in tools/list while the backend remains read-only.
 const WRITE_TOOL_DEFINITIONS = [
+  {
+    name: 'task_write',
+    description: 'Creates a new task with optional project, timeline, assignment, schedule, and task metadata. Use this for bug hunting runs or when agents need to log follow-up work.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        title: { type: 'string' },
+        notes: { type: 'string' },
+        statusId: { type: 'string' },
+        statusTitle: { type: 'string' },
+        assigneeId: { type: 'string' },
+        assigneeName: { type: 'string' },
+        assigneeKind: { type: 'string' },
+        projectId: { type: 'string' },
+        projectIds: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+        swimlaneId: { type: 'string' },
+        startDate: { type: 'string' },
+        endDate: { type: 'string' },
+        size: { type: 'string' },
+        complexity: { type: 'string' },
+        priority: { type: 'string' },
+        blocked: { type: 'boolean' },
+        swimlaneOnly: { type: 'boolean' },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'tasks.create',
+    description: 'Compatibility alias for task_write.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        title: { type: 'string' },
+        notes: { type: 'string' },
+        statusId: { type: 'string' },
+        statusTitle: { type: 'string' },
+        assigneeId: { type: 'string' },
+        assigneeName: { type: 'string' },
+        assigneeKind: { type: 'string' },
+        projectId: { type: 'string' },
+        projectIds: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+        swimlaneId: { type: 'string' },
+        startDate: { type: 'string' },
+        endDate: { type: 'string' },
+        size: { type: 'string' },
+        complexity: { type: 'string' },
+        priority: { type: 'string' },
+        blocked: { type: 'boolean' },
+        swimlaneOnly: { type: 'boolean' },
+      },
+      required: ['title'],
+    },
+  },
   {
     name: 'tasks.transition_under_review',
     description: 'Transitions a task status to under-review. (not available in read-only mode)',
@@ -719,6 +781,54 @@ function handleToolCall(store, req, params) {
         return { error: invalidParams(result.message, result) };
       }
       return { result: makeToolResult(result) };
+    }
+
+    case 'task_write':
+    case 'tasks.create': {
+      const result = createTask(store, {
+        title: args.title,
+        notes: args.notes,
+        statusId: args.statusId,
+        statusTitle: args.statusTitle,
+        assigneeId: args.assigneeId,
+        assigneeName: args.assigneeName,
+        assigneeKind: args.assigneeKind,
+        projectId: args.projectId,
+        projectIds: args.projectIds,
+        swimlaneId: args.swimlaneId,
+        startDate: args.startDate,
+        endDate: args.endDate,
+        size: args.size,
+        complexity: args.complexity,
+        priority: args.priority,
+        blocked: args.blocked,
+        swimlaneOnly: args.swimlaneOnly,
+        actor: 'mcp-agent',
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, {
+          outcome: 'denied',
+          reason: result.error,
+          toolName: name,
+          title: args.title,
+        });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        taskId: result.task?.id,
+        title: result.task?.title,
+        nextRevision: result.task?.__mcpRevision,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: true,
+          auditId: audit?.auditId,
+          task: result.task,
+          revision: result.task?.__mcpRevision,
+        }),
+      };
     }
 
     case 'tasks.transition_under_review': {

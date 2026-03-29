@@ -69,6 +69,7 @@ test('tools/list remains available after initialize handshake', () => {
   assert.ok(Array.isArray(response.result.tools));
   assert.ok(response.result.tools.some(tool => tool.name === 'workspace.get_snapshot'));
   assert.ok(response.result.tools.some(tool => tool.name === 'boards.watch.poll'));
+  assert.ok(response.result.tools.some(tool => tool.name === 'task_write'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks.move_to_status'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks.move_to_ready_for_human_review'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks.complete_and_request_review'));
@@ -95,6 +96,39 @@ test('resources/list exposes the guide, schema, and lookup templates', () => {
   assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'plumy://agents/{personId}/assigned'));
   assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'plumy://projects/{projectId}/tasks'));
   assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'plumy://boards/{statusId}/tasks'));
+});
+
+test('task_write creates a new task through the MCP write surface with metadata', () => {
+  const dispatch = createRequestDispatcher(makeStoreFromFixture('workspace-basic'));
+  const response = dispatch({
+    jsonrpc: '2.0',
+    id: 'create-1',
+    method: 'tools/call',
+    params: {
+      name: 'task_write',
+      arguments: {
+        title: 'Capture bug bash follow-up',
+        notes: 'Created by automated bug hunting run',
+        statusId: 'open',
+        assigneeId: 'agent-1',
+        projectIds: ['lane-1'],
+        swimlaneId: 'lane-1',
+        startDate: '2026-03-25',
+        endDate: '2026-03-26',
+        priority: 'urgent',
+      },
+    },
+  }, makeReq());
+
+  assert.equal(response.jsonrpc, '2.0');
+  assert.equal(response.id, 'create-1');
+  assert.equal(response.result.structuredContent.action, 'task_write');
+  assert.equal(response.result.structuredContent.task.title, 'Capture bug bash follow-up');
+  assert.equal(response.result.structuredContent.task.assigneeId, 'agent-1');
+  assert.equal(response.result.structuredContent.task.swimlaneId, 'lane-1');
+  assert.deepEqual(response.result.structuredContent.task.projectIds, ['lane-1']);
+  assert.equal(response.result.structuredContent.task.priority, 'urgent');
+  assert.equal(response.result.structuredContent.revision, 0);
 });
 
 test('resources/templates/list returns the same lookup templates for clients that query them directly', () => {

@@ -320,6 +320,33 @@
   background-color: #f9fafb;
 }
 
+.plumy-markdown-editor [class*='listitem_'] {
+  margin: 0.375rem 0;
+}
+
+.plumy-markdown-editor [class*='listItemUnchecked_'],
+.plumy-markdown-editor [class*='listItemChecked_'] {
+  margin-inline-start: 0;
+  padding-left: 1.85rem;
+  padding-right: 0;
+  min-height: 1.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.plumy-markdown-editor [class*='listItemUnchecked_']::before,
+.plumy-markdown-editor [class*='listItemChecked_']::before {
+  top: 50%;
+  left: 0.125rem;
+  transform: translateY(-50%);
+}
+
+.plumy-markdown-editor [class*='listItemChecked_']::after {
+  top: calc(50% - 0.28rem);
+  left: 0.42rem;
+  right: auto;
+}
+
 .day-cell {
   display: flex;
   align-items: center;

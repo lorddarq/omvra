@@ -12,6 +12,7 @@ import {
   toolbarPlugin,
 } from '@mdxeditor/editor';
 import { MarkdownEditorToolbar } from './MarkdownEditorToolbar';
+import { normalizeMarkdownEditorValue } from '../utils/markdownEditorValue';
 import '@mdxeditor/editor/style.css';
 
 interface MarkdownEditorProps {
@@ -30,14 +31,15 @@ export function MarkdownEditor({
   autoFocus = false,
 }: MarkdownEditorProps) {
   const editorRef = useRef<MDXEditorMethods>(null);
-  const lastSyncedValueRef = useRef(value);
+  const normalizedValue = useMemo(() => normalizeMarkdownEditorValue(value), [value]);
+  const lastSyncedValueRef = useRef(normalizedValue);
 
   useEffect(() => {
     if (!editorRef.current) return;
-    if (value === lastSyncedValueRef.current) return;
-    editorRef.current.setMarkdown(value);
-    lastSyncedValueRef.current = value;
-  }, [value]);
+    if (normalizedValue === lastSyncedValueRef.current) return;
+    editorRef.current.setMarkdown(normalizedValue);
+    lastSyncedValueRef.current = normalizedValue;
+  }, [normalizedValue]);
 
   const handleChange = useCallback(
     (nextMarkdown: string) => {
@@ -69,7 +71,7 @@ export function MarkdownEditor({
       <MDXEditor
         id={id}
         ref={editorRef}
-        markdown={value}
+        markdown={normalizedValue}
         onChange={handleChange}
         autoFocus={autoFocus}
         placeholder={placeholder}

@@ -28,7 +28,11 @@ export const markdownComponents: Components = {
   li: ({ children, className }) => {
     const isTaskItem = className?.includes('task-list-item');
     return (
-      <li className={`text-sm text-gray-800 ${isTaskItem ? 'list-none pl-0' : ''}`.trim()}>
+      <li
+        className={`text-sm text-gray-800 ${
+          isTaskItem ? 'flex items-start gap-2 list-none pl-0' : ''
+        }`.trim()}
+      >
         {children}
       </li>
     );
@@ -41,7 +45,7 @@ export const markdownComponents: Components = {
         checked={Boolean(checked)}
         disabled={disabled ?? true}
         readOnly
-        className="mr-2 h-4 w-4 rounded border-gray-300 align-middle"
+        className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300"
       />
     );
   },

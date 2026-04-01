@@ -94,6 +94,7 @@ function run() {
 
   const args = ['--config.extraMetadata.version=' + resolvedVersion];
   const buildEnv = { ...process.env };
+  const isWindows = process.platform === 'win32';
 
   // On macOS, electron-builder may auto-discover a locally installed signing
   // identity. Disable that unless signing was configured explicitly so local
@@ -109,7 +110,13 @@ function run() {
 
   const builder = spawn(bin, args, {
     env: buildEnv,
+    shell: isWindows,
     stdio: ['inherit', 'pipe', 'pipe'],
+  });
+
+  builder.on('error', error => {
+    console.error(`[build-electron] failed to launch electron-builder: ${error.message}`);
+    process.exit(1);
   });
 
   let duplicateDependencyWarningShown = false;

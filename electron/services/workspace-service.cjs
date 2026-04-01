@@ -994,6 +994,19 @@ function findProjectById(store, projectId) {
   return projects.find(project => project && project.id === normalizedProjectId) || null;
 }
 
+function findProjectByName(store, projectName) {
+  const normalizedProjectName = normalizeName(projectName);
+  if (!normalizedProjectName) return null;
+  const projects = readArray(store, SWIMLANES_KEY);
+  return projects.find(project => project && normalizeName(project.name) === normalizedProjectName) || null;
+}
+
+function findProjectByReference(store, reference) {
+  const byId = findProjectById(store, reference);
+  if (byId) return byId;
+  return findProjectByName(store, reference);
+}
+
 function normalizeBoolean(value) {
   return value === true;
 }
@@ -1075,24 +1088,24 @@ function createTask(store, {
   );
   const resolvedProjects = [];
   for (const id of requestedProjectIds) {
-    const project = findProjectById(store, id);
+    const project = findProjectByReference(store, id);
     if (!project) {
       return {
         ok: false,
         error: 'PROJECT_NOT_FOUND',
-        message: `Project "${id}" not found.`,
+        message: `Project "${id}" not found. Provide a valid project id or project name.`,
       };
     }
     resolvedProjects.push(project);
   }
 
   const normalizedSwimlaneId = normalizeString(swimlaneId).trim();
-  const primaryTimelineProject = normalizedSwimlaneId ? findProjectById(store, normalizedSwimlaneId) : null;
+  const primaryTimelineProject = normalizedSwimlaneId ? findProjectByReference(store, normalizedSwimlaneId) : null;
   if (normalizedSwimlaneId && !primaryTimelineProject) {
     return {
       ok: false,
       error: 'TIMELINE_PROJECT_NOT_FOUND',
-      message: `Timeline project "${normalizedSwimlaneId}" not found.`,
+      message: `Timeline project "${normalizedSwimlaneId}" not found. Provide a valid project id or project name.`,
     };
   }
 

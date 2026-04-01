@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { STATUS_COLUMNS_KEY, TASKS_KEY, makeStoreFromFixture } = require('./test-fixtures.cjs');
+const { createRequestDispatcher } = require('./mcp-http-server.cjs');
 
 const {
   MCP_TASK_REV_FIELD,
@@ -205,6 +206,43 @@ test('createTask stores task metadata, assignment, and timeline allocation', () 
   const storedTasks = store.get(TASKS_KEY);
   assert.ok(Array.isArray(storedTasks));
   assert.ok(storedTasks.some(task => task.id === created.task.id));
+});
+
+test('createTask resolves projects by human-readable project name', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+
+  const created = createTask(store, {
+    title: 'Capture project-name based task creation',
+    projectIds: ['Project A'],
+    swimlaneId: 'Project A',
+  });
+
+  assert.equal(created.ok, true);
+  assert.deepEqual(created.task.projectIds, ['lane-1']);
+  assert.equal(created.task.swimlaneId, 'lane-1');
+  assert.equal(created.task.project, 'Project A');
+});
+
+test('task_write accepts project names through the MCP write surface', () => {
+  const dispatch = createRequestDispatcher(makeStoreFromFixture('workspace-basic'));
+  const response = dispatch({
+    jsonrpc: '2.0',
+    id: 'create-name-1',
+    method: 'tools/call',
+    params: {
+      name: 'tasks.create',
+      arguments: {
+        title: 'Create from project name',
+        projectIds: ['Project B'],
+        swimlaneId: 'Project B',
+      },
+    },
+  }, { headers: {}, transport: 'stdio' });
+
+  assert.equal(response.jsonrpc, '2.0');
+  assert.equal(response.id, 'create-name-1');
+  assert.equal(response.result.structuredContent.task.swimlaneId, 'lane-2');
+  assert.deepEqual(response.result.structuredContent.task.projectIds, ['lane-2']);
 });
 
 test('assignTaskToPerson resolves assignees by name and id', () => {

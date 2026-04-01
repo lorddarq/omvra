@@ -7,8 +7,63 @@ on:
   workflow_dispatch: {}
 
 jobs:
+  prepare_release:
+    name: Prepare Release Tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      release_tag: ${{ steps.resolve_tag.outputs.release_tag }}
+      release_version: ${{ steps.resolve_tag.outputs.release_version }}
+      created_tag: ${{ steps.resolve_tag.outputs.created_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release tag
+        id: resolve_tag
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            tag="${GITHUB_REF#refs/tags/}"
+            echo "Using existing tag ${tag}"
+            echo "release_tag=${tag}" >> "$GITHUB_OUTPUT"
+            echo "release_version=${tag#v}" >> "$GITHUB_OUTPUT"
+            echo "created_tag=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git fetch --tags --force
+          latest_tag="$(git tag -l 'v*' --sort=-version:refname | head -n 1)"
+
+          if [[ -z "${latest_tag}" ]]; then
+            next_tag="v0.1.0"
+          else
+            version="${latest_tag#v}"
+            IFS='.' read -r major minor patch <<< "${version}"
+            major="${major:-0}"
+            minor="${minor:-1}"
+            patch="${patch:-0}"
+            next_tag="v${major}.${minor}.$((patch + 1))"
+          fi
+
+          echo "Creating new release tag ${next_tag} for ${GITHUB_SHA}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${next_tag}" "${GITHUB_SHA}" -m "Release ${next_tag}"
+          git push origin "refs/tags/${next_tag}"
+
+          echo "release_tag=${next_tag}" >> "$GITHUB_OUTPUT"
+          echo "release_version=${next_tag#v}" >> "$GITHUB_OUTPUT"
+          echo "created_tag=true" >> "$GITHUB_OUTPUT"
+
   build:
     name: Build and Package
+    needs: prepare_release
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -21,6 +76,9 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: true
+
+      - name: Refresh tags
+        run: git fetch --tags --force
 
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -65,29 +123,28 @@ jobs:
 
   release:
     name: Create Release
-    needs: build
+    needs:
+      - prepare_release
+      - build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') && always()
+    if: ${{ needs.prepare_release.result == 'success' && needs.build.result == 'success' }}
     permissions:
       contents: write
     steps:
       - name: Download macOS artifacts
         uses: actions/download-artifact@v4
-        continue-on-error: true
         with:
           name: electron-artifacts-macos-latest
           path: ./artifacts/macos
 
       - name: Download Windows artifacts
         uses: actions/download-artifact@v4
-        continue-on-error: true
         with:
           name: electron-artifacts-windows-latest
           path: ./artifacts/windows
 
       - name: Download Linux artifacts
         uses: actions/download-artifact@v4
-        continue-on-error: true
         with:
           name: electron-artifacts-ubuntu-latest
           path: ./artifacts/linux
@@ -95,12 +152,14 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ needs.prepare_release.outputs.release_tag }}
+          name: ${{ needs.prepare_release.outputs.release_tag }}
           files: |
             ./artifacts/macos/*.dmg
             ./artifacts/windows/*.exe
             ./artifacts/linux/*.AppImage
           draft: false
           prerelease: false
-          fail_on_unmatched_files: false
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -15,6 +15,15 @@
 }
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 
+.kanban-native-scrollbar-hidden {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.kanban-native-scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
 /* Small scroll buttons */
 .timeline-scroll-btn { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; transition: transform .12s ease, box-shadow .12s ease, background-color .12s ease; cursor: pointer; }
 .timeline-scroll-btn:active { transform: translateY(1px) scale(0.98); box-shadow: none; background-color: rgba(0,0,0,0.06); }

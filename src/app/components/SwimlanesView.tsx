@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
-import { Plus, GripVertical } from 'lucide-react';
+import { GripVertical } from 'lucide-react';
 import { Task, TaskStatus, StatusColumn } from '../types';
 import { DroppableColumn } from './DroppableColumn';
 
@@ -46,9 +46,21 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
   const [, drop] = useDrop({
     accept: SWIMLANE_COLUMN,
     hover: (item: { id: string; index: number }, monitor) => {
-      if (item.index === index) return;
+      const dragIndex = swimlanes.findIndex(column => column.id === item.id);
+      const resolvedDragIndex = dragIndex >= 0 ? dragIndex : item.index;
+      if (resolvedDragIndex === index) return;
       if (!ref.current) return;
-      onReorderColumns && onReorderColumns(item.index, index);
+
+      const hoverBoundingRect = ref.current.getBoundingClientRect();
+      const hoverMiddleX = (hoverBoundingRect.right - hoverBoundingRect.left) / 2;
+      const clientOffset = monitor.getClientOffset();
+      if (!clientOffset) return;
+
+      const hoverClientX = clientOffset.x - hoverBoundingRect.left;
+      if (resolvedDragIndex < index && hoverClientX < hoverMiddleX) return;
+      if (resolvedDragIndex > index && hoverClientX > hoverMiddleX) return;
+
+      onReorderColumns && onReorderColumns(resolvedDragIndex, index);
       item.index = index;
     },
   });
@@ -56,7 +68,11 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
   drag(drop(ref));
 
   return (
-    <div key={swimlane.id} ref={ref} className={`${isDragging ? 'opacity-50' : ''}`}>
+    <div
+      key={swimlane.id}
+      ref={ref}
+      className={`flex h-full min-h-0 flex-col ${isDragging ? 'opacity-50' : ''}`}
+    >
       <div className="flex items-center gap-2 mb-2 cursor-grab select-none">
         <div className="p-1 text-gray-500"><GripVertical className="w-4 h-4" /></div>
       </div>
@@ -147,8 +163,8 @@ export function SwimlanesView({
   }
 
   return (
-      <div className="h-full bg-gray-50 p-6">
-        <div className="flex gap-4 min-w-max h-full">
+      <div className="h-full min-h-0 bg-gray-50 p-6 pb-3">
+        <div className="flex h-full min-h-0 min-w-max items-stretch gap-4">
         {cols.map((swimlane, index) => {
             const swimlaneTasks = getVisibleTasksByStatus(swimlane.id);
             return (
@@ -171,10 +187,6 @@ export function SwimlanesView({
             );
           })}
 
-          {/* Add column button */}
-          <button onClick={() => onAddColumn && onAddColumn({ title: 'New Column' })} className="min-w-[60px] bg-gray-100/50 rounded-lg border-2 border-dashed border-gray-300 hover:border-gray-400 hover:bg-gray-100 transition-colors flex items-center justify-center text-gray-400 hover:text-gray-600">
-            <Plus className="w-6 h-6" />
-          </button>
         </div>
       </div>
   );

@@ -70,7 +70,7 @@ export function AppMainViews({
   onKanbanDeleteColumn,
 }: AppMainViewsProps) {
   return (
-    <div className="flex-1 overflow-hidden">
+    <div className="flex-1 min-h-0 overflow-hidden">
       {currentView === 'timeline' && (
         <div key={`timeline-${viewRefreshKey}`} ref={timelineContainerRef} className="h-full w-full">
           <TimelineView
@@ -93,7 +93,7 @@ export function AppMainViews({
       )}
 
       {currentView === 'kanban' && (
-        <div key={`kanban-${viewRefreshKey}`} ref={kanbanContainerRef} className="h-full w-full">
+        <div key={`kanban-${viewRefreshKey}`} ref={kanbanContainerRef} className="flex h-full min-h-0 w-full">
           <DndProvider backend={HTML5Backend}>
             <KanbanView
               tasks={tasks}

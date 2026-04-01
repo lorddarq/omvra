@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-const { spawnSync } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -54,6 +54,32 @@ function hasExplicitMacSigningConfiguration(env) {
   return signingKeys.some(key => Boolean(env[key]));
 }
 
+function pipeFilteredStream(stream, writer, onFilteredLine) {
+  let buffer = '';
+
+  stream.on('data', chunk => {
+    buffer += chunk.toString();
+
+    let newlineIndex = buffer.indexOf('\n');
+    while (newlineIndex !== -1) {
+      const line = buffer.slice(0, newlineIndex);
+      buffer = buffer.slice(newlineIndex + 1);
+
+      if (!onFilteredLine(line)) {
+        writer.write(line + '\n');
+      }
+
+      newlineIndex = buffer.indexOf('\n');
+    }
+  });
+
+  stream.on('end', () => {
+    if (buffer && !onFilteredLine(buffer)) {
+      writer.write(buffer);
+    }
+  });
+}
+
 function run() {
   const packageVersion = readPackageVersion();
   const tagVersion = getVersionFromTag();
@@ -81,8 +107,33 @@ function run() {
     console.log('[build-electron] mac signing auto-discovery disabled (no explicit signing credentials configured)');
   }
 
-  const result = spawnSync(bin, args, { stdio: 'inherit', env: buildEnv });
-  process.exit(result.status || 0);
+  const builder = spawn(bin, args, {
+    env: buildEnv,
+    stdio: ['inherit', 'pipe', 'pipe'],
+  });
+
+  let duplicateDependencyWarningShown = false;
+  const filterDuplicateDependencyLine = line => {
+    if (!line.includes('duplicate dependency references')) {
+      return false;
+    }
+
+    if (!duplicateDependencyWarningShown) {
+      duplicateDependencyWarningShown = true;
+      process.stdout.write(
+        '[build-electron] electron-builder reported duplicate transitive dependency references while scanning node_modules; verbose list suppressed\n'
+      );
+    }
+
+    return true;
+  };
+
+  pipeFilteredStream(builder.stdout, process.stdout, filterDuplicateDependencyLine);
+  pipeFilteredStream(builder.stderr, process.stderr, filterDuplicateDependencyLine);
+
+  builder.on('close', code => {
+    process.exit(code || 0);
+  });
 }
 
 run();

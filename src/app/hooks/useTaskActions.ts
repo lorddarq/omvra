@@ -32,7 +32,7 @@ export function useTaskActions({ people, setTasks }: UseTaskActionsOptions) {
       comments: taskData.comments || [],
     };
 
-    setTasks(prevTasks => [...prevTasks, newTask]);
+    setTasks(prevTasks => [newTask, ...prevTasks]);
   }, [setTasks]);
 
   const addTaskComment = useCallback((taskId: string, content: string) => {

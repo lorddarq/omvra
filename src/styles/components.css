@@ -303,6 +303,25 @@
   background-color: #f9fafb;
 }
 
+.plumy-markdown-editor-content ul,
+.plumy-markdown-editor .mdxeditor-rich-text-editor ul {
+  list-style: disc;
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.plumy-markdown-editor-content ol,
+.plumy-markdown-editor .mdxeditor-rich-text-editor ol {
+  list-style: decimal;
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.plumy-markdown-editor-content li,
+.plumy-markdown-editor .mdxeditor-rich-text-editor li {
+  display: list-item;
+}
+
 .plumy-markdown-editor .cm-editor,
 .plumy-markdown-editor .cm-scroller,
 .plumy-markdown-editor .cm-content {

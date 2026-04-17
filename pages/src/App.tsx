@@ -10,7 +10,7 @@ import Footer from './components/Footer'
 
 function App() {
   return (
-    <div className="min-h-screen bg-nordic-bg text-nordic-gray-800">
+    <div className="landing-shell">
       <Hero />
       <WhyPlumy />
       <Features />

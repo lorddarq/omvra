@@ -34,38 +34,50 @@ const bestPractices = [
 
 const AgentPrompts = () => {
   return (
-    <section id="agent-prompts" className="py-28 bg-nordic-gray-50">
+    <section id="agent-prompts" className="bg-white py-24 md:py-28">
       <div className="container mx-auto px-6">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-5xl font-light text-nordic-gray-800 mb-6 text-center">
+        <div className="mx-auto max-w-6xl">
+          <h2 className="mb-6 text-center text-4xl font-normal tracking-[-0.03em] text-black md:text-5xl">
             Advanced AI workflows, when you want them
           </h2>
-          <p className="text-xl text-nordic-gray-600 font-light mb-16 text-center max-w-3xl mx-auto">
+          <p className="mx-auto mb-14 max-w-4xl text-center text-lg font-normal leading-8 text-[#6B6B6B] md:mb-16 md:text-xl">
             AI support is optional in Plumy, but it is built to be structured when you need it. These examples show how teams can give assistants better context, safer handoff instructions, and clearer review expectations.
           </p>
 
-          <div className="grid lg:grid-cols-2 gap-8">
+          <div className="grid gap-6 lg:grid-cols-2">
             {promptExamples.map((example) => (
-              <div key={example.title} className="rounded-2xl border border-nordic-gray-200 bg-white p-7 shadow-sm">
-                <h3 className="text-2xl font-light text-nordic-gray-800 mb-3">{example.title}</h3>
-                <p className="text-sm text-nordic-gray-500 font-light leading-relaxed mb-5">{example.why}</p>
-                <div className="rounded-xl bg-nordic-gray-50 border border-nordic-gray-200 p-5">
-                  <p className="text-sm uppercase tracking-[0.18em] text-nordic-blue mb-3">Sample Prompt</p>
-                  <p className="text-nordic-gray-700 font-light leading-relaxed">{example.prompt}</p>
+              <div
+                key={example.title}
+                className="rounded-3xl border border-black/8 bg-[#FCFCFC] p-6 transition-all duration-200 hover:border-black/15 hover:shadow-[0_16px_30px_rgba(0,0,0,0.05)] md:p-7"
+              >
+                <h3 className="mb-3 max-w-[18ch] text-2xl font-medium leading-tight tracking-[-0.02em] text-black">
+                  {example.title}
+                </h3>
+                <p className="mb-5 text-sm font-normal leading-6 text-[#5A5A5A]">{example.why}</p>
+                <div className="rounded-xl border border-[#EBEBEB] bg-[#FAFAFA] p-5">
+                  <p className="mb-3 text-sm font-medium uppercase tracking-[0.18em] text-[#838383]">Sample Prompt</p>
+                  <p className="text-sm font-normal leading-6 text-[#2C2C2C] md:text-[15px]">
+                    {example.prompt}
+                  </p>
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="mt-12 rounded-2xl border border-nordic-gray-200 bg-white p-8">
-            <p className="text-sm uppercase tracking-[0.2em] text-nordic-blue font-light mb-4">Best Results</p>
-            <ul className="grid md:grid-cols-2 gap-4 text-nordic-gray-600 font-light leading-relaxed">
-              {bestPractices.map((item) => (
-                <li key={item} className="rounded-xl bg-nordic-gray-50 border border-nordic-gray-200 px-4 py-3">
-                  {item}
-                </li>
-              ))}
-            </ul>
+          <div className="mt-12">
+            <p className="mb-4 text-center text-2xl font-normal text-[#838383]">Tips</p>
+            <div className="rounded-3xl bg-white p-5 md:p-6">
+              <ul className="grid gap-4 md:grid-cols-2">
+                {bestPractices.map((item) => (
+                  <li
+                    key={item}
+                    className="rounded-2xl border border-[#E6E6E6] bg-white px-4 py-4 text-base font-normal leading-7 text-black transition-colors duration-200 hover:border-[#D5CEF1] hover:bg-[#FAFAFA]"
+                  >
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
       </div>

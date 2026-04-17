@@ -1,1 +1,66 @@
+@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
+
+@theme inline {
+  --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
+  --color-plumy-page: #ffffff;
+  --color-plumy-ink: #0a0a0a;
+  --color-plumy-body: #2c2c2c;
+  --color-plumy-muted: #6b6b6b;
+  --color-plumy-line: #e7e7e7;
+  --color-plumy-line-strong: rgba(0, 0, 0, 0.12);
+  --color-plumy-soft: #fafafa;
+  --color-plumy-soft-2: #f3f4f6;
+  --color-plumy-lilac: #6c4fe0;
+  --color-plumy-lilac-soft: rgba(108, 79, 224, 0.13);
+  --color-plumy-lilac-pill: rgba(108, 79, 224, 0.1);
+  --color-plumy-lilac-ink: #34217f;
+  --color-plumy-gold: #ffca15;
+  --color-plumy-gold-soft: rgba(255, 202, 21, 0.09);
+  --color-plumy-gold-ink: #785e16;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply m-0 bg-plumy-page font-sans text-plumy-ink antialiased;
+  }
+
+  a {
+    @apply text-inherit no-underline;
+  }
+
+  button {
+    font: inherit;
+  }
+
+  ::selection {
+    background: rgba(108, 79, 224, 0.18);
+    color: #0a0a0a;
+  }
+}
+
+@layer components {
+  .landing-shell {
+    @apply min-h-dvh bg-plumy-page text-plumy-ink;
+  }
+
+  .landing-container {
+    @apply mx-auto w-full max-w-7xl px-6 sm:px-8 lg:px-12;
+  }
+
+  .landing-section {
+    @apply py-24 sm:py-28;
+  }
+
+  .landing-eyebrow {
+    @apply inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium;
+  }
+}

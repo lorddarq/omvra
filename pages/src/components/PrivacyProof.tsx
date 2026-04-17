@@ -22,27 +22,42 @@ const PrivacyProof = () => {
     },
   ]
 
+  const cardSpans = [
+    'md:col-span-7',
+    'md:col-span-5',
+    'md:col-span-5',
+    'md:col-span-7',
+  ]
+
   return (
-    <section id="privacy" className="py-28 bg-white">
+    <section id="privacy" className="bg-white py-24 md:py-28">
       <div className="container mx-auto px-6">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-5xl font-light text-nordic-gray-800 mb-6 text-center">
+        <div className="mx-auto max-w-6xl">
+          <h2 className="mb-6 text-center text-4xl font-normal tracking-[-0.03em] text-black md:text-5xl">
             Local by design
           </h2>
-          <p className="text-xl text-nordic-gray-600 font-light mb-16 text-center max-w-3xl mx-auto">
+          <p className="mx-auto mb-14 max-w-3xl text-center text-lg font-normal leading-8 text-[#6B6B6B] md:mb-16 md:text-xl">
             Plumy is designed for teams that want more control, fewer surprises, and a planning tool that does not treat their work like a source of telemetry.
           </p>
 
-          <div className="grid md:grid-cols-2 gap-8">
-            {proofPoints.map((point) => (
-              <div key={point.title} className="rounded-2xl border border-nordic-gray-200 bg-nordic-gray-50 p-6">
-                <h3 className="text-2xl font-light text-nordic-gray-800 mb-3">{point.title}</h3>
-                <p className="text-nordic-gray-600 font-light leading-relaxed">{point.description}</p>
+          <div className="grid gap-6 md:grid-cols-12">
+            {proofPoints.map((point, index) => (
+              <div
+                key={point.title}
+                className={`group relative flex min-h-[17rem] flex-col justify-end overflow-hidden rounded-2xl border border-black/10 bg-[#FCFDE8] p-7 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_16px_34px_rgba(176,200,26,0.14)] md:min-h-[20rem] md:p-8 ${cardSpans[index]}`}
+              >
+                <div className="absolute inset-x-0 top-0 h-[3px] bg-[#B0C81A]" />
+                <h3 className="mb-4 max-w-[16ch] text-2xl font-normal leading-tight tracking-[-0.02em] text-[#687912]">
+                  {point.title}
+                </h3>
+                <p className="text-base font-normal leading-7 text-black">
+                  {point.description}
+                </p>
               </div>
             ))}
           </div>
 
-          <p className="mt-8 text-sm text-nordic-gray-500 text-center">
+          <p className="mx-auto mt-8 max-w-2xl text-center text-sm font-normal leading-6 text-black/70">
             Audit basis: app renderer and Electron main/preload paths checked for telemetry, analytics, and auto-upload behavior.
           </p>
         </div>

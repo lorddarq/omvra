@@ -48,9 +48,15 @@ const Footer = () => {
         </div>
 
         <div className="mt-12 border-t border-black/8 pt-8">
-          <p className="text-center text-sm font-normal text-[#656565]">
-            © 2026 Plumy. All rights reserved.
-          </p>
+          <div className="flex flex-col items-center gap-2 text-center">
+            <p className="text-sm font-normal text-[#656565]">© 2026 Plumy. All rights reserved.</p>
+            <a
+              href="https://grazy.sorinjurcut.com/"
+              className="text-sm font-normal text-[#656565] transition-colors duration-200 hover:text-[#6C4FE0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D5CEF1] focus-visible:ring-offset-2"
+            >
+              Built with Grazy in Figma
+            </a>
+          </div>
         </div>
       </div>
     </footer>

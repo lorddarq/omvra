@@ -43,7 +43,7 @@ const WhyPlumy = () => {
                 key={reason.title}
                 className="group relative overflow-hidden rounded-[28px] border border-[#e7e7e7] bg-[#fafafa] p-8 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-300 hover:-translate-y-1 hover:border-[#d5cef1] hover:bg-white hover:shadow-[0_20px_50px_rgba(108,79,224,0.10)] focus-within:-translate-y-1 focus-within:border-[#d5cef1] focus-within:bg-white focus-within:shadow-[0_20px_50px_rgba(108,79,224,0.10)] md:p-9"
               >
-                <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#6c4fe0_0%,#b0c81a_100%)] opacity-70 transition-opacity duration-300 group-hover:opacity-100 group-focus-within:opacity-100" />
+                <div className="absolute inset-x-0 top-0 h-1 bg-black/85 transition-opacity duration-300 group-hover:bg-black group-focus-within:bg-black" />
                 <div className="mb-7 flex items-center justify-between gap-4">
                   <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[#6c4fe0]/15 bg-white text-sm font-semibold tracking-[0.18em] text-[#6c4fe0] shadow-[0_4px_14px_rgba(108,79,224,0.08)]">
                     0{index + 1}

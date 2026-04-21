@@ -144,10 +144,10 @@ const Features = () => {
             {features.map((feature, index) => (
               <article
                 key={feature.title}
-                className="group rounded-[28px] border border-[#ebebeb] bg-white p-7 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-300 hover:-translate-y-1.5 hover:border-[#d5cef1] hover:shadow-[0_18px_45px_rgba(108,79,224,0.10)] focus-within:-translate-y-1.5 focus-within:border-[#d5cef1] focus-within:shadow-[0_18px_45px_rgba(108,79,224,0.10)] md:p-8"
+                className="group rounded-[28px] border border-[#ebebeb] bg-white p-7 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-[transform,border-color,box-shadow] duration-200 ease-out hover:-translate-y-1 hover:border-[#d5cef1] hover:shadow-[0_14px_32px_rgba(108,79,224,0.08)] md:p-8"
               >
                 <div className="mb-5 flex items-start justify-between gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#6c4fe0]/15 bg-[#6c4fe0]/8 text-[#6c4fe0] shadow-[0_8px_24px_rgba(108,79,224,0.12)] transition-transform duration-300 group-hover:scale-105 group-focus-within:scale-105">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#6c4fe0]/15 bg-[#6c4fe0]/8 text-[#6c4fe0] shadow-[0_8px_24px_rgba(108,79,224,0.12)] transition-transform duration-200 ease-out group-hover:scale-[1.03]">
                     {feature.icon}
                   </div>
                   <span className="text-sm font-semibold tracking-[0.18em] text-[#99a1af]">0{index + 1}</span>

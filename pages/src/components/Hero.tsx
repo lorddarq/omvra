@@ -116,14 +116,14 @@ const Hero = () => {
           <div className="mt-10 flex flex-col items-stretch justify-center gap-4 sm:flex-row">
             <a
               href="#download"
-              className="inline-flex min-h-14 items-center justify-center gap-3 rounded-xl border border-black/10 bg-plumy-gold px-8 py-4 text-lg font-medium text-plumy-ink shadow-[0_4px_12px_rgba(136,105,0,0.30),0_2px_4px_rgba(121,94,0,0.20)] transition-transform duration-150 hover:-translate-y-0.5 hover:bg-[#f3c317] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-plumy-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+              className="inline-flex min-h-14 items-center justify-center gap-3 rounded-xl border border-black/10 bg-plumy-gold px-8 py-4 text-lg font-medium text-plumy-ink shadow-[0_4px_12px_rgba(136,105,0,0.30),0_2px_4px_rgba(121,94,0,0.20)] transition-[transform,background-color,box-shadow] duration-150 ease-out hover:-translate-y-0.5 hover:bg-[#f3c317] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-plumy-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
             >
               <Download className="size-5" strokeWidth={2.2} />
               Download Plumy
             </a>
             <a
               href="https://github.com/lorddarq/Plumy"
-              className="inline-flex min-h-14 items-center justify-center rounded-xl bg-plumy-lilac-soft px-8 py-4 text-lg font-normal text-plumy-lilac transition-colors duration-150 hover:bg-[rgba(108,79,224,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-plumy-lilac/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+              className="inline-flex min-h-14 items-center justify-center rounded-xl bg-plumy-lilac-soft px-8 py-4 text-lg font-normal text-plumy-lilac transition-[background-color,transform] duration-150 ease-out hover:bg-[rgba(108,79,224,0.18)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-plumy-lilac/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
             >
               View on GitHub
             </a>
@@ -150,13 +150,17 @@ const Hero = () => {
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
+                      tabIndex={-1}
+                      aria-hidden="true"
                       className="rounded-[4px] bg-white px-4 py-1.5 text-sm font-medium text-[#101828] shadow-[0_1px_3px_rgba(0,0,0,0.10),0_1px_2px_rgba(0,0,0,0.10)]"
                     >
                       Timeline
                     </button>
                     <button
                       type="button"
-                      className="rounded-[4px] px-4 py-1.5 text-sm font-medium text-[#4a5565] transition-colors duration-150 hover:bg-white/70"
+                      tabIndex={-1}
+                      aria-hidden="true"
+                      className="rounded-[4px] px-4 py-1.5 text-sm font-medium text-[#4a5565]"
                     >
                       Kanban
                     </button>
@@ -166,14 +170,18 @@ const Hero = () => {
                   <button
                     type="button"
                     aria-label="Settings"
-                    className="inline-flex size-9 items-center justify-center rounded-md transition-colors duration-150 hover:bg-plumy-soft-2"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    className="inline-flex size-9 items-center justify-center rounded-md"
                   >
                     <Settings2 className="size-4 text-plumy-ink" strokeWidth={1.8} />
                   </button>
                   <button
                     type="button"
                     aria-label="People"
-                    className="inline-flex size-9 items-center justify-center rounded-md transition-colors duration-150 hover:bg-plumy-soft-2"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    className="inline-flex size-9 items-center justify-center rounded-md"
                   >
                     <Users className="size-4 text-plumy-ink" strokeWidth={1.8} />
                   </button>
@@ -185,19 +193,25 @@ const Hero = () => {
                   <span className="mr-1 text-sm font-medium text-plumy-ink">Timeline</span>
                   <button
                     type="button"
-                    className="inline-flex size-5 items-center justify-center rounded-md text-base font-medium text-plumy-ink transition-colors duration-150 hover:bg-white"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    className="inline-flex size-5 items-center justify-center rounded-md text-base font-medium text-plumy-ink"
                   >
                     ◀
                   </button>
                   <button
                     type="button"
-                    className="inline-flex items-center rounded-md border border-black/10 bg-white px-3 py-0.5 text-sm font-medium text-plumy-ink transition-colors duration-150 hover:bg-plumy-soft"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    className="inline-flex items-center rounded-md border border-black/10 bg-white px-3 py-0.5 text-sm font-medium text-plumy-ink"
                   >
                     Today
                   </button>
                   <button
                     type="button"
-                    className="inline-flex size-5 items-center justify-center rounded-md text-base font-medium text-plumy-ink transition-colors duration-150 hover:bg-white"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    className="inline-flex size-5 items-center justify-center rounded-md text-base font-medium text-plumy-ink"
                   >
                     ▶
                   </button>
@@ -209,13 +223,17 @@ const Hero = () => {
                 <div className="hidden rounded-md bg-plumy-soft-2 p-1 sm:flex">
                   <button
                     type="button"
+                    tabIndex={-1}
+                    aria-hidden="true"
                     className="rounded-[4px] bg-white px-3 py-1 text-sm font-medium text-[#101828] shadow-[0_1px_3px_rgba(0,0,0,0.10),0_1px_2px_rgba(0,0,0,0.10)]"
                   >
                     Projects
                   </button>
                   <button
                     type="button"
-                    className="rounded-[4px] px-3 py-1 text-sm font-medium text-[#4a5565] transition-colors duration-150 hover:bg-white/70"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    className="rounded-[4px] px-3 py-1 text-sm font-medium text-[#4a5565]"
                   >
                     People
                   </button>
@@ -229,7 +247,9 @@ const Hero = () => {
                     <button
                       type="button"
                       aria-label="Add swimlane"
-                      className="inline-flex size-8 items-center justify-center rounded-md text-[#4b5563] transition-colors duration-150 hover:bg-white"
+                      tabIndex={-1}
+                      aria-hidden="true"
+                      className="inline-flex size-8 items-center justify-center rounded-md text-[#4b5563]"
                     >
                       <Plus className="size-4" strokeWidth={2.2} />
                     </button>
@@ -254,7 +274,9 @@ const Hero = () => {
                         <button
                           type="button"
                           aria-label={`Edit ${lane.name}`}
-                          className="inline-flex size-6 items-center justify-center rounded-md text-[#929292] transition-colors duration-150 hover:bg-plumy-soft"
+                          tabIndex={-1}
+                          aria-hidden="true"
+                          className="inline-flex size-6 items-center justify-center rounded-md text-[#929292]"
                         >
                           <Pencil className="size-3" strokeWidth={1.8} />
                         </button>

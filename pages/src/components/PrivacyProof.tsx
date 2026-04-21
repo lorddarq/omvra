@@ -44,7 +44,7 @@ const PrivacyProof = () => {
             {proofPoints.map((point, index) => (
               <div
                 key={point.title}
-                className={`group relative flex min-h-[17rem] flex-col justify-end overflow-hidden rounded-2xl border border-black/10 bg-[#FCFDE8] p-7 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_16px_34px_rgba(176,200,26,0.14)] md:min-h-[20rem] md:p-8 ${cardSpans[index]}`}
+                className={`relative flex min-h-[17rem] flex-col justify-end overflow-hidden rounded-2xl border border-black/10 bg-[#FCFDE8] p-7 md:min-h-[20rem] md:p-8 ${cardSpans[index]}`}
               >
                 <div className="absolute inset-x-0 top-0 h-[3px] bg-[#B0C81A]" />
                 <h3 className="mb-4 max-w-[16ch] text-2xl font-normal leading-tight tracking-[-0.02em] text-[#687912]">

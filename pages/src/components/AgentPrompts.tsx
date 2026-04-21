@@ -48,7 +48,7 @@ const AgentPrompts = () => {
             {promptExamples.map((example) => (
               <div
                 key={example.title}
-                className="rounded-3xl border border-black/8 bg-[#FCFCFC] p-6 transition-all duration-200 hover:border-black/15 hover:shadow-[0_16px_30px_rgba(0,0,0,0.05)] md:p-7"
+                className="rounded-3xl border border-black/8 bg-[#FCFCFC] p-6 transition-[border-color,box-shadow] duration-200 ease-out hover:border-black/15 hover:shadow-[0_10px_24px_rgba(0,0,0,0.04)] md:p-7"
               >
                 <h3 className="mb-3 max-w-[18ch] text-2xl font-medium leading-tight tracking-[-0.02em] text-black">
                   {example.title}
@@ -71,7 +71,7 @@ const AgentPrompts = () => {
                 {bestPractices.map((item) => (
                   <li
                     key={item}
-                    className="rounded-2xl border border-[#E6E6E6] bg-white px-4 py-4 text-base font-normal leading-7 text-black transition-colors duration-200 hover:border-[#D5CEF1] hover:bg-[#FAFAFA]"
+                    className="rounded-2xl border border-[#E6E6E6] bg-white px-4 py-4 text-base font-normal leading-7 text-black"
                   >
                     {item}
                   </li>

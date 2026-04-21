@@ -62,11 +62,11 @@ const HowItWorks = () => {
             {steps.map((step) => (
               <article
                 key={step.number}
-                className="group flex h-full flex-col rounded-[28px] border border-[#e7e7e7] bg-white/95 p-8 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-300 hover:-translate-y-1 hover:border-[#d5cef1] hover:shadow-[0_18px_50px_rgba(108,79,224,0.12)] focus-within:-translate-y-1 focus-within:border-[#d5cef1] focus-within:shadow-[0_18px_50px_rgba(108,79,224,0.12)] md:p-9"
+                className="group flex h-full flex-col rounded-[28px] border border-[#e7e7e7] bg-white/95 p-8 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-[transform,border-color,box-shadow] duration-200 ease-out hover:-translate-y-1 hover:border-[#d5cef1] hover:shadow-[0_14px_34px_rgba(108,79,224,0.09)] md:p-9"
               >
                 <div className="mb-7 flex items-center justify-between gap-4">
                   <span className="text-sm font-semibold tracking-[0.22em] text-[#6c4fe0]">{step.number}</span>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-black/8 bg-[#fcfde8] text-black shadow-[0_10px_24px_rgba(176,200,26,0.18)] transition-transform duration-300 group-hover:scale-105 group-focus-within:scale-105">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-black/8 bg-[#fcfde8] text-black shadow-[0_10px_24px_rgba(176,200,26,0.18)] transition-transform duration-200 ease-out group-hover:scale-[1.03]">
                     {step.icon}
                   </div>
                 </div>

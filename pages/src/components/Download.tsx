@@ -15,7 +15,7 @@ const Download = () => {
           <div className="flex flex-col items-center gap-6">
             <a
               href="https://github.com/lorddarq/Plumy/releases/latest"
-              className="inline-flex items-center gap-3 rounded-xl border border-black/10 bg-[#FFCA15] px-8 py-4 text-lg font-medium text-black shadow-[0_4px_12px_rgba(136,105,0,0.3),0_2px_4px_rgba(121,94,0,0.2)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#FFD84A] hover:shadow-[0_10px_24px_rgba(136,105,0,0.28)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B0C81A] focus-visible:ring-offset-2"
+              className="inline-flex items-center gap-3 rounded-xl border border-black/10 bg-[#FFCA15] px-8 py-4 text-lg font-medium text-black shadow-[0_4px_12px_rgba(136,105,0,0.3),0_2px_4px_rgba(121,94,0,0.2)] transition-[transform,background-color,box-shadow] duration-150 ease-out hover:-translate-y-0.5 hover:bg-[#FFD84A] hover:shadow-[0_10px_24px_rgba(136,105,0,0.28)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B0C81A] focus-visible:ring-offset-2"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />

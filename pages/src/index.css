@@ -64,3 +64,15 @@
     @apply inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *, *::before, *::after {
+    animation: none;
+    transition-duration: 0ms !important;
+    transition-delay: 0ms !important;
+  }
+}

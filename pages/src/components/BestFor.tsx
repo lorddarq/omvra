@@ -32,7 +32,7 @@ const BestFor = () => {
             {groups.map((group) => (
               <div
                 key={group.title}
-                className="group flex min-h-[16rem] flex-col justify-between rounded-2xl border border-black/10 bg-white p-8 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200 hover:-translate-y-1 hover:border-black/20 hover:shadow-[0_14px_30px_rgba(0,0,0,0.08)]"
+                className="flex min-h-[16rem] flex-col justify-between rounded-2xl border border-black/10 bg-white p-8 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
               >
                 <h3 className="max-w-[16ch] text-xl font-medium leading-8 text-black md:text-2xl">
                   {group.title}

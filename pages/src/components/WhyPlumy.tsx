@@ -21,7 +21,7 @@ const WhyPlumy = () => {
     <section id="why-plumy" className="bg-white py-24 md:py-28">
       <div className="container mx-auto px-6">
         <div className="mx-auto max-w-6xl">
-          <div className="mx-auto mb-14 max-w-3xl text-center md:mb-16">
+          <div className="mx-auto mb-14 max-w-3xl text-center md:mb-20">
             <div className="mb-5 inline-flex items-center justify-center rounded-full border border-[#6c4fe0]/25 bg-[#6c4fe0]/6 px-4 py-1.5 text-sm font-medium text-[#6c4fe0]">
               Why Plumy?
             </div>
@@ -37,26 +37,23 @@ const WhyPlumy = () => {
             </p>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-3 xl:gap-8">
+          <div className="grid gap-10 md:grid-cols-3 md:gap-8 xl:gap-12">
             {reasons.map((reason, index) => (
-              <article
-                key={reason.title}
-                className="group relative overflow-hidden rounded-[28px] border border-plumy-line p-8 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-[border-color,box-shadow,background-color] duration-200 ease-out hover:border-[#d5cef1] hover:bg-white hover:shadow-[0_10px_24px_rgba(108,79,224,0.06)] md:p-9"
-              >
-                <div className="absolute inset-x-0 top-0 h-1 bg-black/85 transition-opacity duration-300 group-hover:bg-black group-focus-within:bg-black" />
-                <div className="mb-7 flex items-center justify-between gap-4">
-                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[#6c4fe0]/15 bg-white text-sm font-semibold tracking-[0.18em] text-[#6c4fe0] shadow-[0_4px_14px_rgba(108,79,224,0.08)]">
-                    0{index + 1}
+              <article key={reason.title} className="relative pt-6">
+                <div className="mb-8 h-px w-full bg-black/80" />
+                <div className="mb-6 flex items-end justify-between gap-4">
+                  <span className="text-sm font-semibold tracking-[0.24em] text-[#6c4fe0]">0{index + 1}</span>
+                  <span className="text-xs uppercase tracking-[0.24em] text-black/35">
+                    {index === 0 ? 'Visibility' : index === 1 ? 'Execution' : 'Control'}
                   </span>
-                  <div className="h-px flex-1 bg-black/10" />
                 </div>
                 <h3
-                  className="mb-4 text-2xl font-semibold leading-tight tracking-[-0.02em] text-[#101828]"
+                  className="mb-4 max-w-[14ch] text-2xl font-semibold leading-tight tracking-[-0.02em] text-[#101828] md:text-[2rem]"
                   style={{ fontFamily: 'Figtree, sans-serif' }}
                 >
                   {reason.title}
                 </h3>
-                <p className="leading-7 text-[#4a5565]">{reason.description}</p>
+                <p className="max-w-[34ch] leading-7 text-[#4a5565]">{reason.description}</p>
               </article>
             ))}
           </div>

@@ -58,27 +58,47 @@ const HowItWorks = () => {
             </p>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-3 xl:gap-8">
-            {steps.map((step) => (
-              <article
-                key={step.number}
-                className="group flex h-full flex-col rounded-[28px] border border-[#e7e7e7] bg-white/95 p-8 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-[transform,border-color,box-shadow] duration-200 ease-out hover:-translate-y-1 hover:border-[#d5cef1] hover:shadow-[0_14px_34px_rgba(108,79,224,0.09)] md:p-9"
-              >
-                <div className="mb-7 flex items-center justify-between gap-4">
-                  <span className="text-sm font-semibold tracking-[0.22em] text-[#6c4fe0]">{step.number}</span>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-black/8 bg-[#fcfde8] text-black shadow-[0_10px_24px_rgba(176,200,26,0.18)] transition-transform duration-200 ease-out group-hover:scale-[1.03]">
-                    {step.icon}
+          <div className="relative">
+            <div className="absolute bottom-0 left-5 top-0 w-px bg-black/10 lg:left-0 lg:right-0 lg:top-16 lg:h-px lg:w-auto" />
+            <div className="grid gap-12 lg:grid-cols-3 lg:gap-10 xl:gap-14">
+              {steps.map((step, index) => (
+                <article key={step.number} className="relative pl-14 lg:pl-0">
+                  <div className="absolute left-0 top-1 flex h-10 w-10 items-center justify-center rounded-full border border-[#6c4fe0]/18 bg-white text-sm font-semibold tracking-[0.2em] text-[#6c4fe0] lg:static lg:mb-8">
+                    {step.number}
                   </div>
-                </div>
-                <h3
-                  className="mb-4 text-2xl font-semibold leading-tight tracking-[-0.02em] text-[#101828]"
-                  style={{ fontFamily: 'Figtree, sans-serif' }}
-                >
-                  {step.title}
-                </h3>
-                <p className="leading-7 text-[#4a5565]">{step.description}</p>
-              </article>
-            ))}
+                  <div className="mb-8 flex items-center gap-4 lg:flex-col lg:items-start">
+                    <div className="hidden h-px flex-1 bg-transparent lg:block" />
+                    <div
+                      className={`flex h-14 w-14 items-center justify-center rounded-[1.4rem] border text-black shadow-[0_12px_28px_rgba(16,24,40,0.08)] ${
+                        index === 1
+                          ? 'border-[#6c4fe0]/18 bg-[#f4f1ff]'
+                          : 'border-black/8 bg-[#fcfde8]'
+                      }`}
+                    >
+                      {step.icon}
+                    </div>
+                    <span className="hidden text-xs uppercase tracking-[0.26em] text-black/35 lg:inline">
+                      {index === 0 ? 'Set direction' : index === 1 ? 'Shift into motion' : 'Close the loop'}
+                    </span>
+                  </div>
+                  <h3
+                    className="mb-4 max-w-[14ch] text-2xl font-semibold leading-tight tracking-[-0.02em] text-[#101828] md:text-[2rem]"
+                    style={{ fontFamily: 'Figtree, sans-serif' }}
+                  >
+                    {step.title}
+                  </h3>
+                  <p className="max-w-[34ch] leading-7 text-[#4a5565]">{step.description}</p>
+                  {index < steps.length - 1 ? (
+                    <div className="mt-8 flex items-center gap-3 text-xs uppercase tracking-[0.26em] text-black/35 lg:mt-10">
+                      <span>{index === 0 ? 'Then' : 'Next'}</span>
+                      <span className="h-px flex-1 bg-black/12" />
+                    </div>
+                  ) : (
+                    <div className="mt-8 text-xs uppercase tracking-[0.26em] text-black/35 lg:mt-10">Ready for review</div>
+                  )}
+                </article>
+              ))}
+            </div>
           </div>
         </div>
       </div>

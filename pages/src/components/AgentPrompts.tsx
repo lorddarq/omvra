@@ -33,6 +33,9 @@ const bestPractices = [
 ]
 
 const AgentPrompts = () => {
+  const featuredExamples = [promptExamples[0], promptExamples[2]]
+  const supportingExamples = [promptExamples[1], promptExamples[3]]
+
   return (
     <section id="agent-prompts" className="bg-white py-24 md:py-28">
       <div className="container mx-auto px-6">
@@ -44,39 +47,68 @@ const AgentPrompts = () => {
             AI support is optional in Plumy, but it is built to be structured when you need it. These examples show how teams can give assistants better context, safer handoff instructions, and clearer review expectations.
           </p>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            {promptExamples.map((example) => (
-              <div
-                key={example.title}
-                className="rounded-3xl border border-black/8 bg-[#FCFCFC] p-6 transition-[border-color,box-shadow] duration-200 ease-out hover:border-black/15 hover:shadow-[0_10px_24px_rgba(0,0,0,0.04)] md:p-7"
-              >
-                <h3 className="mb-3 max-w-[18ch] text-2xl font-medium leading-tight tracking-[-0.02em] text-black">
-                  {example.title}
-                </h3>
-                <p className="mb-5 text-sm font-normal leading-6 text-[#5A5A5A]">{example.why}</p>
-                <div className="rounded-xl border border-[#EBEBEB] bg-[#FAFAFA] p-5">
-                  <p className="mb-3 text-sm font-medium uppercase tracking-[0.18em] text-[#838383]">Sample Prompt</p>
-                  <p className="text-sm font-normal leading-6 text-[#2C2C2C] md:text-[15px]">
-                    {example.prompt}
-                  </p>
+          <div className="grid gap-10 lg:grid-cols-[minmax(0,1.02fr)_minmax(18rem,0.98fr)] lg:items-start">
+            <div className="space-y-6">
+              {featuredExamples.map((example, index) => (
+                <article
+                  key={example.title}
+                  className="rounded-[28px] bg-[#fbfbfb] p-6 md:p-7"
+                >
+                  <div className="mb-5 flex items-center justify-between gap-4">
+                    <span className="text-sm font-medium uppercase tracking-[0.2em] text-[#6c4fe0]">
+                      Example 0{index + 1}
+                    </span>
+                    <span className="text-sm font-medium text-black/40">Curated workflow</span>
+                  </div>
+                  <div className="grid gap-5 md:grid-cols-[minmax(0,0.72fr)_minmax(0,1fr)] md:gap-6">
+                    <div>
+                      <h3 className="mb-3 max-w-[16ch] text-2xl font-medium leading-tight tracking-[-0.03em] text-black">
+                        {example.title}
+                      </h3>
+                      <p className="text-sm leading-6 text-[#5A5A5A]">{example.why}</p>
+                    </div>
+                    <div className="border-t border-black/8 pt-4 md:border-l md:border-t-0 md:pl-6 md:pt-0">
+                      <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-[#838383]">Sample prompt</p>
+                      <p className="font-mono text-[0.95rem] leading-7 text-[#2C2C2C]">
+                        {example.prompt}
+                      </p>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="space-y-10">
+              <div className="border-t border-black/10 pt-5">
+                <p className="mb-5 text-sm font-medium uppercase tracking-[0.2em] text-[#838383]">
+                  More ways to use it
+                </p>
+                <div className="space-y-5">
+                  {supportingExamples.map((example) => (
+                    <article key={example.title} className="grid gap-2 border-b border-black/8 pb-5 last:border-b-0 last:pb-0">
+                      <h3 className="text-xl font-medium leading-tight tracking-[-0.02em] text-black">
+                        {example.title}
+                      </h3>
+                      <p className="text-sm leading-6 text-[#5A5A5A]">{example.why}</p>
+                      <p className="font-mono text-sm leading-6 text-[#2C2C2C]">{example.prompt}</p>
+                    </article>
+                  ))}
                 </div>
               </div>
-            ))}
-          </div>
 
-          <div className="mt-12">
-            <p className="mb-4 text-center text-2xl font-normal text-[#838383]">Tips</p>
-            <div className="rounded-3xl bg-white p-5 md:p-6">
-              <ul className="grid gap-4 md:grid-cols-2">
-                {bestPractices.map((item) => (
-                  <li
-                    key={item}
-                    className="rounded-2xl border border-[#E6E6E6] bg-white px-4 py-4 text-base font-normal leading-7 text-black"
-                  >
-                    {item}
-                  </li>
-                ))}
-              </ul>
+              <div className="border-t border-black/10 pt-5">
+                <p className="mb-5 text-sm font-medium uppercase tracking-[0.2em] text-[#838383]">
+                  Prompting tips
+                </p>
+                <ul className="grid gap-4 sm:grid-cols-2">
+                  {bestPractices.map((item) => (
+                    <li key={item} className="flex gap-3 text-base leading-7 text-black">
+                      <span aria-hidden="true" className="mt-1.5 h-2.5 w-2.5 rounded-full bg-[#6c4fe0]" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
         </div>

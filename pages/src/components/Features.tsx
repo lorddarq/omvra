@@ -123,6 +123,10 @@ const Features = () => {
     },
   ]
 
+  const [leadFeature, ...supportingFeatures] = features
+  const mcpFeature = supportingFeatures[supportingFeatures.length - 1]
+  const supportingList = supportingFeatures.slice(0, -1)
+
   return (
     <section id="features" className="bg-white py-24 md:py-32">
       <div className="container mx-auto px-6">
@@ -140,51 +144,94 @@ const Features = () => {
             </p>
           </div>
 
-          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 xl:gap-6">
-            {features.map((feature, index) => (
-              <article
-                key={feature.title}
-                className="group rounded-[28px] border border-[#ebebeb] bg-white p-7 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-[transform,border-color,box-shadow] duration-200 ease-out hover:-translate-y-1 hover:border-[#d5cef1] hover:shadow-[0_14px_32px_rgba(108,79,224,0.08)] md:p-8"
-              >
-                <div className="mb-5 flex items-start justify-between gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#6c4fe0]/15 bg-[#6c4fe0]/8 text-[#6c4fe0] shadow-[0_8px_24px_rgba(108,79,224,0.12)] transition-transform duration-200 ease-out group-hover:scale-[1.03]">
-                    {feature.icon}
-                  </div>
-                  <span className="text-sm font-semibold tracking-[0.18em] text-[#99a1af]">0{index + 1}</span>
+          <div className="grid gap-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)] lg:items-start lg:gap-14">
+            <article className="rounded-[32px] border border-[#ebe7f8] bg-[linear-gradient(180deg,#fbf9ff_0%,#ffffff_70%)] p-8 shadow-[0_18px_40px_rgba(108,79,224,0.07)] md:p-10">
+              <div className="mb-8 flex flex-wrap items-start justify-between gap-6">
+                <div className="flex h-14 w-14 items-center justify-center rounded-[22px] bg-[#6c4fe0]/10 text-[#6c4fe0] shadow-[0_12px_30px_rgba(108,79,224,0.12)]">
+                  {leadFeature.icon}
                 </div>
-                <h3
-                  className="mb-3 text-2xl font-semibold leading-tight tracking-[-0.02em] text-[#101828]"
-                  style={{ fontFamily: 'Figtree, sans-serif' }}
-                >
-                  {feature.title}
-                </h3>
-                <p className="leading-7 text-[#4a5565]">{feature.description}</p>
-              </article>
-            ))}
-          </div>
+                <span className="text-sm font-semibold tracking-[0.22em] text-[#99a1af]">01</span>
+              </div>
+              <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,0.66fr)] lg:gap-10">
+                <div>
+                  <p className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-[#6c4fe0]">
+                    Core workflow
+                  </p>
+                  <h3
+                    className="max-w-[13ch] text-3xl font-semibold leading-[1.02] tracking-[-0.04em] text-[#101828] md:text-[2.6rem]"
+                    style={{ fontFamily: 'Figtree, sans-serif' }}
+                  >
+                    {leadFeature.title}
+                  </h3>
+                </div>
+                <p className="text-base leading-8 text-[#4a5565] md:text-lg">{leadFeature.description}</p>
+              </div>
+            </article>
 
-          <div className="mt-16 rounded-[32px] border border-[#d5cef1] bg-[linear-gradient(180deg,rgba(108,79,224,0.06)_0%,rgba(108,79,224,0.02)_100%)] p-8 shadow-[0_24px_60px_rgba(108,79,224,0.08)] md:mt-24 md:p-12">
-            <div className="max-w-3xl">
-              <div className="mb-5 inline-flex items-center rounded-full border border-[#6c4fe0]/25 bg-white/80 px-4 py-1.5 text-sm font-medium text-[#6c4fe0]">
-                MCP Support
-              </div>
-              <h3
-                className="mb-6 text-3xl font-medium leading-tight tracking-[-0.03em] text-[#101828] md:text-4xl"
-                style={{ fontFamily: 'Figtree, sans-serif' }}
-              >
-                AI workflows when you want them, not when you do not
-              </h3>
-              <div className="space-y-5 text-base leading-8 text-[#4a5565] md:text-lg">
-                <p>
-                  Plumy includes Model Context Protocol support for teams that want structured AI help without giving
-                  up human control. Instead of relying on brittle copy-paste, assistants can read typed task context
-                  and follow safer handoff workflows.
+            <div className="space-y-10">
+              <div>
+                <p className="mb-5 text-sm font-semibold uppercase tracking-[0.18em] text-[#99a1af]">
+                  Supporting capabilities
                 </p>
-                <p>
-                  That means agents can inspect assigned work, leave concise completion notes, and move tasks into
-                  human review with clearer guardrails than ad hoc prompting alone.
-                </p>
+                <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
+                  {supportingList.map((feature, index) => (
+                    <article
+                      key={feature.title}
+                      className="border-t border-[#ece8f7] pt-5"
+                    >
+                      <div className="mb-4 flex items-center gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#f6f3ff] text-[#6c4fe0]">
+                          {feature.icon}
+                        </div>
+                        <span className="text-xs font-semibold tracking-[0.18em] text-[#99a1af]">
+                          0{index + 2}
+                        </span>
+                      </div>
+                      <h3
+                        className="mb-2 text-xl font-semibold leading-tight tracking-[-0.025em] text-[#101828]"
+                        style={{ fontFamily: 'Figtree, sans-serif' }}
+                      >
+                        {feature.title}
+                      </h3>
+                      <p className="text-sm leading-7 text-[#4a5565] md:text-[0.97rem]">
+                        {feature.description}
+                      </p>
+                    </article>
+                  ))}
+                </div>
               </div>
+
+              <article className="rounded-[30px] bg-[linear-gradient(180deg,rgba(108,79,224,0.08)_0%,rgba(108,79,224,0.03)_100%)] p-8 md:p-9">
+                <div className="mb-5 inline-flex items-center rounded-full border border-[#6c4fe0]/20 bg-white/80 px-4 py-1.5 text-sm font-medium text-[#6c4fe0]">
+                  MCP Support
+                </div>
+                <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(10rem,0.55fr)] md:items-start">
+                  <div>
+                    <h3
+                      className="mb-4 max-w-[14ch] text-2xl font-medium leading-tight tracking-[-0.03em] text-[#101828] md:text-[2rem]"
+                      style={{ fontFamily: 'Figtree, sans-serif' }}
+                    >
+                      AI workflows when you want them, not when you do not
+                    </h3>
+                    <p className="text-base leading-8 text-[#4a5565]">
+                      Plumy keeps the agent story visible, but deliberate. Typed task context, concise notes, and human
+                      review handoffs make the MCP path feel like a structured capability instead of a vague add-on.
+                    </p>
+                  </div>
+                  <div className="border-t border-[#d9d0f4] pt-5 md:border-l md:border-t-0 md:pl-6 md:pt-0">
+                    <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/90 text-[#6c4fe0] shadow-[0_10px_28px_rgba(108,79,224,0.12)]">
+                      {mcpFeature.icon}
+                    </div>
+                    <p
+                      className="mb-2 text-lg font-semibold leading-tight tracking-[-0.02em] text-[#101828]"
+                      style={{ fontFamily: 'Figtree, sans-serif' }}
+                    >
+                      {mcpFeature.title}
+                    </p>
+                    <p className="text-sm leading-7 text-[#4a5565]">{mcpFeature.description}</p>
+                  </div>
+                </div>
+              </article>
             </div>
           </div>
         </div>

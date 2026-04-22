@@ -52,16 +52,10 @@ const laneTasks = [
   },
 ]
 
-const heroProof = [
-  'Plan on a visual timeline',
-  'Execute in Kanban without duplicating work',
-  'Bring in AI with explicit, reviewable guardrails',
-]
-
 const logoMark = (
   <svg
     aria-hidden="true"
-    className="h-auto w-[8.25rem] sm:w-[9.25rem]"
+    className="h-auto w-[13rem] sm:w-[15rem]"
     viewBox="0 0 241 27"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
@@ -78,7 +72,7 @@ const Hero = () => {
     <section className="relative overflow-hidden bg-white">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 h-[40rem] bg-[radial-gradient(circle_at_top_left,rgba(108,79,224,0.11),transparent_36%),radial-gradient(circle_at_top_right,rgba(255,202,21,0.13),transparent_26%)]"
+        className="pointer-events-none absolute inset-x-0 top-0 h-[34rem] bg-[radial-gradient(circle_at_top,rgba(108,79,224,0.07),transparent_42%)]"
       />
 
       <nav className="landing-container relative z-10 py-8">
@@ -100,270 +94,254 @@ const Hero = () => {
         </div>
       </nav>
 
-      <div className="landing-container relative z-10 pb-20 pt-10 sm:pb-24 sm:pt-14 lg:pb-28">
-        <div className="grid gap-14 lg:grid-cols-[minmax(0,1.04fr)_minmax(0,0.96fr)] lg:items-start lg:gap-12 xl:gap-16">
-          <div className="max-w-2xl">
-            <div className="landing-eyebrow border-plumy-gold/10 bg-plumy-gold-soft text-plumy-gold-ink">
-              Free to download. Available for macOS, Windows, and Linux.
-            </div>
+      <div className="landing-container relative z-10 pb-24 pt-14 sm:pb-28 sm:pt-20">
+        <div className="mx-auto flex max-w-4xl flex-col items-center text-center">
+          <div className="landing-eyebrow border-plumy-gold/10 bg-plumy-gold-soft text-plumy-gold-ink">
+            Free to download. Available for macOS, Windows, and Linux.
+          </div>
+          <div className="mt-8 flex max-w-4xl flex-col items-center gap-3">
+            {logoMark}
+            <h1 className="max-w-4xl text-balance text-[clamp(3.4rem,8vw,4.5rem)] font-normal leading-[0.92] tracking-[-0.045em] text-plumy-ink">
+              Plan work visually.
+              <br />
+              Keep it local.
+            </h1>
+          </div>
+          <p className="mt-7 max-w-3xl text-pretty text-lg leading-8 text-plumy-muted sm:text-xl">
+            Plumy is an open-source desktop planner for teams that want clear timelines, fast
+            Kanban execution, and helpful AI workflows without accounts, hidden telemetry, or
+            extra process.
+          </p>
 
-            <div className="mt-8 space-y-5">
-              {logoMark}
-              <h1 className="max-w-[12ch] text-balance text-[clamp(3.25rem,7vw,5.4rem)] font-normal leading-[0.92] tracking-[-0.05em] text-plumy-ink">
-                Plan work visually.
-                <br />
-                Keep it local.
-              </h1>
-              <p className="max-w-xl text-pretty text-lg leading-8 text-plumy-muted sm:text-xl">
-                Plumy is an open-source desktop planner for teams that want clear timelines, fast
-                Kanban execution, and helpful AI workflows without accounts, hidden telemetry, or
-                extra process.
-              </p>
-            </div>
-
-            <div className="mt-9 flex flex-col items-stretch gap-4 sm:flex-row sm:flex-wrap">
-              <a
-                href="#download"
-                className="inline-flex min-h-14 items-center justify-center gap-3 rounded-xl border border-black/10 bg-plumy-gold px-8 py-4 text-lg font-medium text-plumy-ink shadow-[0_4px_12px_rgba(136,105,0,0.30),0_2px_4px_rgba(121,94,0,0.20)] transition-[transform,background-color,box-shadow] duration-150 ease-out hover:-translate-y-0.5 hover:bg-[#f3c317] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-plumy-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-              >
-                <Download className="size-5" strokeWidth={2.2} />
-                Download Plumy
-              </a>
-              <a
-                href="https://github.com/lorddarq/Plumy"
-                className="inline-flex min-h-14 items-center justify-center rounded-xl bg-plumy-lilac-soft px-8 py-4 text-lg font-normal text-plumy-lilac transition-[background-color,transform] duration-150 ease-out hover:bg-[rgba(108,79,224,0.18)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-plumy-lilac/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-              >
-                View on GitHub
-              </a>
-            </div>
-
-            <div className="mt-9 border-t border-black/10 pt-6">
-              <div className="flex flex-wrap gap-x-6 gap-y-3">
-                {trustPills.map((pill) => (
-                  <span
-                    key={pill}
-                    className="text-sm font-medium tracking-[0.02em] text-plumy-ink sm:text-[0.95rem]"
-                  >
-                    {pill}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-8 grid gap-4 border-t border-black/10 pt-6 sm:grid-cols-3">
-              {heroProof.map((item, index) => (
-                <div key={item} className="space-y-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.22em] text-plumy-lilac/70">
-                    0{index + 1}
-                  </span>
-                  <p className="text-sm leading-6 text-plumy-body">{item}</p>
-                </div>
-              ))}
-            </div>
+          <div className="mt-10 flex flex-col items-stretch justify-center gap-4 sm:flex-row">
+            <a
+              href="#download"
+              className="inline-flex min-h-14 items-center justify-center gap-3 rounded-xl border border-black/10 bg-plumy-gold px-8 py-4 text-lg font-medium text-plumy-ink shadow-[0_4px_12px_rgba(136,105,0,0.30),0_2px_4px_rgba(121,94,0,0.20)] transition-[transform,background-color,box-shadow] duration-150 ease-out hover:-translate-y-0.5 hover:bg-[#f3c317] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-plumy-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+            >
+              <Download className="size-5" strokeWidth={2.2} />
+              Download Plumy
+            </a>
+            <a
+              href="https://github.com/lorddarq/Plumy"
+              className="inline-flex min-h-14 items-center justify-center rounded-xl bg-plumy-lilac-soft px-8 py-4 text-lg font-normal text-plumy-lilac transition-[background-color,transform] duration-150 ease-out hover:bg-[rgba(108,79,224,0.18)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-plumy-lilac/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+            >
+              View on GitHub
+            </a>
           </div>
 
-          <div className="mx-auto w-full max-w-[42rem] lg:pt-8">
-            <div className="relative">
-              <div className="pointer-events-none absolute inset-x-8 top-8 h-48 rounded-full bg-[rgba(232,208,112,0.28)] blur-[120px] sm:inset-x-12 sm:h-64 sm:blur-[160px]" />
-              <div className="relative overflow-hidden rounded-[28px] border border-[#dbdbdb] bg-[#fdfdfd] shadow-[0_20px_40px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.06)]">
-                <div className="flex items-center justify-between border-b border-black/10 bg-white px-4 py-3 sm:px-6">
-                  <div className="rounded-md bg-plumy-soft-2 p-1">
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        tabIndex={-1}
-                        aria-hidden="true"
-                        className="rounded-[4px] bg-white px-4 py-1.5 text-sm font-medium text-[#101828] shadow-[0_1px_3px_rgba(0,0,0,0.10),0_1px_2px_rgba(0,0,0,0.10)]"
-                      >
-                        Timeline
-                      </button>
-                      <button
-                        type="button"
-                        tabIndex={-1}
-                        aria-hidden="true"
-                        className="rounded-[4px] px-4 py-1.5 text-sm font-medium text-[#4a5565]"
-                      >
-                        Kanban
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            {trustPills.map((pill) => (
+              <span
+                key={pill}
+                className="rounded-full border border-black/20 px-4 py-2 text-sm font-medium text-plumy-ink"
+              >
+                {pill}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="mx-auto mt-24 max-w-[70rem] px-0 sm:px-4">
+          <div className="relative">
+            <div className="pointer-events-none absolute inset-x-6 top-8 h-48 rounded-full bg-[rgba(232,208,112,0.25)] blur-[120px] sm:inset-x-10 sm:h-64 sm:blur-[160px]" />
+            <div className="relative overflow-hidden rounded-xl border border-[#dbdbdb] bg-[#fdfdfd] shadow-[0_10px_13px_rgba(0,0,0,0.05),0_3px_4px_rgba(0,0,0,0.10)]">
+              <div className="flex items-center justify-between border-b border-black/10 bg-white px-4 py-3 sm:px-6">
+                <div className="rounded-md bg-plumy-soft-2 p-1">
+                  <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      aria-label="Settings"
                       tabIndex={-1}
                       aria-hidden="true"
-                      className="inline-flex size-9 items-center justify-center rounded-md"
+                      className="rounded-[4px] bg-white px-4 py-1.5 text-sm font-medium text-[#101828] shadow-[0_1px_3px_rgba(0,0,0,0.10),0_1px_2px_rgba(0,0,0,0.10)]"
                     >
-                      <Settings2 className="size-4 text-plumy-ink" strokeWidth={1.8} />
+                      Timeline
                     </button>
                     <button
                       type="button"
-                      aria-label="People"
                       tabIndex={-1}
                       aria-hidden="true"
-                      className="inline-flex size-9 items-center justify-center rounded-md"
+                      className="rounded-[4px] px-4 py-1.5 text-sm font-medium text-[#4a5565]"
                     >
-                      <Users className="size-4 text-plumy-ink" strokeWidth={1.8} />
+                      Kanban
                     </button>
                   </div>
                 </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    aria-label="Settings"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    className="inline-flex size-9 items-center justify-center rounded-md"
+                  >
+                    <Settings2 className="size-4 text-plumy-ink" strokeWidth={1.8} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="People"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    className="inline-flex size-9 items-center justify-center rounded-md"
+                  >
+                    <Users className="size-4 text-plumy-ink" strokeWidth={1.8} />
+                  </button>
+                </div>
+              </div>
 
-                <div className="flex items-center justify-between gap-4 border-b border-black/5 bg-plumy-soft px-4 py-3 sm:px-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="mr-1 text-sm font-medium text-plumy-ink">Timeline</span>
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      aria-hidden="true"
-                      className="inline-flex size-5 items-center justify-center rounded-md text-base font-medium text-plumy-ink"
-                    >
-                      ◀
-                    </button>
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      aria-hidden="true"
-                      className="inline-flex items-center rounded-md border border-black/10 bg-white px-3 py-0.5 text-sm font-medium text-plumy-ink"
-                    >
-                      Today
-                    </button>
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      aria-hidden="true"
-                      className="inline-flex size-5 items-center justify-center rounded-md text-base font-medium text-plumy-ink"
-                    >
-                      ▶
-                    </button>
-                    <span className="rounded-md bg-plumy-soft-2 px-3 py-0.5 text-sm font-medium text-[#364153]">
-                      7 days
-                    </span>
-                  </div>
-
-                  <div className="hidden rounded-md bg-plumy-soft-2 p-1 sm:flex">
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      aria-hidden="true"
-                      className="rounded-[4px] bg-white px-3 py-1 text-sm font-medium text-[#101828] shadow-[0_1px_3px_rgba(0,0,0,0.10),0_1px_2px_rgba(0,0,0,0.10)]"
-                    >
-                      Projects
-                    </button>
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      aria-hidden="true"
-                      className="rounded-[4px] px-3 py-1 text-sm font-medium text-[#4a5565]"
-                    >
-                      People
-                    </button>
-                  </div>
+              <div className="flex items-center justify-between gap-4 border-b border-black/5 bg-plumy-soft px-4 py-3 sm:px-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="mr-1 text-sm font-medium text-plumy-ink">Timeline</span>
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    className="inline-flex size-5 items-center justify-center rounded-md text-base font-medium text-plumy-ink"
+                  >
+                    ◀
+                  </button>
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    className="inline-flex items-center rounded-md border border-black/10 bg-white px-3 py-0.5 text-sm font-medium text-plumy-ink"
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    className="inline-flex size-5 items-center justify-center rounded-md text-base font-medium text-plumy-ink"
+                  >
+                    ▶
+                  </button>
+                  <span className="rounded-md bg-plumy-soft-2 px-3 py-0.5 text-sm font-medium text-[#364153]">
+                    7 days
+                  </span>
                 </div>
 
-                <div className="flex flex-col lg:flex-row">
-                  <div className="w-full border-b border-black/10 lg:w-[16.5rem] lg:border-b-0 lg:border-r">
-                    <div className="relative flex items-start justify-between bg-plumy-soft px-3 pb-10 pt-3">
-                      <span className="text-sm font-medium text-plumy-ink">Swimlanes</span>
-                      <button
-                        type="button"
-                        aria-label="Add swimlane"
-                        tabIndex={-1}
-                        aria-hidden="true"
-                        className="inline-flex size-8 items-center justify-center rounded-md text-[#4b5563]"
-                      >
-                        <Plus className="size-4" strokeWidth={2.2} />
-                      </button>
-                      <div className="absolute bottom-0 right-0 top-0 flex w-[7px] items-center justify-center bg-[#e5e7eb]">
-                        <div className="flex h-3 gap-px">
-                          <span className="h-full w-px rounded-full bg-[#abb2bf]" />
-                          <span className="h-full w-px rounded-full bg-[#abb2bf]" />
-                          <span className="h-full w-px rounded-full bg-[#abb2bf]" />
-                        </div>
+                <div className="hidden rounded-md bg-plumy-soft-2 p-1 sm:flex">
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    className="rounded-[4px] bg-white px-3 py-1 text-sm font-medium text-[#101828] shadow-[0_1px_3px_rgba(0,0,0,0.10),0_1px_2px_rgba(0,0,0,0.10)]"
+                  >
+                    Projects
+                  </button>
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    className="rounded-[4px] px-3 py-1 text-sm font-medium text-[#4a5565]"
+                  >
+                    People
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-col lg:flex-row">
+                <div className="w-full border-b border-black/10 lg:w-[16.5rem] lg:border-b-0 lg:border-r">
+                  <div className="relative flex items-start justify-between bg-plumy-soft px-3 pb-10 pt-3">
+                    <span className="text-sm font-medium text-plumy-ink">Swimlanes</span>
+                    <button
+                      type="button"
+                      aria-label="Add swimlane"
+                      tabIndex={-1}
+                      aria-hidden="true"
+                      className="inline-flex size-8 items-center justify-center rounded-md text-[#4b5563]"
+                    >
+                      <Plus className="size-4" strokeWidth={2.2} />
+                    </button>
+                    <div className="absolute bottom-0 right-0 top-0 flex w-[7px] items-center justify-center bg-[#e5e7eb]">
+                      <div className="flex h-3 gap-px">
+                        <span className="h-full w-px rounded-full bg-[#abb2bf]" />
+                        <span className="h-full w-px rounded-full bg-[#abb2bf]" />
+                        <span className="h-full w-px rounded-full bg-[#abb2bf]" />
                       </div>
                     </div>
+                  </div>
 
-                    <div className="divide-y divide-black/5 bg-white">
-                      {swimlanes.map((lane) => (
-                        <div
-                          key={lane.name}
-                          className="flex items-center gap-2 border-l-4 px-4 py-3"
-                          style={{ borderLeftColor: lane.accent }}
+                  <div className="divide-y divide-black/5 bg-white">
+                    {swimlanes.map((lane) => (
+                      <div
+                        key={lane.name}
+                        className="flex items-center gap-2 border-l-4 px-4 py-3"
+                        style={{ borderLeftColor: lane.accent }}
+                      >
+                        <GripVertical className="size-3.5 text-[#99a1af]" />
+                        <span className="flex-1 text-left text-sm text-[#364153]">{lane.name}</span>
+                        <button
+                          type="button"
+                          aria-label={`Edit ${lane.name}`}
+                          tabIndex={-1}
+                          aria-hidden="true"
+                          className="inline-flex size-6 items-center justify-center rounded-md text-[#929292]"
                         >
-                          <GripVertical className="size-3.5 text-[#99a1af]" />
-                          <span className="flex-1 text-left text-sm text-[#364153]">{lane.name}</span>
-                          <button
-                            type="button"
-                            aria-label={`Edit ${lane.name}`}
-                            tabIndex={-1}
-                            aria-hidden="true"
-                            className="inline-flex size-6 items-center justify-center rounded-md text-[#929292]"
+                          <Pencil className="size-3" strokeWidth={1.8} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="min-w-0 flex-1 overflow-x-auto">
+                  <div className="min-w-[52rem]">
+                    <div className="border-b border-[#e7e7e7] bg-white px-3 py-2 text-sm font-medium text-plumy-ink">
+                      Mar 2026
+                    </div>
+                    <div className="flex border-b border-[#e7e7e7] bg-white px-1 py-2">
+                      {days.map((day) => (
+                        <div key={day} className="flex min-w-[58px] flex-1 items-center justify-center">
+                          <span
+                            className={
+                              day === 10
+                                ? 'inline-flex size-8 items-center justify-center rounded-full border border-[#3b82f6] text-center text-xs text-[rgba(43,127,255,0.90)]'
+                                : 'text-xs text-plumy-ink'
+                            }
                           >
-                            <Pencil className="size-3" strokeWidth={1.8} />
-                          </button>
+                            {day}
+                          </span>
                         </div>
                       ))}
                     </div>
-                  </div>
 
-                  <div className="min-w-0 flex-1 overflow-x-auto">
-                    <div className="min-w-[52rem]">
-                      <div className="border-b border-[#e7e7e7] bg-white px-3 py-2 text-sm font-medium text-plumy-ink">
-                        Mar 2026
-                      </div>
-                      <div className="flex border-b border-[#e7e7e7] bg-white px-1 py-2">
-                        {days.map((day) => (
-                          <div key={day} className="flex min-w-[58px] flex-1 items-center justify-center">
-                            <span
-                              className={
-                                day === 10
-                                  ? 'inline-flex size-8 items-center justify-center rounded-full border border-[#3b82f6] text-center text-xs text-[rgba(43,127,255,0.90)]'
-                                  : 'text-xs text-plumy-ink'
-                              }
-                            >
-                              {day}
-                            </span>
+                    <div className="flex flex-col">
+                      {swimlanes.map((lane) => (
+                        <div
+                          key={lane.name}
+                          className="relative flex h-12 items-center border-b border-[#e7e7e7]"
+                          style={{ backgroundColor: lane.tint }}
+                        >
+                          <div className="absolute inset-0 flex">
+                            {days.map((day) => (
+                              <div
+                                key={`${lane.name}-${day}`}
+                                className="min-w-[58px] flex-1 border-r border-black/10 last:border-r-0"
+                              />
+                            ))}
                           </div>
-                        ))}
-                      </div>
-
-                      <div className="flex flex-col">
-                        {swimlanes.map((lane) => (
-                          <div
-                            key={lane.name}
-                            className="relative flex h-12 items-center border-b border-[#e7e7e7]"
-                            style={{ backgroundColor: lane.tint }}
-                          >
-                            <div className="absolute inset-0 flex">
-                              {days.map((day) => (
-                                <div
-                                  key={`${lane.name}-${day}`}
-                                  className="min-w-[58px] flex-1 border-r border-black/10 last:border-r-0"
+                          {laneTasks
+                            .filter((task) => task.lane === lane.name)
+                            .map((task) => (
+                              <div
+                                key={task.title}
+                                className="relative z-10 flex h-8 items-center gap-2 rounded-md border border-black/25 px-2 text-xs font-medium text-white shadow-[0_1px_2px_rgba(0,0,0,0.10)]"
+                                style={{
+                                  backgroundColor: task.color,
+                                  width: `calc(${task.span} * (100% / ${days.length}) - 16px)`,
+                                  marginLeft: `calc(${task.start - 1} * (100% / ${days.length}) + 8px)`,
+                                }}
+                              >
+                                <span
+                                  className="h-3 w-3 shrink-0 rounded-full border-2 border-white/25"
+                                  style={{ backgroundColor: task.dot }}
                                 />
-                              ))}
-                            </div>
-                            {laneTasks
-                              .filter((task) => task.lane === lane.name)
-                              .map((task) => (
-                                <div
-                                  key={task.title}
-                                  className="relative z-10 flex h-8 items-center gap-2 rounded-md border border-black/25 px-2 text-xs font-medium text-white shadow-[0_1px_2px_rgba(0,0,0,0.10)]"
-                                  style={{
-                                    backgroundColor: task.color,
-                                    width: `calc(${task.span} * (100% / ${days.length}) - 16px)`,
-                                    marginLeft: `calc(${task.start - 1} * (100% / ${days.length}) + 8px)`,
-                                  }}
-                                >
-                                  <span
-                                    className="h-3 w-3 shrink-0 rounded-full border-2 border-white/25"
-                                    style={{ backgroundColor: task.dot }}
-                                  />
-                                  <span className="truncate">{task.title}</span>
-                                </div>
-                              ))}
-                          </div>
-                        ))}
-                      </div>
+                                <span className="truncate">{task.title}</span>
+                              </div>
+                            ))}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>

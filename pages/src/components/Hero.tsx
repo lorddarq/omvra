@@ -53,21 +53,9 @@ const laneTasks = [
 ]
 
 const heroProof = [
-  {
-    number: '01',
-    title: 'Plan on a visual timeline',
-    description: 'Map work early and keep the schedule legible.',
-  },
-  {
-    number: '02',
-    title: 'Execute in Kanban',
-    description: 'Move the same tasks forward without duplicating work.',
-  },
-  {
-    number: '03',
-    title: 'Bring in AI with guardrails',
-    description: 'Keep assistants structured, visible, and reviewable.',
-  },
+  'Plan on a visual timeline',
+  'Execute in Kanban without duplicating work',
+  'Bring in AI with explicit, reviewable guardrails',
 ]
 
 const logoMark = (
@@ -112,29 +100,28 @@ const Hero = () => {
         </div>
       </nav>
 
-      <div className="relative z-10 overflow-hidden pb-20 pt-10 sm:pb-24 sm:pt-14 lg:pb-28">
-        <div className="grid gap-12 lg:min-h-[calc(100svh-5rem)] lg:grid-cols-[minmax(0,28rem)_minmax(0,1fr)] lg:items-stretch lg:gap-10 xl:grid-cols-[minmax(0,31rem)_minmax(0,1fr)]">
-          <div className="landing-container flex max-w-none lg:justify-end lg:px-10 xl:px-14">
-            <div className="max-w-[36rem]">
+      <div className="landing-container relative z-10 pb-20 pt-10 sm:pb-24 sm:pt-14 lg:pb-28">
+        <div className="grid gap-14 lg:grid-cols-[minmax(0,1.04fr)_minmax(0,0.96fr)] lg:items-start lg:gap-12 xl:gap-16">
+          <div className="max-w-2xl">
             <div className="landing-eyebrow border-plumy-gold/10 bg-plumy-gold-soft text-plumy-gold-ink">
               Free to download. Available for macOS, Windows, and Linux.
             </div>
 
-            <div className="mt-8 space-y-6">
+            <div className="mt-8 space-y-5">
               {logoMark}
               <h1 className="max-w-[12ch] text-balance text-[clamp(3.25rem,7vw,5.4rem)] font-normal leading-[0.92] tracking-[-0.05em] text-plumy-ink">
                 Plan work visually.
                 <br />
                 Keep it local.
               </h1>
-              <p className="max-w-lg text-pretty text-lg leading-8 text-plumy-muted sm:text-xl">
+              <p className="max-w-xl text-pretty text-lg leading-8 text-plumy-muted sm:text-xl">
                 Plumy is an open-source desktop planner for teams that want clear timelines, fast
                 Kanban execution, and helpful AI workflows without accounts, hidden telemetry, or
                 extra process.
               </p>
             </div>
 
-            <div className="mt-10 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap">
+            <div className="mt-9 flex flex-col items-stretch gap-4 sm:flex-row sm:flex-wrap">
               <a
                 href="#download"
                 className="inline-flex min-h-14 items-center justify-center gap-3 rounded-xl border border-black/10 bg-plumy-gold px-8 py-4 text-lg font-medium text-plumy-ink shadow-[0_4px_12px_rgba(136,105,0,0.30),0_2px_4px_rgba(121,94,0,0.20)] transition-[transform,background-color,box-shadow] duration-150 ease-out hover:-translate-y-0.5 hover:bg-[#f3c317] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-plumy-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
@@ -144,54 +131,41 @@ const Hero = () => {
               </a>
               <a
                 href="https://github.com/lorddarq/Plumy"
-                className="inline-flex min-h-14 items-center justify-center rounded-xl border border-plumy-lilac/12 bg-white px-8 py-4 text-lg font-normal text-plumy-lilac shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-[background-color,border-color,transform] duration-150 ease-out hover:-translate-y-0.5 hover:border-plumy-lilac/20 hover:bg-plumy-lilac-soft active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-plumy-lilac/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                className="inline-flex min-h-14 items-center justify-center rounded-xl bg-plumy-lilac-soft px-8 py-4 text-lg font-normal text-plumy-lilac transition-[background-color,transform] duration-150 ease-out hover:bg-[rgba(108,79,224,0.18)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-plumy-lilac/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
               >
                 View on GitHub
               </a>
             </div>
 
-            <div className="mt-10 border-t border-black/10 pt-6">
-              <div className="space-y-6">
-                <div className="flex flex-wrap gap-x-5 gap-y-2">
-                  {trustPills.map((pill, index) => (
-                    <span
-                      key={pill}
-                      className="text-sm font-medium tracking-[0.02em] text-plumy-ink/84 sm:text-[0.95rem]"
-                    >
-                      {pill}
-                      {index < trustPills.length - 1 ? (
-                        <span aria-hidden="true" className="ml-5 text-plumy-ink/25">
-                          /
-                        </span>
-                      ) : null}
-                    </span>
-                  ))}
-                </div>
-
-                <div className="grid gap-5 border-t border-black/8 pt-5 sm:grid-cols-3">
-                  {heroProof.map((item) => (
-                    <article key={item.number} className="space-y-2">
-                      <span className="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-plumy-lilac/70">
-                        {item.number}
-                      </span>
-                      <h2 className="max-w-[14ch] text-lg font-medium leading-7 text-plumy-ink">
-                        {item.title}
-                      </h2>
-                      <p className="max-w-[20ch] text-sm leading-6 text-plumy-muted">
-                        {item.description}
-                      </p>
-                    </article>
-                  ))}
-                </div>
+            <div className="mt-9 border-t border-black/10 pt-6">
+              <div className="flex flex-wrap gap-x-6 gap-y-3">
+                {trustPills.map((pill) => (
+                  <span
+                    key={pill}
+                    className="text-sm font-medium tracking-[0.02em] text-plumy-ink sm:text-[0.95rem]"
+                  >
+                    {pill}
+                  </span>
+                ))}
               </div>
             </div>
-          </div>
+
+            <div className="mt-8 grid gap-4 border-t border-black/10 pt-6 sm:grid-cols-3">
+              {heroProof.map((item, index) => (
+                <div key={item} className="space-y-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.22em] text-plumy-lilac/70">
+                    0{index + 1}
+                  </span>
+                  <p className="text-sm leading-6 text-plumy-body">{item}</p>
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div className="relative min-w-0 pl-6 sm:pl-8 lg:pl-0">
-            <div className="pointer-events-none absolute inset-x-10 top-10 h-56 rounded-full bg-[rgba(232,208,112,0.24)] blur-[120px] sm:inset-x-16 sm:h-72 sm:blur-[160px] lg:left-[12%] lg:right-[8%] lg:top-[8%]" />
-            <div className="relative flex h-full items-start lg:items-center">
-              <div className="relative w-[calc(100%+4.5rem)] max-w-none overflow-hidden rounded-l-[34px] rounded-r-none border border-r-0 border-[#dbdbdb] bg-[#fdfdfd] shadow-[0_24px_60px_rgba(16,24,40,0.10),0_4px_14px_rgba(16,24,40,0.05)] sm:w-[calc(100%+6rem)] lg:ml-0 lg:w-[min(72rem,100%)] lg:rounded-l-[36px] lg:rounded-r-none">
+          <div className="mx-auto w-full max-w-[42rem] lg:pt-8">
+            <div className="relative">
+              <div className="pointer-events-none absolute inset-x-8 top-8 h-48 rounded-full bg-[rgba(232,208,112,0.28)] blur-[120px] sm:inset-x-12 sm:h-64 sm:blur-[160px]" />
+              <div className="relative overflow-hidden rounded-[28px] border border-[#dbdbdb] bg-[#fdfdfd] shadow-[0_20px_40px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.06)]">
                 <div className="flex items-center justify-between border-b border-black/10 bg-white px-4 py-3 sm:px-6">
                   <div className="rounded-md bg-plumy-soft-2 p-1">
                     <div className="flex items-center gap-1">

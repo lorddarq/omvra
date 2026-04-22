@@ -53,9 +53,21 @@ const laneTasks = [
 ]
 
 const heroProof = [
-  'Plan on a visual timeline',
-  'Execute in Kanban without duplicating work',
-  'Bring in AI with explicit, reviewable guardrails',
+  {
+    number: '01',
+    title: 'Plan on a visual timeline',
+    description: 'Map work early and keep the schedule legible.',
+  },
+  {
+    number: '02',
+    title: 'Execute in Kanban',
+    description: 'Move the same tasks forward without duplicating work.',
+  },
+  {
+    number: '03',
+    title: 'Bring in AI with guardrails',
+    description: 'Keep assistants structured, visible, and reviewable.',
+  },
 ]
 
 const logoMark = (
@@ -100,9 +112,10 @@ const Hero = () => {
         </div>
       </nav>
 
-      <div className="landing-container relative z-10 pb-20 pt-10 sm:pb-24 sm:pt-14 lg:pb-28">
-        <div className="grid gap-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.96fr)] lg:items-start lg:gap-12 xl:gap-16">
-          <div className="max-w-[36rem]">
+      <div className="relative z-10 overflow-hidden pb-20 pt-10 sm:pb-24 sm:pt-14 lg:pb-28">
+        <div className="grid gap-12 lg:min-h-[calc(100svh-5rem)] lg:grid-cols-[minmax(0,28rem)_minmax(0,1fr)] lg:items-stretch lg:gap-10 xl:grid-cols-[minmax(0,31rem)_minmax(0,1fr)]">
+          <div className="landing-container flex max-w-none lg:justify-end lg:px-10 xl:px-14">
+            <div className="max-w-[36rem]">
             <div className="landing-eyebrow border-plumy-gold/10 bg-plumy-gold-soft text-plumy-gold-ink">
               Free to download. Available for macOS, Windows, and Linux.
             </div>
@@ -138,7 +151,7 @@ const Hero = () => {
             </div>
 
             <div className="mt-10 border-t border-black/10 pt-6">
-              <div className="grid gap-6 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)] lg:items-start">
+              <div className="space-y-6">
                 <div className="flex flex-wrap gap-x-5 gap-y-2">
                   {trustPills.map((pill, index) => (
                     <span
@@ -155,24 +168,30 @@ const Hero = () => {
                   ))}
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-3 lg:gap-5">
-                  {heroProof.map((item, index) => (
-                    <div key={item} className="space-y-2">
-                      <span className="text-[0.7rem] font-semibold uppercase tracking-[0.22em] text-plumy-lilac/70">
-                        0{index + 1}
+                <div className="grid gap-5 border-t border-black/8 pt-5 sm:grid-cols-3">
+                  {heroProof.map((item) => (
+                    <article key={item.number} className="space-y-2">
+                      <span className="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-plumy-lilac/70">
+                        {item.number}
                       </span>
-                      <p className="text-sm leading-6 text-plumy-body">{item}</p>
-                    </div>
+                      <h2 className="max-w-[14ch] text-lg font-medium leading-7 text-plumy-ink">
+                        {item.title}
+                      </h2>
+                      <p className="max-w-[20ch] text-sm leading-6 text-plumy-muted">
+                        {item.description}
+                      </p>
+                    </article>
                   ))}
                 </div>
               </div>
             </div>
           </div>
+          </div>
 
-          <div className="mx-auto w-full max-w-[42rem] lg:pt-6">
-            <div className="relative">
-              <div className="pointer-events-none absolute inset-x-8 top-10 h-48 rounded-full bg-[rgba(232,208,112,0.24)] blur-[120px] sm:inset-x-12 sm:h-64 sm:blur-[160px]" />
-              <div className="relative overflow-hidden rounded-[32px] border border-[#dbdbdb] bg-[#fdfdfd] shadow-[0_24px_60px_rgba(16,24,40,0.10),0_4px_14px_rgba(16,24,40,0.05)]">
+          <div className="relative min-w-0 pl-6 sm:pl-8 lg:pl-0">
+            <div className="pointer-events-none absolute inset-x-10 top-10 h-56 rounded-full bg-[rgba(232,208,112,0.24)] blur-[120px] sm:inset-x-16 sm:h-72 sm:blur-[160px] lg:left-[12%] lg:right-[8%] lg:top-[8%]" />
+            <div className="relative flex h-full items-start lg:items-center">
+              <div className="relative w-[calc(100%+4.5rem)] max-w-none overflow-hidden rounded-l-[34px] rounded-r-none border border-r-0 border-[#dbdbdb] bg-[#fdfdfd] shadow-[0_24px_60px_rgba(16,24,40,0.10),0_4px_14px_rgba(16,24,40,0.05)] sm:w-[calc(100%+6rem)] lg:ml-0 lg:w-[min(72rem,100%)] lg:rounded-l-[36px] lg:rounded-r-none">
                 <div className="flex items-center justify-between border-b border-black/10 bg-white px-4 py-3 sm:px-6">
                   <div className="rounded-md bg-plumy-soft-2 p-1">
                     <div className="flex items-center gap-1">

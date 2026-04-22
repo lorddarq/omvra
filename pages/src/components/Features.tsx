@@ -144,7 +144,7 @@ const Features = () => {
             </p>
           </div>
 
-          <div className="grid gap-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)] lg:items-start lg:gap-14">
+          <div className="grid gap-14 lg:grid-cols-[minmax(0,1.05fr)_minmax(18rem,0.95fr)] lg:items-start lg:gap-14">
             <article className="rounded-[32px] border border-[#ebe7f8] bg-[linear-gradient(180deg,#fbf9ff_0%,#ffffff_70%)] p-8 shadow-[0_18px_40px_rgba(108,79,224,0.07)] md:p-10">
               <div className="mb-8 flex flex-wrap items-start justify-between gap-6">
                 <div className="flex h-14 w-14 items-center justify-center rounded-[22px] bg-[#6c4fe0]/10 text-[#6c4fe0] shadow-[0_12px_30px_rgba(108,79,224,0.12)]">
@@ -152,7 +152,7 @@ const Features = () => {
                 </div>
                 <span className="text-sm font-semibold tracking-[0.22em] text-[#99a1af]">01</span>
               </div>
-              <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,0.66fr)] lg:gap-10">
+              <div className="grid gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(15rem,0.7fr)] lg:gap-12">
                 <div>
                   <p className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-[#6c4fe0]">
                     Core workflow
@@ -164,7 +164,27 @@ const Features = () => {
                     {leadFeature.title}
                   </h3>
                 </div>
-                <p className="text-base leading-8 text-[#4a5565] md:text-lg">{leadFeature.description}</p>
+                <div className="space-y-5">
+                  <p className="text-base leading-8 text-[#4a5565] md:text-lg">{leadFeature.description}</p>
+                  <div className="grid gap-4 border-t border-[#e4def8] pt-5 sm:grid-cols-2">
+                    <div>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#99a1af]">
+                        Why it matters
+                      </p>
+                      <p className="text-sm leading-7 text-[#4a5565]">
+                        The timeline stays strategic while Kanban keeps execution moving in the same workspace.
+                      </p>
+                    </div>
+                    <div>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#99a1af]">
+                        Result
+                      </p>
+                      <p className="text-sm leading-7 text-[#4a5565]">
+                        Less status translation, less duplicated planning, and a clearer handoff from planning to delivery.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </article>
 
@@ -173,13 +193,13 @@ const Features = () => {
                 <p className="mb-5 text-sm font-semibold uppercase tracking-[0.18em] text-[#99a1af]">
                   Supporting capabilities
                 </p>
-                <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
+                <div className="space-y-4">
                   {supportingList.map((feature, index) => (
                     <article
                       key={feature.title}
-                      className="border-t border-[#ece8f7] pt-5"
+                      className="grid gap-3 border-t border-[#ece8f7] pt-4 sm:grid-cols-[auto_minmax(0,1fr)] sm:gap-4"
                     >
-                      <div className="mb-4 flex items-center gap-3">
+                      <div className="flex items-center gap-3 sm:items-start">
                         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#f6f3ff] text-[#6c4fe0]">
                           {feature.icon}
                         </div>
@@ -187,15 +207,17 @@ const Features = () => {
                           0{index + 2}
                         </span>
                       </div>
-                      <h3
-                        className="mb-2 text-xl font-semibold leading-tight tracking-[-0.025em] text-[#101828]"
-                        style={{ fontFamily: 'Figtree, sans-serif' }}
-                      >
-                        {feature.title}
-                      </h3>
-                      <p className="text-sm leading-7 text-[#4a5565] md:text-[0.97rem]">
-                        {feature.description}
-                      </p>
+                      <div>
+                        <h3
+                          className="mb-1 text-xl font-semibold leading-tight tracking-[-0.025em] text-[#101828]"
+                          style={{ fontFamily: 'Figtree, sans-serif' }}
+                        >
+                          {feature.title}
+                        </h3>
+                        <p className="max-w-[40ch] text-sm leading-7 text-[#4a5565] md:text-[0.97rem]">
+                          {feature.description}
+                        </p>
+                      </div>
                     </article>
                   ))}
                 </div>
@@ -213,7 +235,7 @@ const Features = () => {
                     >
                       AI workflows when you want them, not when you do not
                     </h3>
-                    <p className="text-base leading-8 text-[#4a5565]">
+                    <p className="max-w-[34ch] text-base leading-8 text-[#4a5565]">
                       Plumy keeps the agent story visible, but deliberate. Typed task context, concise notes, and human
                       review handoffs make the MCP path feel like a structured capability instead of a vague add-on.
                     </p>

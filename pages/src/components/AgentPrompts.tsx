@@ -60,7 +60,7 @@ const AgentPrompts = () => {
                     </span>
                     <span className="text-sm font-medium text-black/40">Curated workflow</span>
                   </div>
-                  <div className="grid gap-5 md:grid-cols-[minmax(0,0.72fr)_minmax(0,1fr)] md:gap-6">
+                  <div className="grid gap-5 md:grid-cols-[minmax(0,0.74fr)_minmax(0,1fr)] md:gap-6">
                     <div>
                       <h3 className="mb-3 max-w-[16ch] text-2xl font-medium leading-tight tracking-[-0.03em] text-black">
                         {example.title}
@@ -69,8 +69,10 @@ const AgentPrompts = () => {
                     </div>
                     <div className="border-t border-black/8 pt-4 md:border-l md:border-t-0 md:pl-6 md:pt-0">
                       <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-[#838383]">Sample prompt</p>
-                      <p className="font-mono text-[0.95rem] leading-7 text-[#2C2C2C]">
-                        {example.prompt}
+                      <p className="font-mono text-[0.93rem] leading-7 text-[#2C2C2C]">
+                        {index === 0
+                          ? 'Connect to Plumy MCP, inspect the guide and assigned-work resources for Codex, summarize what is actionable now, then start with the highest-priority task.'
+                          : 'Use Plumy MCP to complete task <TASK_ID>, keep the completion note brief, follow the handoff workflow, and move it to Ready for human review.'}
                       </p>
                     </div>
                   </div>
@@ -85,12 +87,21 @@ const AgentPrompts = () => {
                 </p>
                 <div className="space-y-5">
                   {supportingExamples.map((example) => (
-                    <article key={example.title} className="grid gap-2 border-b border-black/8 pb-5 last:border-b-0 last:pb-0">
-                      <h3 className="text-xl font-medium leading-tight tracking-[-0.02em] text-black">
-                        {example.title}
-                      </h3>
-                      <p className="text-sm leading-6 text-[#5A5A5A]">{example.why}</p>
-                      <p className="font-mono text-sm leading-6 text-[#2C2C2C]">{example.prompt}</p>
+                    <article
+                      key={example.title}
+                      className="grid gap-2 border-b border-black/8 pb-5 last:border-b-0 last:pb-0 sm:grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)] sm:gap-4"
+                    >
+                      <div>
+                        <h3 className="text-xl font-medium leading-tight tracking-[-0.02em] text-black">
+                          {example.title}
+                        </h3>
+                        <p className="mt-2 text-sm leading-6 text-[#5A5A5A]">{example.why}</p>
+                      </div>
+                      <p className="font-mono text-sm leading-6 text-[#2C2C2C]">
+                        {example.title === 'Work a single task without guessing'
+                          ? 'Read the task guide, inspect one task carefully, review description/comments/context first, then explain the plan before making updates.'
+                          : 'Watch the active board for newly assigned Codex work, ignore duplicates, and report only new actionable tasks.'}
+                      </p>
                     </article>
                   ))}
                 </div>

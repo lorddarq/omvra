@@ -40,7 +40,6 @@ const WhyPlumy = () => {
           <div className="grid gap-10 md:grid-cols-3 md:gap-8 xl:gap-12">
             {reasons.map((reason, index) => (
               <article key={reason.title} className="relative pt-6">
-                <div className="mb-8 h-px w-full bg-black/80" />
                 <div className="mb-6 flex items-end justify-between gap-4">
                   <span className="text-sm font-semibold tracking-[0.24em] text-[#6c4fe0]">0{index + 1}</span>
                   <span className="text-xs uppercase tracking-[0.24em] text-black/35">

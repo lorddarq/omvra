@@ -52,7 +52,7 @@ const WhyPlumy = () => {
                 >
                   {reason.title}
                 </h3>
-                <p className="max-w-[34ch] leading-7 text-[#4a5565]">{reason.description}</p>
+                <p className="max-w-[34ch] leading-6 text-[#4a5565]">{reason.description}</p>
               </article>
             ))}
           </div>

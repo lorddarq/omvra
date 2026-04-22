@@ -35,10 +35,10 @@ const BestFor = () => {
             {groups.map((group, index) => (
               <article key={group.title} className="border-t border-black/10 pt-6">
                 <div className="mb-6 text-sm font-medium tracking-[0.2em] text-black/40">0{index + 1}</div>
-                <h3 className="max-w-[16ch] text-xl font-medium leading-8 text-black md:text-2xl">
+                <h3 className="max-w-[16ch] text-xl font-medium leading-tight text-black md:text-2xl">
                   {group.title}
                 </h3>
-                <p className="max-w-[32ch] pt-6 text-base font-normal leading-7 text-[#6B6B6B]">
+                <p className="max-w-[32ch] pt-6 text-base font-normal leading-6 text-[#6B6B6B]">
                   {group.description}
                 </p>
               </article>

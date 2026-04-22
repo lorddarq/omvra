@@ -81,7 +81,7 @@ const HowItWorks = () => {
                   >
                     {step.title}
                   </h3>
-                  <p className="max-w-[34ch] leading-7 text-[#4a5565]">{step.description}</p>
+                  <p className="max-w-[34ch] leading-6 text-[#4a5565]">{step.description}</p>
                   {index < steps.length - 1 ? (
                     <div className="mt-8 flex items-center gap-3 text-xs uppercase tracking-[0.26em] text-black/35 lg:mt-auto lg:pt-10">
                       <span>{index === 0 ? 'Then' : 'Next'}</span>

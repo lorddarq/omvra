@@ -58,7 +58,7 @@ const PrivacyProof = () => {
                   <p className="mb-2 text-sm font-medium uppercase tracking-[0.18em] text-black/55">
                     Practical effect
                   </p>
-                  <p className="text-sm leading-7 text-black/80">
+                  <p className="text-sm leading-5 text-black/80">
                     Your tasks, comments, people, and backup exports stay part of your own desktop workflow rather than a hosted account system.
                   </p>
                 </div>
@@ -72,9 +72,9 @@ const PrivacyProof = () => {
                 <h3 className="mb-4 max-w-[12ch] text-2xl font-normal leading-tight tracking-[-0.03em] text-[#687912] md:text-[2rem]">
                   {proofPoints[1].title}
                 </h3>
-                <p className="text-base leading-7 text-black">{proofPoints[1].description}</p>
+                <p className="text-base leading-6 text-black">{proofPoints[1].description}</p>
               </div>
-              <p className="mt-auto border-t border-black/10 pt-4 text-sm leading-6 text-black/65">
+              <p className="mt-auto border-t border-black/10 pt-4 text-sm leading-5 text-black/65">
                 Open the app, download a release, and start planning without another signup step in the middle.
               </p>
             </article>
@@ -85,7 +85,7 @@ const PrivacyProof = () => {
               <h3 className="mb-4 max-w-[14ch] text-2xl font-normal leading-tight tracking-[-0.03em] text-[#687912]">
                 {proofPoints[2].title}
               </h3>
-              <p className="text-base leading-7 text-black">{proofPoints[2].description}</p>
+              <p className="text-base leading-6 text-black">{proofPoints[2].description}</p>
             </article>
 
             <article
@@ -97,14 +97,14 @@ const PrivacyProof = () => {
                     {proofPoints[3].title}
                   </h3>
                 </div>
-                <p className="text-base leading-8 text-black">
+                <p className="text-base leading-6 text-black">
                   {proofPoints[3].description}
                 </p>
               </div>
             </article>
           </div>
 
-          <p className="mx-auto mt-8 max-w-2xl text-center text-sm font-normal leading-6 text-black/70">
+          <p className="mx-auto mt-8 max-w-2xl text-center text-sm font-normal leading-5 text-black/70">
             Audit basis: app renderer and Electron main/preload paths checked for telemetry, analytics, and auto-upload behavior.
           </p>
         </div>

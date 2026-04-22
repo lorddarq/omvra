@@ -63,9 +63,9 @@ const AgentPrompts = () => {
                         <h3 className="text-xl font-medium leading-tight tracking-[-0.02em] text-black">
                           {example.title}
                         </h3>
-                        <p className="mt-2 text-sm leading-6 text-[#5A5A5A]">{example.why}</p>
+                        <p className="mt-2 text-sm leading-5 text-[#5A5A5A]">{example.why}</p>
                       </div>
-                      <p className="font-mono text-sm leading-6 text-[#2C2C2C]">
+                      <p className="font-mono text-sm leading-5 text-[#2C2C2C]">
                         {example.title === 'Work a single task without guessing'
                           ? 'Read the task guide, inspect one task carefully, review description/comments/context first, then explain the plan before making updates.'
                           : 'Watch the active board for newly assigned Codex work, ignore duplicates, and report only new actionable tasks.'}
@@ -81,7 +81,7 @@ const AgentPrompts = () => {
                 </p>
                 <ul className="grid gap-4 sm:grid-cols-2">
                   {bestPractices.map((item) => (
-                    <li key={item} className="flex gap-3 text-base leading-7 text-black">
+                    <li key={item} className="flex gap-3 text-base leading-6 text-black">
                       <span aria-hidden="true" className="mt-1.5 h-2.5 w-2.5 rounded-full bg-[#6c4fe0]" />
                       <span>{item}</span>
                     </li>
@@ -107,11 +107,11 @@ const AgentPrompts = () => {
                       <h3 className="mb-3 max-w-[16ch] text-2xl font-medium leading-tight tracking-[-0.03em] text-black">
                         {example.title}
                       </h3>
-                      <p className="text-sm leading-6 text-[#5A5A5A]">{example.why}</p>
+                      <p className="text-sm leading-5 text-[#5A5A5A]">{example.why}</p>
                     </div>
                     <div className="border-t border-black/8 pt-4 md:border-l md:border-t-0 md:pl-6 md:pt-0">
                       <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-[#838383]">Sample prompt</p>
-                      <p className="font-mono text-[0.93rem] leading-7 text-[#2C2C2C]">
+                      <p className="font-mono text-[0.93rem] leading-5 text-[#2C2C2C]">
                         {index === 0
                           ? 'Connect to Plumy MCP, inspect the guide and assigned-work resources for Codex, summarize what is actionable now, then start with the highest-priority task.'
                           : 'Use Plumy MCP to complete task <TASK_ID>, keep the completion note brief, follow the handoff workflow, and move it to Ready for human review.'}

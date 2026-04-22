@@ -148,12 +148,12 @@ const Features = () => {
             <div className="space-y-10">
               <article className="rounded-[32px] border border-[#ebe7f8] bg-[linear-gradient(180deg,#fbf9ff_0%,#ffffff_70%)] p-8 shadow-[0_18px_40px_rgba(108,79,224,0.07)] md:p-10">
                 <div className="mb-8 flex flex-wrap items-start justify-between gap-6">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-[22px] bg-[#6c4fe0]/10 text-[#6c4fe0] shadow-[0_12px_30px_rgba(108,79,224,0.12)]">
+                  <div className="flex items-center justify-center text-[#6c4fe0]">
                     {leadFeature.icon}
                   </div>
                   <span className="text-sm font-semibold tracking-[0.22em] text-[#99a1af]">01</span>
                 </div>
-                <div className="grid gap-10 xl:grid-cols-[minmax(0,0.95fr)_minmax(15rem,0.7fr)] xl:gap-12">
+                <div className="space-y-4 xl:space-y-5">
                   <div>
                     <p className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-[#6c4fe0]">
                       Core workflow
@@ -166,13 +166,13 @@ const Features = () => {
                     </h3>
                   </div>
                   <div className="space-y-5">
-                    <p className="text-base leading-8 text-[#4a5565] md:text-lg">{leadFeature.description}</p>
+                    <p className="text-base leading-6 text-[#4a5565] md:text-lg">{leadFeature.description}</p>
                     <div className="grid gap-4 border-t border-[#e4def8] pt-5 xl:grid-cols-2">
                       <div>
                         <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#99a1af]">
                           Why it matters
                         </p>
-                        <p className="text-sm leading-7 text-[#4a5565]">
+                        <p className="text-sm leading-5 text-[#4a5565]">
                           The timeline stays strategic while Kanban keeps execution moving in the same workspace.
                         </p>
                       </div>
@@ -180,7 +180,7 @@ const Features = () => {
                         <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#99a1af]">
                           Result
                         </p>
-                        <p className="text-sm leading-7 text-[#4a5565]">
+                        <p className="text-sm leading-5 text-[#4a5565]">
                           Less status translation, less duplicated planning, and a clearer handoff from planning to delivery.
                         </p>
                       </div>
@@ -193,30 +193,27 @@ const Features = () => {
                 <div className="mb-5 inline-flex items-center rounded-full border border-[#6c4fe0]/20 bg-white/80 px-4 py-1.5 text-sm font-medium text-[#6c4fe0]">
                   MCP Support
                 </div>
-                <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(10rem,0.55fr)] md:items-start">
+                <div className="w-full space-y-8">
                   <div>
                     <h3
-                      className="mb-4 max-w-[14ch] text-2xl font-medium leading-tight tracking-[-0.03em] text-[#101828] md:text-[2rem]"
+                      className="mb-4 text-2xl font-medium leading-tight tracking-[-0.03em] text-[#101828] md:text-[2rem]"
                       style={{ fontFamily: 'Figtree, sans-serif' }}
                     >
                       AI workflows when you want them, not when you do not
                     </h3>
-                    <p className="max-w-[34ch] text-base leading-8 text-[#4a5565]">
+                    <p className="text-base leading-6 text-[#4a5565]">
                       Plumy keeps the agent story visible, but deliberate. Typed task context, concise notes, and human
                       review handoffs make the MCP path feel like a structured capability instead of a vague add-on.
                     </p>
                   </div>
-                  <div className="border-t border-[#d9d0f4] pt-5 md:border-l md:border-t-0 md:pl-6 md:pt-0">
-                    <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/90 text-[#6c4fe0] shadow-[0_10px_28px_rgba(108,79,224,0.12)]">
-                      {mcpFeature.icon}
-                    </div>
+                  <div>
                     <p
                       className="mb-2 text-lg font-semibold leading-tight tracking-[-0.02em] text-[#101828]"
                       style={{ fontFamily: 'Figtree, sans-serif' }}
                     >
                       {mcpFeature.title}
                     </p>
-                    <p className="text-sm leading-7 text-[#4a5565]">{mcpFeature.description}</p>
+                    <p className="text-sm leading-5 tracking-tight text-[#4a5565]">{mcpFeature.description}</p>
                   </div>
                 </div>
               </article>
@@ -248,7 +245,7 @@ const Features = () => {
                         >
                           {feature.title}
                         </h3>
-                        <p className="max-w-[40ch] text-sm leading-7 text-[#4a5565] md:text-[0.97rem]">
+                        <p className="max-w-[40ch] text-sm leading-6 text-[#4a5565] md:text-[0.97rem]">
                           {feature.description}
                         </p>
                       </div>
@@ -256,7 +253,6 @@ const Features = () => {
                   ))}
                 </div>
               </div>
-
             </div>
           </div>
         </div>

@@ -47,39 +47,7 @@ const AgentPrompts = () => {
             AI support is optional in Plumy, but it is built to be structured when you need it. These examples show how teams can give assistants better context, safer handoff instructions, and clearer review expectations.
           </p>
 
-          <div className="grid gap-10 lg:grid-cols-[minmax(0,1.02fr)_minmax(18rem,0.98fr)] lg:items-start">
-            <div className="space-y-6">
-              {featuredExamples.map((example, index) => (
-                <article
-                  key={example.title}
-                  className="rounded-[28px] bg-[#fbfbfb] p-6 md:p-7"
-                >
-                  <div className="mb-5 flex items-center justify-between gap-4">
-                    <span className="text-sm font-medium uppercase tracking-[0.2em] text-[#6c4fe0]">
-                      Example 0{index + 1}
-                    </span>
-                    <span className="text-sm font-medium text-black/40">Curated workflow</span>
-                  </div>
-                  <div className="grid gap-5 md:grid-cols-[minmax(0,0.74fr)_minmax(0,1fr)] md:gap-6">
-                    <div>
-                      <h3 className="mb-3 max-w-[16ch] text-2xl font-medium leading-tight tracking-[-0.03em] text-black">
-                        {example.title}
-                      </h3>
-                      <p className="text-sm leading-6 text-[#5A5A5A]">{example.why}</p>
-                    </div>
-                    <div className="border-t border-black/8 pt-4 md:border-l md:border-t-0 md:pl-6 md:pt-0">
-                      <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-[#838383]">Sample prompt</p>
-                      <p className="font-mono text-[0.93rem] leading-7 text-[#2C2C2C]">
-                        {index === 0
-                          ? 'Connect to Plumy MCP, inspect the guide and assigned-work resources for Codex, summarize what is actionable now, then start with the highest-priority task.'
-                          : 'Use Plumy MCP to complete task <TASK_ID>, keep the completion note brief, follow the handoff workflow, and move it to Ready for human review.'}
-                      </p>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-
+          <div className="grid gap-10 lg:grid-cols-[minmax(18rem,0.92fr)_minmax(0,1.08fr)] lg:items-start">
             <div className="space-y-10">
               <div className="border-t border-black/10 pt-5">
                 <p className="mb-5 text-sm font-medium uppercase tracking-[0.2em] text-[#838383]">
@@ -120,6 +88,38 @@ const AgentPrompts = () => {
                   ))}
                 </ul>
               </div>
+            </div>
+
+            <div className="space-y-6">
+              {featuredExamples.map((example, index) => (
+                <article
+                  key={example.title}
+                  className="rounded-[28px] bg-[#fbfbfb] p-6 md:p-7"
+                >
+                  <div className="mb-5 flex items-center justify-between gap-4">
+                    <span className="text-sm font-medium uppercase tracking-[0.2em] text-[#6c4fe0]">
+                      Example 0{index + 1}
+                    </span>
+                    <span className="text-sm font-medium text-black/40">Curated workflow</span>
+                  </div>
+                  <div className="grid gap-5 md:grid-cols-[minmax(0,0.74fr)_minmax(0,1fr)] md:gap-6">
+                    <div>
+                      <h3 className="mb-3 max-w-[16ch] text-2xl font-medium leading-tight tracking-[-0.03em] text-black">
+                        {example.title}
+                      </h3>
+                      <p className="text-sm leading-6 text-[#5A5A5A]">{example.why}</p>
+                    </div>
+                    <div className="border-t border-black/8 pt-4 md:border-l md:border-t-0 md:pl-6 md:pt-0">
+                      <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-[#838383]">Sample prompt</p>
+                      <p className="font-mono text-[0.93rem] leading-7 text-[#2C2C2C]">
+                        {index === 0
+                          ? 'Connect to Plumy MCP, inspect the guide and assigned-work resources for Codex, summarize what is actionable now, then start with the highest-priority task.'
+                          : 'Use Plumy MCP to complete task <TASK_ID>, keep the completion note brief, follow the handoff workflow, and move it to Ready for human review.'}
+                      </p>
+                    </div>
+                  </div>
+                </article>
+              ))}
             </div>
           </div>
         </div>

@@ -45,10 +45,7 @@ const PrivacyProof = () => {
               className={`relative overflow-hidden rounded-[30px] bg-[#FCFDE8] p-8 shadow-[0_18px_44px_rgba(104,121,18,0.10)] md:min-h-[22rem] md:p-10 ${cardSpans[0]}`}
             >
               <div className="absolute inset-x-0 top-0 h-[4px] bg-[#B0C81A]" />
-              <p className="mb-10 text-sm font-medium uppercase tracking-[0.2em] text-[#8A9826]">
-                Trust signal 01
-              </p>
-              <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(13rem,0.52fr)] md:items-end">
+              <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(13rem,0.52fr)] md:items-start">
                 <div>
                   <h3 className="mb-5 max-w-[10ch] text-[2.35rem] font-normal leading-[0.98] tracking-[-0.045em] text-[#687912] md:text-[3rem]">
                     {proofPoints[0].title}
@@ -69,28 +66,22 @@ const PrivacyProof = () => {
             </article>
 
             <article
-              className={`flex min-h-[22rem] flex-col justify-between rounded-[30px] bg-[#F4F7D8] p-7 md:p-8 ${cardSpans[1]}`}
+              className={`flex min-h-[22rem] flex-col rounded-[30px] bg-[#F4F7D8] p-7 md:p-8 ${cardSpans[1]}`}
             >
               <div>
-                <p className="mb-8 text-sm font-medium uppercase tracking-[0.2em] text-[#8A9826]">
-                  Trust signal 02
-                </p>
                 <h3 className="mb-4 max-w-[12ch] text-2xl font-normal leading-tight tracking-[-0.03em] text-[#687912] md:text-[2rem]">
                   {proofPoints[1].title}
                 </h3>
                 <p className="text-base leading-7 text-black">{proofPoints[1].description}</p>
               </div>
-              <p className="mt-8 border-t border-black/10 pt-4 text-sm leading-6 text-black/65">
+              <p className="mt-auto border-t border-black/10 pt-4 text-sm leading-6 text-black/65">
                 Open the app, download a release, and start planning without another signup step in the middle.
               </p>
             </article>
 
             <article
-              className={`flex min-h-[17rem] flex-col justify-end rounded-[30px] bg-[#FAFBEF] p-7 md:min-h-[18rem] md:p-8 ${cardSpans[2]}`}
+              className={`flex min-h-[17rem] flex-col rounded-[30px] bg-[#FAFBEF] p-7 md:min-h-[18rem] md:p-8 ${cardSpans[2]}`}
             >
-              <p className="mb-5 text-sm font-medium uppercase tracking-[0.2em] text-[#8A9826]">
-                Trust signal 03
-              </p>
               <h3 className="mb-4 max-w-[14ch] text-2xl font-normal leading-tight tracking-[-0.03em] text-[#687912]">
                 {proofPoints[2].title}
               </h3>
@@ -102,9 +93,6 @@ const PrivacyProof = () => {
             >
               <div className="grid gap-6 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)] md:items-start">
                 <div>
-                  <p className="mb-5 text-sm font-medium uppercase tracking-[0.2em] text-[#8A9826]">
-                    Trust signal 04
-                  </p>
                   <h3 className="mb-4 max-w-[13ch] text-2xl font-normal leading-tight tracking-[-0.03em] text-[#687912] md:text-[2rem]">
                     {proofPoints[3].title}
                   </h3>

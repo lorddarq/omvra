@@ -13,7 +13,7 @@ const BestFor = () => {
     {
       title: 'Teams replacing spreadsheet-plus-chat workflows',
       description:
-        'A strong fit if you have outgrown ad hoc planning but still want something simpler, calmer, and easier to trust than a cloud-heavy stack.',
+        'A strong fit if you have outgrown ad hoc planning and want a calmer, simpler tool that is easier to trust than a cloud-heavy stack.',
     },
   ]
 
@@ -38,7 +38,7 @@ const BestFor = () => {
                 <h3 className="max-w-[16ch] text-xl font-medium leading-8 text-black md:text-2xl">
                   {group.title}
                 </h3>
-                <p className="max-w-[34ch] pt-6 text-base font-normal leading-7 text-[#6B6B6B]">
+                <p className="max-w-[32ch] pt-6 text-base font-normal leading-7 text-[#6B6B6B]">
                   {group.description}
                 </p>
               </article>

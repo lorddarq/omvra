@@ -62,7 +62,11 @@
     "icon": "electron/assets/icon",
     "appId": "com.plumy.app",
     "productName": "Plumy",
-    "publish": null,
+    "publish": {
+      "provider": "github",
+      "owner": "lorddarq",
+      "repo": "Plumy"
+    },
     "files": [
       "dist/**",
       "electron/**",
@@ -76,6 +80,7 @@
       "entitlementsInherit": "electron/entitlements.mac.inherit.plist",
       "target": [
         "dmg",
+        "zip",
         "pkg"
       ]
     },

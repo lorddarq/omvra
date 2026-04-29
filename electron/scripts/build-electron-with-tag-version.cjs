@@ -92,7 +92,7 @@ function run() {
     ? path.resolve(process.cwd(), 'node_modules', '.bin', 'electron-builder.cmd')
     : path.resolve(process.cwd(), 'node_modules', '.bin', 'electron-builder');
 
-  const args = ['--config.extraMetadata.version=' + resolvedVersion];
+  const args = ['--config.extraMetadata.version=' + resolvedVersion, '--publish=never'];
   const buildEnv = { ...process.env };
   const isWindows = process.platform === 'win32';
 

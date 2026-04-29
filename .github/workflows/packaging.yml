@@ -4,7 +4,12 @@ on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Optional release tag to build, e.g. v0.2.1 or v0.2.1-rc.1. Leave blank to create the next stable patch tag.'
+        required: false
+        type: string
 
 jobs:
   prepare_release:
@@ -16,6 +21,7 @@ jobs:
       release_tag: ${{ steps.resolve_tag.outputs.release_tag }}
       release_version: ${{ steps.resolve_tag.outputs.release_version }}
       created_tag: ${{ steps.resolve_tag.outputs.created_tag }}
+      is_prerelease: ${{ steps.resolve_tag.outputs.is_prerelease }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,20 +31,74 @@ jobs:
       - name: Resolve release tag
         id: resolve_tag
         shell: bash
+        env:
+          REQUESTED_RELEASE_TAG: ${{ github.event.inputs.release_tag || '' }}
         run: |
           set -euo pipefail
 
+          emit_outputs() {
+            local tag="$1"
+            local created="$2"
+            local version="${tag#v}"
+            local is_prerelease="false"
+
+            if [[ "${version}" == *-* ]]; then
+              is_prerelease="true"
+            fi
+
+            echo "release_tag=${tag}" >> "$GITHUB_OUTPUT"
+            echo "release_version=${version}" >> "$GITHUB_OUTPUT"
+            echo "created_tag=${created}" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=${is_prerelease}" >> "$GITHUB_OUTPUT"
+          }
+
+          normalize_release_tag() {
+            local raw="$1"
+            raw="${raw#refs/tags/}"
+            if [[ "${raw}" != v* ]]; then
+              raw="v${raw}"
+            fi
+            echo "${raw}"
+          }
+
+          validate_release_tag() {
+            local tag="$1"
+            if [[ ! "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
+              echo "Invalid release tag '${tag}'. Use vX.Y.Z or vX.Y.Z-rc.N." >&2
+              exit 1
+            fi
+          }
+
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             tag="${GITHUB_REF#refs/tags/}"
+            validate_release_tag "${tag}"
             echo "Using existing tag ${tag}"
-            echo "release_tag=${tag}" >> "$GITHUB_OUTPUT"
-            echo "release_version=${tag#v}" >> "$GITHUB_OUTPUT"
-            echo "created_tag=false" >> "$GITHUB_OUTPUT"
+            emit_outputs "${tag}" "false"
             exit 0
           fi
 
           git fetch --tags --force
-          latest_tag="$(git tag -l 'v*' --sort=-version:refname | head -n 1)"
+
+          if [[ -n "${REQUESTED_RELEASE_TAG}" ]]; then
+            requested_tag="$(normalize_release_tag "${REQUESTED_RELEASE_TAG}")"
+            validate_release_tag "${requested_tag}"
+
+            if git rev-parse -q --verify "refs/tags/${requested_tag}" >/dev/null; then
+              echo "Using existing requested tag ${requested_tag}"
+              emit_outputs "${requested_tag}" "false"
+              exit 0
+            fi
+
+            echo "Creating requested release tag ${requested_tag} for ${GITHUB_SHA}"
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag -a "${requested_tag}" "${GITHUB_SHA}" -m "Release ${requested_tag}"
+            git push origin "refs/tags/${requested_tag}"
+            emit_outputs "${requested_tag}" "true"
+            exit 0
+          fi
+
+          latest_tag="$(git tag -l 'v*' --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)"
 
           if [[ -z "${latest_tag}" ]]; then
             next_tag="v0.1.0"
@@ -57,9 +117,7 @@ jobs:
           git tag -a "${next_tag}" "${GITHUB_SHA}" -m "Release ${next_tag}"
           git push origin "refs/tags/${next_tag}"
 
-          echo "release_tag=${next_tag}" >> "$GITHUB_OUTPUT"
-          echo "release_version=${next_tag#v}" >> "$GITHUB_OUTPUT"
-          echo "created_tag=true" >> "$GITHUB_OUTPUT"
+          emit_outputs "${next_tag}" "true"
 
   build:
     name: Build and Package
@@ -76,6 +134,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: true
+          ref: ${{ needs.prepare_release.outputs.release_tag }}
 
       - name: Refresh tags
         run: git fetch --tags --force
@@ -112,6 +171,8 @@ jobs:
       - name: Package app
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
+          GITHUB_REF_TYPE: tag
+          GITHUB_REF_NAME: ${{ needs.prepare_release.outputs.release_tag }}
         run: npm run build:electron
 
       - name: Upload artifacts
@@ -156,10 +217,15 @@ jobs:
           name: ${{ needs.prepare_release.outputs.release_tag }}
           files: |
             ./artifacts/macos/*.dmg
+            ./artifacts/macos/*.pkg
+            ./artifacts/macos/*.zip
+            ./artifacts/macos/latest-mac.yml
             ./artifacts/windows/*.exe
+            ./artifacts/windows/latest.yml
             ./artifacts/linux/*.AppImage
+            ./artifacts/linux/latest-linux.yml
           draft: false
-          prerelease: false
+          prerelease: ${{ needs.prepare_release.outputs.is_prerelease == 'true' }}
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

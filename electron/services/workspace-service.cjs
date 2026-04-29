@@ -412,6 +412,7 @@ function buildMcpCapabilitySnapshot(store) {
     exposedWriteTools: writeToolsEnabled
         ? [
             'tasks.transition_under_review',
+            'tasks.update',
             'tasks.update_agent_summary',
             'tasks.update_completion_description',
             'tasks.move_to_requires_human_review',
@@ -703,6 +704,7 @@ function buildMcpAgentGuide() {
       'cards.timeline.list',
       'boards.watch.poll',
       'task_write',
+      'tasks.update',
       'tasks.add_comment',
       'tasks.update_completion_description',
       'tasks.move_to_status',
@@ -747,6 +749,7 @@ function buildMcpTaskExecutionSchema() {
     ],
     recommendedWriteSequence: [
       'task_write when new follow-up work must be logged',
+      'tasks.update when an existing task detail or metadata field needs a targeted edit',
       'tasks.add_comment',
       'tasks.update_completion_description',
       'tasks.move_to_status or tasks.move_to_ready_for_human_review',
@@ -1022,6 +1025,38 @@ function normalizeOptionalEnum(value, allowedValues, fallback) {
   return allowedValues.includes(normalized) ? normalized : fallback;
 }
 
+function hasOwn(value, key) {
+  return Boolean(value) && Object.prototype.hasOwnProperty.call(value, key);
+}
+
+function normalizePatchDate(value, fieldName) {
+  if (value === null || value === undefined) return { ok: true, value: undefined };
+  const normalized = normalizeString(value).trim();
+  if (!normalized) return { ok: true, value: undefined };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    return {
+      ok: false,
+      error: 'INVALID_DATE',
+      message: `${fieldName} must use YYYY-MM-DD format when provided.`,
+    };
+  }
+  return { ok: true, value: normalized };
+}
+
+function normalizePatchEnum(value, allowedValues, fieldName) {
+  if (value === null || value === undefined) return { ok: true, value: undefined };
+  const normalized = normalizeString(value).trim();
+  if (!normalized) return { ok: true, value: undefined };
+  if (!allowedValues.includes(normalized)) {
+    return {
+      ok: false,
+      error: 'INVALID_ENUM_VALUE',
+      message: `${fieldName} must be one of: ${allowedValues.join(', ')}.`,
+    };
+  }
+  return { ok: true, value: normalized };
+}
+
 function createTask(store, {
   title,
   notes,
@@ -1226,6 +1261,172 @@ function updateTaskWithRevision(store, taskId, expectedRevision, updater) {
   store.set(TASKS_KEY, nextTasks);
 
   return { ok: true, task: normalizeTaskForMcp(updated) };
+}
+
+function updateTaskDetails(store, options = {}) {
+  const patch = options && typeof options === 'object' && !Array.isArray(options) ? options : {};
+  const {
+    taskId,
+    expectedRevision,
+    title,
+    notes,
+    statusId,
+    statusTitle,
+    assigneeId,
+    assigneeName,
+    assigneeKind,
+    projectId,
+    projectIds,
+    swimlaneId,
+    startDate,
+    endDate,
+    size,
+    complexity,
+    priority,
+    blocked,
+    swimlaneOnly,
+    actor = 'agent',
+  } = patch;
+
+  const normalizedTaskId = normalizeString(taskId).trim();
+  if (!normalizedTaskId) {
+    return { ok: false, error: 'TASK_ID_REQUIRED', message: 'taskId is required.' };
+  }
+
+  if (hasOwn(patch, 'title') && !normalizeString(title).trim()) {
+    return { ok: false, error: 'INVALID_TITLE', message: 'title cannot be empty.' };
+  }
+
+  const hasStatusPatch = hasOwn(patch, 'statusId') || hasOwn(patch, 'statusTitle');
+  const targetStatus = hasStatusPatch && (normalizeString(statusId) || normalizeString(statusTitle))
+    ? findStatusColumnByReference(store, { statusId, statusTitle })
+    : null;
+  if (hasStatusPatch && (normalizeString(statusId) || normalizeString(statusTitle)) && !targetStatus) {
+    return { ok: false, error: 'STATUS_NOT_FOUND', message: 'Target status/board not found.' };
+  }
+
+  const hasAssigneePatch = hasOwn(patch, 'assigneeId') || hasOwn(patch, 'assigneeName');
+  const hasAssigneeValue = normalizeString(assigneeId) || normalizeString(assigneeName);
+  const assignee = hasAssigneePatch && hasAssigneeValue
+    ? findPersonByReference(store, { assigneeId, assigneeName })
+    : null;
+  if (hasAssigneePatch && hasAssigneeValue && !assignee) {
+    return { ok: false, error: 'ASSIGNEE_NOT_FOUND', message: 'Assignee not found.' };
+  }
+  if (assignee && typeof assigneeKind === 'string' && assigneeKind.trim() && assignee.kind !== assigneeKind.trim()) {
+    return {
+      ok: false,
+      error: 'ASSIGNEE_KIND_MISMATCH',
+      message: 'Assignee kind does not match the selected person.',
+    };
+  }
+
+  const hasProjectPatch = hasOwn(patch, 'projectId') || hasOwn(patch, 'projectIds');
+  let resolvedProjects = null;
+  if (hasProjectPatch) {
+    const requestedProjectIds = normalizeTaskIdList(
+      Array.isArray(projectIds)
+        ? projectIds.concat(projectId ? [projectId] : [])
+        : (projectId ? [projectId] : [])
+    );
+    resolvedProjects = [];
+    for (const id of requestedProjectIds) {
+      const project = findProjectByReference(store, id);
+      if (!project) {
+        return {
+          ok: false,
+          error: 'PROJECT_NOT_FOUND',
+          message: `Project "${id}" not found. Provide a valid project id or project name.`,
+        };
+      }
+      resolvedProjects.push(project);
+    }
+  }
+
+  const hasSwimlanePatch = hasOwn(patch, 'swimlaneId');
+  const normalizedSwimlaneId = normalizeString(swimlaneId).trim();
+  const primaryTimelineProject = hasSwimlanePatch && normalizedSwimlaneId
+    ? findProjectByReference(store, normalizedSwimlaneId)
+    : null;
+  if (hasSwimlanePatch && normalizedSwimlaneId && !primaryTimelineProject) {
+    return {
+      ok: false,
+      error: 'TIMELINE_PROJECT_NOT_FOUND',
+      message: `Timeline project "${normalizedSwimlaneId}" not found. Provide a valid project id or project name.`,
+    };
+  }
+
+  const startDatePatch = hasOwn(patch, 'startDate') ? normalizePatchDate(startDate, 'startDate') : null;
+  if (startDatePatch && !startDatePatch.ok) return startDatePatch;
+  const endDatePatch = hasOwn(patch, 'endDate') ? normalizePatchDate(endDate, 'endDate') : null;
+  if (endDatePatch && !endDatePatch.ok) return endDatePatch;
+
+  const sizePatch = hasOwn(patch, 'size') ? normalizePatchEnum(size, ['xs', 's', 'm', 'l'], 'size') : null;
+  if (sizePatch && !sizePatch.ok) return sizePatch;
+  const complexityPatch = hasOwn(patch, 'complexity') ? normalizePatchEnum(complexity, ['routine', 'medium', 'hard'], 'complexity') : null;
+  if (complexityPatch && !complexityPatch.ok) return complexityPatch;
+  const priorityPatch = hasOwn(patch, 'priority') ? normalizePatchEnum(priority, ['urgent', 'moderate', 'normal', 'low'], 'priority') : null;
+  if (priorityPatch && !priorityPatch.ok) return priorityPatch;
+
+  return updateTaskWithRevision(store, normalizedTaskId, expectedRevision, (task) => {
+    const nextTask = { ...task };
+
+    if (hasOwn(patch, 'title')) {
+      const normalizedTitle = normalizeString(title).trim();
+      nextTask.title = normalizedTitle;
+    }
+
+    if (hasOwn(patch, 'notes')) {
+      nextTask.notes = typeof notes === 'string' ? notes : '';
+    }
+
+    if (hasStatusPatch && targetStatus) {
+      nextTask.status = targetStatus.id;
+    }
+
+    if (hasAssigneePatch) {
+      nextTask.assigneeId = assignee?.id;
+    }
+
+    if (hasProjectPatch || hasSwimlanePatch) {
+      const nextProjectIds = hasProjectPatch
+        ? resolvedProjects.map(project => project.id)
+        : normalizeTaskIdList(nextTask.projectIds);
+      let nextSwimlaneId = nextTask.swimlaneId;
+
+      if (hasSwimlanePatch) {
+        nextSwimlaneId = primaryTimelineProject?.id;
+      } else if (hasProjectPatch && nextProjectIds.length === 0) {
+        nextSwimlaneId = undefined;
+      } else if (hasProjectPatch && nextSwimlaneId && nextProjectIds.length > 0 && !nextProjectIds.includes(nextSwimlaneId)) {
+        nextSwimlaneId = nextProjectIds[0];
+      }
+
+      if (nextSwimlaneId && !nextProjectIds.includes(nextSwimlaneId)) {
+        nextProjectIds.unshift(nextSwimlaneId);
+      }
+
+      nextTask.projectIds = nextProjectIds;
+      nextTask.swimlaneId = nextSwimlaneId;
+      nextTask.project = nextProjectIds
+        .map(id => findProjectById(store, id)?.name)
+        .filter(Boolean)
+        .join(', ') || undefined;
+    }
+
+    if (startDatePatch) nextTask.startDate = startDatePatch.value;
+    if (endDatePatch) nextTask.endDate = endDatePatch.value;
+    if (nextTask.startDate && nextTask.endDate && nextTask.endDate < nextTask.startDate) return null;
+
+    if (sizePatch) nextTask.size = sizePatch.value || 'm';
+    if (complexityPatch) nextTask.complexity = complexityPatch.value || 'medium';
+    if (priorityPatch) nextTask.priority = priorityPatch.value || 'normal';
+    if (hasOwn(patch, 'blocked')) nextTask.blocked = normalizeBoolean(blocked);
+    if (hasOwn(patch, 'swimlaneOnly')) nextTask.swimlaneOnly = normalizeBoolean(swimlaneOnly);
+
+    nextTask.mcpLastActor = actor;
+    return nextTask;
+  });
 }
 
 function transitionTaskToUnderReview(store, { taskId, expectedRevision, actor = 'agent' }) {
@@ -1706,6 +1907,7 @@ module.exports = {
   moveTaskToStatus,
   moveTaskToReadyForHumanReview,
   assignTaskToPerson,
+  updateTaskDetails,
   REQUIRES_HUMAN_REVIEW_STATUS_ID,
   REQUIRES_HUMAN_REVIEW_STATUS_TITLE,
 };

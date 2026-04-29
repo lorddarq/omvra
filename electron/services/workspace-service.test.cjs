@@ -19,6 +19,7 @@ const {
   listBoardWatcherStates,
   pollBoardWatcher,
   createTask,
+  updateTaskDetails,
   transitionTaskToUnderReview,
   updateTaskAgentSummary,
   addTaskComment,
@@ -243,6 +244,97 @@ test('task_write accepts project names through the MCP write surface', () => {
   assert.equal(response.id, 'create-name-1');
   assert.equal(response.result.structuredContent.task.swimlaneId, 'lane-2');
   assert.deepEqual(response.result.structuredContent.task.projectIds, ['lane-2']);
+});
+
+test('updateTaskDetails edits existing task details with revision protection', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const task = listTasks(store, { status: 'in-progress' })[0];
+  const revision = task[MCP_TASK_REV_FIELD];
+
+  const updated = updateTaskDetails(store, {
+    taskId: task.id,
+    title: 'Build timeline polish',
+    notes: 'Tighten the timeline interactions and metadata.',
+    statusTitle: 'Open',
+    assigneeName: 'Alex',
+    assigneeKind: 'human',
+    projectIds: ['Project B'],
+    swimlaneId: 'Project B',
+    startDate: '2026-03-21',
+    endDate: '2026-03-24',
+    size: 'l',
+    complexity: 'hard',
+    priority: 'urgent',
+    blocked: true,
+    swimlaneOnly: false,
+    expectedRevision: revision,
+  });
+
+  assert.equal(updated.ok, true);
+  assert.equal(updated.task.title, 'Build timeline polish');
+  assert.equal(updated.task.notes, 'Tighten the timeline interactions and metadata.');
+  assert.equal(updated.task.status, 'open');
+  assert.equal(updated.task.assigneeId, 'person-1');
+  assert.deepEqual(updated.task.projectIds, ['lane-2']);
+  assert.equal(updated.task.swimlaneId, 'lane-2');
+  assert.equal(updated.task.project, 'Project B');
+  assert.equal(updated.task.startDate, '2026-03-21');
+  assert.equal(updated.task.endDate, '2026-03-24');
+  assert.equal(updated.task.size, 'l');
+  assert.equal(updated.task.complexity, 'hard');
+  assert.equal(updated.task.priority, 'urgent');
+  assert.equal(updated.task.blocked, true);
+  assert.equal(updated.task.swimlaneOnly, false);
+  assert.equal(updated.task[MCP_TASK_REV_FIELD], revision + 1);
+});
+
+test('tasks.update is exposed through MCP and audits targeted edits', () => {
+  const dispatch = createRequestDispatcher(makeStoreFromFixture('workspace-basic'));
+  const response = dispatch({
+    jsonrpc: '2.0',
+    id: 'update-task-1',
+    method: 'tools/call',
+    params: {
+      name: 'tasks.update',
+      arguments: {
+        taskId: 'task-2',
+        title: 'Review card details',
+        priority: 'low',
+        blocked: true,
+        expectedRevision: 0,
+      },
+    },
+  }, { headers: {}, transport: 'stdio' });
+
+  assert.equal(response.jsonrpc, '2.0');
+  assert.equal(response.id, 'update-task-1');
+  assert.equal(response.result.structuredContent.action, 'tasks.update');
+  assert.equal(response.result.structuredContent.changed, true);
+  assert.equal(response.result.structuredContent.task.title, 'Review card details');
+  assert.equal(response.result.structuredContent.task.priority, 'low');
+  assert.equal(response.result.structuredContent.task.blocked, true);
+  assert.equal(response.result.structuredContent.revision, 1);
+  assert.ok(response.result.structuredContent.auditId);
+});
+
+test('updateTaskDetails rejects stale revisions and invalid references', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+
+  const stale = updateTaskDetails(store, {
+    taskId: 'task-1',
+    title: 'Should not apply',
+    expectedRevision: 99,
+  });
+  assert.equal(stale.ok, false);
+  assert.equal(stale.error, 'REVISION_MISMATCH');
+
+  const invalidProject = updateTaskDetails(store, {
+    taskId: 'task-1',
+    projectIds: ['Missing Project'],
+    expectedRevision: 0,
+  });
+  assert.equal(invalidProject.ok, false);
+  assert.equal(invalidProject.error, 'PROJECT_NOT_FOUND');
 });
 
 test('assignTaskToPerson resolves assignees by name and id', () => {

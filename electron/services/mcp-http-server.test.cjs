@@ -70,6 +70,7 @@ test('tools/list remains available after initialize handshake', () => {
   assert.ok(response.result.tools.some(tool => tool.name === 'workspace.get_snapshot'));
   assert.ok(response.result.tools.some(tool => tool.name === 'boards.watch.poll'));
   assert.ok(response.result.tools.some(tool => tool.name === 'task_write'));
+  assert.ok(response.result.tools.some(tool => tool.name === 'tasks.update'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks.move_to_status'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks.move_to_ready_for_human_review'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks.complete_and_request_review'));
@@ -644,6 +645,7 @@ test('read_only fixture only exposes read tools and preserves custom resources',
 
   const toolNames = toolsResponse.result.tools.map(tool => tool.name);
   assert.ok(toolNames.includes('workspace.get_snapshot'));
+  assert.ok(!toolNames.includes('tasks.update'));
   assert.ok(!toolNames.includes('tasks.transition_under_review'));
   assert.ok(!toolNames.includes('tasks.move_to_status'));
   assert.ok(!toolNames.includes('tasks.move_to_ready_for_human_review'));

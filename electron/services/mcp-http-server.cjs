@@ -18,6 +18,7 @@ const {
   listTimelineCards,
   pollBoardWatcher,
   createTask,
+  updateTaskDetails,
   transitionTaskToUnderReview,
   updateTaskAgentSummary,
   addTaskComment,
@@ -189,6 +190,39 @@ const WRITE_TOOL_DEFINITIONS = [
         swimlaneOnly: { type: 'boolean' },
       },
       required: ['title'],
+    },
+  },
+  {
+    name: 'tasks.update',
+    description: 'Edits an existing task details/metadata patch with optimistic revision protection. Omitted fields are preserved; empty optional fields clear their value.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        taskId: { type: 'string' },
+        title: { type: 'string' },
+        notes: { type: 'string' },
+        statusId: { type: 'string' },
+        statusTitle: { type: 'string' },
+        assigneeId: { type: 'string' },
+        assigneeName: { type: 'string' },
+        assigneeKind: { type: 'string' },
+        projectId: { type: 'string' },
+        projectIds: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+        swimlaneId: { type: 'string' },
+        startDate: { type: 'string' },
+        endDate: { type: 'string' },
+        size: { type: 'string' },
+        complexity: { type: 'string' },
+        priority: { type: 'string' },
+        blocked: { type: 'boolean' },
+        swimlaneOnly: { type: 'boolean' },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+      },
+      required: ['taskId', 'expectedRevision'],
     },
   },
   {
@@ -819,6 +853,43 @@ function handleToolCall(store, req, params) {
         toolName: name,
         taskId: result.task?.id,
         title: result.task?.title,
+        nextRevision: result.task?.__mcpRevision,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: true,
+          auditId: audit?.auditId,
+          task: result.task,
+          revision: result.task?.__mcpRevision,
+        }),
+      };
+    }
+
+    case 'tasks.update': {
+      const taskId = parseTaskId(args);
+      if (!taskId) {
+        return { error: invalidParams('Invalid params: "taskId" is required.') };
+      }
+      const result = updateTaskDetails(store, {
+        ...args,
+        taskId,
+        actor: 'mcp-agent',
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, {
+          outcome: 'denied',
+          reason: result.error,
+          toolName: name,
+          taskId,
+          fields: Object.keys(args).filter(key => key !== 'expectedRevision'),
+        });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        taskId,
+        fields: Object.keys(args).filter(key => key !== 'expectedRevision'),
         nextRevision: result.task?.__mcpRevision,
       });
       return {

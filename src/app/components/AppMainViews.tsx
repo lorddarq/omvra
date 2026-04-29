@@ -98,6 +98,8 @@ export function AppMainViews({
             <KanbanView
               tasks={tasks}
               swimlanes={statusColumns}
+              projects={timelineSwimlanes}
+              people={people}
               onTaskClick={onKanbanTaskClick}
               onEditTask={onKanbanEditTask}
               onAddTask={onKanbanAddTask}

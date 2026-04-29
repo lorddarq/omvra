@@ -8,16 +8,47 @@
  * Columns grow to fill available width or overflow-scroll if total width exceeds viewport.
  */
 
-import { useRef, useEffect, useLayoutEffect, useCallback, useState } from 'react';
-import { Task, TaskStatus, StatusColumn } from '../types';
+import { useRef, useEffect, useLayoutEffect, useCallback, useMemo, useState } from 'react';
+import { Task, TaskStatus, StatusColumn, TimelineSwimlane, Person, TaskPriority } from '../types';
 import { SwimlanesView } from './SwimlanesView';
-import { useViewState } from '../hooks/useViewState';
 import { Input } from './ui/input';
-import { Plus, Search } from 'lucide-react';
+import { Button } from './ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
+import { Filter, Plus, Search, X } from 'lucide-react';
+import {
+  EMPTY_KANBAN_TASK_FILTERS,
+  UNASSIGNED_ASSIGNEE_FILTER_VALUE,
+  clearAllKanbanTaskFilters,
+  clearKanbanTaskFilter,
+  filterKanbanTasks,
+  hasActiveKanbanTaskFilters,
+  persistKanbanTaskFilters,
+  readInitialKanbanTaskFilters,
+  sanitizeKanbanTaskFilters,
+  type KanbanTaskFilterKey,
+  type KanbanTaskFilters,
+} from '../utils/taskFilters';
+
+const ALL_FILTER_VALUE = '__plumy_all__';
+
+const PRIORITY_FILTERS: { value: TaskPriority; label: string }[] = [
+  { value: 'urgent', label: 'Urgent' },
+  { value: 'moderate', label: 'Moderate' },
+  { value: 'normal', label: 'Normal' },
+  { value: 'low', label: 'Low' },
+];
 
 interface KanbanViewProps {
   tasks: Task[];
   swimlanes: StatusColumn[];
+  projects: TimelineSwimlane[];
+  people: Person[];
   onTaskClick: (task: Task) => void;
   onEditTask?: (task: Task) => void;
   onAddTask: (status: TaskStatus) => void;
@@ -33,6 +64,8 @@ interface KanbanViewProps {
 export function KanbanView({
   tasks,
   swimlanes,
+  projects,
+  people,
   onTaskClick,
   onEditTask,
   onAddTask,
@@ -48,11 +81,78 @@ export function KanbanView({
   const scrollbarTrackRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<{ startClientX: number; startScrollLeft: number } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState<KanbanTaskFilters>(() =>
+    readInitialKanbanTaskFilters(projects, people)
+  );
   const [scrollMetrics, setScrollMetrics] = useState({
     clientWidth: 0,
     scrollWidth: 0,
     scrollLeft: 0,
   });
+
+  const activeFilters = useMemo(
+    () => sanitizeKanbanTaskFilters(filters, projects, people),
+    [filters, people, projects]
+  );
+
+  const trimmedSearchQuery = searchQuery.trim().toLowerCase();
+  const isSearchActive = trimmedSearchQuery.length > 0;
+  const hasActiveFilters = hasActiveKanbanTaskFilters(activeFilters);
+  const isBoardFiltered = isSearchActive || hasActiveFilters;
+
+  const filteredTasks = useMemo(() => {
+    return filterKanbanTasks(tasks, activeFilters).filter(task => {
+      if (isSearchActive) {
+        const haystack = `${task.title} ${task.notes || ''}`.toLowerCase();
+        if (!haystack.includes(trimmedSearchQuery)) return false;
+      }
+
+      return true;
+    });
+  }, [activeFilters, isSearchActive, tasks, trimmedSearchQuery]);
+
+  useEffect(() => {
+    persistKanbanTaskFilters(activeFilters);
+  }, [activeFilters]);
+
+  useEffect(() => {
+    setFilters(previousFilters => {
+      const nextFilters = sanitizeKanbanTaskFilters(previousFilters, projects, people);
+      return JSON.stringify(previousFilters) === JSON.stringify(nextFilters)
+        ? previousFilters
+        : nextFilters;
+    });
+  }, [people, projects]);
+
+  const projectFilterValue = activeFilters.projectId || ALL_FILTER_VALUE;
+  const priorityFilterValue = activeFilters.priority || ALL_FILTER_VALUE;
+  const assigneeFilterValue = activeFilters.assigneeId || ALL_FILTER_VALUE;
+
+  const setFilterValue = (key: KanbanTaskFilterKey, value: string) => {
+    setFilters(previousFilters => {
+      if (value === ALL_FILTER_VALUE) {
+        return clearKanbanTaskFilter(previousFilters, key);
+      }
+
+      return { ...previousFilters, [key]: value };
+    });
+  };
+
+  const clearFilter = (key: KanbanTaskFilterKey) => {
+    setFilters(previousFilters => clearKanbanTaskFilter(previousFilters, key));
+  };
+
+  const clearAllFilters = () => {
+    setFilters(clearAllKanbanTaskFilters());
+  };
+
+  const getFilterSelectClassName = (isActive: boolean) => (
+    isActive ? 'w-[150px] border-gray-400 bg-white' : 'w-[150px] bg-white'
+  );
+
+  const getPrioritySelectClassName = (isActive: boolean) => (
+    isActive ? 'w-[140px] border-gray-400 bg-white' : 'w-[140px] bg-white'
+  );
 
   const syncScrollMetrics = useCallback((node?: HTMLDivElement | null) => {
     const target = node ?? containerRef.current;
@@ -94,7 +194,7 @@ export function KanbanView({
 
   useLayoutEffect(() => {
     syncScrollMetrics();
-  }, [syncScrollMetrics, swimlanes.length, tasks.length, searchQuery]);
+  }, [syncScrollMetrics, swimlanes.length, filteredTasks.length, searchQuery, activeFilters]);
 
   useEffect(() => {
     const node = containerRef.current;
@@ -119,7 +219,7 @@ export function KanbanView({
       resizeObserver.disconnect();
       window.removeEventListener('resize', handleWindowResize);
     };
-  }, [syncScrollMetrics, swimlanes.length, tasks.length]);
+  }, [syncScrollMetrics, swimlanes.length, filteredTasks.length]);
 
   const hasHorizontalOverflow = scrollMetrics.scrollWidth > scrollMetrics.clientWidth + 1;
   const maxScrollLeft = Math.max(scrollMetrics.scrollWidth - scrollMetrics.clientWidth, 0);
@@ -203,8 +303,8 @@ export function KanbanView({
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-gray-50">
       <div className="border-b bg-white px-4 py-3">
-        <div className="flex items-center justify-between gap-4">
-          <div className="relative max-w-md flex-1">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="relative min-w-[220px] max-w-md flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <Input
               value={searchQuery}
@@ -212,6 +312,105 @@ export function KanbanView({
               placeholder="Search tasks by title or details..."
               className="pl-9"
             />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1">
+              <Select value={projectFilterValue} onValueChange={(value) => setFilterValue('projectId', value)}>
+                <SelectTrigger size="sm" className={getFilterSelectClassName(Boolean(activeFilters.projectId))}>
+                  <SelectValue placeholder="Project" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_FILTER_VALUE}>All projects</SelectItem>
+                  {projects.map(project => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {activeFilters.projectId && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => clearFilter('projectId')}
+                  className="size-8"
+                  aria-label="Clear project filter"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1">
+              <Select value={priorityFilterValue} onValueChange={(value) => setFilterValue('priority', value)}>
+                <SelectTrigger size="sm" className={getPrioritySelectClassName(Boolean(activeFilters.priority))}>
+                  <SelectValue placeholder="Priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_FILTER_VALUE}>All priorities</SelectItem>
+                  {PRIORITY_FILTERS.map(priority => (
+                    <SelectItem key={priority.value} value={priority.value}>
+                      {priority.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {activeFilters.priority && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => clearFilter('priority')}
+                  className="size-8"
+                  aria-label="Clear priority filter"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1">
+              <Select value={assigneeFilterValue} onValueChange={(value) => setFilterValue('assigneeId', value)}>
+                <SelectTrigger size="sm" className={getFilterSelectClassName(Boolean(activeFilters.assigneeId))}>
+                  <SelectValue placeholder="Assignee" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_FILTER_VALUE}>All assignees</SelectItem>
+                  <SelectItem value={UNASSIGNED_ASSIGNEE_FILTER_VALUE}>Unassigned</SelectItem>
+                  {people.map(person => (
+                    <SelectItem key={person.id} value={person.id}>
+                      {person.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {activeFilters.assigneeId && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => clearFilter('assigneeId')}
+                  className="size-8"
+                  aria-label="Clear assignee filter"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+
+            {hasActiveFilters && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={clearAllFilters}
+                className="gap-2"
+              >
+                <Filter className="h-4 w-4" />
+                Clear filters
+              </Button>
+            )}
           </div>
           <button
             type="button"
@@ -230,9 +429,9 @@ export function KanbanView({
         style={{ scrollbarGutter: 'stable both-edges' }}
       >
         <SwimlanesView
-          tasks={tasks}
+          tasks={filteredTasks}
           swimlanes={swimlanes}
-          searchQuery={searchQuery}
+          isFilterActive={isBoardFiltered}
           onTaskClick={onTaskClick}
           onEditTask={onEditTask}
           onAddTask={onAddTask}

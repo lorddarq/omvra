@@ -97,7 +97,7 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
 interface SwimlanesViewProps {
   tasks: Task[];
   swimlanes: StatusColumn[];
-  searchQuery?: string;
+  isFilterActive?: boolean;
   onTaskClick: (task: Task) => void;
   onEditTask?: (task: Task) => void;
   onAddTask: (status: TaskStatus) => void;
@@ -112,7 +112,7 @@ interface SwimlanesViewProps {
 export function SwimlanesView({
   tasks,
   swimlanes,
-  searchQuery = '',
+  isFilterActive = false,
   onTaskClick,
   onEditTask,
   onAddTask,
@@ -124,26 +124,13 @@ export function SwimlanesView({
   onAddColumn,
   onDeleteColumn,
 }: SwimlanesViewProps) {
-  const trimmedSearch = searchQuery.trim().toLowerCase();
-  const isSearchActive = trimmedSearch.length > 0;
-
-  const matchesTaskSearch = (task: Task) => {
-    if (!isSearchActive) return true;
-    const haystack = `${task.title} ${task.notes || ''}`.toLowerCase();
-    return haystack.includes(trimmedSearch);
-  };
-
   const getTasksByStatus = (status: string) => {
     return tasks.filter(task => task.status === status);
   };
 
-  const getVisibleTasksByStatus = (status: string) => {
-    return getTasksByStatus(status).filter(matchesTaskSearch);
-  };
-
   const handleReorderTask = (dragIndex: number, hoverIndex: number, status: TaskStatus) => {
-    // Reordering while filtered can mismatch indices, so keep it disabled during search.
-    if (isSearchActive) return;
+    // Reordering while filtered can mismatch visible indices with the full task order.
+    if (isFilterActive) return;
 
     const statusTasks = getTasksByStatus(status);
     const reorderedTasks = [...statusTasks];
@@ -164,9 +151,14 @@ export function SwimlanesView({
 
   return (
       <div className="h-full min-h-0 bg-gray-50 p-6 pb-3">
+        {isFilterActive && tasks.length === 0 && (
+          <div className="mb-4 rounded-md border border-dashed border-gray-300 bg-white px-4 py-3 text-sm text-gray-600">
+            No tasks match the current filters.
+          </div>
+        )}
         <div className="flex h-full min-h-0 min-w-max items-stretch gap-4">
         {cols.map((swimlane, index) => {
-            const swimlaneTasks = getVisibleTasksByStatus(swimlane.id);
+            const swimlaneTasks = getTasksByStatus(swimlane.id);
             return (
               <ColumnDraggable
                 key={swimlane.id}

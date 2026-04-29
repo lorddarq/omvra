@@ -303,7 +303,7 @@ export function KanbanView({
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-gray-50">
       <div className="border-b bg-white px-4 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative min-w-[220px] max-w-md flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <Input
@@ -313,113 +313,115 @@ export function KanbanView({
               className="pl-9"
             />
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1">
-              <Select value={projectFilterValue} onValueChange={(value) => setFilterValue('projectId', value)}>
-                <SelectTrigger size="sm" className={getFilterSelectClassName(Boolean(activeFilters.projectId))}>
-                  <SelectValue placeholder="Project" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL_FILTER_VALUE}>All projects</SelectItem>
-                  {projects.map(project => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {activeFilters.projectId && (
+          <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-3">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <div className="flex items-center gap-1">
+                <Select value={projectFilterValue} onValueChange={(value) => setFilterValue('projectId', value)}>
+                  <SelectTrigger size="sm" className={getFilterSelectClassName(Boolean(activeFilters.projectId))}>
+                    <SelectValue placeholder="Project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL_FILTER_VALUE}>All projects</SelectItem>
+                    {projects.map(project => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {activeFilters.projectId && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => clearFilter('projectId')}
+                    className="size-8"
+                    aria-label="Clear project filter"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1">
+                <Select value={priorityFilterValue} onValueChange={(value) => setFilterValue('priority', value)}>
+                  <SelectTrigger size="sm" className={getPrioritySelectClassName(Boolean(activeFilters.priority))}>
+                    <SelectValue placeholder="Priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL_FILTER_VALUE}>All priorities</SelectItem>
+                    {PRIORITY_FILTERS.map(priority => (
+                      <SelectItem key={priority.value} value={priority.value}>
+                        {priority.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {activeFilters.priority && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => clearFilter('priority')}
+                    className="size-8"
+                    aria-label="Clear priority filter"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1">
+                <Select value={assigneeFilterValue} onValueChange={(value) => setFilterValue('assigneeId', value)}>
+                  <SelectTrigger size="sm" className={getFilterSelectClassName(Boolean(activeFilters.assigneeId))}>
+                    <SelectValue placeholder="Assignee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL_FILTER_VALUE}>All assignees</SelectItem>
+                    <SelectItem value={UNASSIGNED_ASSIGNEE_FILTER_VALUE}>Unassigned</SelectItem>
+                    {people.map(person => (
+                      <SelectItem key={person.id} value={person.id}>
+                        {person.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {activeFilters.assigneeId && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => clearFilter('assigneeId')}
+                    className="size-8"
+                    aria-label="Clear assignee filter"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+
+              {hasActiveFilters && (
                 <Button
                   type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => clearFilter('projectId')}
-                  className="size-8"
-                  aria-label="Clear project filter"
+                  variant="outline"
+                  size="sm"
+                  onClick={clearAllFilters}
+                  className="gap-2"
                 >
-                  <X className="h-4 w-4" />
+                  <Filter className="h-4 w-4" />
+                  Clear filters
                 </Button>
               )}
             </div>
-
-            <div className="flex items-center gap-1">
-              <Select value={priorityFilterValue} onValueChange={(value) => setFilterValue('priority', value)}>
-                <SelectTrigger size="sm" className={getPrioritySelectClassName(Boolean(activeFilters.priority))}>
-                  <SelectValue placeholder="Priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL_FILTER_VALUE}>All priorities</SelectItem>
-                  {PRIORITY_FILTERS.map(priority => (
-                    <SelectItem key={priority.value} value={priority.value}>
-                      {priority.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {activeFilters.priority && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => clearFilter('priority')}
-                  className="size-8"
-                  aria-label="Clear priority filter"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-
-            <div className="flex items-center gap-1">
-              <Select value={assigneeFilterValue} onValueChange={(value) => setFilterValue('assigneeId', value)}>
-                <SelectTrigger size="sm" className={getFilterSelectClassName(Boolean(activeFilters.assigneeId))}>
-                  <SelectValue placeholder="Assignee" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL_FILTER_VALUE}>All assignees</SelectItem>
-                  <SelectItem value={UNASSIGNED_ASSIGNEE_FILTER_VALUE}>Unassigned</SelectItem>
-                  {people.map(person => (
-                    <SelectItem key={person.id} value={person.id}>
-                      {person.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {activeFilters.assigneeId && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => clearFilter('assigneeId')}
-                  className="size-8"
-                  aria-label="Clear assignee filter"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-
-            {hasActiveFilters && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={clearAllFilters}
-                className="gap-2"
-              >
-                <Filter className="h-4 w-4" />
-                Clear filters
-              </Button>
-            )}
+            <button
+              type="button"
+              onClick={() => onAddColumn && onAddColumn({ title: 'New Column' })}
+              className="inline-flex shrink-0 items-center gap-2 rounded-md bg-[#111111] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#222222]"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add Board</span>
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => onAddColumn && onAddColumn({ title: 'New Column' })}
-            className="inline-flex shrink-0 items-center gap-2 rounded-md bg-[#111111] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#222222]"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Add Board</span>
-          </button>
         </div>
       </div>
       <div

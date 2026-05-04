@@ -102,7 +102,7 @@ Current supported MCP resource and prompt surfaces include:
 ### Build and Release
 
 - Renderer build supported through Vite via `npm run build:renderer`.
-- Electron packaging supported through `npm run build:electron`.
+- Electron packaging supported through `npm run build:electron`, which now builds renderer assets first and emits packaged artifacts to `release/`.
 - Full artifact build supported through `npm run dist`.
 - Pages site build supported through `npm run build:pages`.
 - MCP smoke and contract verification supported through:

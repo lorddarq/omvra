@@ -13,14 +13,14 @@
     "dev:pages": "vite --config pages/vite.config.ts",
     "build": "npm run build:renderer",
     "build:renderer": "vite build",
-    "build:electron": "node electron/scripts/build-electron-with-tag-version.cjs",
+    "build:electron": "npm run build:renderer && node electron/scripts/build-electron-with-tag-version.cjs",
     "build:pages": "vite build --config pages/vite.config.ts",
     "test:hooks": "node --experimental-strip-types --experimental-specifier-resolution=node --test src/app/hooks/*.test.ts",
     "test:mcp": "node --test electron/services/workspace-service.test.cjs electron/services/mcp-http-server.test.cjs electron/services/mcp-fixtures.test.cjs electron/services/mcp-ipc.test.cjs electron/services/canonical-hydration.test.cjs",
     "mcp:smoke": "node scripts/mcp-smoke-test.mjs",
     "mcp:stdio": "node electron/scripts/mcp-stdio.cjs",
     "predist": "npm run generate:icons",
-    "dist": "npm run predist && npm run build:renderer && npm run build:electron",
+    "dist": "npm run predist && npm run build:electron",
     "start": "electron .",
     "generate:icons": "node electron/scripts/generate-icons.cjs"
   },
@@ -62,6 +62,9 @@
     "icon": "electron/assets/icon",
     "appId": "com.plumy.app",
     "productName": "Plumy",
+    "directories": {
+      "output": "release"
+    },
     "publish": {
       "provider": "github",
       "owner": "lorddarq",

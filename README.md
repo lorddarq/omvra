@@ -54,13 +54,13 @@ npm run dev:pages     # Run the Pages site locally
 ```bash
 npm run build          # renderer build alias
 npm run build:renderer # Vite renderer build -> dist/
-npm run build:electron # electron-builder packaging
-npm run dist           # generate icons + build renderer + package app
+npm run build:electron # build renderer, then package app -> release/
+npm run dist           # generate icons + build renderer + package app -> release/
 ```
 
 ### Version resolution in packaged builds
 
-`npm run build:electron` runs `electron/scripts/build-electron-with-tag-version.cjs`, which resolves build version as:
+`npm run build:electron` first creates the Vite renderer build in `dist/`, then runs `electron/scripts/build-electron-with-tag-version.cjs`, which resolves build version as:
 
 1. Current Git tag version (supports `vX.Y.Z`)
 2. Fallback to `package.json` version if no valid tag exists

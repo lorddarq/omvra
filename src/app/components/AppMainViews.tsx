@@ -1,10 +1,12 @@
 import React, { type RefObject } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { Task, TimelineSwimlane, Person, TaskStatus, StatusColumn } from '../types';
+import { Task, TimelineSwimlane, Person, TaskStatus, StatusColumn, ProjectMilestone } from '../types';
 import { ViewType } from '../hooks/useViewState';
+import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import { TimelineView } from './TimelineView';
 import { KanbanView } from './KanbanView';
+import { RoadmapView } from './RoadmapView';
 
 export interface AppMainViewsProps {
   currentView: ViewType;
@@ -16,6 +18,8 @@ export interface AppMainViewsProps {
   timelineSwimlanes: TimelineSwimlane[];
   people: Person[];
   statusColumns: StatusColumn[];
+  milestones: ProjectMilestone[];
+  readModel: WorkspaceReadModel;
   timelineInitialScrollLeft: number;
   onTimelineTaskClick: (task: Task) => void;
   onTimelineAddTask: (date: Date, swimlaneId: string, endDate?: Date, mode?: 'projects' | 'people') => void;
@@ -36,6 +40,9 @@ export interface AppMainViewsProps {
   onKanbanChangeColumnColor: (colId: string, newColor: string) => void;
   onKanbanAddColumn: (col: any) => void;
   onKanbanDeleteColumn: (colId: string) => void;
+  onRoadmapAddMilestone: () => void;
+  onRoadmapMilestoneClick: (milestone: ProjectMilestone) => void;
+  onRoadmapTaskClick: (task: Task) => void;
 }
 
 export function AppMainViews({
@@ -48,6 +55,8 @@ export function AppMainViews({
   timelineSwimlanes,
   people,
   statusColumns,
+  milestones,
+  readModel,
   timelineInitialScrollLeft,
   onTimelineTaskClick,
   onTimelineAddTask,
@@ -68,6 +77,9 @@ export function AppMainViews({
   onKanbanChangeColumnColor,
   onKanbanAddColumn,
   onKanbanDeleteColumn,
+  onRoadmapAddMilestone,
+  onRoadmapMilestoneClick,
+  onRoadmapTaskClick,
 }: AppMainViewsProps) {
   return (
     <div className="flex-1 min-h-0 overflow-hidden">
@@ -112,6 +124,21 @@ export function AppMainViews({
               onDeleteColumn={onKanbanDeleteColumn}
             />
           </DndProvider>
+        </div>
+      )}
+
+      {currentView === 'roadmap' && (
+        <div key={`roadmap-${viewRefreshKey}`} className="flex h-full min-h-0 w-full">
+          <RoadmapView
+            milestones={milestones}
+            tasks={tasks}
+            projects={timelineSwimlanes}
+            statusColumns={statusColumns as Array<{ id: TaskStatus; title: string; color?: string }>}
+            readModel={readModel}
+            onAddMilestone={onRoadmapAddMilestone}
+            onMilestoneClick={onRoadmapMilestoneClick}
+            onTaskClick={onRoadmapTaskClick}
+          />
         </div>
       )}
     </div>

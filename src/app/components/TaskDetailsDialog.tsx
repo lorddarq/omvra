@@ -1,4 +1,4 @@
-import { Task, TimelineSwimlane, Person, TaskStatus, StatusColumn } from '../types';
+import { Task, TimelineSwimlane, Person, TaskStatus, StatusColumn, ProjectMilestone } from '../types';
 import { useMemo, useState } from 'react';
 import {
   Dialog,
@@ -12,6 +12,8 @@ import { Button } from '@/app/components/ui/button';
 import { Textarea } from '@/app/components/ui/textarea';
 import { MarkdownContent } from './MarkdownContent';
 import { getTaskLoadContributionPercent, getTaskLoadPoints, PERSON_CAPACITY_POINTS } from '../utils/taskLoad';
+import { getMilestoneForTask } from '../utils/roadmap';
+import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 
 interface TaskDetailsDialogProps {
   isOpen: boolean;
@@ -23,6 +25,9 @@ interface TaskDetailsDialogProps {
   swimlanes: TimelineSwimlane[];
   people: Person[];
   statusColumns: StatusColumn[];
+  tasks?: Task[];
+  milestones?: ProjectMilestone[];
+  readModel?: WorkspaceReadModel;
 }
 
 function formatDate(dateValue?: string): string {
@@ -42,22 +47,39 @@ export function TaskDetailsDialog({
   swimlanes,
   people,
   statusColumns,
+  tasks = [],
+  milestones = [],
+  readModel,
 }: TaskDetailsDialogProps) {
   const [newComment, setNewComment] = useState('');
-  const primaryTimelineProject = task?.swimlaneId
+  const enrichedTask = task ? readModel?.tasksById.get(task.id) : undefined;
+  const primaryTimelineProject = enrichedTask?.primaryTimelineProject?.name
+    ?? (task?.swimlaneId
     ? swimlanes.find(s => s.id === task.swimlaneId)?.name ?? 'Unknown swimlane'
-    : 'No timeline project';
-  const projectLabels = task?.projectIds?.length
+    : 'No timeline project');
+  const projectLabels = enrichedTask
+    ? enrichedTask.projects.map(project => project.name)
+    : task?.projectIds?.length
     ? task.projectIds
         .map(projectId => swimlanes.find(s => s.id === projectId)?.name)
         .filter((label): label is string => Boolean(label))
     : [];
-  const personLabel = task?.assigneeId
+  const personLabel = enrichedTask?.assignee?.name
+    ? enrichedTask.assignee.name
+    : task?.assigneeId
     ? people.find(p => p.id === task.assigneeId)?.name ?? 'Unknown assignee'
     : 'Unassigned';
-  const assignee = task?.assigneeId ? people.find(p => p.id === task.assigneeId) : null;
+  const milestone = enrichedTask?.milestone ?? getMilestoneForTask(task, milestones);
+  const dependencyTasks = enrichedTask
+    ? enrichedTask.dependencyTasks.map(item => item.task)
+    : task
+      ? (task.dependencyIds || [])
+          .map(dependencyId => tasks.find(item => item.id === dependencyId))
+          .filter((item): item is Task => Boolean(item))
+      : [];
+  const assignee = enrichedTask?.assignee ?? (task?.assigneeId ? people.find(p => p.id === task.assigneeId) : null);
   const statusLabel = task
-    ? statusColumns.find(c => c.id === task.status)?.title ?? task.status
+    ? enrichedTask?.statusColumn?.title ?? statusColumns.find(c => c.id === task.status)?.title ?? task.status
     : '';
   const taskLoadPoints = task ? getTaskLoadPoints(task) : 0;
   const taskLoadContribution = task && task.assigneeId
@@ -135,6 +157,20 @@ export function TaskDetailsDialog({
               <div>
                 <div className="text-xs uppercase tracking-wide text-gray-500">Blocked</div>
                 <div className="text-sm font-medium text-gray-900">{task.blocked ? 'Yes' : 'No'}</div>
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wide text-gray-500">Roadmap Milestone</div>
+                <div className="text-sm font-medium text-gray-900">
+                  {milestone ? `${milestone.title} (${formatDate(milestone.endDate)})` : 'No roadmap milestone'}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wide text-gray-500">Roadmap Dependencies</div>
+                <div className="text-sm font-medium text-gray-900">
+                  {dependencyTasks.length > 0
+                    ? dependencyTasks.map(dependencyTask => dependencyTask.title).join(', ')
+                    : 'No roadmap dependencies'}
+                </div>
               </div>
               <div>
                 <div className="text-xs uppercase tracking-wide text-gray-500">Load Points</div>

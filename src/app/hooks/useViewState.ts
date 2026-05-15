@@ -23,7 +23,7 @@
 import { useEffect, useCallback, useRef, useState } from 'react';
 import { deleteStoredValue, getJSON, persistJSONWithElectronMirror } from '../utils/storage';
 
-export type ViewType = 'timeline' | 'kanban';
+export type ViewType = 'timeline' | 'kanban' | 'roadmap';
 
 export interface TimelineViewState {
   scrollLeft: number;
@@ -40,9 +40,15 @@ export interface KanbanViewState {
   filterStatus?: string;
 }
 
+export interface RoadmapViewState {
+  scrollLeft: number;
+  scrollTop: number;
+}
+
 export type AllViewStates = {
   timeline: TimelineViewState;
   kanban: KanbanViewState;
+  roadmap: RoadmapViewState;
 };
 
 /**
@@ -58,6 +64,10 @@ const DEFAULT_STATES: AllViewStates = {
     scrollLeft: 0,
     scrollTop: 0,
   },
+  roadmap: {
+    scrollLeft: 0,
+    scrollTop: 0,
+  },
 };
 
 export function useViewState(initialView: ViewType = 'timeline') {
@@ -68,15 +78,17 @@ export function useViewState(initialView: ViewType = 'timeline') {
   const viewStatesRef = useRef<Record<string, Record<string, any>>>({
     timeline: { ...DEFAULT_STATES.timeline },
     kanban: { ...DEFAULT_STATES.kanban },
+    roadmap: { ...DEFAULT_STATES.roadmap },
   });
 
   useEffect(() => {
     let cancelled = false;
 
     const hydrateStoredViewStates = async () => {
-      const [timelineState, kanbanState] = await Promise.all([
+      const [timelineState, kanbanState, roadmapState] = await Promise.all([
         getJSON<Record<string, any>>('plumy_viewstate_timeline', null),
         getJSON<Record<string, any>>('plumy_viewstate_kanban', null),
+        getJSON<Record<string, any>>('plumy_viewstate_roadmap', null),
       ]);
 
       if (cancelled) return;
@@ -92,6 +104,13 @@ export function useViewState(initialView: ViewType = 'timeline') {
         viewStatesRef.current.kanban = {
           ...DEFAULT_STATES.kanban,
           ...kanbanState,
+        };
+      }
+
+      if (roadmapState) {
+        viewStatesRef.current.roadmap = {
+          ...DEFAULT_STATES.roadmap,
+          ...roadmapState,
         };
       }
     };
@@ -185,6 +204,7 @@ export function useViewState(initialView: ViewType = 'timeline') {
       viewStatesRef.current = {
         timeline: { ...DEFAULT_STATES.timeline },
         kanban: { ...DEFAULT_STATES.kanban },
+        roadmap: { ...DEFAULT_STATES.roadmap },
       };
     }
   }, []);

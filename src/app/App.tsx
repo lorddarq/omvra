@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Task, TaskStatus, TimelineSwimlane, Person } from './types';
+import { ProjectMilestone, Task, TaskStatus, TimelineSwimlane, Person } from './types';
 import { initialTasks, initialTimelineSwimlanes } from './data/sampleData';
+import { initialMilestones } from './data/sampleMilestones';
 import { initialPeople } from './data/samplePeople';
 import { TimelineView } from './components/TimelineView';
 import { KanbanView } from './components/KanbanView';
@@ -28,6 +29,7 @@ import {
 import { AppHeader } from './components/AppHeader';
 import { AppMainViews } from './components/AppMainViews';
 import { AppPanels } from './components/AppPanels';
+import { buildWorkspaceReadModel } from './domain/workspaceReadModel';
 import { swimlanes as defaultSwimlanes } from './constants/swimlanes';
 import {
   DEFAULT_MCP_BIND_HOST,
@@ -63,6 +65,7 @@ import {
   deriveStatusColumnsFromTasks,
   normalizeTask,
   sanitizeAgentWatchConfigs,
+  sanitizeMilestones,
   sanitizePeople,
   sanitizePreferences,
   sanitizeStatusColumns,
@@ -75,6 +78,7 @@ import {
 const TASKS_KEY = 'plumy.tasks.v1';
 const SWIMLANES_KEY = 'plumy.swimlanes.v1';
 const PEOPLE_KEY = 'plumy.people.v1';
+const MILESTONES_KEY = 'plumy.milestones.v1';
 const STATUS_COLUMNS_KEY = 'plumy.statusColumns.v1';
 const PREFERENCES_KEY = 'plumy.preferences.v1';
 const TIMELINE_VIEW_STATE_KEY = 'plumy_viewstate_timeline';
@@ -87,6 +91,7 @@ const ENABLE_SAMPLE_WORKSPACE = Boolean(import.meta.env.DEV);
 const DEFAULT_TASKS_SEED = ENABLE_SAMPLE_WORKSPACE ? initialTasks : [];
 const DEFAULT_SWIMLANES_SEED = ENABLE_SAMPLE_WORKSPACE ? initialTimelineSwimlanes : [];
 const DEFAULT_PEOPLE_SEED = ENABLE_SAMPLE_WORKSPACE ? initialPeople : [];
+const DEFAULT_MILESTONES_SEED = ENABLE_SAMPLE_WORKSPACE ? initialMilestones : [];
 
 interface AppPreferences {
   executionLoadStatusId: TaskStatus;
@@ -177,6 +182,12 @@ function App() {
       kind: person.kind === 'agentic' ? 'agentic' : 'human',
       color: person.color || defaultColors[index % defaultColors.length]
     }));
+  });
+
+  const [milestones, setMilestones] = useState<ProjectMilestone[]>(() => {
+    const stored = readInitialWorkspaceJSON<ProjectMilestone[]>(MILESTONES_KEY, DEFAULT_MILESTONES_SEED);
+    const projects = readInitialWorkspaceJSON<TimelineSwimlane[]>(SWIMLANES_KEY, DEFAULT_SWIMLANES_SEED);
+    return sanitizeMilestones(stored, projects, DEFAULT_MILESTONES_SEED);
   });
 
   const [statusColumns, setStatusColumns] = useState<StatusColumnState[]>(() =>
@@ -275,10 +286,16 @@ function App() {
     persistJSONWithElectronMirror(PEOPLE_KEY, people);
   }, [hasHydratedCanonicalWorkspace, people]);
 
+  useEffect(() => {
+    if (!hasHydratedCanonicalWorkspace) return;
+    persistJSONWithElectronMirror(MILESTONES_KEY, milestones);
+  }, [hasHydratedCanonicalWorkspace, milestones]);
+
   const syncCanonicalWorkspaceFromExport = useCallback((exported: Record<string, unknown>) => {
     const exportedTasks = getPortableStoreValue<Task[]>(exported, TASKS_KEY);
     const exportedProjects = getPortableStoreValue<TimelineSwimlane[]>(exported, SWIMLANES_KEY);
     const exportedPeople = getPortableStoreValue<Person[]>(exported, PEOPLE_KEY);
+    const exportedMilestones = getPortableStoreValue<ProjectMilestone[]>(exported, MILESTONES_KEY);
     const exportedStatusColumns = getPortableStoreValue<StatusColumnState[]>(exported, STATUS_COLUMNS_KEY);
     const exportedPreferences = getPortableStoreValue<Partial<AppPreferences>>(exported, PREFERENCES_KEY);
     const exportedAgentWatchConfigs = getPortableStoreValue<AgentWatchConfig[]>(exported, MCP_AGENT_WATCH_CONFIGS_KEY);
@@ -299,6 +316,14 @@ function App() {
       mirrorCanonicalJsonToLocalStorage(PEOPLE_KEY, nextPeople);
       setPeople(previous =>
         areSerializedValuesEqual(previous, nextPeople) ? previous : nextPeople
+      );
+    }
+
+    if (exportedMilestones !== undefined) {
+      const nextMilestones = sanitizeMilestones(exportedMilestones, nextProjects, DEFAULT_MILESTONES_SEED);
+      mirrorCanonicalJsonToLocalStorage(MILESTONES_KEY, nextMilestones);
+      setMilestones(previous =>
+        areSerializedValuesEqual(previous, nextMilestones) ? previous : nextMilestones
       );
     }
 
@@ -351,16 +376,18 @@ function App() {
           const exportedTasks = getPortableStoreValue<Task[]>(exported, TASKS_KEY);
           const exportedProjects = getPortableStoreValue<TimelineSwimlane[]>(exported, SWIMLANES_KEY);
           const exportedPeople = getPortableStoreValue<Person[]>(exported, PEOPLE_KEY);
+          const exportedMilestones = getPortableStoreValue<ProjectMilestone[]>(exported, MILESTONES_KEY);
           const exportedStatusColumns = getPortableStoreValue<StatusColumnState[]>(exported, STATUS_COLUMNS_KEY);
           const exportedPreferences = getPortableStoreValue<Partial<AppPreferences>>(exported, PREFERENCES_KEY);
           const exportedAgentWatchConfigs = getPortableStoreValue<AgentWatchConfig[]>(exported, MCP_AGENT_WATCH_CONFIGS_KEY);
           const hasTasks = exportedTasks !== undefined;
           const hasProjects = exportedProjects !== undefined;
           const hasPeople = exportedPeople !== undefined;
+          const hasMilestones = exportedMilestones !== undefined;
           const hasStatusColumns = exportedStatusColumns !== undefined;
           const hasPreferences = exportedPreferences !== undefined;
           const hasAgentWatchConfigs = exportedAgentWatchConfigs !== undefined;
-          const hasCanonicalWorkspaceData = hasTasks || hasProjects || hasPeople || hasStatusColumns || hasPreferences;
+          const hasCanonicalWorkspaceData = hasTasks || hasProjects || hasPeople || hasMilestones || hasStatusColumns || hasPreferences;
 
           if (!hasCanonicalWorkspaceData && hasAnyPortableLocalStorageData()) {
             const migratedProjects = sanitizeTimelineSwimlanes(
@@ -389,9 +416,15 @@ function App() {
               migratedProjects,
               DEFAULT_TASKS_SEED
             );
+            const migratedMilestones = sanitizeMilestones(
+              safeReadLocalStorageJSON<ProjectMilestone[]>(MILESTONES_KEY, DEFAULT_MILESTONES_SEED),
+              migratedProjects,
+              DEFAULT_MILESTONES_SEED
+            );
 
             setTimelineSwimlanes(migratedProjects);
             setPeople(migratedPeople);
+            setMilestones(migratedMilestones);
             setStatusColumns(migratedStatusColumns);
             setPreferences(migratedPreferences);
             setAgentWatchConfigs(migratedAgentWatchConfigs);
@@ -399,7 +432,7 @@ function App() {
             return;
           }
 
-          if (hasProjects || hasPeople || hasStatusColumns || hasPreferences || hasAgentWatchConfigs || hasTasks) {
+          if (hasProjects || hasPeople || hasMilestones || hasStatusColumns || hasPreferences || hasAgentWatchConfigs || hasTasks) {
             syncCanonicalWorkspaceFromExport(exported);
           }
         } finally {
@@ -471,10 +504,70 @@ function App() {
       tasks,
       timelineSwimlanes,
       people,
+      milestones,
       statusColumns,
       preferences,
     ],
   });
+
+  const [selectedMilestone, setSelectedMilestone] = useState<ProjectMilestone | null>(null);
+  const [detailsMilestoneId, setDetailsMilestoneId] = useState<string | null>(null);
+  const [isMilestoneDialogOpen, setIsMilestoneDialogOpen] = useState(false);
+  const detailsMilestone = detailsMilestoneId
+    ? milestones.find(milestone => milestone.id === detailsMilestoneId) ?? null
+    : null;
+  const workspaceReadModel = useMemo(
+    () => buildWorkspaceReadModel({
+      tasks,
+      milestones,
+      projects: timelineSwimlanes,
+      people,
+      statusColumns,
+    }),
+    [milestones, people, statusColumns, tasks, timelineSwimlanes]
+  );
+
+  const syncMilestoneTaskLinks = useCallback((milestone: ProjectMilestone) => {
+    const linkedTaskIds = new Set(milestone.linkedTaskIds || []);
+    setTasks(prevTasks =>
+      prevTasks.map(task => {
+        if (linkedTaskIds.has(task.id)) {
+          return { ...task, milestoneId: milestone.id };
+        }
+        if (task.milestoneId === milestone.id) {
+          return { ...task, milestoneId: undefined, dependencyIds: [] };
+        }
+        return task;
+      })
+    );
+  }, []);
+
+  const syncTaskMilestoneLink = useCallback((taskId: string, nextMilestoneId?: string) => {
+    setMilestones(prevMilestones =>
+      prevMilestones.map(milestone => {
+        const linkedTaskIds = milestone.linkedTaskIds || [];
+        const shouldLink = milestone.id === nextMilestoneId;
+        const isLinked = linkedTaskIds.includes(taskId);
+
+        if (shouldLink && !isLinked) {
+          return { ...milestone, linkedTaskIds: [...linkedTaskIds, taskId] };
+        }
+        if (!shouldLink && isLinked) {
+          return { ...milestone, linkedTaskIds: linkedTaskIds.filter(id => id !== taskId) };
+        }
+        return milestone;
+      })
+    );
+  }, []);
+
+  const removeTaskFromMilestones = useCallback((taskId: string) => {
+    setMilestones(prevMilestones =>
+      prevMilestones.map(milestone => ({
+        ...milestone,
+        linkedTaskIds: (milestone.linkedTaskIds || []).filter(id => id !== taskId),
+      }))
+    );
+  }, []);
 
   const {
     saveTask: handleSaveTask,
@@ -486,16 +579,30 @@ function App() {
   } = useTaskActions({
     people,
     setTasks,
+    onTaskMilestoneChange: syncTaskMilestoneLink,
+    onTaskDeleted: removeTaskFromMilestones,
   });
   const {
     saveSwimlane: handleSaveSwimlane,
-    deleteSwimlane: handleDeleteSwimlane,
+    deleteSwimlane: deleteSwimlaneBase,
     reorderSwimlanes: handleReorderSwimlanes,
   } = useProjectActions({
     timelineSwimlanes,
     setTimelineSwimlanes,
     setTasks,
   });
+  const handleDeleteSwimlane = useCallback((swimlaneId: string) => {
+    deleteSwimlaneBase(swimlaneId);
+    setMilestones(prevMilestones =>
+      prevMilestones
+        .map(milestone => {
+          const projectIds = (milestone.projectIds || (milestone.projectId ? [milestone.projectId] : []))
+            .filter(projectId => projectId !== swimlaneId);
+          return { ...milestone, projectIds, projectId: projectIds[0] };
+        })
+        .filter(milestone => milestone.projectIds.length > 0)
+    );
+  }, [deleteSwimlaneBase]);
   const {
     renameStatusColumn: handleRenameStatusColumn,
     changeStatusColumnColor: handleChangeStatusColumnColor,
@@ -582,6 +689,11 @@ function App() {
     setIsTaskDetailsOpen(false);
   }, []);
 
+  const handleMilestoneTaskClick = useCallback((task: Task) => {
+    setDetailsMilestoneId(null);
+    handleTaskClick(task);
+  }, [handleTaskClick]);
+
   const handleTimelineScroll = useCallback((state: { scrollLeft: number; scrollTop: number }) => {
     timelineScrollStateRef.current = state;
   }, []);
@@ -611,6 +723,79 @@ function App() {
     setTasks(reorderedTasks);
   };
 
+  const handleAddMilestone = useCallback(() => {
+    setSelectedMilestone(null);
+    setIsMilestoneDialogOpen(true);
+  }, []);
+
+  const handleMilestoneClick = useCallback((milestone: ProjectMilestone) => {
+    setDetailsMilestoneId(milestone.id);
+  }, []);
+
+  const handleEditMilestoneFromDetails = useCallback((milestone: ProjectMilestone) => {
+    setSelectedMilestone(milestone);
+    setDetailsMilestoneId(null);
+    setIsMilestoneDialogOpen(true);
+  }, []);
+
+  const handleCloseMilestoneDialog = useCallback(() => {
+    setIsMilestoneDialogOpen(false);
+    setSelectedMilestone(null);
+  }, []);
+
+  const handleSaveMilestone = useCallback((milestone: ProjectMilestone) => {
+    setMilestones(prevMilestones => {
+      const exists = prevMilestones.some(item => item.id === milestone.id);
+      return exists
+        ? prevMilestones.map(item => (item.id === milestone.id ? milestone : item))
+        : [milestone, ...prevMilestones];
+    });
+    syncMilestoneTaskLinks(milestone);
+    setSelectedMilestone(null);
+    setDetailsMilestoneId(null);
+    setIsMilestoneDialogOpen(false);
+  }, [syncMilestoneTaskLinks]);
+
+  const handleUpdateRoadmapTaskDependencies = useCallback((
+    updates: Array<{ taskId: string; dependencyIds: string[] }>
+  ) => {
+    const updatesByTaskId = new Map(updates.map(update => [update.taskId, update.dependencyIds]));
+    setTasks(prevTasks =>
+      prevTasks.map(task => {
+        const dependencyIds = updatesByTaskId.get(task.id);
+        if (!dependencyIds) return task;
+        return { ...task, dependencyIds };
+      })
+    );
+  }, []);
+
+  const handleDeleteMilestone = useCallback((milestoneId: string) => {
+    const milestoneTaskIds = new Set(
+      tasks
+        .filter(task => task.milestoneId === milestoneId)
+        .map(task => task.id)
+    );
+    const milestone = milestones.find(item => item.id === milestoneId);
+    (milestone?.linkedTaskIds || []).forEach(taskId => milestoneTaskIds.add(taskId));
+
+    setMilestones(prevMilestones => prevMilestones.filter(milestone => milestone.id !== milestoneId));
+    setTasks(prevTasks =>
+      prevTasks.map(task => {
+        const shouldClearMilestone = task.milestoneId === milestoneId;
+        const shouldClearDependencies = milestoneTaskIds.has(task.id);
+
+        return {
+          ...task,
+          milestoneId: shouldClearMilestone ? undefined : task.milestoneId,
+          dependencyIds: shouldClearDependencies ? [] : task.dependencyIds,
+        };
+      })
+    );
+    setSelectedMilestone(null);
+    setDetailsMilestoneId(null);
+    setIsMilestoneDialogOpen(false);
+  }, [milestones, tasks]);
+
   const handleNukeLocalData = async () => {
     if (typeof window === 'undefined') return;
     const confirmed = window.confirm(
@@ -628,6 +813,7 @@ function App() {
     setTasks([]);
     setTimelineSwimlanes([]);
     setPeople([]);
+    setMilestones([]);
     setStatusColumns(defaultSwimlanes);
     setPreferences({
       executionLoadStatusId: getDefaultStatusId(defaultSwimlanes, 'in-progress'),
@@ -677,6 +863,7 @@ function App() {
         : safeReadLocalStorageJSON<Record<string, unknown>>(KANBAN_VIEW_STATE_KEY, viewState.getViewState('kanban'));
     const payload = buildWorkspaceBackupPayload({
       tasks,
+      milestones,
       projects: timelineSwimlanes,
       people,
       statusColumns,
@@ -686,6 +873,7 @@ function App() {
         viewState: {
           timeline: currentTimelineViewState,
           kanban: currentKanbanViewState,
+          roadmap: safeReadLocalStorageJSON<Record<string, unknown>>('plumy_viewstate_roadmap', viewState.getViewState('roadmap')),
         },
         timeline: {
           leftColWidth: Number(safeReadRaw(LEFT_COL_WIDTH_KEY) || 200),
@@ -731,6 +919,7 @@ function App() {
         fallbackStatusColumns: statusColumns,
         fallbackPreferences: preferences,
         fallbackTasks: tasks,
+        fallbackMilestones: milestones,
         allowFallbackForMissingArrays: false,
       });
 
@@ -743,6 +932,7 @@ function App() {
 
       setTimelineSwimlanes(repaired.projects);
       setTasks(repaired.tasks);
+      setMilestones(repaired.milestones);
       setPeople(repaired.people);
       setStatusColumns(repaired.statusColumns);
       setPreferences(repaired.preferences);
@@ -753,13 +943,20 @@ function App() {
       if (repaired.ui?.viewState?.kanban) {
         viewState.saveViewState('kanban', repaired.ui.viewState.kanban);
       }
+      if (repaired.ui?.viewState?.roadmap) {
+        viewState.saveViewState('roadmap', repaired.ui.viewState.roadmap);
+      }
       if (repaired.ui?.timeline?.monthWidths && typeof repaired.ui.timeline.monthWidths === 'object') {
         safeWriteRaw(MONTH_WIDTHS_KEY, JSON.stringify(repaired.ui.timeline.monthWidths));
       }
       if (Number.isFinite(Number(repaired.ui?.timeline?.leftColWidth))) {
         safeWriteRaw(LEFT_COL_WIDTH_KEY, String(repaired.ui?.timeline?.leftColWidth));
       }
-      if (repaired.ui?.currentView === 'timeline' || repaired.ui?.currentView === 'kanban') {
+      if (
+        repaired.ui?.currentView === 'timeline' ||
+        repaired.ui?.currentView === 'kanban' ||
+        repaired.ui?.currentView === 'roadmap'
+      ) {
         viewState.switchView(repaired.ui.currentView as ViewType);
       }
       setViewRefreshKey(prev => prev + 1);
@@ -808,7 +1005,7 @@ function App() {
   });
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="flex h-dvh flex-col bg-gray-50">
       <AppHeader
         currentView={viewState.currentView}
         onViewChange={(view) => {
@@ -824,6 +1021,8 @@ function App() {
               scrollLeft: kanbanContainerRef.current?.scrollLeft || 0,
               scrollTop: kanbanContainerRef.current?.scrollTop || 0,
             });
+          } else if (viewState.currentView === 'roadmap') {
+            viewState.saveViewState('roadmap', viewState.getViewState('roadmap'));
           }
 
           viewState.switchView(view);
@@ -850,6 +1049,8 @@ function App() {
         timelineSwimlanes={timelineSwimlanes}
         people={people}
         statusColumns={statusColumns}
+        milestones={milestones}
+        readModel={workspaceReadModel}
         timelineInitialScrollLeft={viewState.getViewState('timeline').scrollLeft || 0}
         onTimelineTaskClick={handleTaskClick}
         onTimelineAddTask={handleAddTaskFromTimeline}
@@ -870,6 +1071,9 @@ function App() {
         onKanbanChangeColumnColor={handleChangeStatusColumnColor}
         onKanbanAddColumn={handleAddStatusColumn}
         onKanbanDeleteColumn={handleDeleteStatusColumn}
+        onRoadmapAddMilestone={handleAddMilestone}
+        onRoadmapMilestoneClick={handleMilestoneClick}
+        onRoadmapTaskClick={handleTaskClick}
       />
 
       <AppPanels
@@ -880,6 +1084,8 @@ function App() {
         isPreferencesOpen={isPreferencesOpen}
         selectedTask={selectedTask}
         detailsTask={detailsTask}
+        selectedMilestone={selectedMilestone}
+        detailsMilestone={detailsMilestone}
         selectedSwimlane={selectedSwimlane}
         defaultStatus={defaultStatus}
         defaultDate={defaultDate}
@@ -890,6 +1096,9 @@ function App() {
         timelineSwimlanes={timelineSwimlanes}
         people={people}
         statusColumns={statusColumns}
+        milestones={milestones}
+        readModel={workspaceReadModel}
+        isMilestoneDialogOpen={isMilestoneDialogOpen}
         executionLoadStatusId={preferences.executionLoadStatusId}
         pipelineLoadStatusId={preferences.pipelineLoadStatusId}
         agentWatchConfigs={agentWatchConfigs}
@@ -916,6 +1125,13 @@ function App() {
         onEditTaskFromDetails={handleEditTaskFromDetails}
         onMoveAgentTaskToReview={handleMoveAgentTaskToReview}
         onAddTaskComment={handleAddTaskComment}
+        onCloseMilestoneDialog={handleCloseMilestoneDialog}
+        onSaveMilestone={handleSaveMilestone}
+        onDeleteMilestone={handleDeleteMilestone}
+        onUpdateRoadmapTaskDependencies={handleUpdateRoadmapTaskDependencies}
+        onCloseMilestoneDetails={() => setDetailsMilestoneId(null)}
+        onEditMilestoneFromDetails={handleEditMilestoneFromDetails}
+        onMilestoneTaskClick={handleMilestoneTaskClick}
         onCloseSwimlaneDialog={handleCloseSwimlaneDialog}
         onSaveSwimlane={handleSaveSwimlane}
         onDeleteSwimlane={handleDeleteSwimlane}

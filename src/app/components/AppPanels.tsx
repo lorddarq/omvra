@@ -1,8 +1,11 @@
-import { Person, StorageMeter, Task, TaskStatus, TimelineSwimlane, StatusColumn } from '../types';
+import { Person, ProjectMilestone, StorageMeter, Task, TaskStatus, TimelineSwimlane, StatusColumn } from '../types';
 import { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import { AgentWatchConfig } from '../utils/workspaceSanitizers';
+import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import { TaskDialog } from './TaskDialog';
 import { TaskDetailsDialog } from './TaskDetailsDialog';
+import { MilestoneDialog } from './MilestoneDialog';
+import { MilestoneDetailsDialog } from './MilestoneDetailsDialog';
 import { SwimlaneDialog } from './SwimlaneDialog';
 import { PeoplePanel } from './PeoplePanel';
 import { PreferencesPanel } from './PreferencesPanel';
@@ -16,6 +19,8 @@ interface AppPanelsProps {
   isPreferencesOpen: boolean;
   selectedTask: Task | null;
   detailsTask: Task | null;
+  selectedMilestone: ProjectMilestone | null;
+  detailsMilestone: ProjectMilestone | null;
   selectedSwimlane: TimelineSwimlane | null;
   defaultStatus: TaskStatus;
   defaultDate?: Date;
@@ -26,6 +31,9 @@ interface AppPanelsProps {
   timelineSwimlanes: TimelineSwimlane[];
   people: Person[];
   statusColumns: StatusColumn[];
+  milestones: ProjectMilestone[];
+  readModel: WorkspaceReadModel;
+  isMilestoneDialogOpen: boolean;
   executionLoadStatusId: TaskStatus;
   pipelineLoadStatusId: TaskStatus;
   agentWatchConfigs: AgentWatchConfig[];
@@ -52,6 +60,13 @@ interface AppPanelsProps {
   onEditTaskFromDetails: (task: Task) => void;
   onMoveAgentTaskToReview: (taskId: string) => void;
   onAddTaskComment: (taskId: string, content: string) => void;
+  onCloseMilestoneDialog: () => void;
+  onSaveMilestone: (milestone: ProjectMilestone) => void;
+  onDeleteMilestone: (milestoneId: string) => void;
+  onUpdateRoadmapTaskDependencies: (updates: Array<{ taskId: string; dependencyIds: string[] }>) => void;
+  onCloseMilestoneDetails: () => void;
+  onEditMilestoneFromDetails: (milestone: ProjectMilestone) => void;
+  onMilestoneTaskClick: (task: Task) => void;
   onCloseSwimlaneDialog: () => void;
   onSaveSwimlane: (swimlaneData: Partial<TimelineSwimlane>) => void;
   onDeleteSwimlane: (swimlaneId: string) => void;
@@ -89,6 +104,8 @@ export function AppPanels({
   isPreferencesOpen,
   selectedTask,
   detailsTask,
+  selectedMilestone,
+  detailsMilestone,
   selectedSwimlane,
   defaultStatus,
   defaultDate,
@@ -99,6 +116,9 @@ export function AppPanels({
   timelineSwimlanes,
   people,
   statusColumns,
+  milestones,
+  readModel,
+  isMilestoneDialogOpen,
   executionLoadStatusId,
   pipelineLoadStatusId,
   agentWatchConfigs,
@@ -125,6 +145,13 @@ export function AppPanels({
   onEditTaskFromDetails,
   onMoveAgentTaskToReview,
   onAddTaskComment,
+  onCloseMilestoneDialog,
+  onSaveMilestone,
+  onDeleteMilestone,
+  onUpdateRoadmapTaskDependencies,
+  onCloseMilestoneDetails,
+  onEditMilestoneFromDetails,
+  onMilestoneTaskClick,
   onCloseSwimlaneDialog,
   onSaveSwimlane,
   onDeleteSwimlane,
@@ -169,6 +196,9 @@ export function AppPanels({
         swimlanes={timelineSwimlanes}
         statusColumns={statusColumns}
         people={people}
+        tasks={tasks}
+        milestones={milestones}
+        readModel={readModel}
       />
 
       <TaskDetailsDialog
@@ -181,6 +211,33 @@ export function AppPanels({
         swimlanes={timelineSwimlanes}
         people={people}
         statusColumns={statusColumns}
+        tasks={tasks}
+        milestones={milestones}
+        readModel={readModel}
+      />
+
+      <MilestoneDetailsDialog
+        isOpen={Boolean(detailsMilestone)}
+        onClose={onCloseMilestoneDetails}
+        onEdit={onEditMilestoneFromDetails}
+        onTaskClick={onMilestoneTaskClick}
+        milestone={detailsMilestone}
+        projects={timelineSwimlanes}
+        tasks={tasks}
+        statusColumns={statusColumns as Array<{ id: TaskStatus; title: string; color?: string }>}
+        readModel={readModel}
+      />
+
+      <MilestoneDialog
+        isOpen={isMilestoneDialogOpen}
+        onClose={onCloseMilestoneDialog}
+        onSave={onSaveMilestone}
+        onDelete={onDeleteMilestone}
+        onUpdateTaskDependencies={onUpdateRoadmapTaskDependencies}
+        milestone={selectedMilestone}
+        projects={timelineSwimlanes}
+        tasks={tasks}
+        readModel={readModel}
       />
 
       <SwimlaneDialog

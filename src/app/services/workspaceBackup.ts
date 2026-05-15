@@ -1,4 +1,4 @@
-import { Task, TaskStatus, TimelineSwimlane, Person, StatusColumn } from '../types';
+import { Task, TaskStatus, TimelineSwimlane, Person, StatusColumn, ProjectMilestone } from '../types';
 import {
   buildLocalMcpAddress,
   normalizeMcpBindHost,
@@ -10,7 +10,7 @@ import { flattenPortableStoreEntries, isPortableStorageKey } from '../utils/stor
 
 export const WORKSPACE_BACKUP_SCHEMA_VERSION = 2;
 
-export type WorkspaceViewType = 'timeline' | 'kanban';
+export type WorkspaceViewType = 'timeline' | 'kanban' | 'roadmap';
 
 export interface WorkspacePreferences {
   executionLoadStatusId: TaskStatus;
@@ -32,6 +32,7 @@ export interface WorkspaceBackupUiState {
   viewState?: {
     timeline?: Record<string, unknown>;
     kanban?: Record<string, unknown>;
+    roadmap?: Record<string, unknown>;
   };
   timeline?: {
     leftColWidth?: number;
@@ -43,6 +44,7 @@ export interface WorkspaceBackupPayload {
   version: number;
   exportedAt: string;
   tasks?: Task[];
+  milestones?: ProjectMilestone[];
   projects?: TimelineSwimlane[];
   people?: Person[];
   statusColumns?: WorkspaceStatusColumn[];
@@ -54,6 +56,7 @@ export interface WorkspaceBackupPayload {
 
 export interface WorkspaceBackupBuildInput {
   tasks: Task[];
+  milestones: ProjectMilestone[];
   projects: TimelineSwimlane[];
   people: Person[];
   statusColumns: WorkspaceStatusColumn[];
@@ -71,6 +74,7 @@ export interface WorkspaceBackupRepairOptions {
   fallbackStatusColumns?: WorkspaceStatusColumn[];
   fallbackPreferences: WorkspacePreferences;
   fallbackTasks?: Task[];
+  fallbackMilestones?: ProjectMilestone[];
   allowFallbackForMissingArrays?: boolean;
 }
 
@@ -81,6 +85,7 @@ export interface WorkspaceBackupRepairResult {
   version: number;
   exportedAt?: string;
   tasks: Task[];
+  milestones: ProjectMilestone[];
   projects: TimelineSwimlane[];
   people: Person[];
   statusColumns: WorkspaceStatusColumn[];
@@ -121,7 +126,46 @@ function normalizeTask(task: Task, swimlanes: TimelineSwimlane[]): Task {
     complexity: task.complexity || 'medium',
     blocked: Boolean(task.blocked),
     priority: task.priority || 'normal',
+    dependencyIds: Array.isArray(task.dependencyIds) ? task.dependencyIds : [],
   };
+}
+
+export function sanitizeMilestones(
+  value: unknown,
+  projects: TimelineSwimlane[],
+  fallback: ProjectMilestone[] = []
+): ProjectMilestone[] {
+  if (!Array.isArray(value)) return fallback;
+
+  const validProjectIds = new Set(projects.map(project => project.id));
+  const sanitized = value
+    .filter(item => item && typeof item === 'object')
+    .map((item, index) => {
+      const candidate = item as Record<string, unknown>;
+      if (typeof candidate.title !== 'string') return null;
+      const rawProjectIds = Array.isArray(candidate.projectIds)
+        ? candidate.projectIds.map(String)
+        : typeof candidate.projectId === 'string'
+          ? [candidate.projectId]
+          : [];
+      const projectIds = Array.from(new Set(rawProjectIds.filter(projectId => validProjectIds.has(projectId))));
+      if (projectIds.length === 0 || typeof candidate.endDate !== 'string' || !candidate.endDate) return null;
+
+      return {
+        id: typeof candidate.id === 'string' ? candidate.id : `milestone-${index}`,
+        title: candidate.title,
+        projectIds,
+        projectId: projectIds[0],
+        startDate: typeof candidate.startDate === 'string' ? candidate.startDate : undefined,
+        endDate: candidate.endDate,
+        notes: typeof candidate.notes === 'string' ? candidate.notes : undefined,
+        color: typeof candidate.color === 'string' ? candidate.color : undefined,
+        linkedTaskIds: Array.isArray(candidate.linkedTaskIds) ? candidate.linkedTaskIds.map(String) : [],
+      };
+    })
+    .filter((item): item is ProjectMilestone => Boolean(item));
+
+  return sanitized.length > 0 ? sanitized : fallback;
 }
 
 export function sanitizeTimelineSwimlanes(
@@ -344,6 +388,7 @@ export function buildWorkspaceBackupPayload(input: WorkspaceBackupBuildInput): W
     version: input.version ?? WORKSPACE_BACKUP_SCHEMA_VERSION,
     exportedAt: input.exportedAt ?? new Date().toISOString(),
     tasks: input.tasks,
+    milestones: input.milestones,
     projects: input.projects,
     people: input.people,
     statusColumns: input.statusColumns,
@@ -364,6 +409,7 @@ export function repairWorkspaceBackupPayload(
   const fallbackStatusColumns = options.fallbackStatusColumns || [];
   const fallbackPreferences = options.fallbackPreferences;
   const fallbackTasks = options.fallbackTasks || [];
+  const fallbackMilestones = options.fallbackMilestones || [];
 
   if (!isRecord(payload)) {
     return {
@@ -372,6 +418,7 @@ export function repairWorkspaceBackupPayload(
       warnings,
       version: WORKSPACE_BACKUP_SCHEMA_VERSION,
       tasks: [],
+      milestones: [],
       projects: [],
       people: [],
       statusColumns: fallbackStatusColumns,
@@ -402,6 +449,12 @@ export function repairWorkspaceBackupPayload(
   if (!Array.isArray(payload.tasks)) {
     warnings.push('Backup was missing a tasks array; using fallback tasks.');
   }
+
+  const importedMilestones = sanitizeMilestones(
+    payload.milestones,
+    importedProjects,
+    options.allowFallbackForMissingArrays ? fallbackMilestones : []
+  );
 
   const importedPeople = sanitizePeople(
     payload.people,
@@ -437,6 +490,12 @@ export function repairWorkspaceBackupPayload(
       project: project || undefined,
       swimlaneId: nextSwimlaneId,
       assigneeId: nextAssigneeId,
+      milestoneId: importedMilestones.some(milestone => milestone.id === task.milestoneId)
+        ? task.milestoneId
+        : undefined,
+      dependencyIds: (task.dependencyIds || []).filter(dependencyId =>
+        importedTasks.some(candidate => candidate.id === dependencyId)
+      ),
     };
   });
 
@@ -449,13 +508,14 @@ export function repairWorkspaceBackupPayload(
   const ui: WorkspaceBackupUiState | undefined = isRecord(payload.ui)
     ? {
         currentView:
-          payload.ui.currentView === 'timeline' || payload.ui.currentView === 'kanban'
+          payload.ui.currentView === 'timeline' || payload.ui.currentView === 'kanban' || payload.ui.currentView === 'roadmap'
             ? payload.ui.currentView
             : undefined,
         viewState: isRecord(payload.ui.viewState)
           ? {
               timeline: isRecord(payload.ui.viewState.timeline) ? cloneRecord(payload.ui.viewState.timeline) : undefined,
               kanban: isRecord(payload.ui.viewState.kanban) ? cloneRecord(payload.ui.viewState.kanban) : undefined,
+              roadmap: isRecord(payload.ui.viewState.roadmap) ? cloneRecord(payload.ui.viewState.roadmap) : undefined,
             }
           : undefined,
         timeline: isRecord(payload.ui.timeline)
@@ -503,6 +563,7 @@ export function repairWorkspaceBackupPayload(
     version: parsedVersion,
     exportedAt,
     tasks: repairedTasks,
+    milestones: importedMilestones,
     projects: importedProjects,
     people: importedPeople,
     statusColumns: importedStatusColumns,

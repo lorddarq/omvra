@@ -43,7 +43,21 @@ export interface Task {
   projectIds?: string[]; // Projects this task belongs to
   assigneeId?: string; // Person assigned to this task
   project?: string; // Project this task belongs to
+  milestoneId?: string; // Primary roadmap milestone this task contributes to
+  dependencyIds?: string[]; // Roadmap-only dependencies used for milestone planning arrows
   comments?: TaskComment[];
+}
+
+export interface ProjectMilestone {
+  id: string;
+  title: string;
+  projectIds: string[];
+  projectId?: string; // Legacy single-project milestone field kept for migration.
+  startDate?: string;
+  endDate: string;
+  notes?: string;
+  color?: string;
+  linkedTaskIds?: string[];
 }
 
 export type Swimlane = StatusColumn;

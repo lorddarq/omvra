@@ -28,6 +28,7 @@ export function ViewToggle({
   const views: { value: ViewType; label: string }[] = [
     { value: 'timeline', label: 'Timeline' },
     { value: 'kanban', label: 'Kanban' },
+    { value: 'roadmap', label: 'Roadmap' },
   ];
 
   return (

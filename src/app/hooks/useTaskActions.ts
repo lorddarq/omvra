@@ -4,17 +4,26 @@ import type { Person, Task, TaskComment, TaskStatus } from '../types.ts';
 interface UseTaskActionsOptions {
   people: Person[];
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
+  onTaskMilestoneChange?: (taskId: string, nextMilestoneId?: string) => void;
+  onTaskDeleted?: (taskId: string) => void;
 }
 
-export function useTaskActions({ people, setTasks }: UseTaskActionsOptions) {
+export function useTaskActions({
+  people,
+  setTasks,
+  onTaskMilestoneChange,
+  onTaskDeleted,
+}: UseTaskActionsOptions) {
   const saveTask = useCallback((taskData: Partial<Task>) => {
     if (taskData.id) {
       setTasks(prevTasks => prevTasks.map(t => (t.id === taskData.id ? { ...t, ...taskData } : t)));
+      onTaskMilestoneChange?.(taskData.id, taskData.milestoneId);
       return;
     }
 
+    const taskId = Date.now().toString();
     const newTask: Task = {
-      id: Date.now().toString(),
+      id: taskId,
       title: taskData.title!,
       status: taskData.status || 'open',
       notes: taskData.notes,
@@ -29,11 +38,14 @@ export function useTaskActions({ people, setTasks }: UseTaskActionsOptions) {
       swimlaneOnly: taskData.swimlaneOnly,
       swimlaneId: taskData.swimlaneId,
       assigneeId: taskData.assigneeId,
+      milestoneId: taskData.milestoneId,
+      dependencyIds: taskData.dependencyIds || [],
       comments: taskData.comments || [],
     };
 
     setTasks(prevTasks => [newTask, ...prevTasks]);
-  }, [setTasks]);
+    onTaskMilestoneChange?.(taskId, newTask.milestoneId);
+  }, [onTaskMilestoneChange, setTasks]);
 
   const addTaskComment = useCallback((taskId: string, content: string) => {
     const trimmed = content.trim();
@@ -54,8 +66,16 @@ export function useTaskActions({ people, setTasks }: UseTaskActionsOptions) {
   }, [setTasks]);
 
   const deleteTask = useCallback((taskId: string) => {
-    setTasks(prevTasks => prevTasks.filter(t => t.id !== taskId));
-  }, [setTasks]);
+    setTasks(prevTasks =>
+      prevTasks
+        .filter(t => t.id !== taskId)
+        .map(task => ({
+          ...task,
+          dependencyIds: (task.dependencyIds || []).filter(id => id !== taskId),
+        }))
+    );
+    onTaskDeleted?.(taskId);
+  }, [onTaskDeleted, setTasks]);
 
   const moveTask = useCallback((taskId: string, newStatus: TaskStatus) => {
     setTasks(prevTasks => prevTasks.map(t => (t.id === taskId ? { ...t, status: newStatus } : t)));

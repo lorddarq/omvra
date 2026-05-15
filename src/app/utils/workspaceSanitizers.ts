@@ -1,4 +1,4 @@
-import type { Task, TaskStatus, TimelineSwimlane, Person, StatusColumn } from '../types.ts';
+import type { ProjectMilestone, Task, TaskStatus, TimelineSwimlane, Person, StatusColumn } from '../types.ts';
 import { buildLocalMcpAddress, normalizeMcpBindHost, normalizeMcpPort, normalizeMcpServerAddress } from '../constants/mcp.ts';
 
 export type StatusColumnState = StatusColumn;
@@ -61,7 +61,45 @@ export function normalizeTask(task: Task, swimlanes: TimelineSwimlane[]): Task {
     complexity: task.complexity || 'medium',
     blocked: Boolean(task.blocked),
     priority: task.priority || 'normal',
+    dependencyIds: Array.isArray(task.dependencyIds) ? task.dependencyIds : [],
   };
+}
+
+export function sanitizeMilestones(
+  value: unknown,
+  projects: TimelineSwimlane[],
+  fallback: ProjectMilestone[] = []
+): ProjectMilestone[] {
+  if (!Array.isArray(value)) return fallback;
+
+  const validProjectIds = new Set(projects.map(project => project.id));
+  const sanitized = value
+    .filter(isObject)
+    .map((item, index) => {
+      if (typeof item.title !== 'string') return null;
+      const rawProjectIds = Array.isArray(item.projectIds)
+        ? item.projectIds.map(String)
+        : typeof item.projectId === 'string'
+          ? [item.projectId]
+          : [];
+      const projectIds = Array.from(new Set(rawProjectIds.filter(projectId => validProjectIds.has(projectId))));
+      if (projectIds.length === 0 || typeof item.endDate !== 'string' || !item.endDate) return null;
+
+      return {
+        id: typeof item.id === 'string' ? item.id : `milestone-${index}`,
+        title: item.title,
+        projectIds,
+        projectId: projectIds[0],
+        startDate: typeof item.startDate === 'string' ? item.startDate : undefined,
+        endDate: item.endDate,
+        notes: typeof item.notes === 'string' ? item.notes : undefined,
+        color: typeof item.color === 'string' ? item.color : undefined,
+        linkedTaskIds: Array.isArray(item.linkedTaskIds) ? item.linkedTaskIds.map(String) : [],
+      };
+    })
+    .filter((item): item is ProjectMilestone => Boolean(item));
+
+  return sanitized;
 }
 
 export function sanitizeStatusColumns(

@@ -13,7 +13,9 @@ const {
   appendMcpAuditLog,
   getWorkspaceSnapshot,
   listMilestones,
+  getMilestoneById,
   listTasks,
+  getTaskById,
   listKanbanCards,
   listTimelineCards,
   listMcpAuditLog,
@@ -24,6 +26,8 @@ const {
   updateTaskDescription,
   logTaskTime,
   createMilestone,
+  updateMilestone,
+  deleteMilestone,
   deleteTask,
   transitionTaskToUnderReview,
   updateTaskAgentSummary,
@@ -423,6 +427,34 @@ test('deleteTask removes a task with revision protection', () => {
   assert.ok(!getWorkspaceSnapshot(store).workspace.tasks.some(item => item.id === task.id));
 });
 
+test('deleteTask cleans milestone links and task dependency references', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const milestone = createMilestone(store, {
+    title: 'Release Alpha',
+    projectIds: ['Project A'],
+    endDate: '2026-04-01',
+    linkedTaskIds: ['task-1', 'task-2'],
+  }).milestone;
+  const dependentUpdate = updateTaskDetails(store, {
+    taskId: 'task-3',
+    dependencyIds: ['task-2'],
+    expectedRevision: 0,
+  });
+  assert.equal(dependentUpdate.ok, true);
+
+  const taskToDelete = getTaskById(store, 'task-2');
+  const deleted = deleteTask(store, {
+    taskId: 'task-2',
+    expectedRevision: taskToDelete[MCP_TASK_REV_FIELD],
+  });
+
+  assert.equal(deleted.ok, true);
+  assert.deepEqual(deleted.cleanup.updatedMilestoneIds, [milestone.id]);
+  assert.deepEqual(deleted.cleanup.removedDependencyReferences, ['task-3']);
+  assert.deepEqual(getMilestoneById(store, milestone.id).linkedTaskIds, ['task-1']);
+  assert.deepEqual(getTaskById(store, 'task-3').dependencyIds, []);
+});
+
 test('updateTaskDetails rejects stale revisions and invalid references', () => {
   const store = makeStoreFromFixture('workspace-basic');
 
@@ -564,6 +596,60 @@ test('createMilestone creates roadmap milestone and links existing tasks', () =>
   const linkedTask = listTasks(store).find(task => task.id === 'task-1');
   assert.equal(linkedTask.milestoneId, created.milestone.id);
   assert.equal(linkedTask[MCP_TASK_REV_FIELD], 1);
+});
+
+test('updateMilestone unlinks tasks and clears milestoneId from removed tasks', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const created = createMilestone(store, {
+    title: 'Release Alpha',
+    projectIds: ['Project A'],
+    endDate: '2026-04-01',
+    linkedTaskIds: ['task-1', 'task-2'],
+  });
+
+  const updated = updateMilestone(store, {
+    milestoneId: created.milestone.id,
+    linkedTaskIds: ['task-1'],
+    expectedRevision: created.milestone[MCP_TASK_REV_FIELD],
+  });
+
+  assert.equal(updated.ok, true);
+  assert.deepEqual(updated.milestone.linkedTaskIds, ['task-1']);
+  assert.equal(updated.milestone[MCP_TASK_REV_FIELD], 1);
+
+  const stillLinkedTask = listTasks(store).find(task => task.id === 'task-1');
+  const unlinkedTask = listTasks(store).find(task => task.id === 'task-2');
+  assert.equal(stillLinkedTask.milestoneId, created.milestone.id);
+  assert.equal(unlinkedTask.milestoneId, undefined);
+});
+
+test('deleteMilestone removes milestone and clears linked task roadmap metadata', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const created = createMilestone(store, {
+    title: 'Release Alpha',
+    projectIds: ['Project A'],
+    endDate: '2026-04-01',
+    linkedTaskIds: ['task-1', 'task-2'],
+  });
+  const dependencyUpdate = updateTaskDetails(store, {
+    taskId: 'task-1',
+    dependencyIds: ['task-2'],
+    expectedRevision: 1,
+  });
+  assert.equal(dependencyUpdate.ok, true);
+
+  const deleted = deleteMilestone(store, {
+    milestoneId: created.milestone.id,
+    expectedRevision: created.milestone[MCP_TASK_REV_FIELD],
+  });
+
+  assert.equal(deleted.ok, true);
+  assert.equal(getMilestoneById(store, created.milestone.id), null);
+  assert.deepEqual(deleted.cleanup.clearedMilestoneTaskIds.sort(), ['task-1', 'task-2']);
+  assert.deepEqual(deleted.cleanup.clearedDependencyTaskIds, ['task-1']);
+  assert.equal(getTaskById(store, 'task-1').milestoneId, undefined);
+  assert.deepEqual(getTaskById(store, 'task-1').dependencyIds, []);
+  assert.equal(getTaskById(store, 'task-2').milestoneId, undefined);
 });
 
 test('task normalization extracts project context from description notes', () => {

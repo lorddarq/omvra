@@ -450,6 +450,8 @@ function buildMcpCapabilitySnapshot(store) {
             'tasks.add_comment',
             'tasks.add_activity_entry',
             'milestones.create',
+            'milestones.update',
+            'milestones.delete',
           ]
         : [],
     },
@@ -505,6 +507,9 @@ function normalizeMilestoneForMcp(milestone) {
   const title = normalizeString(milestone.title).trim();
   const endDate = normalizeString(milestone.endDate).trim();
   if (!title || !endDate) return null;
+  const revision = Number.isFinite(Number(milestone[MCP_TASK_REV_FIELD]))
+    ? Math.max(0, Math.floor(Number(milestone[MCP_TASK_REV_FIELD])))
+    : 0;
   const projectIds = normalizeTaskIdList(
     Array.isArray(milestone.projectIds)
       ? milestone.projectIds
@@ -521,6 +526,7 @@ function normalizeMilestoneForMcp(milestone) {
     notes: normalizeString(milestone.notes),
     color: normalizeString(milestone.color).trim() || undefined,
     linkedTaskIds: normalizeTaskIdList(milestone.linkedTaskIds),
+    [MCP_TASK_REV_FIELD]: revision,
   };
 }
 
@@ -782,6 +788,8 @@ function buildMcpAgentGuide() {
       'tasks.move_to_ready_for_human_review',
       'tasks.assign',
       'milestones.create',
+      'milestones.update',
+      'milestones.delete',
     ],
     workflow: [
       'Read the guide and task-execution schema before taking action.',
@@ -825,6 +833,8 @@ function buildMcpTaskExecutionSchema() {
       'tasks.update_description when only the main task description/notes field needs to be replaced',
       'tasks.log_time when approximate time spent should be recorded',
       'milestones.create when roadmap planning needs a milestone with linked tasks',
+      'milestones.update when roadmap linked tasks or milestone metadata need to change',
+      'milestones.delete when a roadmap milestone should be removed and task links cleaned',
       'tasks.add_comment',
       'tasks.update_completion_description',
       'tasks.move_to_status or tasks.move_to_ready_for_human_review',
@@ -1736,6 +1746,7 @@ function createMilestone(store, {
     notes: typeof notes === 'string' ? notes : (typeof description === 'string' ? description : undefined),
     color: normalizeString(color).trim() || projectResolution.projects[0].color,
     linkedTaskIds: taskValidation.taskIds,
+    [MCP_TASK_REV_FIELD]: 0,
     mcpUpdatedAt: new Date().toISOString(),
     mcpLastActor: actor,
   };
@@ -1764,6 +1775,251 @@ function createMilestone(store, {
     ok: true,
     milestone: normalizeMilestoneForMcp(milestone),
     linkedTaskIds: taskValidation.taskIds,
+  };
+}
+
+function syncMilestoneTaskLinks(store, milestoneId, previousLinkedTaskIds, nextLinkedTaskIds, actor) {
+  const previousLinked = new Set(normalizeTaskIdList(previousLinkedTaskIds));
+  const nextLinked = new Set(normalizeTaskIdList(nextLinkedTaskIds));
+  const tasks = readArray(store, TASKS_KEY);
+  let changed = false;
+
+  const nextTasks = tasks.map(rawTask => {
+    if (!rawTask || typeof rawTask !== 'object') return rawTask;
+    const task = normalizeTaskForMcp(rawTask);
+    const wasLinked = previousLinked.has(task.id) || task.milestoneId === milestoneId;
+    const shouldBeLinked = nextLinked.has(task.id);
+
+    if (shouldBeLinked && task.milestoneId !== milestoneId) {
+      changed = true;
+      return {
+        ...task,
+        milestoneId,
+        [MCP_TASK_REV_FIELD]: (task[MCP_TASK_REV_FIELD] || 0) + 1,
+        mcpUpdatedAt: new Date().toISOString(),
+        mcpLastActor: actor,
+      };
+    }
+
+    if (wasLinked && !shouldBeLinked && task.milestoneId === milestoneId) {
+      changed = true;
+      return {
+        ...task,
+        milestoneId: undefined,
+        [MCP_TASK_REV_FIELD]: (task[MCP_TASK_REV_FIELD] || 0) + 1,
+        mcpUpdatedAt: new Date().toISOString(),
+        mcpLastActor: actor,
+      };
+    }
+
+    return rawTask;
+  });
+
+  if (changed) {
+    store.set(TASKS_KEY, nextTasks);
+  }
+}
+
+function updateMilestone(store, {
+  milestoneId,
+  title,
+  projectId,
+  projectIds,
+  startDate,
+  endDate,
+  notes,
+  description,
+  color,
+  linkedTaskIds,
+  expectedRevision,
+  actor = 'agent',
+} = {}) {
+  const normalizedMilestoneId = normalizeString(milestoneId).trim();
+  if (!normalizedMilestoneId) {
+    return { ok: false, error: 'MILESTONE_ID_REQUIRED', message: 'milestoneId is required.' };
+  }
+
+  const milestones = readArray(store, MILESTONES_KEY);
+  const milestoneIndex = milestones.findIndex(milestone => milestone && milestone.id === normalizedMilestoneId);
+  if (milestoneIndex < 0) {
+    return { ok: false, error: 'MILESTONE_NOT_FOUND', message: `Milestone "${normalizedMilestoneId}" not found.` };
+  }
+
+  const currentMilestone = normalizeMilestoneForMcp(milestones[milestoneIndex]);
+  const currentRevision = currentMilestone[MCP_TASK_REV_FIELD] || 0;
+  if (!Number.isFinite(Number(expectedRevision))) {
+    return {
+      ok: false,
+      error: 'EXPECTED_REVISION_REQUIRED',
+      message: 'expectedRevision is required and must be a finite number.',
+      currentRevision,
+    };
+  }
+
+  const expected = Math.max(0, Math.floor(Number(expectedRevision)));
+  if (expected !== currentRevision) {
+    return {
+      ok: false,
+      error: 'REVISION_MISMATCH',
+      message: 'Milestone revision mismatch.',
+      currentRevision,
+      expectedRevision: expected,
+    };
+  }
+
+  if (hasOwn(arguments[1] || {}, 'title') && !normalizeString(title).trim()) {
+    return { ok: false, error: 'INVALID_TITLE', message: 'title cannot be empty.' };
+  }
+
+  const startDatePatch = hasOwn(arguments[1] || {}, 'startDate') ? normalizePatchDate(startDate, 'startDate') : null;
+  if (startDatePatch && !startDatePatch.ok) return startDatePatch;
+  const endDatePatch = hasOwn(arguments[1] || {}, 'endDate') ? normalizePatchDate(endDate, 'endDate') : null;
+  if (endDatePatch && !endDatePatch.ok) return endDatePatch;
+
+  const hasProjectPatch = hasOwn(arguments[1] || {}, 'projectId') || hasOwn(arguments[1] || {}, 'projectIds');
+  const projectResolution = hasProjectPatch
+    ? resolveProjectReferences(
+        store,
+        Array.isArray(projectIds)
+          ? projectIds.concat(projectId ? [projectId] : [])
+          : (projectId ? [projectId] : [])
+      )
+    : null;
+  if (projectResolution && !projectResolution.ok) return projectResolution;
+  if (projectResolution && projectResolution.projects.length === 0) {
+    return { ok: false, error: 'PROJECT_REQUIRED', message: 'At least one project id or project name is required.' };
+  }
+
+  const hasLinkedTaskPatch = hasOwn(arguments[1] || {}, 'linkedTaskIds');
+  const taskValidation = hasLinkedTaskPatch
+    ? validateTaskReferences(store, linkedTaskIds, { fieldName: 'linkedTaskIds' })
+    : null;
+  if (taskValidation && !taskValidation.ok) return taskValidation;
+
+  const nextMilestone = {
+    ...currentMilestone,
+    title: hasOwn(arguments[1] || {}, 'title') ? normalizeString(title).trim() : currentMilestone.title,
+    startDate: startDatePatch ? startDatePatch.value : currentMilestone.startDate,
+    endDate: endDatePatch ? endDatePatch.value : currentMilestone.endDate,
+    notes: hasOwn(arguments[1] || {}, 'notes')
+      ? normalizeString(notes)
+      : hasOwn(arguments[1] || {}, 'description')
+        ? normalizeString(description)
+        : currentMilestone.notes,
+    color: hasOwn(arguments[1] || {}, 'color') ? normalizeString(color).trim() || undefined : currentMilestone.color,
+    linkedTaskIds: taskValidation ? taskValidation.taskIds : currentMilestone.linkedTaskIds,
+    [MCP_TASK_REV_FIELD]: currentRevision + 1,
+    mcpUpdatedAt: new Date().toISOString(),
+    mcpLastActor: actor,
+  };
+
+  if (projectResolution) {
+    nextMilestone.projectIds = projectResolution.projects.map(project => project.id);
+    nextMilestone.projectId = projectResolution.projects[0].id;
+  }
+
+  if (nextMilestone.startDate && nextMilestone.endDate && nextMilestone.endDate < nextMilestone.startDate) {
+    return { ok: false, error: 'INVALID_DATE_RANGE', message: 'endDate cannot be earlier than startDate.' };
+  }
+
+  const nextMilestones = milestones.slice();
+  nextMilestones[milestoneIndex] = nextMilestone;
+  store.set(MILESTONES_KEY, nextMilestones);
+
+  if (taskValidation) {
+    syncMilestoneTaskLinks(
+      store,
+      nextMilestone.id,
+      currentMilestone.linkedTaskIds,
+      taskValidation.taskIds,
+      actor
+    );
+  }
+
+  return {
+    ok: true,
+    milestone: normalizeMilestoneForMcp(nextMilestone),
+    linkedTaskIds: nextMilestone.linkedTaskIds,
+  };
+}
+
+function deleteMilestone(store, {
+  milestoneId,
+  expectedRevision,
+  actor = 'agent',
+} = {}) {
+  const normalizedMilestoneId = normalizeString(milestoneId).trim();
+  if (!normalizedMilestoneId) {
+    return { ok: false, error: 'MILESTONE_ID_REQUIRED', message: 'milestoneId is required.' };
+  }
+
+  const milestones = readArray(store, MILESTONES_KEY);
+  const milestoneIndex = milestones.findIndex(milestone => milestone && milestone.id === normalizedMilestoneId);
+  if (milestoneIndex < 0) {
+    return { ok: false, error: 'MILESTONE_NOT_FOUND', message: `Milestone "${normalizedMilestoneId}" not found.` };
+  }
+
+  const currentMilestone = normalizeMilestoneForMcp(milestones[milestoneIndex]);
+  const currentRevision = currentMilestone[MCP_TASK_REV_FIELD] || 0;
+  if (!Number.isFinite(Number(expectedRevision))) {
+    return {
+      ok: false,
+      error: 'EXPECTED_REVISION_REQUIRED',
+      message: 'expectedRevision is required and must be a finite number.',
+      currentRevision,
+    };
+  }
+
+  const expected = Math.max(0, Math.floor(Number(expectedRevision)));
+  if (expected !== currentRevision) {
+    return {
+      ok: false,
+      error: 'REVISION_MISMATCH',
+      message: 'Milestone revision mismatch.',
+      currentRevision,
+      expectedRevision: expected,
+    };
+  }
+
+  const affectedTaskIds = new Set(currentMilestone.linkedTaskIds || []);
+  const cleanup = {
+    clearedMilestoneTaskIds: [],
+    clearedDependencyTaskIds: [],
+  };
+
+  const tasks = readArray(store, TASKS_KEY);
+  const nextTasks = tasks.map(rawTask => {
+    if (!rawTask || typeof rawTask !== 'object') return rawTask;
+    const task = normalizeTaskForMcp(rawTask);
+    const shouldClearMilestone = task.milestoneId === normalizedMilestoneId || affectedTaskIds.has(task.id);
+    const shouldClearDependencies = shouldClearMilestone && (task.dependencyIds || []).length > 0;
+    if (!shouldClearMilestone && !shouldClearDependencies) return rawTask;
+
+    if (shouldClearMilestone) cleanup.clearedMilestoneTaskIds.push(task.id);
+    if (shouldClearDependencies) cleanup.clearedDependencyTaskIds.push(task.id);
+
+    return {
+      ...task,
+      milestoneId: shouldClearMilestone ? undefined : task.milestoneId,
+      dependencyIds: shouldClearDependencies ? [] : task.dependencyIds,
+      [MCP_TASK_REV_FIELD]: (task[MCP_TASK_REV_FIELD] || 0) + 1,
+      mcpUpdatedAt: new Date().toISOString(),
+      mcpLastActor: actor,
+    };
+  });
+
+  const nextMilestones = milestones.slice(0, milestoneIndex).concat(milestones.slice(milestoneIndex + 1));
+  store.set(MILESTONES_KEY, nextMilestones);
+  if (cleanup.clearedMilestoneTaskIds.length > 0 || cleanup.clearedDependencyTaskIds.length > 0) {
+    store.set(TASKS_KEY, nextTasks);
+  }
+
+  return {
+    ok: true,
+    deletedMilestoneId: normalizedMilestoneId,
+    milestone: currentMilestone,
+    currentRevision,
+    cleanup,
   };
 }
 
@@ -1805,8 +2061,47 @@ function deleteTask(store, {
     };
   }
 
-  const nextTasks = tasks.slice(0, taskIndex).concat(tasks.slice(taskIndex + 1));
+  const cleanup = {
+    removedDependencyReferences: [],
+    updatedMilestoneIds: [],
+  };
+  const nextTasks = tasks
+    .slice(0, taskIndex)
+    .concat(tasks.slice(taskIndex + 1))
+    .map(rawTask => {
+      if (!rawTask || typeof rawTask !== 'object') return rawTask;
+      const task = normalizeTaskForMcp(rawTask);
+      const nextDependencyIds = (task.dependencyIds || []).filter(dependencyId => dependencyId !== normalizedTaskId);
+      if (nextDependencyIds.length === (task.dependencyIds || []).length) return rawTask;
+      cleanup.removedDependencyReferences.push(task.id);
+      return {
+        ...task,
+        dependencyIds: nextDependencyIds,
+        [MCP_TASK_REV_FIELD]: (task[MCP_TASK_REV_FIELD] || 0) + 1,
+        mcpUpdatedAt: new Date().toISOString(),
+        mcpLastActor: actor,
+      };
+    });
   store.set(TASKS_KEY, nextTasks);
+
+  const milestones = readArray(store, MILESTONES_KEY);
+  const nextMilestones = milestones.map(rawMilestone => {
+    const milestone = normalizeMilestoneForMcp(rawMilestone);
+    if (!milestone) return rawMilestone;
+    const nextLinkedTaskIds = (milestone.linkedTaskIds || []).filter(taskId => taskId !== normalizedTaskId);
+    if (nextLinkedTaskIds.length === (milestone.linkedTaskIds || []).length) return rawMilestone;
+    cleanup.updatedMilestoneIds.push(milestone.id);
+    return {
+      ...milestone,
+      linkedTaskIds: nextLinkedTaskIds,
+      [MCP_TASK_REV_FIELD]: (milestone[MCP_TASK_REV_FIELD] || 0) + 1,
+      mcpUpdatedAt: new Date().toISOString(),
+      mcpLastActor: actor,
+    };
+  });
+  if (cleanup.updatedMilestoneIds.length > 0) {
+    store.set(MILESTONES_KEY, nextMilestones);
+  }
 
   return {
     ok: true,
@@ -1816,6 +2111,7 @@ function deleteTask(store, {
       mcpLastActor: actor,
     },
     currentRevision,
+    cleanup,
   };
 }
 
@@ -2304,6 +2600,8 @@ module.exports = {
   updateTaskDescription,
   logTaskTime,
   createMilestone,
+  updateMilestone,
+  deleteMilestone,
   deleteTask,
   REQUIRES_HUMAN_REVIEW_STATUS_ID,
   REQUIRES_HUMAN_REVIEW_STATUS_TITLE,

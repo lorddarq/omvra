@@ -14,8 +14,8 @@ export function useProjectActions({
 }: UseProjectActionsOptions) {
   const saveSwimlane = useCallback((swimlaneData: Partial<TimelineSwimlane>) => {
     if (swimlaneData.id) {
-      setTimelineSwimlanes(
-        timelineSwimlanes.map(s => (s.id === swimlaneData.id ? { ...s, ...swimlaneData } : s))
+      setTimelineSwimlanes(previousSwimlanes =>
+        previousSwimlanes.map(s => (s.id === swimlaneData.id ? { ...s, ...swimlaneData } : s))
       );
       return;
     }
@@ -23,9 +23,10 @@ export function useProjectActions({
     const newSwimlane: TimelineSwimlane = {
       id: Date.now().toString(),
       name: swimlaneData.name!,
+      color: swimlaneData.color,
     };
-    setTimelineSwimlanes([...timelineSwimlanes, newSwimlane]);
-  }, [setTimelineSwimlanes, timelineSwimlanes]);
+    setTimelineSwimlanes(previousSwimlanes => [...previousSwimlanes, newSwimlane]);
+  }, [setTimelineSwimlanes]);
 
   const deleteSwimlane = useCallback((swimlaneId: string) => {
     const remainingSwimlanes = timelineSwimlanes.filter(s => s.id !== swimlaneId);

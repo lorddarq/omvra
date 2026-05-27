@@ -78,6 +78,8 @@ test('tools/list remains available after initialize handshake', () => {
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks_delete'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks_log_time'));
   assert.ok(response.result.tools.some(tool => tool.name === 'milestones_create'));
+  assert.ok(response.result.tools.some(tool => tool.name === 'milestones_update'));
+  assert.ok(response.result.tools.some(tool => tool.name === 'milestones_delete'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks_move_to_status'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks_move_to_ready_for_human_review'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks_complete_and_request_review'));
@@ -281,6 +283,121 @@ test('MCP logs approximate task time and creates linked milestones', () => {
   assert.ok(listResponse.result.structuredContent.some(item => item.id === milestone.id));
 });
 
+test('MCP updates milestone linked tasks and clears removed task milestone links', () => {
+  const dispatch = createRequestDispatcher(makeStoreFromFixture('workspace-basic'));
+
+  const milestoneResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'milestone-update-create-1',
+    method: 'tools/call',
+    params: {
+      name: 'milestones_create',
+      arguments: {
+        title: 'Release Alpha',
+        projectIds: ['Project A'],
+        endDate: '2026-04-01',
+        linkedTaskIds: ['task-1', 'task-2'],
+      },
+    },
+  }, makeReq({}, 'stdio'));
+
+  const milestone = milestoneResponse.result.structuredContent.result.milestone;
+  const updateResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'milestone-update-1',
+    method: 'tools/call',
+    params: {
+      name: 'milestones_update',
+      arguments: {
+        milestoneId: milestone.id,
+        linkedTaskIds: ['task-1'],
+        expectedRevision: milestone.__mcpRevision,
+      },
+    },
+  }, makeReq({}, 'stdio'));
+
+  const updatedMilestone = updateResponse.result.structuredContent.result.milestone;
+  assert.deepEqual(updatedMilestone.linkedTaskIds, ['task-1']);
+  assert.equal(updatedMilestone.__mcpRevision, 1);
+
+  const removedTaskResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'milestone-update-task-get-1',
+    method: 'tools/call',
+    params: {
+      name: 'tasks_get',
+      arguments: { taskId: 'task-2' },
+    },
+  }, makeReq({}, 'stdio'));
+
+  assert.equal(removedTaskResponse.result.structuredContent.milestoneId, undefined);
+});
+
+test('MCP deletes milestones and clears linked task roadmap metadata', () => {
+  const dispatch = createRequestDispatcher(makeStoreFromFixture('workspace-basic'));
+  const req = makeReq({}, 'stdio');
+
+  const milestoneResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'milestone-delete-create-1',
+    method: 'tools/call',
+    params: {
+      name: 'milestones_create',
+      arguments: {
+        title: 'Release Alpha',
+        projectIds: ['Project A'],
+        endDate: '2026-04-01',
+        linkedTaskIds: ['task-1', 'task-2'],
+      },
+    },
+  }, req);
+  const milestone = milestoneResponse.result.structuredContent.result.milestone;
+
+  const dependencyUpdate = dispatch({
+    jsonrpc: '2.0',
+    id: 'milestone-delete-dependency-1',
+    method: 'tools/call',
+    params: {
+      name: 'tasks_update',
+      arguments: {
+        taskId: 'task-1',
+        dependencyIds: ['task-2'],
+        expectedRevision: 1,
+      },
+    },
+  }, req);
+  assert.deepEqual(dependencyUpdate.result.structuredContent.task.dependencyIds, ['task-2']);
+
+  const deleteResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'milestone-delete-1',
+    method: 'tools/call',
+    params: {
+      name: 'milestones_delete',
+      arguments: {
+        milestoneId: milestone.id,
+        expectedRevision: milestone.__mcpRevision,
+      },
+    },
+  }, req);
+
+  assert.equal(deleteResponse.result.structuredContent.result.deletedMilestoneId, milestone.id);
+  assert.deepEqual(deleteResponse.result.structuredContent.result.cleanup.clearedMilestoneTaskIds.sort(), ['task-1', 'task-2']);
+  assert.deepEqual(deleteResponse.result.structuredContent.result.cleanup.clearedDependencyTaskIds, ['task-1']);
+
+  const taskResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'milestone-delete-task-read-1',
+    method: 'tools/call',
+    params: {
+      name: 'tasks_get',
+      arguments: { taskId: 'task-1' },
+    },
+  }, req);
+  assert.equal(taskResponse.result.structuredContent.milestoneId, undefined);
+  assert.deepEqual(taskResponse.result.structuredContent.dependencyIds, []);
+});
+
 test('tasks.update_description replaces notes through MCP and audits the write', () => {
   const store = makeStoreFromFixture('workspace-basic');
   store.set(PREFERENCES_KEY, {
@@ -389,6 +506,68 @@ test('tasks.delete removes a task through MCP and workspace snapshots stay in sy
     },
   }, req);
   assert.ok(!snapshotResponse.result.structuredContent.workspace.tasks.some(task => task.id === 'task-2'));
+});
+
+test('tasks.delete reports cleanup for milestone links and dependencies', () => {
+  const dispatch = createRequestDispatcher(makeStoreFromFixture('workspace-basic'));
+  const req = makeReq({}, 'stdio');
+
+  const milestoneResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'delete-cleanup-milestone',
+    method: 'tools/call',
+    params: {
+      name: 'milestones_create',
+      arguments: {
+        title: 'Release Alpha',
+        projectIds: ['Project A'],
+        endDate: '2026-04-01',
+        linkedTaskIds: ['task-1', 'task-2'],
+      },
+    },
+  }, req);
+  const milestone = milestoneResponse.result.structuredContent.result.milestone;
+
+  const dependentUpdate = dispatch({
+    jsonrpc: '2.0',
+    id: 'delete-cleanup-dependent',
+    method: 'tools/call',
+    params: {
+      name: 'tasks_update',
+      arguments: {
+        taskId: 'task-3',
+        dependencyIds: ['task-2'],
+        expectedRevision: 0,
+      },
+    },
+  }, req);
+  assert.equal(dependentUpdate.result.structuredContent.task.dependencyIds[0], 'task-2');
+
+  const taskResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'delete-cleanup-task-read',
+    method: 'tools/call',
+    params: {
+      name: 'tasks_get',
+      arguments: { taskId: 'task-2' },
+    },
+  }, req);
+
+  const deleteResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'delete-cleanup-task',
+    method: 'tools/call',
+    params: {
+      name: 'tasks_delete',
+      arguments: {
+        taskId: 'task-2',
+        expectedRevision: taskResponse.result.structuredContent.__mcpRevision,
+      },
+    },
+  }, req);
+
+  assert.deepEqual(deleteResponse.result.structuredContent.result.cleanup.updatedMilestoneIds, [milestone.id]);
+  assert.deepEqual(deleteResponse.result.structuredContent.result.cleanup.removedDependencyReferences, ['task-3']);
 });
 
 test('resources/templates/list returns the same lookup templates for clients that query them directly', () => {
@@ -911,6 +1090,8 @@ test('read_only fixture only exposes read tools and preserves custom resources',
   assert.ok(!toolNames.includes('tasks_delete'));
   assert.ok(!toolNames.includes('tasks_log_time'));
   assert.ok(!toolNames.includes('milestones_create'));
+  assert.ok(!toolNames.includes('milestones_update'));
+  assert.ok(!toolNames.includes('milestones_delete'));
   assert.ok(!toolNames.includes('tasks_transition_under_review'));
   assert.ok(!toolNames.includes('tasks_move_to_status'));
   assert.ok(!toolNames.includes('tasks_move_to_ready_for_human_review'));

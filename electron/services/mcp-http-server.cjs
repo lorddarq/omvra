@@ -25,6 +25,8 @@ const {
   deleteTask,
   logTaskTime,
   createMilestone,
+  updateMilestone,
+  deleteMilestone,
   transitionTaskToUnderReview,
   updateTaskAgentSummary,
   addTaskComment,
@@ -344,6 +346,47 @@ const WRITE_TOOL_DEFINITIONS = [
     },
   },
   {
+    name: 'milestones.update',
+    description: 'Updates a roadmap milestone with revision protection. Use linkedTaskIds to link or unlink tasks from the milestone.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        milestoneId: { type: 'string' },
+        title: { type: 'string' },
+        projectId: { type: 'string' },
+        projectIds: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+        startDate: { type: 'string' },
+        endDate: { type: 'string' },
+        notes: { type: 'string' },
+        description: { type: 'string' },
+        color: { type: 'string' },
+        linkedTaskIds: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+      },
+      required: ['milestoneId', 'expectedRevision'],
+    },
+  },
+  {
+    name: 'milestones.delete',
+    description: 'Deletes a roadmap milestone with revision protection and clears affected task milestone/dependency metadata.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        milestoneId: { type: 'string' },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+      },
+      required: ['milestoneId', 'expectedRevision'],
+    },
+  },
+  {
     name: 'tasks.transition_under_review',
     description: 'Transitions a task status to under-review. (not available in read-only mode)',
     inputSchema: {
@@ -508,6 +551,8 @@ const TOOL_NAME_ALIASES = new Map([
   ['tasks_delete', 'tasks.delete'],
   ['tasks_log_time', 'tasks.log_time'],
   ['milestones_create', 'milestones.create'],
+  ['milestones_update', 'milestones.update'],
+  ['milestones_delete', 'milestones.delete'],
   ['tasks_transition_under_review', 'tasks.transition_under_review'],
   ['tasks_update_agent_summary', 'tasks.update_agent_summary'],
   ['tasks_add_comment', 'tasks.add_comment'],
@@ -1196,6 +1241,9 @@ function handleToolCall(store, req, params) {
           task: result.task,
           deletedTaskId: result.deletedTaskId,
           revision: result.currentRevision,
+          result: {
+            cleanup: result.cleanup,
+          },
         }),
       };
     }
@@ -1272,6 +1320,78 @@ function handleToolCall(store, req, params) {
           changed: true,
           auditId: audit?.auditId,
           result,
+        }),
+      };
+    }
+
+    case 'milestones.update': {
+      const milestoneId = parseMilestoneId(args);
+      if (!milestoneId) {
+        return { error: invalidParams('Invalid params: "milestoneId" is required.') };
+      }
+      const result = updateMilestone(store, {
+        ...args,
+        milestoneId,
+        actor: 'mcp-agent',
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, {
+          outcome: 'denied',
+          reason: result.error,
+          toolName: name,
+          milestoneId,
+        });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        milestoneId: result.milestone?.id,
+        linkedTaskIds: result.linkedTaskIds,
+        nextRevision: result.milestone?.__mcpRevision,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: true,
+          auditId: audit?.auditId,
+          result,
+          revision: result.milestone?.__mcpRevision,
+        }),
+      };
+    }
+
+    case 'milestones.delete': {
+      const milestoneId = parseMilestoneId(args);
+      if (!milestoneId) {
+        return { error: invalidParams('Invalid params: "milestoneId" is required.') };
+      }
+      const result = deleteMilestone(store, {
+        milestoneId,
+        expectedRevision: args.expectedRevision,
+        actor: 'mcp-agent',
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, {
+          outcome: 'denied',
+          reason: result.error,
+          toolName: name,
+          milestoneId,
+        });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        milestoneId: result.deletedMilestoneId,
+        revision: result.currentRevision,
+        cleanup: result.cleanup,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: true,
+          auditId: audit?.auditId,
+          result,
+          revision: result.currentRevision,
         }),
       };
     }

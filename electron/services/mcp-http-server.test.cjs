@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const { createRequestDispatcher } = require('./mcp-http-server.cjs');
 const {
+  MILESTONES_KEY,
   PREFERENCES_KEY,
   makeStoreFromFixture,
 } = require('./test-fixtures.cjs');
@@ -70,10 +71,13 @@ test('tools/list remains available after initialize handshake', () => {
   assert.ok(response.result.tools.every(tool => /^[a-zA-Z0-9_-]{1,64}$/.test(tool.name)));
   assert.ok(response.result.tools.some(tool => tool.name === 'workspace_get_snapshot'));
   assert.ok(response.result.tools.some(tool => tool.name === 'boards_watch_poll'));
+  assert.ok(response.result.tools.some(tool => tool.name === 'milestones_list'));
   assert.ok(response.result.tools.some(tool => tool.name === 'task_write'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks_update'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks_update_description'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks_delete'));
+  assert.ok(response.result.tools.some(tool => tool.name === 'tasks_log_time'));
+  assert.ok(response.result.tools.some(tool => tool.name === 'milestones_create'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks_move_to_status'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks_move_to_ready_for_human_review'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks_complete_and_request_review'));
@@ -97,6 +101,8 @@ test('resources/list exposes the guide, schema, and lookup templates', () => {
   assert.ok(Array.isArray(response.result.resourceTemplates));
   assert.ok(response.result.resources.some(resource => resource.uri === 'plumy://agent/guide'));
   assert.ok(response.result.resources.some(resource => resource.uri === 'plumy://schema/task-execution'));
+  assert.ok(response.result.resources.some(resource => resource.uri === 'plumy://milestones'));
+  assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'plumy://milestones/{milestoneId}'));
   assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'plumy://agents/{personId}/assigned'));
   assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'plumy://projects/{projectId}/tasks'));
   assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'plumy://boards/{statusId}/tasks'));
@@ -151,6 +157,128 @@ test('underscore tool aliases dispatch to the canonical handlers', () => {
   assert.equal(response.id, 'alias-list-1');
   assert.ok(Array.isArray(response.result.structuredContent));
   assert.ok(response.result.structuredContent.some(task => task.id === 'task-1'));
+});
+
+test('MCP persists dependency IDs and approximate time fields through task writes', () => {
+  const store = makeStoreFromFixture('workspace-basic', {
+    [MILESTONES_KEY]: [
+      {
+        id: 'milestone-1',
+        title: 'Release Alpha',
+        projectIds: ['lane-1'],
+        projectId: 'lane-1',
+        endDate: '2026-04-01',
+        linkedTaskIds: [],
+      },
+    ],
+  });
+  const dispatch = createRequestDispatcher(store);
+
+  const createResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'metadata-create-1',
+    method: 'tools/call',
+    params: {
+      name: 'tasks_create',
+      arguments: {
+        title: 'Create roadmap metadata task',
+        projectIds: ['Project A'],
+        milestoneId: 'milestone-1',
+        dependencyIds: ['task-1'],
+        timeSpentMinutes: 25,
+        timeSpentNote: 'Initial estimate',
+      },
+    },
+  }, makeReq({}, 'stdio'));
+
+  assert.equal(createResponse.jsonrpc, '2.0');
+  const task = createResponse.result.structuredContent.task;
+  assert.equal(task.milestoneId, 'milestone-1');
+  assert.deepEqual(task.dependencyIds, ['task-1']);
+  assert.equal(task.timeSpentMinutes, 25);
+
+  const updateResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'metadata-update-1',
+    method: 'tools/call',
+    params: {
+      name: 'tasks_update',
+      arguments: {
+        taskId: task.id,
+        dependencyIds: ['task-2'],
+        expectedRevision: task.__mcpRevision,
+      },
+    },
+  }, makeReq({}, 'stdio'));
+
+  assert.equal(updateResponse.result.structuredContent.task.dependencyIds[0], 'task-2');
+
+  const getResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'metadata-get-1',
+    method: 'tools/call',
+    params: {
+      name: 'tasks_get',
+      arguments: { taskId: task.id },
+    },
+  }, makeReq({}, 'stdio'));
+
+  assert.deepEqual(getResponse.result.structuredContent.dependencyIds, ['task-2']);
+  assert.equal(getResponse.result.structuredContent.timeSpentMinutes, 25);
+});
+
+test('MCP logs approximate task time and creates linked milestones', () => {
+  const dispatch = createRequestDispatcher(makeStoreFromFixture('workspace-basic'));
+
+  const timeResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'time-log-1',
+    method: 'tools/call',
+    params: {
+      name: 'tasks_log_time',
+      arguments: {
+        taskId: 'task-2',
+        minutes: 50,
+        note: 'Approximate debugging time',
+        expectedRevision: 0,
+      },
+    },
+  }, makeReq({}, 'stdio'));
+
+  assert.equal(timeResponse.result.structuredContent.task.timeSpentMinutes, 50);
+  assert.equal(timeResponse.result.structuredContent.task.timeEntries[0].minutes, 50);
+
+  const milestoneResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'milestone-create-1',
+    method: 'tools/call',
+    params: {
+      name: 'milestones_create',
+      arguments: {
+        title: 'Release Alpha',
+        projectIds: ['Project A'],
+        endDate: '2026-04-01',
+        description: 'First agent-created roadmap milestone.',
+        linkedTaskIds: ['task-1', 'task-2'],
+      },
+    },
+  }, makeReq({}, 'stdio'));
+
+  const milestone = milestoneResponse.result.structuredContent.result.milestone;
+  assert.equal(milestone.title, 'Release Alpha');
+  assert.deepEqual(milestone.linkedTaskIds, ['task-1', 'task-2']);
+
+  const listResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'milestone-list-1',
+    method: 'tools/call',
+    params: {
+      name: 'milestones_list',
+      arguments: {},
+    },
+  }, makeReq({}, 'stdio'));
+
+  assert.ok(listResponse.result.structuredContent.some(item => item.id === milestone.id));
 });
 
 test('tasks.update_description replaces notes through MCP and audits the write', () => {
@@ -781,6 +909,8 @@ test('read_only fixture only exposes read tools and preserves custom resources',
   assert.ok(!toolNames.includes('tasks_update'));
   assert.ok(!toolNames.includes('tasks_update_description'));
   assert.ok(!toolNames.includes('tasks_delete'));
+  assert.ok(!toolNames.includes('tasks_log_time'));
+  assert.ok(!toolNames.includes('milestones_create'));
   assert.ok(!toolNames.includes('tasks_transition_under_review'));
   assert.ok(!toolNames.includes('tasks_move_to_status'));
   assert.ok(!toolNames.includes('tasks_move_to_ready_for_human_review'));

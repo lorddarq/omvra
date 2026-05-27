@@ -62,6 +62,22 @@ export function normalizeTask(task: Task, swimlanes: TimelineSwimlane[]): Task {
     blocked: Boolean(task.blocked),
     priority: task.priority || 'normal',
     dependencyIds: Array.isArray(task.dependencyIds) ? task.dependencyIds : [],
+    timeSpentMinutes: Number.isFinite(Number(task.timeSpentMinutes))
+      ? Math.max(0, Math.floor(Number(task.timeSpentMinutes)))
+      : undefined,
+    timeSpentNote: typeof task.timeSpentNote === 'string' ? task.timeSpentNote : undefined,
+    timeEntries: Array.isArray(task.timeEntries)
+      ? task.timeEntries
+        .filter(entry => entry && typeof entry === 'object')
+        .map(entry => ({
+          id: typeof entry.id === 'string' ? entry.id : `time-${Date.now()}`,
+          minutes: Number.isFinite(Number(entry.minutes)) ? Math.max(0, Math.floor(Number(entry.minutes))) : 0,
+          note: typeof entry.note === 'string' ? entry.note : undefined,
+          loggedAt: typeof entry.loggedAt === 'string' ? entry.loggedAt : new Date().toISOString(),
+          actor: typeof entry.actor === 'string' ? entry.actor : undefined,
+        }))
+        .filter(entry => entry.minutes > 0)
+      : [],
   };
 }
 
@@ -75,7 +91,7 @@ export function sanitizeMilestones(
   const validProjectIds = new Set(projects.map(project => project.id));
   const sanitized = value
     .filter(isObject)
-    .map((item, index) => {
+    .map<ProjectMilestone | null>((item, index) => {
       if (typeof item.title !== 'string') return null;
       const rawProjectIds = Array.isArray(item.projectIds)
         ? item.projectIds.map(String)
@@ -87,6 +103,7 @@ export function sanitizeMilestones(
 
       return {
         id: typeof item.id === 'string' ? item.id : `milestone-${index}`,
+        convexId: typeof item.convexId === 'string' ? item.convexId : undefined,
         title: item.title,
         projectIds,
         projectId: projectIds[0],

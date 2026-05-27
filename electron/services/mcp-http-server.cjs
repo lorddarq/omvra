@@ -7,6 +7,8 @@ const {
   buildMcpInitializeResult,
   appendMcpAuditLog,
   getWorkspaceSnapshot,
+  listMilestones,
+  getMilestoneById,
   buildMcpAgentGuide,
   buildMcpTaskExecutionSchema,
   buildMcpPromptCatalog,
@@ -21,6 +23,8 @@ const {
   updateTaskDetails,
   updateTaskDescription,
   deleteTask,
+  logTaskTime,
+  createMilestone,
   transitionTaskToUnderReview,
   updateTaskAgentSummary,
   addTaskComment,
@@ -129,6 +133,28 @@ const READ_TOOL_DEFINITIONS = [
       required: ['statusId'],
     },
   },
+  {
+    name: 'milestones.list',
+    description: 'Lists roadmap milestones with project scope, release dates, notes, and linked task IDs.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {},
+    },
+  },
+  {
+    name: 'milestones.get',
+    description: 'Gets one roadmap milestone by id.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        id: { type: 'string' },
+        milestoneId: { type: 'string' },
+      },
+      oneOf: [{ required: ['id'] }, { required: ['milestoneId'] }],
+    },
+  },
 ];
 
 const WRITE_TOOL_DEFINITIONS = [
@@ -152,6 +178,11 @@ const WRITE_TOOL_DEFINITIONS = [
           items: { type: 'string' },
         },
         swimlaneId: { type: 'string' },
+        milestoneId: { type: 'string' },
+        dependencyIds: {
+          type: 'array',
+          items: { type: 'string' },
+        },
         startDate: { type: 'string' },
         endDate: { type: 'string' },
         size: { type: 'string' },
@@ -159,6 +190,8 @@ const WRITE_TOOL_DEFINITIONS = [
         priority: { type: 'string' },
         blocked: { type: 'boolean' },
         swimlaneOnly: { type: 'boolean' },
+        timeSpentMinutes: { type: 'number' },
+        timeSpentNote: { type: 'string' },
       },
       required: ['title'],
     },
@@ -183,6 +216,11 @@ const WRITE_TOOL_DEFINITIONS = [
           items: { type: 'string' },
         },
         swimlaneId: { type: 'string' },
+        milestoneId: { type: 'string' },
+        dependencyIds: {
+          type: 'array',
+          items: { type: 'string' },
+        },
         startDate: { type: 'string' },
         endDate: { type: 'string' },
         size: { type: 'string' },
@@ -190,6 +228,8 @@ const WRITE_TOOL_DEFINITIONS = [
         priority: { type: 'string' },
         blocked: { type: 'boolean' },
         swimlaneOnly: { type: 'boolean' },
+        timeSpentMinutes: { type: 'number' },
+        timeSpentNote: { type: 'string' },
       },
       required: ['title'],
     },
@@ -215,6 +255,11 @@ const WRITE_TOOL_DEFINITIONS = [
           items: { type: 'string' },
         },
         swimlaneId: { type: 'string' },
+        milestoneId: { type: 'string' },
+        dependencyIds: {
+          type: 'array',
+          items: { type: 'string' },
+        },
         startDate: { type: 'string' },
         endDate: { type: 'string' },
         size: { type: 'string' },
@@ -222,6 +267,8 @@ const WRITE_TOOL_DEFINITIONS = [
         priority: { type: 'string' },
         blocked: { type: 'boolean' },
         swimlaneOnly: { type: 'boolean' },
+        timeSpentMinutes: { type: 'number' },
+        timeSpentNote: { type: 'string' },
         expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
       },
       required: ['taskId', 'expectedRevision'],
@@ -253,6 +300,47 @@ const WRITE_TOOL_DEFINITIONS = [
         expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
       },
       required: ['taskId', 'expectedRevision'],
+    },
+  },
+  {
+    name: 'tasks.log_time',
+    description: 'Logs approximate time spent on a task and increments the task time total. This is not a stopwatch.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        taskId: { type: 'string' },
+        minutes: { type: 'number' },
+        note: { type: 'string' },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+      },
+      required: ['taskId', 'minutes', 'expectedRevision'],
+    },
+  },
+  {
+    name: 'milestones.create',
+    description: 'Creates a roadmap milestone with project scope, release date, description, and linked task IDs.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        title: { type: 'string' },
+        projectId: { type: 'string' },
+        projectIds: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+        startDate: { type: 'string' },
+        endDate: { type: 'string' },
+        notes: { type: 'string' },
+        description: { type: 'string' },
+        color: { type: 'string' },
+        linkedTaskIds: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+      },
+      required: ['title', 'endDate'],
     },
   },
   {
@@ -412,10 +500,14 @@ const TOOL_NAME_ALIASES = new Map([
   ['cards_kanban_list', 'cards.kanban.list'],
   ['cards_timeline_list', 'cards.timeline.list'],
   ['boards_watch_poll', 'boards.watch.poll'],
+  ['milestones_list', 'milestones.list'],
+  ['milestones_get', 'milestones.get'],
   ['tasks_create', 'tasks.create'],
   ['tasks_update', 'tasks.update'],
   ['tasks_update_description', 'tasks.update_description'],
   ['tasks_delete', 'tasks.delete'],
+  ['tasks_log_time', 'tasks.log_time'],
+  ['milestones_create', 'milestones.create'],
   ['tasks_transition_under_review', 'tasks.transition_under_review'],
   ['tasks_update_agent_summary', 'tasks.update_agent_summary'],
   ['tasks_add_comment', 'tasks.add_comment'],
@@ -478,6 +570,12 @@ const RESOURCE_DEFINITIONS = [
     mimeType: 'application/json',
   },
   {
+    uri: 'plumy://milestones',
+    name: 'Roadmap milestones',
+    description: 'Read-only roadmap milestone list',
+    mimeType: 'application/json',
+  },
+  {
     uriTemplate: 'plumy://tasks/{taskId}',
     name: 'Task by id',
     description: 'Read-only task resource',
@@ -490,6 +588,12 @@ const RESOURCE_TEMPLATE_DEFINITIONS = [
     uriTemplate: 'plumy://tasks/{taskId}',
     name: 'Task by id',
     description: 'Resolve a task by id',
+    mimeType: 'application/json',
+  },
+  {
+    uriTemplate: 'plumy://milestones/{milestoneId}',
+    name: 'Milestone by id',
+    description: 'Resolve a roadmap milestone by id',
     mimeType: 'application/json',
   },
   {
@@ -637,6 +741,17 @@ function parseTaskId(args) {
   return null;
 }
 
+function parseMilestoneId(args) {
+  const normalized = normalizeObject(args);
+  if (typeof normalized.id === 'string' && normalized.id.trim()) {
+    return normalized.id.trim();
+  }
+  if (typeof normalized.milestoneId === 'string' && normalized.milestoneId.trim()) {
+    return normalized.milestoneId.trim();
+  }
+  return null;
+}
+
 function isJsonRpcIdValid(id) {
   return id === undefined
     || id === null
@@ -675,7 +790,7 @@ function isKnownWriteToolName(name) {
   if (WRITE_TOOL_DEFINITIONS.some(tool => tool.name === name)) {
     return true;
   }
-  return /^tasks\.(create|update|delete|write|set|transition|complete)/.test(name);
+  return /^(tasks\.(create|update|delete|write|set|transition|complete|log_time)|milestones\.(create|update|delete))/.test(name);
 }
 
 function getResourceForUri(store, uri, requestParams) {
@@ -691,7 +806,12 @@ function getResourceForUri(store, uri, requestParams) {
     return { uri, data: buildMcpTaskExecutionSchema() };
   }
 
+  if (uri === 'plumy://milestones') {
+    return { uri, data: listMilestones(store) };
+  }
+
   if (uri === 'plumy://tasks/{taskId}'
+    || uri === 'plumy://milestones/{milestoneId}'
     || uri === 'plumy://agents/{personId}/assigned'
     || uri === 'plumy://projects/{projectId}/tasks'
     || uri === 'plumy://boards/{statusId}/tasks') {
@@ -708,6 +828,16 @@ function getResourceForUri(store, uri, requestParams) {
       };
     }
     return { uri, data: getTaskById(store, taskId) };
+  }
+
+  if (uri.startsWith('plumy://milestones/')) {
+    const milestoneId = decodeURIComponent(uri.slice('plumy://milestones/'.length));
+    if (!milestoneId) {
+      return {
+        error: invalidParams('Invalid params: milestone resource URI must include milestone id.', { uri }),
+      };
+    }
+    return { uri, data: getMilestoneById(store, milestoneId) };
   }
 
   if (uri.startsWith('plumy://agents/') && uri.endsWith('/assigned')) {
@@ -789,7 +919,7 @@ function getResourceForUri(store, uri, requestParams) {
 
   return {
     error: invalidParams(`Unsupported resource URI "${uri}".`, {
-      supported: ['plumy://workspace', 'plumy://tasks/{taskId}', 'plumy://cards/kanban', 'plumy://cards/timeline'],
+      supported: ['plumy://workspace', 'plumy://tasks/{taskId}', 'plumy://milestones', 'plumy://milestones/{milestoneId}', 'plumy://cards/kanban', 'plumy://cards/timeline'],
     }),
   };
 }
@@ -892,6 +1022,19 @@ function handleToolCall(store, req, params) {
       return { result: makeToolResult(result) };
     }
 
+    case 'milestones.list':
+      return { result: makeToolResult(listMilestones(store)) };
+
+    case 'milestones.get': {
+      const milestoneId = parseMilestoneId(args);
+      if (!milestoneId) {
+        return {
+          error: invalidParams('Invalid params: "id" (or "milestoneId") is required for milestones.get.'),
+        };
+      }
+      return { result: makeToolResult(getMilestoneById(store, milestoneId)) };
+    }
+
     case 'task_write':
     case 'tasks.create': {
       const result = createTask(store, {
@@ -905,6 +1048,8 @@ function handleToolCall(store, req, params) {
         projectId: args.projectId,
         projectIds: args.projectIds,
         swimlaneId: args.swimlaneId,
+        milestoneId: args.milestoneId,
+        dependencyIds: args.dependencyIds,
         startDate: args.startDate,
         endDate: args.endDate,
         size: args.size,
@@ -912,6 +1057,8 @@ function handleToolCall(store, req, params) {
         priority: args.priority,
         blocked: args.blocked,
         swimlaneOnly: args.swimlaneOnly,
+        timeSpentMinutes: args.timeSpentMinutes,
+        timeSpentNote: args.timeSpentNote,
         actor: 'mcp-agent',
       });
       if (!result.ok) {
@@ -1049,6 +1196,82 @@ function handleToolCall(store, req, params) {
           task: result.task,
           deletedTaskId: result.deletedTaskId,
           revision: result.currentRevision,
+        }),
+      };
+    }
+
+    case 'tasks.log_time': {
+      const taskId = parseTaskId(args);
+      if (!taskId) {
+        return { error: invalidParams('Invalid params: "taskId" is required.') };
+      }
+      const result = logTaskTime(store, {
+        taskId,
+        minutes: args.minutes,
+        note: args.note,
+        expectedRevision: args.expectedRevision,
+        actor: 'mcp-agent',
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, {
+          outcome: 'denied',
+          reason: result.error,
+          toolName: name,
+          taskId,
+        });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        taskId,
+        minutes: args.minutes,
+        nextRevision: result.task?.__mcpRevision,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: true,
+          auditId: audit?.auditId,
+          task: result.task,
+          revision: result.task?.__mcpRevision,
+        }),
+      };
+    }
+
+    case 'milestones.create': {
+      const result = createMilestone(store, {
+        title: args.title,
+        projectId: args.projectId,
+        projectIds: args.projectIds,
+        startDate: args.startDate,
+        endDate: args.endDate,
+        notes: args.notes,
+        description: args.description,
+        color: args.color,
+        linkedTaskIds: args.linkedTaskIds,
+        actor: 'mcp-agent',
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, {
+          outcome: 'denied',
+          reason: result.error,
+          toolName: name,
+          title: args.title,
+        });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        milestoneId: result.milestone?.id,
+        title: result.milestone?.title,
+        linkedTaskIds: result.linkedTaskIds,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: true,
+          auditId: audit?.auditId,
+          result,
         }),
       };
     }

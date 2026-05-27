@@ -17,6 +17,14 @@ export interface TaskComment {
   createdAt: string;
 }
 
+export interface TaskTimeEntry {
+  id: string;
+  minutes: number;
+  note?: string;
+  loggedAt: string;
+  actor?: string;
+}
+
 export interface Person {
   id: string;
   name: string;
@@ -45,11 +53,15 @@ export interface Task {
   project?: string; // Project this task belongs to
   milestoneId?: string; // Primary roadmap milestone this task contributes to
   dependencyIds?: string[]; // Roadmap-only dependencies used for milestone planning arrows
+  timeSpentMinutes?: number; // Approximate total time spent on this task
+  timeSpentNote?: string; // Latest human-readable time-spent note/source
+  timeEntries?: TaskTimeEntry[]; // Optional append-only approximate time log
   comments?: TaskComment[];
 }
 
 export interface ProjectMilestone {
   id: string;
+  convexId?: string;
   title: string;
   projectIds: string[];
   projectId?: string; // Legacy single-project milestone field kept for migration.

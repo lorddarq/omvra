@@ -67,9 +67,8 @@ export function MarkdownEditor({
   );
 
   return (
-    <div className="plumy-markdown-editor overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+    <div id={id} className="plumy-markdown-editor overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
       <MDXEditor
-        id={id}
         ref={editorRef}
         markdown={normalizedValue}
         onChange={handleChange}

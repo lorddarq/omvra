@@ -3,6 +3,7 @@ const path = require('path');
 
 const PREFERENCES_KEY = 'plumy.preferences.v1';
 const TASKS_KEY = 'plumy.tasks.v1';
+const MILESTONES_KEY = 'plumy.milestones.v1';
 const PEOPLE_KEY = 'plumy.people.v1';
 const SWIMLANES_KEY = 'plumy.swimlanes.v1';
 const STATUS_COLUMNS_KEY = 'plumy.statusColumns.v1';
@@ -38,6 +39,7 @@ module.exports = {
   MemoryStore,
   PREFERENCES_KEY,
   TASKS_KEY,
+  MILESTONES_KEY,
   PEOPLE_KEY,
   SWIMLANES_KEY,
   STATUS_COLUMNS_KEY,

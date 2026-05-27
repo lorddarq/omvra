@@ -2,6 +2,7 @@ const { randomUUID } = require('crypto');
 
 const PREFERENCES_KEY = 'plumy.preferences.v1';
 const TASKS_KEY = 'plumy.tasks.v1';
+const MILESTONES_KEY = 'plumy.milestones.v1';
 const PEOPLE_KEY = 'plumy.people.v1';
 const SWIMLANES_KEY = 'plumy.swimlanes.v1';
 const STATUS_COLUMNS_KEY = 'plumy.statusColumns.v1';
@@ -48,6 +49,30 @@ function normalizeTaskIdList(value) {
     ids.push(id);
   }
   return ids;
+}
+
+function normalizePositiveInteger(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return null;
+  return Math.max(0, Math.floor(number));
+}
+
+function normalizeTimeEntries(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(entry => entry && typeof entry === 'object' && !Array.isArray(entry))
+    .map(entry => {
+      const minutes = normalizePositiveInteger(entry.minutes);
+      if (!minutes || minutes <= 0) return null;
+      return {
+        id: normalizeString(entry.id).trim() || `time-${randomUUID()}`,
+        minutes,
+        note: normalizeString(entry.note).trim() || undefined,
+        loggedAt: normalizeString(entry.loggedAt).trim() || new Date().toISOString(),
+        actor: normalizeString(entry.actor).trim() || undefined,
+      };
+    })
+    .filter(Boolean);
 }
 
 function normalizeRevisionMap(value) {
@@ -415,6 +440,7 @@ function buildMcpCapabilitySnapshot(store) {
             'tasks.update',
             'tasks.update_description',
             'tasks.delete',
+            'tasks.log_time',
             'tasks.update_agent_summary',
             'tasks.update_completion_description',
             'tasks.move_to_requires_human_review',
@@ -423,6 +449,7 @@ function buildMcpCapabilitySnapshot(store) {
             'tasks.assign',
             'tasks.add_comment',
             'tasks.add_activity_entry',
+            'milestones.create',
           ]
         : [],
     },
@@ -473,10 +500,47 @@ function listMcpAuditLog(store, { limit } = {}) {
     .reverse();
 }
 
+function normalizeMilestoneForMcp(milestone) {
+  if (!milestone || typeof milestone !== 'object') return null;
+  const title = normalizeString(milestone.title).trim();
+  const endDate = normalizeString(milestone.endDate).trim();
+  if (!title || !endDate) return null;
+  const projectIds = normalizeTaskIdList(
+    Array.isArray(milestone.projectIds)
+      ? milestone.projectIds
+      : (milestone.projectId ? [milestone.projectId] : [])
+  );
+  return {
+    ...milestone,
+    id: normalizeString(milestone.id).trim() || `milestone-${randomUUID()}`,
+    title,
+    projectIds,
+    projectId: projectIds[0],
+    startDate: normalizeString(milestone.startDate).trim() || undefined,
+    endDate,
+    notes: normalizeString(milestone.notes),
+    color: normalizeString(milestone.color).trim() || undefined,
+    linkedTaskIds: normalizeTaskIdList(milestone.linkedTaskIds),
+  };
+}
+
+function listMilestones(store) {
+  return readArray(store, MILESTONES_KEY)
+    .map(normalizeMilestoneForMcp)
+    .filter(Boolean);
+}
+
+function getMilestoneById(store, milestoneId) {
+  const normalizedMilestoneId = normalizeString(milestoneId).trim();
+  if (!normalizedMilestoneId) return null;
+  return listMilestones(store).find(milestone => milestone.id === normalizedMilestoneId) || null;
+}
+
 function getWorkspaceSnapshot(store) {
   // TODO(next-phase): unify storage source of truth. The renderer currently persists
   // most workspace state in localStorage; MCP should read from a canonical backend store.
   const tasks = readArray(store, TASKS_KEY).map(normalizeTaskForMcp);
+  const milestones = listMilestones(store);
   const people = readArray(store, PEOPLE_KEY);
   const projects = readArray(store, SWIMLANES_KEY);
   const statusColumns = readArray(store, STATUS_COLUMNS_KEY);
@@ -487,6 +551,7 @@ function getWorkspaceSnapshot(store) {
     readOnly: true,
     workspace: {
       tasks,
+      milestones,
       people,
       projects,
       // Alias kept for compatibility with existing naming in the app.
@@ -498,6 +563,7 @@ function getWorkspaceSnapshot(store) {
       mcpAgentAccessEnabled: isMcpAgentAccessEnabled(store),
       counts: {
         tasks: tasks.length,
+        milestones: milestones.length,
         people: people.length,
         projects: projects.length,
         statusColumns: statusColumns.length,
@@ -709,11 +775,13 @@ function buildMcpAgentGuide() {
       'tasks.update',
       'tasks.update_description',
       'tasks.delete',
+      'tasks.log_time',
       'tasks.add_comment',
       'tasks.update_completion_description',
       'tasks.move_to_status',
       'tasks.move_to_ready_for_human_review',
       'tasks.assign',
+      'milestones.create',
     ],
     workflow: [
       'Read the guide and task-execution schema before taking action.',
@@ -755,6 +823,8 @@ function buildMcpTaskExecutionSchema() {
       'task_write when new follow-up work must be logged',
       'tasks.update when an existing task detail or metadata field needs a targeted edit',
       'tasks.update_description when only the main task description/notes field needs to be replaced',
+      'tasks.log_time when approximate time spent should be recorded',
+      'milestones.create when roadmap planning needs a milestone with linked tasks',
       'tasks.add_comment',
       'tasks.update_completion_description',
       'tasks.move_to_status or tasks.move_to_ready_for_human_review',
@@ -887,8 +957,13 @@ function normalizeTaskForMcp(task) {
     ? Math.max(0, Math.floor(Number(task[MCP_TASK_REV_FIELD])))
     : 0;
   const descriptionProjectContext = extractProjectContextFromDescription(task.notes);
+  const timeSpentMinutes = normalizePositiveInteger(task.timeSpentMinutes);
   return {
     ...task,
+    dependencyIds: normalizeTaskIdList(task.dependencyIds),
+    timeSpentMinutes: timeSpentMinutes === null ? undefined : timeSpentMinutes,
+    timeSpentNote: normalizeString(task.timeSpentNote).trim() || undefined,
+    timeEntries: normalizeTimeEntries(task.timeEntries),
     [MCP_TASK_REV_FIELD]: revision,
     descriptionProjectContext,
   };
@@ -1015,6 +1090,62 @@ function findProjectByReference(store, reference) {
   return findProjectByName(store, reference);
 }
 
+function validateTaskReferences(store, taskIds, { fieldName = 'taskIds', excludeTaskId } = {}) {
+  const normalizedTaskIds = normalizeTaskIdList(taskIds);
+  const tasks = readArray(store, TASKS_KEY);
+  const existingTaskIds = new Set(tasks.map(task => task && task.id).filter(Boolean));
+
+  for (const taskId of normalizedTaskIds) {
+    if (excludeTaskId && taskId === excludeTaskId) {
+      return {
+        ok: false,
+        error: 'INVALID_TASK_REFERENCE',
+        message: `${fieldName} cannot include the task itself.`,
+      };
+    }
+    if (!existingTaskIds.has(taskId)) {
+      return {
+        ok: false,
+        error: 'TASK_REFERENCE_NOT_FOUND',
+        message: `${fieldName} contains unknown task "${taskId}".`,
+      };
+    }
+  }
+
+  return { ok: true, taskIds: normalizedTaskIds };
+}
+
+function resolveMilestoneReference(store, milestoneId) {
+  const normalizedMilestoneId = normalizeString(milestoneId).trim();
+  if (!normalizedMilestoneId) return { ok: true, milestoneId: undefined };
+  const milestone = getMilestoneById(store, normalizedMilestoneId);
+  if (!milestone) {
+    return {
+      ok: false,
+      error: 'MILESTONE_NOT_FOUND',
+      message: `Milestone "${normalizedMilestoneId}" not found.`,
+    };
+  }
+  return { ok: true, milestoneId: milestone.id, milestone };
+}
+
+function resolveProjectReferences(store, references) {
+  const requestedProjectIds = normalizeTaskIdList(references);
+  const resolvedProjects = [];
+  for (const id of requestedProjectIds) {
+    const project = findProjectByReference(store, id);
+    if (!project) {
+      return {
+        ok: false,
+        error: 'PROJECT_NOT_FOUND',
+        message: `Project "${id}" not found. Provide a valid project id or project name.`,
+      };
+    }
+    resolvedProjects.push(project);
+  }
+  return { ok: true, projects: resolvedProjects };
+}
+
 function normalizeBoolean(value) {
   return value === true;
 }
@@ -1080,6 +1211,10 @@ function createTask(store, {
   priority,
   blocked,
   swimlaneOnly,
+  milestoneId,
+  dependencyIds,
+  timeSpentMinutes,
+  timeSpentNote,
   actor = 'agent',
 } = {}) {
   const normalizedTitle = normalizeString(title).trim();
@@ -1165,6 +1300,22 @@ function createTask(store, {
     };
   }
 
+  const dependencyValidation = validateTaskReferences(store, dependencyIds, { fieldName: 'dependencyIds' });
+  if (!dependencyValidation.ok) return dependencyValidation;
+
+  const milestoneValidation = resolveMilestoneReference(store, milestoneId);
+  if (!milestoneValidation.ok) return milestoneValidation;
+
+  const hasTimeSpentValue = timeSpentMinutes !== undefined && timeSpentMinutes !== null;
+  const normalizedTimeSpentMinutes = hasTimeSpentValue ? normalizePositiveInteger(timeSpentMinutes) : null;
+  if (hasTimeSpentValue && normalizedTimeSpentMinutes === null) {
+    return {
+      ok: false,
+      error: 'INVALID_TIME_SPENT',
+      message: 'timeSpentMinutes must be a finite non-negative number.',
+    };
+  }
+
   const nextTask = {
     id: `task-${randomUUID()}`,
     title: normalizedTitle,
@@ -1186,6 +1337,11 @@ function createTask(store, {
       .filter(Boolean)
       .join(', ') || undefined,
     assigneeId: assignee?.id,
+    milestoneId: milestoneValidation.milestoneId,
+    dependencyIds: dependencyValidation.taskIds,
+    timeSpentMinutes: normalizedTimeSpentMinutes === null ? undefined : normalizedTimeSpentMinutes,
+    timeSpentNote: normalizeString(timeSpentNote).trim() || undefined,
+    timeEntries: [],
     comments: [],
     [MCP_TASK_REV_FIELD]: 0,
     mcpUpdatedAt: new Date().toISOString(),
@@ -1290,6 +1446,10 @@ function updateTaskDetails(store, options = {}) {
     priority,
     blocked,
     swimlaneOnly,
+    milestoneId,
+    dependencyIds,
+    timeSpentMinutes,
+    timeSpentNote,
     actor = 'agent',
   } = patch;
 
@@ -1373,6 +1533,26 @@ function updateTaskDetails(store, options = {}) {
   const priorityPatch = hasOwn(patch, 'priority') ? normalizePatchEnum(priority, ['urgent', 'moderate', 'normal', 'low'], 'priority') : null;
   if (priorityPatch && !priorityPatch.ok) return priorityPatch;
 
+  const hasDependencyPatch = hasOwn(patch, 'dependencyIds');
+  const dependencyPatch = hasDependencyPatch
+    ? validateTaskReferences(store, dependencyIds, { fieldName: 'dependencyIds', excludeTaskId: normalizedTaskId })
+    : null;
+  if (dependencyPatch && !dependencyPatch.ok) return dependencyPatch;
+
+  const hasMilestonePatch = hasOwn(patch, 'milestoneId');
+  const milestonePatch = hasMilestonePatch ? resolveMilestoneReference(store, milestoneId) : null;
+  if (milestonePatch && !milestonePatch.ok) return milestonePatch;
+
+  const hasTimeSpentPatch = hasOwn(patch, 'timeSpentMinutes');
+  const normalizedTimeSpentMinutes = hasTimeSpentPatch ? normalizePositiveInteger(timeSpentMinutes) : null;
+  if (hasTimeSpentPatch && normalizedTimeSpentMinutes === null) {
+    return {
+      ok: false,
+      error: 'INVALID_TIME_SPENT',
+      message: 'timeSpentMinutes must be a finite non-negative number.',
+    };
+  }
+
   return updateTaskWithRevision(store, normalizedTaskId, expectedRevision, (task) => {
     const nextTask = { ...task };
 
@@ -1428,6 +1608,10 @@ function updateTaskDetails(store, options = {}) {
     if (priorityPatch) nextTask.priority = priorityPatch.value || 'normal';
     if (hasOwn(patch, 'blocked')) nextTask.blocked = normalizeBoolean(blocked);
     if (hasOwn(patch, 'swimlaneOnly')) nextTask.swimlaneOnly = normalizeBoolean(swimlaneOnly);
+    if (dependencyPatch) nextTask.dependencyIds = dependencyPatch.taskIds;
+    if (milestonePatch) nextTask.milestoneId = milestonePatch.milestoneId;
+    if (hasTimeSpentPatch) nextTask.timeSpentMinutes = normalizedTimeSpentMinutes;
+    if (hasOwn(patch, 'timeSpentNote')) nextTask.timeSpentNote = normalizeString(timeSpentNote).trim() || undefined;
 
     nextTask.mcpLastActor = actor;
     return nextTask;
@@ -1458,6 +1642,129 @@ function updateTaskDescription(store, options = {}) {
     notes: typeof nextNotes === 'string' ? nextNotes : '',
     mcpLastActor: actor,
   }));
+}
+
+function logTaskTime(store, {
+  taskId,
+  minutes,
+  note,
+  expectedRevision,
+  actor = 'agent',
+} = {}) {
+  const normalizedTaskId = normalizeString(taskId).trim();
+  if (!normalizedTaskId) {
+    return { ok: false, error: 'TASK_ID_REQUIRED', message: 'taskId is required.' };
+  }
+
+  const normalizedMinutes = normalizePositiveInteger(minutes);
+  if (!normalizedMinutes || normalizedMinutes <= 0) {
+    return {
+      ok: false,
+      error: 'INVALID_TIME_SPENT',
+      message: 'minutes must be a finite number greater than 0.',
+    };
+  }
+
+  return updateTaskWithRevision(store, normalizedTaskId, expectedRevision, (task) => {
+    const existingEntries = normalizeTimeEntries(task.timeEntries);
+    const nextEntry = {
+      id: `time-${randomUUID()}`,
+      minutes: normalizedMinutes,
+      note: normalizeString(note).trim() || undefined,
+      loggedAt: new Date().toISOString(),
+      actor,
+    };
+    const currentTotal = normalizePositiveInteger(task.timeSpentMinutes) || 0;
+    return {
+      ...task,
+      timeSpentMinutes: currentTotal + normalizedMinutes,
+      timeSpentNote: nextEntry.note || task.timeSpentNote,
+      timeEntries: existingEntries.concat(nextEntry).slice(-TASK_ACTIVITY_LOG_MAX_ENTRIES),
+      mcpLastActor: actor,
+    };
+  });
+}
+
+function createMilestone(store, {
+  title,
+  projectId,
+  projectIds,
+  startDate,
+  endDate,
+  notes,
+  description,
+  color,
+  linkedTaskIds,
+  actor = 'agent',
+} = {}) {
+  const normalizedTitle = normalizeString(title).trim();
+  if (!normalizedTitle) {
+    return { ok: false, error: 'INVALID_TITLE', message: 'title is required.' };
+  }
+
+  const normalizedEndDate = normalizeOptionalDate(endDate);
+  if (!normalizedEndDate) {
+    return { ok: false, error: 'INVALID_DATE', message: 'endDate is required and must use YYYY-MM-DD format.' };
+  }
+
+  const normalizedStartDate = normalizeOptionalDate(startDate);
+  if (normalizedStartDate && normalizedEndDate < normalizedStartDate) {
+    return { ok: false, error: 'INVALID_DATE_RANGE', message: 'endDate cannot be earlier than startDate.' };
+  }
+
+  const projectResolution = resolveProjectReferences(
+    store,
+    Array.isArray(projectIds)
+      ? projectIds.concat(projectId ? [projectId] : [])
+      : (projectId ? [projectId] : [])
+  );
+  if (!projectResolution.ok) return projectResolution;
+  if (projectResolution.projects.length === 0) {
+    return { ok: false, error: 'PROJECT_REQUIRED', message: 'At least one project id or project name is required.' };
+  }
+
+  const taskValidation = validateTaskReferences(store, linkedTaskIds, { fieldName: 'linkedTaskIds' });
+  if (!taskValidation.ok) return taskValidation;
+
+  const milestone = {
+    id: `milestone-${randomUUID()}`,
+    title: normalizedTitle,
+    projectIds: projectResolution.projects.map(project => project.id),
+    projectId: projectResolution.projects[0].id,
+    startDate: normalizedStartDate,
+    endDate: normalizedEndDate,
+    notes: typeof notes === 'string' ? notes : (typeof description === 'string' ? description : undefined),
+    color: normalizeString(color).trim() || projectResolution.projects[0].color,
+    linkedTaskIds: taskValidation.taskIds,
+    mcpUpdatedAt: new Date().toISOString(),
+    mcpLastActor: actor,
+  };
+
+  const milestones = readArray(store, MILESTONES_KEY);
+  store.set(MILESTONES_KEY, milestones.concat(milestone));
+
+  if (taskValidation.taskIds.length > 0) {
+    const linkedTaskIdSet = new Set(taskValidation.taskIds);
+    const tasks = readArray(store, TASKS_KEY);
+    const nextTasks = tasks.map(rawTask => {
+      if (!rawTask || !linkedTaskIdSet.has(rawTask.id)) return rawTask;
+      const task = normalizeTaskForMcp(rawTask);
+      return {
+        ...task,
+        milestoneId: milestone.id,
+        [MCP_TASK_REV_FIELD]: (task[MCP_TASK_REV_FIELD] || 0) + 1,
+        mcpUpdatedAt: new Date().toISOString(),
+        mcpLastActor: actor,
+      };
+    });
+    store.set(TASKS_KEY, nextTasks);
+  }
+
+  return {
+    ok: true,
+    milestone: normalizeMilestoneForMcp(milestone),
+    linkedTaskIds: taskValidation.taskIds,
+  };
 }
 
 function deleteTask(store, {
@@ -1946,6 +2253,7 @@ function moveTasksToRequiresHumanReviewBoard(store, {
 
 module.exports = {
   PREFERENCES_KEY,
+  MILESTONES_KEY,
   MCP_PROTOCOL_VERSION,
   MCP_SERVER_NAME,
   DEFAULT_MCP_HOST,
@@ -1967,6 +2275,8 @@ module.exports = {
   listMcpAuditLog,
   MCP_TASK_REV_FIELD,
   getWorkspaceSnapshot,
+  listMilestones,
+  getMilestoneById,
   listTasks,
   listAssignedWorkForAgent,
   getTaskById,
@@ -1992,6 +2302,8 @@ module.exports = {
   assignTaskToPerson,
   updateTaskDetails,
   updateTaskDescription,
+  logTaskTime,
+  createMilestone,
   deleteTask,
   REQUIRES_HUMAN_REVIEW_STATUS_ID,
   REQUIRES_HUMAN_REVIEW_STATUS_TITLE,

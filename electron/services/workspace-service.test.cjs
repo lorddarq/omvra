@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { STATUS_COLUMNS_KEY, TASKS_KEY, makeStoreFromFixture } = require('./test-fixtures.cjs');
+const { MILESTONES_KEY, STATUS_COLUMNS_KEY, TASKS_KEY, makeStoreFromFixture } = require('./test-fixtures.cjs');
 const { createRequestDispatcher } = require('./mcp-http-server.cjs');
 
 const {
@@ -12,6 +12,7 @@ const {
   buildMcpListenerStatus,
   appendMcpAuditLog,
   getWorkspaceSnapshot,
+  listMilestones,
   listTasks,
   listKanbanCards,
   listTimelineCards,
@@ -21,6 +22,8 @@ const {
   createTask,
   updateTaskDetails,
   updateTaskDescription,
+  logTaskTime,
+  createMilestone,
   deleteTask,
   transitionTaskToUnderReview,
   updateTaskAgentSummary,
@@ -43,10 +46,12 @@ test('workspace snapshot contract has expected keys and stable counts', () => {
   assert.ok(snapshot.generatedAt);
   assert.ok(snapshot.workspace);
   assert.ok(Array.isArray(snapshot.workspace.tasks));
+  assert.ok(Array.isArray(snapshot.workspace.milestones));
   assert.ok(Array.isArray(snapshot.workspace.people));
   assert.ok(Array.isArray(snapshot.workspace.projects));
   assert.ok(Array.isArray(snapshot.workspace.statusColumns));
   assert.equal(snapshot.meta.counts.tasks, snapshot.workspace.tasks.length);
+  assert.equal(snapshot.meta.counts.milestones, snapshot.workspace.milestones.length);
   assert.equal(snapshot.meta.counts.people, snapshot.workspace.people.length);
   assert.equal(snapshot.meta.counts.projects, snapshot.workspace.projects.length);
   assert.equal(snapshot.meta.counts.statusColumns, snapshot.workspace.statusColumns.length);
@@ -224,6 +229,57 @@ test('createTask resolves projects by human-readable project name', () => {
   assert.deepEqual(created.task.projectIds, ['lane-1']);
   assert.equal(created.task.swimlaneId, 'lane-1');
   assert.equal(created.task.project, 'Project A');
+});
+
+test('createTask and updateTaskDetails persist dependency, milestone, and time metadata', () => {
+  const store = makeStoreFromFixture('workspace-basic', {
+    [MILESTONES_KEY]: [
+      {
+        id: 'milestone-1',
+        title: 'Release Alpha',
+        projectIds: ['lane-1'],
+        projectId: 'lane-1',
+        endDate: '2026-04-01',
+        linkedTaskIds: [],
+      },
+    ],
+  });
+
+  const created = createTask(store, {
+    title: 'Create roadmap-linked follow-up',
+    projectIds: ['Project A'],
+    milestoneId: 'milestone-1',
+    dependencyIds: ['task-1'],
+    timeSpentMinutes: 45,
+    timeSpentNote: 'Initial estimate',
+  });
+
+  assert.equal(created.ok, true);
+  assert.equal(created.task.milestoneId, 'milestone-1');
+  assert.deepEqual(created.task.dependencyIds, ['task-1']);
+  assert.equal(created.task.timeSpentMinutes, 45);
+  assert.equal(created.task.timeSpentNote, 'Initial estimate');
+
+  const updated = updateTaskDetails(store, {
+    taskId: created.task.id,
+    dependencyIds: ['task-2'],
+    timeSpentMinutes: 90,
+    timeSpentNote: 'Refined estimate',
+    expectedRevision: created.task[MCP_TASK_REV_FIELD],
+  });
+
+  assert.equal(updated.ok, true);
+  assert.deepEqual(updated.task.dependencyIds, ['task-2']);
+  assert.equal(updated.task.timeSpentMinutes, 90);
+  assert.equal(updated.task.timeSpentNote, 'Refined estimate');
+
+  const invalidDependency = updateTaskDetails(store, {
+    taskId: created.task.id,
+    dependencyIds: ['missing-task'],
+    expectedRevision: updated.task[MCP_TASK_REV_FIELD],
+  });
+  assert.equal(invalidDependency.ok, false);
+  assert.equal(invalidDependency.error, 'TASK_REFERENCE_NOT_FOUND');
 });
 
 test('task_write accepts project names through the MCP write surface', () => {
@@ -465,6 +521,49 @@ test('task activity entries are appended structurally and increment revision', (
   assert.equal(updated.task.activityLog[0].type, 'activity');
   assert.match(updated.task.activityLog[0].message, /started repository inspection/);
   assert.equal(updated.task[MCP_TASK_REV_FIELD], revision + 1);
+});
+
+test('logTaskTime appends approximate time and increments total minutes', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const task = listTasks(store, { status: 'open' })[0];
+  const revision = task[MCP_TASK_REV_FIELD];
+
+  const logged = logTaskTime(store, {
+    taskId: task.id,
+    minutes: 35,
+    note: 'Approximate implementation pass',
+    expectedRevision: revision,
+  });
+
+  assert.equal(logged.ok, true);
+  assert.equal(logged.task.timeSpentMinutes, 35);
+  assert.equal(logged.task.timeSpentNote, 'Approximate implementation pass');
+  assert.equal(logged.task.timeEntries.length, 1);
+  assert.equal(logged.task.timeEntries[0].minutes, 35);
+  assert.equal(logged.task[MCP_TASK_REV_FIELD], revision + 1);
+});
+
+test('createMilestone creates roadmap milestone and links existing tasks', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+
+  const created = createMilestone(store, {
+    title: 'Release Alpha',
+    projectIds: ['Project A'],
+    startDate: '2026-03-20',
+    endDate: '2026-04-01',
+    description: 'First roadmap release.',
+    linkedTaskIds: ['task-1', 'task-2'],
+  });
+
+  assert.equal(created.ok, true);
+  assert.equal(created.milestone.title, 'Release Alpha');
+  assert.deepEqual(created.milestone.projectIds, ['lane-1']);
+  assert.deepEqual(created.milestone.linkedTaskIds, ['task-1', 'task-2']);
+  assert.equal(listMilestones(store).length, 1);
+
+  const linkedTask = listTasks(store).find(task => task.id === 'task-1');
+  assert.equal(linkedTask.milestoneId, created.milestone.id);
+  assert.equal(linkedTask[MCP_TASK_REV_FIELD], 1);
 });
 
 test('task normalization extracts project context from description notes', () => {

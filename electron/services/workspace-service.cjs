@@ -413,6 +413,8 @@ function buildMcpCapabilitySnapshot(store) {
         ? [
             'tasks.transition_under_review',
             'tasks.update',
+            'tasks.update_description',
+            'tasks.delete',
             'tasks.update_agent_summary',
             'tasks.update_completion_description',
             'tasks.move_to_requires_human_review',
@@ -705,6 +707,8 @@ function buildMcpAgentGuide() {
       'boards.watch.poll',
       'task_write',
       'tasks.update',
+      'tasks.update_description',
+      'tasks.delete',
       'tasks.add_comment',
       'tasks.update_completion_description',
       'tasks.move_to_status',
@@ -750,6 +754,7 @@ function buildMcpTaskExecutionSchema() {
     recommendedWriteSequence: [
       'task_write when new follow-up work must be logged',
       'tasks.update when an existing task detail or metadata field needs a targeted edit',
+      'tasks.update_description when only the main task description/notes field needs to be replaced',
       'tasks.add_comment',
       'tasks.update_completion_description',
       'tasks.move_to_status or tasks.move_to_ready_for_human_review',
@@ -1429,6 +1434,84 @@ function updateTaskDetails(store, options = {}) {
   });
 }
 
+function updateTaskDescription(store, options = {}) {
+  const patch = options && typeof options === 'object' && !Array.isArray(options) ? options : {};
+  const { taskId, expectedRevision, notes, description, actor = 'agent' } = patch;
+  const normalizedTaskId = normalizeString(taskId).trim();
+  if (!normalizedTaskId) {
+    return { ok: false, error: 'TASK_ID_REQUIRED', message: 'taskId is required.' };
+  }
+
+  const hasNotes = hasOwn(patch, 'notes') && notes !== undefined;
+  const hasDescription = hasOwn(patch, 'description') && description !== undefined;
+  if (!hasNotes && !hasDescription) {
+    return {
+      ok: false,
+      error: 'DESCRIPTION_REQUIRED',
+      message: 'notes or description is required.',
+    };
+  }
+
+  const nextNotes = hasNotes ? notes : description;
+  return updateTaskWithRevision(store, normalizedTaskId, expectedRevision, (task) => ({
+    ...task,
+    notes: typeof nextNotes === 'string' ? nextNotes : '',
+    mcpLastActor: actor,
+  }));
+}
+
+function deleteTask(store, {
+  taskId,
+  expectedRevision,
+  actor = 'agent',
+} = {}) {
+  const normalizedTaskId = normalizeString(taskId).trim();
+  if (!normalizedTaskId) {
+    return { ok: false, error: 'TASK_ID_REQUIRED', message: 'taskId is required.' };
+  }
+
+  const tasks = readArray(store, TASKS_KEY);
+  const taskIndex = tasks.findIndex(task => task && task.id === normalizedTaskId);
+  if (taskIndex < 0) {
+    return { ok: false, error: 'TASK_NOT_FOUND', message: `Task "${normalizedTaskId}" not found.` };
+  }
+
+  const currentTask = normalizeTaskForMcp(tasks[taskIndex]);
+  const currentRevision = currentTask[MCP_TASK_REV_FIELD] || 0;
+  if (!Number.isFinite(Number(expectedRevision))) {
+    return {
+      ok: false,
+      error: 'EXPECTED_REVISION_REQUIRED',
+      message: 'expectedRevision is required and must be a finite number.',
+      currentRevision,
+    };
+  }
+
+  const expected = Math.max(0, Math.floor(Number(expectedRevision)));
+  if (expected !== currentRevision) {
+    return {
+      ok: false,
+      error: 'REVISION_MISMATCH',
+      message: 'Task revision mismatch.',
+      currentRevision,
+      expectedRevision: expected,
+    };
+  }
+
+  const nextTasks = tasks.slice(0, taskIndex).concat(tasks.slice(taskIndex + 1));
+  store.set(TASKS_KEY, nextTasks);
+
+  return {
+    ok: true,
+    deletedTaskId: normalizedTaskId,
+    task: {
+      ...currentTask,
+      mcpLastActor: actor,
+    },
+    currentRevision,
+  };
+}
+
 function transitionTaskToUnderReview(store, { taskId, expectedRevision, actor = 'agent' }) {
   return updateTaskWithRevision(store, taskId, expectedRevision, (task) => {
     if (task.status !== 'in-progress') return null;
@@ -1908,6 +1991,8 @@ module.exports = {
   moveTaskToReadyForHumanReview,
   assignTaskToPerson,
   updateTaskDetails,
+  updateTaskDescription,
+  deleteTask,
   REQUIRES_HUMAN_REVIEW_STATUS_ID,
   REQUIRES_HUMAN_REVIEW_STATUS_TITLE,
 };

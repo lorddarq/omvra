@@ -20,6 +20,8 @@ const {
   pollBoardWatcher,
   createTask,
   updateTaskDetails,
+  updateTaskDescription,
+  deleteTask,
   transitionTaskToUnderReview,
   updateTaskAgentSummary,
   addTaskComment,
@@ -315,6 +317,54 @@ test('tasks.update is exposed through MCP and audits targeted edits', () => {
   assert.equal(response.result.structuredContent.task.blocked, true);
   assert.equal(response.result.structuredContent.revision, 1);
   assert.ok(response.result.structuredContent.auditId);
+});
+
+test('updateTaskDescription replaces notes with revision protection', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const task = listTasks(store, { status: 'open' })[0];
+  const revision = task[MCP_TASK_REV_FIELD];
+
+  const updated = updateTaskDescription(store, {
+    taskId: task.id,
+    description: 'Replacement task description from MCP.',
+    expectedRevision: revision,
+  });
+
+  assert.equal(updated.ok, true);
+  assert.equal(updated.task.notes, 'Replacement task description from MCP.');
+  assert.equal(updated.task[MCP_TASK_REV_FIELD], revision + 1);
+
+  const stale = updateTaskDescription(store, {
+    taskId: task.id,
+    notes: 'This should not apply.',
+    expectedRevision: revision,
+  });
+  assert.equal(stale.ok, false);
+  assert.equal(stale.error, 'REVISION_MISMATCH');
+});
+
+test('deleteTask removes a task with revision protection', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const task = listTasks(store, { status: 'open' })[0];
+  const revision = task[MCP_TASK_REV_FIELD];
+
+  const stale = deleteTask(store, {
+    taskId: task.id,
+    expectedRevision: revision + 1,
+  });
+  assert.equal(stale.ok, false);
+  assert.equal(stale.error, 'REVISION_MISMATCH');
+  assert.ok(listTasks(store).some(item => item.id === task.id));
+
+  const deleted = deleteTask(store, {
+    taskId: task.id,
+    expectedRevision: revision,
+  });
+  assert.equal(deleted.ok, true);
+  assert.equal(deleted.deletedTaskId, task.id);
+  assert.equal(deleted.currentRevision, revision);
+  assert.ok(!listTasks(store).some(item => item.id === task.id));
+  assert.ok(!getWorkspaceSnapshot(store).workspace.tasks.some(item => item.id === task.id));
 });
 
 test('updateTaskDetails rejects stale revisions and invalid references', () => {

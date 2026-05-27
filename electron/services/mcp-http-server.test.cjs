@@ -67,16 +67,19 @@ test('tools/list remains available after initialize handshake', () => {
   assert.equal(response.jsonrpc, '2.0');
   assert.equal(response.id, '2');
   assert.ok(Array.isArray(response.result.tools));
-  assert.ok(response.result.tools.some(tool => tool.name === 'workspace.get_snapshot'));
-  assert.ok(response.result.tools.some(tool => tool.name === 'boards.watch.poll'));
+  assert.ok(response.result.tools.every(tool => /^[a-zA-Z0-9_-]{1,64}$/.test(tool.name)));
+  assert.ok(response.result.tools.some(tool => tool.name === 'workspace_get_snapshot'));
+  assert.ok(response.result.tools.some(tool => tool.name === 'boards_watch_poll'));
   assert.ok(response.result.tools.some(tool => tool.name === 'task_write'));
-  assert.ok(response.result.tools.some(tool => tool.name === 'tasks.update'));
-  assert.ok(response.result.tools.some(tool => tool.name === 'tasks.move_to_status'));
-  assert.ok(response.result.tools.some(tool => tool.name === 'tasks.move_to_ready_for_human_review'));
-  assert.ok(response.result.tools.some(tool => tool.name === 'tasks.complete_and_request_review'));
-  assert.ok(response.result.tools.some(tool => tool.name === 'tasks.assign'));
-  assert.ok(response.result.tools.some(tool => tool.name === 'tasks.add_comment'));
-  assert.ok(response.result.tools.some(tool => tool.name === 'tasks.add_activity_entry'));
+  assert.ok(response.result.tools.some(tool => tool.name === 'tasks_update'));
+  assert.ok(response.result.tools.some(tool => tool.name === 'tasks_update_description'));
+  assert.ok(response.result.tools.some(tool => tool.name === 'tasks_delete'));
+  assert.ok(response.result.tools.some(tool => tool.name === 'tasks_move_to_status'));
+  assert.ok(response.result.tools.some(tool => tool.name === 'tasks_move_to_ready_for_human_review'));
+  assert.ok(response.result.tools.some(tool => tool.name === 'tasks_complete_and_request_review'));
+  assert.ok(response.result.tools.some(tool => tool.name === 'tasks_assign'));
+  assert.ok(response.result.tools.some(tool => tool.name === 'tasks_add_comment'));
+  assert.ok(response.result.tools.some(tool => tool.name === 'tasks_add_activity_entry'));
 });
 
 test('resources/list exposes the guide, schema, and lookup templates', () => {
@@ -130,6 +133,134 @@ test('task_write creates a new task through the MCP write surface with metadata'
   assert.deepEqual(response.result.structuredContent.task.projectIds, ['lane-1']);
   assert.equal(response.result.structuredContent.task.priority, 'urgent');
   assert.equal(response.result.structuredContent.revision, 0);
+});
+
+test('underscore tool aliases dispatch to the canonical handlers', () => {
+  const dispatch = createRequestDispatcher(makeStoreFromFixture('workspace-basic'));
+  const response = dispatch({
+    jsonrpc: '2.0',
+    id: 'alias-list-1',
+    method: 'tools/call',
+    params: {
+      name: 'tasks_list',
+      arguments: {},
+    },
+  }, makeReq());
+
+  assert.equal(response.jsonrpc, '2.0');
+  assert.equal(response.id, 'alias-list-1');
+  assert.ok(Array.isArray(response.result.structuredContent));
+  assert.ok(response.result.structuredContent.some(task => task.id === 'task-1'));
+});
+
+test('tasks.update_description replaces notes through MCP and audits the write', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  store.set(PREFERENCES_KEY, {
+    mcpAgentAccessEnabled: true,
+    mcpCapabilityProfile: 'task_write',
+    mcpAccessToken: 'secret-token',
+    mcpAccessTokenIssuedAt: new Date().toISOString(),
+    mcpAccessTokenTtlMinutes: 60,
+  });
+
+  const dispatch = createRequestDispatcher(store);
+  const req = makeReq({ authorization: 'Bearer secret-token' }, 'http');
+
+  const response = dispatch({
+    jsonrpc: '2.0',
+    id: 'update-description-1',
+    method: 'tools/call',
+    params: {
+      name: 'tasks.update_description',
+      arguments: {
+        taskId: 'task-2',
+        description: 'Updated full task description.',
+        expectedRevision: 0,
+      },
+    },
+  }, req);
+
+  assert.equal(response.jsonrpc, '2.0');
+  assert.equal(response.id, 'update-description-1');
+  assert.equal(response.result.structuredContent.action, 'tasks.update_description');
+  assert.equal(response.result.structuredContent.changed, true);
+  assert.ok(response.result.structuredContent.auditId);
+  assert.equal(response.result.structuredContent.task.notes, 'Updated full task description.');
+  assert.equal(response.result.structuredContent.revision, 1);
+});
+
+test('tasks.delete removes a task through MCP and workspace snapshots stay in sync', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  store.set(PREFERENCES_KEY, {
+    mcpAgentAccessEnabled: true,
+    mcpCapabilityProfile: 'task_write',
+    mcpAccessToken: 'secret-token',
+    mcpAccessTokenIssuedAt: new Date().toISOString(),
+    mcpAccessTokenTtlMinutes: 60,
+  });
+
+  const dispatch = createRequestDispatcher(store);
+  const req = makeReq({ authorization: 'Bearer secret-token' }, 'http');
+
+  const staleResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'delete-task-stale',
+    method: 'tools/call',
+    params: {
+      name: 'tasks.delete',
+      arguments: {
+        taskId: 'task-2',
+        expectedRevision: 99,
+      },
+    },
+  }, req);
+
+  assert.ok(staleResponse.error);
+  assert.equal(staleResponse.error.data.error, 'REVISION_MISMATCH');
+
+  const deleteResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'delete-task-1',
+    method: 'tools/call',
+    params: {
+      name: 'tasks.delete',
+      arguments: {
+        taskId: 'task-2',
+        expectedRevision: 0,
+      },
+    },
+  }, req);
+
+  assert.equal(deleteResponse.jsonrpc, '2.0');
+  assert.equal(deleteResponse.id, 'delete-task-1');
+  assert.equal(deleteResponse.result.structuredContent.action, 'tasks.delete');
+  assert.equal(deleteResponse.result.structuredContent.changed, true);
+  assert.ok(deleteResponse.result.structuredContent.auditId);
+  assert.equal(deleteResponse.result.structuredContent.deletedTaskId, 'task-2');
+  assert.equal(deleteResponse.result.structuredContent.task.id, 'task-2');
+  assert.equal(deleteResponse.result.structuredContent.revision, 0);
+
+  const listResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'delete-task-list',
+    method: 'tools/call',
+    params: {
+      name: 'tasks.list',
+      arguments: {},
+    },
+  }, req);
+  assert.ok(!listResponse.result.structuredContent.some(task => task.id === 'task-2'));
+
+  const snapshotResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'delete-task-snapshot',
+    method: 'tools/call',
+    params: {
+      name: 'workspace.get_snapshot',
+      arguments: {},
+    },
+  }, req);
+  assert.ok(!snapshotResponse.result.structuredContent.workspace.tasks.some(task => task.id === 'task-2'));
 });
 
 test('resources/templates/list returns the same lookup templates for clients that query them directly', () => {
@@ -396,7 +527,8 @@ test('remote http transport can read resources and expose write tools with valid
   }, req);
 
   assert.ok(Array.isArray(toolsResponse.result.tools));
-  assert.ok(toolsResponse.result.tools.some(tool => tool.name === 'tasks.transition_under_review'));
+  assert.ok(toolsResponse.result.tools.every(tool => /^[a-zA-Z0-9_-]{1,64}$/.test(tool.name)));
+  assert.ok(toolsResponse.result.tools.some(tool => tool.name === 'tasks_transition_under_review'));
 
   const resourcesResponse = dispatch({
     jsonrpc: '2.0',
@@ -644,13 +776,16 @@ test('read_only fixture only exposes read tools and preserves custom resources',
   }, req);
 
   const toolNames = toolsResponse.result.tools.map(tool => tool.name);
-  assert.ok(toolNames.includes('workspace.get_snapshot'));
-  assert.ok(!toolNames.includes('tasks.update'));
-  assert.ok(!toolNames.includes('tasks.transition_under_review'));
-  assert.ok(!toolNames.includes('tasks.move_to_status'));
-  assert.ok(!toolNames.includes('tasks.move_to_ready_for_human_review'));
-  assert.ok(!toolNames.includes('tasks.assign'));
-  assert.ok(!toolNames.includes('tasks.move_to_requires_human_review'));
+  assert.ok(toolNames.every(name => /^[a-zA-Z0-9_-]{1,64}$/.test(name)));
+  assert.ok(toolNames.includes('workspace_get_snapshot'));
+  assert.ok(!toolNames.includes('tasks_update'));
+  assert.ok(!toolNames.includes('tasks_update_description'));
+  assert.ok(!toolNames.includes('tasks_delete'));
+  assert.ok(!toolNames.includes('tasks_transition_under_review'));
+  assert.ok(!toolNames.includes('tasks_move_to_status'));
+  assert.ok(!toolNames.includes('tasks_move_to_ready_for_human_review'));
+  assert.ok(!toolNames.includes('tasks_assign'));
+  assert.ok(!toolNames.includes('tasks_move_to_requires_human_review'));
 
   const resourceResponse = dispatch({
     jsonrpc: '2.0',
@@ -663,6 +798,35 @@ test('read_only fixture only exposes read tools and preserves custom resources',
 
   assert.match(resourceResponse.result.contents[0].text, /ready-human/);
   assert.match(resourceResponse.result.contents[0].text, /task-custom-1/);
+});
+
+test('read_only profile rejects task deletion attempts', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  store.set(PREFERENCES_KEY, {
+    mcpAgentAccessEnabled: true,
+    mcpCapabilityProfile: 'read_only',
+    mcpAccessToken: 'secret-token',
+    mcpAccessTokenIssuedAt: new Date().toISOString(),
+    mcpAccessTokenTtlMinutes: 60,
+  });
+
+  const dispatch = createRequestDispatcher(store);
+  const response = dispatch({
+    jsonrpc: '2.0',
+    id: 'delete-denied-1',
+    method: 'tools/call',
+    params: {
+      name: 'tasks.delete',
+      arguments: {
+        taskId: 'task-2',
+        expectedRevision: 0,
+      },
+    },
+  }, makeReq({ authorization: 'Bearer secret-token' }, 'http'));
+
+  assert.ok(response.error);
+  assert.equal(response.error.code, -32003);
+  assert.match(response.error.message, /read-only/i);
 });
 
 test('boards.watch.poll exposes board deltas and suppresses duplicate processing', () => {

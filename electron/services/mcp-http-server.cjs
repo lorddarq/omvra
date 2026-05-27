@@ -19,6 +19,8 @@ const {
   pollBoardWatcher,
   createTask,
   updateTaskDetails,
+  updateTaskDescription,
+  deleteTask,
   transitionTaskToUnderReview,
   updateTaskAgentSummary,
   addTaskComment,
@@ -226,6 +228,34 @@ const WRITE_TOOL_DEFINITIONS = [
     },
   },
   {
+    name: 'tasks.update_description',
+    description: 'Replaces the main task description/notes field with optimistic revision protection. Use this for focused description edits.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        taskId: { type: 'string' },
+        notes: { type: 'string' },
+        description: { type: 'string' },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+      },
+      required: ['taskId', 'expectedRevision'],
+    },
+  },
+  {
+    name: 'tasks.delete',
+    description: 'Deletes a task after validating the expected revision. Use only when deletion was explicitly requested or allowed by workflow rules.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        taskId: { type: 'string' },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+      },
+      required: ['taskId', 'expectedRevision'],
+    },
+  },
+  {
     name: 'tasks.transition_under_review',
     description: 'Transitions a task status to under-review. (not available in read-only mode)',
     inputSchema: {
@@ -375,6 +405,47 @@ const WRITE_TOOL_DEFINITIONS = [
   },
 ];
 
+const TOOL_NAME_ALIASES = new Map([
+  ['workspace_get_snapshot', 'workspace.get_snapshot'],
+  ['tasks_list', 'tasks.list'],
+  ['tasks_get', 'tasks.get'],
+  ['cards_kanban_list', 'cards.kanban.list'],
+  ['cards_timeline_list', 'cards.timeline.list'],
+  ['boards_watch_poll', 'boards.watch.poll'],
+  ['tasks_create', 'tasks.create'],
+  ['tasks_update', 'tasks.update'],
+  ['tasks_update_description', 'tasks.update_description'],
+  ['tasks_delete', 'tasks.delete'],
+  ['tasks_transition_under_review', 'tasks.transition_under_review'],
+  ['tasks_update_agent_summary', 'tasks.update_agent_summary'],
+  ['tasks_add_comment', 'tasks.add_comment'],
+  ['tasks_add_activity_entry', 'tasks.add_activity_entry'],
+  ['tasks_update_completion_description', 'tasks.update_completion_description'],
+  ['tasks_complete_and_request_review', 'tasks.complete_and_request_review'],
+  ['tasks_move_to_requires_human_review', 'tasks.move_to_requires_human_review'],
+  ['tasks_move_to_status', 'tasks.move_to_status'],
+  ['tasks_move_to_ready_for_human_review', 'tasks.move_to_ready_for_human_review'],
+  ['tasks_assign', 'tasks.assign'],
+]);
+
+function toPublicToolName(name) {
+  return name.replace(/\./g, '_');
+}
+
+function toCanonicalToolName(name) {
+  return TOOL_NAME_ALIASES.get(name) || name;
+}
+
+function toPublicToolDefinition(tool) {
+  return {
+    ...tool,
+    name: toPublicToolName(tool.name),
+  };
+}
+
+const PUBLIC_READ_TOOL_DEFINITIONS = READ_TOOL_DEFINITIONS.map(toPublicToolDefinition);
+const PUBLIC_WRITE_TOOL_DEFINITIONS = WRITE_TOOL_DEFINITIONS.map(toPublicToolDefinition);
+
 const RESOURCE_DEFINITIONS = [
   {
     uri: 'plumy://workspace',
@@ -505,6 +576,10 @@ function makeWriteToolResult(action, payload = {}) {
     structuredContent.statusCreated = payload.statusCreated;
   }
 
+  if (Object.prototype.hasOwnProperty.call(payload, 'deletedTaskId')) {
+    structuredContent.deletedTaskId = payload.deletedTaskId;
+  }
+
   return makeToolResult(structuredContent);
 }
 
@@ -591,7 +666,7 @@ function getToolCallPayload(params) {
   }
 
   return {
-    name,
+    name: toCanonicalToolName(name),
     args: normalizeObject(normalized.arguments),
   };
 }
@@ -898,6 +973,82 @@ function handleToolCall(store, req, params) {
           auditId: audit?.auditId,
           task: result.task,
           revision: result.task?.__mcpRevision,
+        }),
+      };
+    }
+
+    case 'tasks.update_description': {
+      const taskId = parseTaskId(args);
+      if (!taskId) {
+        return { error: invalidParams('Invalid params: "taskId" is required.') };
+      }
+      const result = updateTaskDescription(store, {
+        taskId,
+        notes: args.notes,
+        description: args.description,
+        expectedRevision: args.expectedRevision,
+        actor: 'mcp-agent',
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, {
+          outcome: 'denied',
+          reason: result.error,
+          toolName: name,
+          taskId,
+          fields: Object.keys(args).filter(key => key !== 'expectedRevision'),
+        });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        taskId,
+        fields: Object.keys(args).filter(key => key !== 'expectedRevision'),
+        nextRevision: result.task?.__mcpRevision,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: true,
+          auditId: audit?.auditId,
+          task: result.task,
+          revision: result.task?.__mcpRevision,
+        }),
+      };
+    }
+
+    case 'tasks.delete': {
+      const taskId = parseTaskId(args);
+      if (!taskId) {
+        return { error: invalidParams('Invalid params: "taskId" is required.') };
+      }
+      const result = deleteTask(store, {
+        taskId,
+        expectedRevision: args.expectedRevision,
+        actor: 'mcp-agent',
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, {
+          outcome: 'denied',
+          reason: result.error,
+          toolName: name,
+          taskId,
+        });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        taskId,
+        deletedTaskId: result.deletedTaskId,
+        revision: result.currentRevision,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: true,
+          auditId: audit?.auditId,
+          task: result.task,
+          deletedTaskId: result.deletedTaskId,
+          revision: result.currentRevision,
         }),
       };
     }
@@ -1470,8 +1621,8 @@ function createRequestDispatcher(store) {
       return respond({
         result: {
           tools: writeToolsEnabled
-            ? [...READ_TOOL_DEFINITIONS, ...WRITE_TOOL_DEFINITIONS]
-            : READ_TOOL_DEFINITIONS,
+            ? [...PUBLIC_READ_TOOL_DEFINITIONS, ...PUBLIC_WRITE_TOOL_DEFINITIONS]
+            : PUBLIC_READ_TOOL_DEFINITIONS,
         },
       });
     }

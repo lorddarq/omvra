@@ -451,6 +451,7 @@ function buildMcpCapabilitySnapshot(store) {
             'tasks.add_activity_entry',
             'milestones.create',
             'milestones.update',
+            'milestones.link_tasks',
             'milestones.delete',
           ]
         : [],
@@ -788,14 +789,23 @@ function buildMcpAgentGuide() {
       'tasks.move_to_ready_for_human_review',
       'tasks.assign',
       'milestones.create',
+      'milestones.link_tasks',
       'milestones.update',
       'milestones.delete',
     ],
+    canonicalWritePaths: {
+      createTask: 'Use task_write. If the task belongs in a milestone, call milestones.link_tasks after creation.',
+      addTasksToMilestone: 'Use milestones.link_tasks. Do not use tasks.update milestoneId for this workflow.',
+      setTaskDependencies: 'Use milestones.link_tasks with dependencyUpdates. Do not use tasks.update dependencyIds for roadmap dependencies.',
+      editMilestoneMetadata: 'Use milestones.update for title, dates, notes, color, project scope, or intentional linkedTaskIds replacement/removal.',
+      deleteMilestone: 'Use milestones.delete.',
+    },
     workflow: [
       'Read the guide and task-execution schema before taking action.',
       'Use resources/templates/list to discover stable lookup URIs.',
       'Inspect plumy://workspace for the overall state, then read the assigned task resource.',
       'Read current task data before writing, and pass expectedRevision on every write.',
+      'For roadmap membership and intertask dependencies, use milestones.link_tasks as the single canonical write path.',
       'Keep completion notes brief, then move the task to the appropriate review board.',
     ],
     handoffChecklist: [
@@ -826,14 +836,38 @@ function buildMcpTaskExecutionSchema() {
       'Always pass expectedRevision on writes.',
       'Write a brief completion summary before moving the task to review.',
       'Prefer the narrowest write tool that matches the action.',
+      'For roadmap membership and task dependencies, use milestones.link_tasks. Do not split the workflow across milestones.update and tasks.update.',
     ],
+    canonicalRoadmapPath: {
+      addTasksToMilestone: {
+        tool: 'milestones.link_tasks',
+        requiredInputs: ['milestoneId', 'expectedRevision'],
+        optionalInputs: ['taskIds', 'dependencyUpdates'],
+        notes: [
+          'Use this even when only adding tasks and no dependencies are needed.',
+          'Use dependencyUpdates to set dependencyIds for tasks in the same roadmap write.',
+          'Read the milestone first and pass the milestone __mcpRevision as expectedRevision.',
+        ],
+      },
+      createTaskThenAddToMilestone: [
+        'Call task_write to create the task.',
+        'Read the target milestone or use a fresh milestone snapshot.',
+        'Call milestones.link_tasks with the new task id.',
+      ],
+      avoid: [
+        'Do not use tasks.update milestoneId as the normal milestone-linking path.',
+        'Do not use tasks.update dependencyIds as the normal roadmap-dependency path.',
+        'Do not call milestones.update followed by tasks.update just to add tasks and dependencies.',
+      ],
+    },
     recommendedWriteSequence: [
       'task_write when new follow-up work must be logged',
       'tasks.update when an existing task detail or metadata field needs a targeted edit',
       'tasks.update_description when only the main task description/notes field needs to be replaced',
       'tasks.log_time when approximate time spent should be recorded',
-      'milestones.create when roadmap planning needs a milestone with linked tasks',
-      'milestones.update when roadmap linked tasks or milestone metadata need to change',
+      'milestones.create when roadmap planning needs a new milestone',
+      'milestones.link_tasks when adding tasks to a milestone or setting roadmap dependencyIds',
+      'milestones.update when milestone metadata or intentional link replacement/removal needs to change',
       'milestones.delete when a roadmap milestone should be removed and task links cleaned',
       'tasks.add_comment',
       'tasks.update_completion_description',
@@ -1123,6 +1157,44 @@ function validateTaskReferences(store, taskIds, { fieldName = 'taskIds', exclude
   }
 
   return { ok: true, taskIds: normalizedTaskIds };
+}
+
+function normalizeRoadmapDependencyUpdates(value) {
+  if (!Array.isArray(value)) return [];
+  const updatesByTaskId = new Map();
+
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const taskId = normalizeString(item.taskId || item.id).trim();
+    if (!taskId) continue;
+    updatesByTaskId.set(taskId, {
+      taskId,
+      dependencyIds: normalizeTaskIdList(item.dependencyIds),
+    });
+  }
+
+  return Array.from(updatesByTaskId.values());
+}
+
+function validateRoadmapDependencyUpdates(store, updates) {
+  const normalizedUpdates = normalizeRoadmapDependencyUpdates(updates);
+  const updateTaskValidation = validateTaskReferences(
+    store,
+    normalizedUpdates.map(update => update.taskId),
+    { fieldName: 'dependencyUpdates.taskId' }
+  );
+  if (!updateTaskValidation.ok) return updateTaskValidation;
+
+  for (const update of normalizedUpdates) {
+    const dependencyValidation = validateTaskReferences(store, update.dependencyIds, {
+      fieldName: `dependencyUpdates[${update.taskId}].dependencyIds`,
+      excludeTaskId: update.taskId,
+    });
+    if (!dependencyValidation.ok) return dependencyValidation;
+    update.dependencyIds = dependencyValidation.taskIds;
+  }
+
+  return { ok: true, updates: normalizedUpdates };
 }
 
 function resolveMilestoneReference(store, milestoneId) {
@@ -1943,6 +2015,115 @@ function updateMilestone(store, {
   };
 }
 
+function linkMilestoneTasks(store, {
+  milestoneId,
+  taskIds,
+  dependencyUpdates,
+  expectedRevision,
+  actor = 'agent',
+} = {}) {
+  const normalizedMilestoneId = normalizeString(milestoneId).trim();
+  if (!normalizedMilestoneId) {
+    return { ok: false, error: 'MILESTONE_ID_REQUIRED', message: 'milestoneId is required.' };
+  }
+
+  const milestones = readArray(store, MILESTONES_KEY);
+  const milestoneIndex = milestones.findIndex(milestone => milestone && milestone.id === normalizedMilestoneId);
+  if (milestoneIndex < 0) {
+    return { ok: false, error: 'MILESTONE_NOT_FOUND', message: `Milestone "${normalizedMilestoneId}" not found.` };
+  }
+
+  const currentMilestone = normalizeMilestoneForMcp(milestones[milestoneIndex]);
+  const currentRevision = currentMilestone[MCP_TASK_REV_FIELD] || 0;
+  if (!Number.isFinite(Number(expectedRevision))) {
+    return {
+      ok: false,
+      error: 'EXPECTED_REVISION_REQUIRED',
+      message: 'expectedRevision is required and must be a finite number.',
+      currentRevision,
+    };
+  }
+
+  const expected = Math.max(0, Math.floor(Number(expectedRevision)));
+  if (expected !== currentRevision) {
+    return {
+      ok: false,
+      error: 'REVISION_MISMATCH',
+      message: 'Milestone revision mismatch.',
+      currentRevision,
+      expectedRevision: expected,
+    };
+  }
+
+  const taskValidation = validateTaskReferences(store, taskIds, { fieldName: 'taskIds' });
+  if (!taskValidation.ok) return taskValidation;
+
+  const dependencyValidation = validateRoadmapDependencyUpdates(store, dependencyUpdates);
+  if (!dependencyValidation.ok) return dependencyValidation;
+
+  const linkedTaskIdSet = new Set(currentMilestone.linkedTaskIds || []);
+  taskValidation.taskIds.forEach(taskId => linkedTaskIdSet.add(taskId));
+  dependencyValidation.updates.forEach(update => linkedTaskIdSet.add(update.taskId));
+
+  const linkedTaskIds = Array.from(linkedTaskIdSet);
+  const dependencyUpdatesByTaskId = new Map(
+    dependencyValidation.updates.map(update => [update.taskId, update.dependencyIds])
+  );
+  const now = new Date().toISOString();
+  const tasks = readArray(store, TASKS_KEY);
+  const changedTaskIds = [];
+
+  const nextTasks = tasks.map(rawTask => {
+    if (!rawTask || typeof rawTask !== 'object') return rawTask;
+    const task = normalizeTaskForMcp(rawTask);
+    const nextDependencyIds = dependencyUpdatesByTaskId.has(task.id)
+      ? dependencyUpdatesByTaskId.get(task.id)
+      : task.dependencyIds;
+    const shouldLink = linkedTaskIdSet.has(task.id);
+    const milestoneChanged = shouldLink && task.milestoneId !== currentMilestone.id;
+    const dependencyChanged = dependencyUpdatesByTaskId.has(task.id)
+      && JSON.stringify(nextDependencyIds) !== JSON.stringify(task.dependencyIds || []);
+
+    if (!milestoneChanged && !dependencyChanged) return rawTask;
+
+    changedTaskIds.push(task.id);
+    return {
+      ...task,
+      milestoneId: shouldLink ? currentMilestone.id : task.milestoneId,
+      dependencyIds: nextDependencyIds,
+      [MCP_TASK_REV_FIELD]: (task[MCP_TASK_REV_FIELD] || 0) + 1,
+      mcpUpdatedAt: now,
+      mcpLastActor: actor,
+    };
+  });
+
+  const milestoneChanged = JSON.stringify(linkedTaskIds) !== JSON.stringify(currentMilestone.linkedTaskIds || []);
+  const nextMilestone = {
+    ...currentMilestone,
+    linkedTaskIds,
+    [MCP_TASK_REV_FIELD]: currentRevision + 1,
+    mcpUpdatedAt: now,
+    mcpLastActor: actor,
+  };
+
+  const nextMilestones = milestones.slice();
+  nextMilestones[milestoneIndex] = nextMilestone;
+  store.set(MILESTONES_KEY, nextMilestones);
+  if (changedTaskIds.length > 0) {
+    store.set(TASKS_KEY, nextTasks);
+  }
+
+  return {
+    ok: true,
+    changed: milestoneChanged || changedTaskIds.length > 0,
+    milestone: normalizeMilestoneForMcp(nextMilestone),
+    linkedTaskIds,
+    linkedTaskIdsAdded: linkedTaskIds.filter(taskId => !(currentMilestone.linkedTaskIds || []).includes(taskId)),
+    dependencyUpdates: dependencyValidation.updates,
+    changedTaskIds,
+  };
+}
+
 function deleteMilestone(store, {
   milestoneId,
   expectedRevision,
@@ -2601,6 +2782,7 @@ module.exports = {
   logTaskTime,
   createMilestone,
   updateMilestone,
+  linkMilestoneTasks,
   deleteMilestone,
   deleteTask,
   REQUIRES_HUMAN_REVIEW_STATUS_ID,

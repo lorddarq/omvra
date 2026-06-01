@@ -26,6 +26,7 @@ const {
   logTaskTime,
   createMilestone,
   updateMilestone,
+  linkMilestoneTasks,
   deleteMilestone,
   transitionTaskToUnderReview,
   updateTaskAgentSummary,
@@ -162,7 +163,7 @@ const READ_TOOL_DEFINITIONS = [
 const WRITE_TOOL_DEFINITIONS = [
   {
     name: 'task_write',
-    description: 'Creates a new task with optional project, timeline, assignment, schedule, and task metadata. Use this for bug hunting runs or when agents need to log follow-up work.',
+    description: 'Creates a new standalone task with optional project, timeline, assignment, schedule, and task metadata. For roadmap membership or task dependencies, create the task first, then use milestones_link_tasks as the single canonical roadmap write.',
     inputSchema: {
       type: 'object',
       additionalProperties: true,
@@ -180,11 +181,6 @@ const WRITE_TOOL_DEFINITIONS = [
           items: { type: 'string' },
         },
         swimlaneId: { type: 'string' },
-        milestoneId: { type: 'string' },
-        dependencyIds: {
-          type: 'array',
-          items: { type: 'string' },
-        },
         startDate: { type: 'string' },
         endDate: { type: 'string' },
         size: { type: 'string' },
@@ -200,7 +196,7 @@ const WRITE_TOOL_DEFINITIONS = [
   },
   {
     name: 'tasks.create',
-    description: 'Compatibility alias for task_write.',
+    description: 'Compatibility alias for task_write. For roadmap membership or task dependencies, create the task first, then use milestones_link_tasks.',
     inputSchema: {
       type: 'object',
       additionalProperties: true,
@@ -218,11 +214,6 @@ const WRITE_TOOL_DEFINITIONS = [
           items: { type: 'string' },
         },
         swimlaneId: { type: 'string' },
-        milestoneId: { type: 'string' },
-        dependencyIds: {
-          type: 'array',
-          items: { type: 'string' },
-        },
         startDate: { type: 'string' },
         endDate: { type: 'string' },
         size: { type: 'string' },
@@ -238,7 +229,7 @@ const WRITE_TOOL_DEFINITIONS = [
   },
   {
     name: 'tasks.update',
-    description: 'Edits an existing task details/metadata patch with optimistic revision protection. Omitted fields are preserved; empty optional fields clear their value.',
+    description: 'Edits ordinary task details with optimistic revision protection. Do not use this for roadmap milestone membership or intertask dependencies; use milestones_link_tasks for adding tasks to milestones and setting dependencyIds.',
     inputSchema: {
       type: 'object',
       additionalProperties: true,
@@ -257,11 +248,6 @@ const WRITE_TOOL_DEFINITIONS = [
           items: { type: 'string' },
         },
         swimlaneId: { type: 'string' },
-        milestoneId: { type: 'string' },
-        dependencyIds: {
-          type: 'array',
-          items: { type: 'string' },
-        },
         startDate: { type: 'string' },
         endDate: { type: 'string' },
         size: { type: 'string' },
@@ -321,7 +307,7 @@ const WRITE_TOOL_DEFINITIONS = [
   },
   {
     name: 'milestones.create',
-    description: 'Creates a roadmap milestone with project scope, release date, description, and linked task IDs.',
+    description: 'Creates a roadmap milestone with project scope, release date, description, and optional initial linked task IDs. For adding tasks or dependencies after creation, use milestones_link_tasks.',
     inputSchema: {
       type: 'object',
       additionalProperties: true,
@@ -347,7 +333,7 @@ const WRITE_TOOL_DEFINITIONS = [
   },
   {
     name: 'milestones.update',
-    description: 'Updates a roadmap milestone with revision protection. Use linkedTaskIds to link or unlink tasks from the milestone.',
+    description: 'Updates milestone metadata or replaces/removes linkedTaskIds with revision protection. Do not use this as the normal add-tasks path; use milestones_link_tasks when adding tasks to a milestone or setting intertask dependencies.',
     inputSchema: {
       type: 'object',
       additionalProperties: true,
@@ -367,6 +353,38 @@ const WRITE_TOOL_DEFINITIONS = [
         linkedTaskIds: {
           type: 'array',
           items: { type: 'string' },
+        },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+      },
+      required: ['milestoneId', 'expectedRevision'],
+    },
+  },
+  {
+    name: 'milestones.link_tasks',
+    description: 'Canonical roadmap write: atomically add existing tasks to a milestone and set intertask dependency IDs using only the milestone revision. Use this for all add-task-to-milestone and dependency workflows.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        milestoneId: { type: 'string' },
+        taskIds: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+        dependencyUpdates: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: true,
+            properties: {
+              taskId: { type: 'string' },
+              dependencyIds: {
+                type: 'array',
+                items: { type: 'string' },
+              },
+            },
+            required: ['taskId', 'dependencyIds'],
+          },
         },
         expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
       },
@@ -552,6 +570,7 @@ const TOOL_NAME_ALIASES = new Map([
   ['tasks_log_time', 'tasks.log_time'],
   ['milestones_create', 'milestones.create'],
   ['milestones_update', 'milestones.update'],
+  ['milestones_link_tasks', 'milestones.link_tasks'],
   ['milestones_delete', 'milestones.delete'],
   ['tasks_transition_under_review', 'tasks.transition_under_review'],
   ['tasks_update_agent_summary', 'tasks.update_agent_summary'],
@@ -1353,6 +1372,45 @@ function handleToolCall(store, req, params) {
       return {
         result: makeWriteToolResult(name, {
           changed: true,
+          auditId: audit?.auditId,
+          result,
+          revision: result.milestone?.__mcpRevision,
+        }),
+      };
+    }
+
+    case 'milestones.link_tasks': {
+      const milestoneId = parseMilestoneId(args);
+      if (!milestoneId) {
+        return { error: invalidParams('Invalid params: "milestoneId" is required.') };
+      }
+      const result = linkMilestoneTasks(store, {
+        milestoneId,
+        taskIds: args.taskIds,
+        dependencyUpdates: args.dependencyUpdates,
+        expectedRevision: args.expectedRevision,
+        actor: 'mcp-agent',
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, {
+          outcome: 'denied',
+          reason: result.error,
+          toolName: name,
+          milestoneId,
+        });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        milestoneId: result.milestone?.id,
+        linkedTaskIds: result.linkedTaskIds,
+        changedTaskIds: result.changedTaskIds,
+        nextRevision: result.milestone?.__mcpRevision,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: result.changed,
           auditId: audit?.auditId,
           result,
           revision: result.milestone?.__mcpRevision,

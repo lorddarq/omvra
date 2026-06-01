@@ -79,6 +79,7 @@ test('tools/list remains available after initialize handshake', () => {
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks_log_time'));
   assert.ok(response.result.tools.some(tool => tool.name === 'milestones_create'));
   assert.ok(response.result.tools.some(tool => tool.name === 'milestones_update'));
+  assert.ok(response.result.tools.some(tool => tool.name === 'milestones_link_tasks'));
   assert.ok(response.result.tools.some(tool => tool.name === 'milestones_delete'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks_move_to_status'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks_move_to_ready_for_human_review'));
@@ -86,6 +87,23 @@ test('tools/list remains available after initialize handshake', () => {
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks_assign'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks_add_comment'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks_add_activity_entry'));
+});
+
+test('tool schemas advertise one canonical roadmap write path', () => {
+  const dispatch = createRequestDispatcher(makeStoreFromFixture('workspace-basic'));
+  const response = dispatch({
+    jsonrpc: '2.0',
+    id: 'tool-schema-roadmap-1',
+    method: 'tools/list',
+    params: {},
+  }, makeReq());
+
+  const toolsByName = new Map(response.result.tools.map(tool => [tool.name, tool]));
+  const taskUpdateProperties = toolsByName.get('tasks_update').inputSchema.properties;
+  assert.equal(Object.prototype.hasOwnProperty.call(taskUpdateProperties, 'milestoneId'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(taskUpdateProperties, 'dependencyIds'), false);
+  assert.match(toolsByName.get('tasks_update').description, /milestones_link_tasks/);
+  assert.match(toolsByName.get('milestones_link_tasks').description, /Canonical roadmap write/);
 });
 
 test('resources/list exposes the guide, schema, and lookup templates', () => {
@@ -331,6 +349,62 @@ test('MCP updates milestone linked tasks and clears removed task milestone links
   }, makeReq({}, 'stdio'));
 
   assert.equal(removedTaskResponse.result.structuredContent.milestoneId, undefined);
+});
+
+test('MCP atomically links milestone tasks and intertask dependencies', () => {
+  const dispatch = createRequestDispatcher(makeStoreFromFixture('workspace-basic'));
+
+  const milestoneResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'milestone-link-create-1',
+    method: 'tools/call',
+    params: {
+      name: 'milestones_create',
+      arguments: {
+        title: 'Release Alpha',
+        projectIds: ['Project A'],
+        endDate: '2026-04-01',
+        linkedTaskIds: ['task-1'],
+      },
+    },
+  }, makeReq({}, 'stdio'));
+
+  const milestone = milestoneResponse.result.structuredContent.result.milestone;
+  const linkResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'milestone-link-tasks-1',
+    method: 'tools/call',
+    params: {
+      name: 'milestones_link_tasks',
+      arguments: {
+        milestoneId: milestone.id,
+        taskIds: ['task-2', 'task-3'],
+        dependencyUpdates: [
+          { taskId: 'task-3', dependencyIds: ['task-2'] },
+        ],
+        expectedRevision: milestone.__mcpRevision,
+      },
+    },
+  }, makeReq({}, 'stdio'));
+
+  const result = linkResponse.result.structuredContent.result;
+  assert.deepEqual(result.milestone.linkedTaskIds, ['task-1', 'task-2', 'task-3']);
+  assert.deepEqual(result.linkedTaskIdsAdded, ['task-2', 'task-3']);
+  assert.deepEqual(result.changedTaskIds.sort(), ['task-2', 'task-3']);
+  assert.equal(linkResponse.result.structuredContent.revision, 1);
+
+  const taskResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'milestone-link-task-get-1',
+    method: 'tools/call',
+    params: {
+      name: 'tasks_get',
+      arguments: { taskId: 'task-3' },
+    },
+  }, makeReq({}, 'stdio'));
+
+  assert.equal(taskResponse.result.structuredContent.milestoneId, milestone.id);
+  assert.deepEqual(taskResponse.result.structuredContent.dependencyIds, ['task-2']);
 });
 
 test('MCP deletes milestones and clears linked task roadmap metadata', () => {
@@ -635,6 +709,8 @@ test('guide and execution schema resources explain the task workflow', () => {
   assert.match(guideResponse.result.contents[0].text, /plumy:\/\/agent\/guide/);
   assert.match(guideResponse.result.contents[0].text, /resources\/templates\/list/);
   assert.match(guideResponse.result.contents[0].text, /tasks\.move_to_ready_for_human_review/);
+  assert.match(guideResponse.result.contents[0].text, /canonicalWritePaths/);
+  assert.match(guideResponse.result.contents[0].text, /milestones\.link_tasks/);
 
   const schemaResponse = dispatch({
     jsonrpc: '2.0',
@@ -648,6 +724,8 @@ test('guide and execution schema resources explain the task workflow', () => {
   assert.match(schemaResponse.result.contents[0].text, /task execution schema/i);
   assert.match(schemaResponse.result.contents[0].text, /expectedRevision/);
   assert.match(schemaResponse.result.contents[0].text, /handoff/);
+  assert.match(schemaResponse.result.contents[0].text, /canonicalRoadmapPath/);
+  assert.match(schemaResponse.result.contents[0].text, /Do not split the workflow across milestones\.update and tasks\.update/);
 });
 
 test('template resources resolve assigned work, project work, and board work', () => {
@@ -1091,6 +1169,7 @@ test('read_only fixture only exposes read tools and preserves custom resources',
   assert.ok(!toolNames.includes('tasks_log_time'));
   assert.ok(!toolNames.includes('milestones_create'));
   assert.ok(!toolNames.includes('milestones_update'));
+  assert.ok(!toolNames.includes('milestones_link_tasks'));
   assert.ok(!toolNames.includes('milestones_delete'));
   assert.ok(!toolNames.includes('tasks_transition_under_review'));
   assert.ok(!toolNames.includes('tasks_move_to_status'));

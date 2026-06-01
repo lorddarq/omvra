@@ -27,6 +27,7 @@ const {
   logTaskTime,
   createMilestone,
   updateMilestone,
+  linkMilestoneTasks,
   deleteMilestone,
   deleteTask,
   transitionTaskToUnderReview,
@@ -621,6 +622,59 @@ test('updateMilestone unlinks tasks and clears milestoneId from removed tasks', 
   const unlinkedTask = listTasks(store).find(task => task.id === 'task-2');
   assert.equal(stillLinkedTask.milestoneId, created.milestone.id);
   assert.equal(unlinkedTask.milestoneId, undefined);
+});
+
+test('linkMilestoneTasks atomically links tasks and dependency IDs without task revisions', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const created = createMilestone(store, {
+    title: 'Release Alpha',
+    projectIds: ['Project A'],
+    endDate: '2026-04-01',
+    linkedTaskIds: ['task-1'],
+  });
+
+  const staleTaskRevision = getTaskById(store, 'task-2')[MCP_TASK_REV_FIELD];
+  const linked = linkMilestoneTasks(store, {
+    milestoneId: created.milestone.id,
+    taskIds: ['task-2', 'task-3'],
+    dependencyUpdates: [
+      { taskId: 'task-3', dependencyIds: ['task-2'] },
+    ],
+    expectedRevision: created.milestone[MCP_TASK_REV_FIELD],
+  });
+
+  assert.equal(linked.ok, true);
+  assert.deepEqual(linked.milestone.linkedTaskIds, ['task-1', 'task-2', 'task-3']);
+  assert.deepEqual(linked.linkedTaskIdsAdded, ['task-2', 'task-3']);
+  assert.deepEqual(linked.changedTaskIds.sort(), ['task-2', 'task-3']);
+  assert.equal(getTaskById(store, 'task-2').milestoneId, created.milestone.id);
+  assert.equal(getTaskById(store, 'task-2')[MCP_TASK_REV_FIELD], staleTaskRevision + 1);
+  assert.equal(getTaskById(store, 'task-3').milestoneId, created.milestone.id);
+  assert.deepEqual(getTaskById(store, 'task-3').dependencyIds, ['task-2']);
+});
+
+test('linkMilestoneTasks rejects invalid dependency updates before changing the milestone', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const created = createMilestone(store, {
+    title: 'Release Alpha',
+    projectIds: ['Project A'],
+    endDate: '2026-04-01',
+    linkedTaskIds: ['task-1'],
+  });
+
+  const rejected = linkMilestoneTasks(store, {
+    milestoneId: created.milestone.id,
+    taskIds: ['task-2'],
+    dependencyUpdates: [
+      { taskId: 'task-2', dependencyIds: ['missing-task'] },
+    ],
+    expectedRevision: created.milestone[MCP_TASK_REV_FIELD],
+  });
+
+  assert.equal(rejected.ok, false);
+  assert.equal(rejected.error, 'TASK_REFERENCE_NOT_FOUND');
+  assert.deepEqual(getMilestoneById(store, created.milestone.id).linkedTaskIds, ['task-1']);
+  assert.equal(getTaskById(store, 'task-2').milestoneId, undefined);
 });
 
 test('deleteMilestone removes milestone and clears linked task roadmap metadata', () => {

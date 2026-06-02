@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { lazy, Suspense, useState, useEffect, useMemo } from 'react';
 import { Briefcase, CalendarDays, GitBranch, User } from 'lucide-react';
 import { Task, TaskStatus, TimelineSwimlane, Person, TaskSize, TaskComplexity, TaskPriority, StatusColumn, ProjectMilestone } from '../types';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
@@ -22,8 +22,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/app/components/ui/select';
-import { MarkdownEditor } from './MarkdownEditor';
 import { normalizeTaskNotesForSave } from '../utils/taskNotes';
+
+const MarkdownEditor = lazy(() =>
+  import('./MarkdownEditor').then(module => ({ default: module.MarkdownEditor }))
+);
 
 interface TaskDialogProps {
   isOpen: boolean;
@@ -570,11 +573,20 @@ export function TaskDialog({
                 {task ? 'Edit the task details below.' : 'Enter the task details below.'}
               </p>
             </div>
-            <MarkdownEditor
-              id="notes"
-              value={notes}
-              onChange={setNotes}
-            />
+            <Suspense
+              fallback={
+                <div
+                  className="h-64 animate-pulse rounded-xl border border-gray-200 bg-gray-100"
+                  aria-label="Loading notes editor"
+                />
+              }
+            >
+              <MarkdownEditor
+                id="notes"
+                value={notes}
+                onChange={setNotes}
+              />
+            </Suspense>
           </div>
         </div>
 

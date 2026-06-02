@@ -1,6 +1,8 @@
 node_modules
 dist
 release
+artifacts/
+.artifacts/
 .env
 .env.local
 .env.development.local

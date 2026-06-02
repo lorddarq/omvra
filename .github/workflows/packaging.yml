@@ -180,7 +180,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: electron-artifacts-${{ matrix.os }}
-          path: dist/
+          path: release/*
 
   release:
     name: Create Release

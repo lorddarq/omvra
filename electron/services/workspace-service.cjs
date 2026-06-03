@@ -75,6 +75,86 @@ function normalizeTimeEntries(value) {
     .filter(Boolean);
 }
 
+function getFileNameFromPath(filePath) {
+  const normalized = normalizeString(filePath).replace(/\\/g, '/');
+  return normalized.split('/').filter(Boolean).pop() || normalized;
+}
+
+function toFileUri(filePath) {
+  const normalized = normalizeString(filePath).replace(/\\/g, '/');
+  const prefixed = normalized.match(/^[A-Za-z]:\//) ? `/${normalized}` : normalized;
+  return `file://${encodeURI(prefixed)}`;
+}
+
+function fileUriToPath(uri) {
+  try {
+    const url = new URL(uri);
+    if (url.protocol !== 'file:') return null;
+    return decodeURIComponent(url.pathname || '');
+  } catch (err) {
+    return null;
+  }
+}
+
+function normalizeAttachmentPath(value) {
+  const raw = normalizeString(value);
+  if (!raw) return null;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(raw)) {
+    return raw.toLowerCase().startsWith('file:') ? fileUriToPath(raw) : null;
+  }
+  if (raw.startsWith('/') || /^[A-Za-z]:[\\/]/.test(raw)) {
+    return raw;
+  }
+  return null;
+}
+
+function normalizeTaskAttachments(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  return value
+    .filter(attachment => attachment && typeof attachment === 'object' && !Array.isArray(attachment))
+    .map((attachment, index) => {
+      const path = normalizeAttachmentPath(attachment.path || attachment.uri || attachment.fileUri || attachment.url);
+      if (!path || seen.has(path)) return null;
+      seen.add(path);
+      const size = normalizePositiveInteger(attachment.size);
+      return {
+        id: normalizeString(attachment.id).trim() || `attachment-${index}`,
+        name: normalizeString(attachment.name).trim() || getFileNameFromPath(path),
+        path,
+        uri: normalizeString(attachment.uri).trim() || toFileUri(path),
+        size: size === null ? undefined : size,
+        addedAt: normalizeString(attachment.addedAt).trim() || new Date().toISOString(),
+      };
+    })
+    .filter(Boolean);
+}
+
+function normalizeAttachmentInput(input = {}) {
+  const source = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
+  const path = normalizeAttachmentPath(source.path || source.filePath || source.uri || source.fileUri || source.url);
+  if (!path) {
+    return {
+      ok: false,
+      error: 'INVALID_ATTACHMENT_URI',
+      message: 'Provide an absolute local path or file:// URL for the attachment.',
+    };
+  }
+
+  const size = normalizePositiveInteger(source.size);
+  return {
+    ok: true,
+    attachment: {
+      id: normalizeString(source.id).trim() || `attachment-${randomUUID()}`,
+      name: normalizeString(source.name).trim() || getFileNameFromPath(path),
+      path,
+      uri: normalizeString(source.uri || source.fileUri || source.url).trim() || toFileUri(path),
+      size: size === null ? undefined : size,
+      addedAt: normalizeString(source.addedAt).trim() || new Date().toISOString(),
+    },
+  };
+}
+
 function normalizeRevisionMap(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   const out = {};
@@ -439,6 +519,8 @@ function buildMcpCapabilitySnapshot(store) {
             'tasks.transition_under_review',
             'tasks.update',
             'tasks.update_description',
+            'tasks.attach_file',
+            'tasks.remove_attachment',
             'tasks.delete',
             'tasks.log_time',
             'tasks.update_agent_summary',
@@ -781,6 +863,8 @@ function buildMcpAgentGuide() {
       'task_write',
       'tasks.update',
       'tasks.update_description',
+      'tasks.attach_file',
+      'tasks.remove_attachment',
       'tasks.delete',
       'tasks.log_time',
       'tasks.add_comment',
@@ -864,6 +948,8 @@ function buildMcpTaskExecutionSchema() {
       'task_write when new follow-up work must be logged',
       'tasks.update when an existing task detail or metadata field needs a targeted edit',
       'tasks.update_description when only the main task description/notes field needs to be replaced',
+      'tasks.attach_file when a local file path or file:// URL should be referenced from a task',
+      'tasks.remove_attachment when a task attachment reference should be removed',
       'tasks.log_time when approximate time spent should be recorded',
       'milestones.create when roadmap planning needs a new milestone',
       'milestones.link_tasks when adding tasks to a milestone or setting roadmap dependencyIds',
@@ -1008,6 +1094,7 @@ function normalizeTaskForMcp(task) {
     timeSpentMinutes: timeSpentMinutes === null ? undefined : timeSpentMinutes,
     timeSpentNote: normalizeString(task.timeSpentNote).trim() || undefined,
     timeEntries: normalizeTimeEntries(task.timeEntries),
+    attachments: normalizeTaskAttachments(task.attachments),
     [MCP_TASK_REV_FIELD]: revision,
     descriptionProjectContext,
   };
@@ -1724,6 +1811,109 @@ function updateTaskDescription(store, options = {}) {
     notes: typeof nextNotes === 'string' ? nextNotes : '',
     mcpLastActor: actor,
   }));
+}
+
+function attachTaskFile(store, options = {}) {
+  const patch = options && typeof options === 'object' && !Array.isArray(options) ? options : {};
+  const { taskId, expectedRevision, actor = 'agent' } = patch;
+  const normalizedTaskId = normalizeString(taskId).trim();
+  if (!normalizedTaskId) {
+    return { ok: false, error: 'TASK_ID_REQUIRED', message: 'taskId is required.' };
+  }
+
+  const normalizedAttachment = normalizeAttachmentInput(patch);
+  if (!normalizedAttachment.ok) return normalizedAttachment;
+
+  let unchangedDuplicate = null;
+  const result = updateTaskWithRevision(store, normalizedTaskId, expectedRevision, (task) => {
+    const existingAttachments = normalizeTaskAttachments(task.attachments);
+    const attachment = normalizedAttachment.attachment;
+    if (existingAttachments.some(item => item.path === attachment.path)) {
+      unchangedDuplicate = existingAttachments.find(item => item.path === attachment.path) || attachment;
+      return null;
+    }
+
+    return {
+      ...task,
+      attachments: existingAttachments.concat(attachment),
+      mcpLastActor: actor,
+    };
+  });
+
+  if (!result.ok && result.error === 'INVALID_UPDATE' && unchangedDuplicate) {
+    return {
+      ok: true,
+      changed: false,
+      attachment: unchangedDuplicate,
+      task: getTaskById(store, normalizedTaskId),
+    };
+  }
+
+  if (result.ok) {
+    return {
+      ...result,
+      changed: true,
+      attachment: normalizedAttachment.attachment,
+    };
+  }
+
+  return result;
+}
+
+function removeTaskAttachment(store, options = {}) {
+  const patch = options && typeof options === 'object' && !Array.isArray(options) ? options : {};
+  const { taskId, expectedRevision, attachmentId, actor = 'agent' } = patch;
+  const normalizedTaskId = normalizeString(taskId).trim();
+  if (!normalizedTaskId) {
+    return { ok: false, error: 'TASK_ID_REQUIRED', message: 'taskId is required.' };
+  }
+
+  const normalizedAttachmentId = normalizeString(attachmentId).trim();
+  const normalizedPath = normalizeAttachmentPath(patch.path || patch.filePath || patch.uri || patch.fileUri || patch.url);
+  if (!normalizedAttachmentId && !normalizedPath) {
+    return {
+      ok: false,
+      error: 'ATTACHMENT_REFERENCE_REQUIRED',
+      message: 'attachmentId or an attachment path/file URL is required.',
+    };
+  }
+
+  let removedAttachment = null;
+  const result = updateTaskWithRevision(store, normalizedTaskId, expectedRevision, (task) => {
+    const existingAttachments = normalizeTaskAttachments(task.attachments);
+    const nextAttachments = existingAttachments.filter(attachment => {
+      const shouldRemove = normalizedAttachmentId
+        ? attachment.id === normalizedAttachmentId
+        : attachment.path === normalizedPath;
+      if (shouldRemove) removedAttachment = attachment;
+      return !shouldRemove;
+    });
+
+    if (!removedAttachment) return null;
+
+    return {
+      ...task,
+      attachments: nextAttachments,
+      mcpLastActor: actor,
+    };
+  });
+
+  if (!result.ok && result.error === 'INVALID_UPDATE' && !removedAttachment) {
+    return {
+      ok: false,
+      error: 'ATTACHMENT_NOT_FOUND',
+      message: 'Attachment not found on task.',
+    };
+  }
+
+  if (result.ok) {
+    return {
+      ...result,
+      removedAttachment,
+    };
+  }
+
+  return result;
 }
 
 function logTaskTime(store, {
@@ -2779,6 +2969,8 @@ module.exports = {
   assignTaskToPerson,
   updateTaskDetails,
   updateTaskDescription,
+  attachTaskFile,
+  removeTaskAttachment,
   logTaskTime,
   createMilestone,
   updateMilestone,

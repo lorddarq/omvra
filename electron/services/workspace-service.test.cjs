@@ -24,6 +24,8 @@ const {
   createTask,
   updateTaskDetails,
   updateTaskDescription,
+  attachTaskFile,
+  removeTaskAttachment,
   logTaskTime,
   createMilestone,
   updateMilestone,
@@ -402,6 +404,51 @@ test('updateTaskDescription replaces notes with revision protection', () => {
   });
   assert.equal(stale.ok, false);
   assert.equal(stale.error, 'REVISION_MISMATCH');
+});
+
+test('attachTaskFile and removeTaskAttachment manage local file references with revision protection', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const task = listTasks(store, { status: 'open' })[0];
+  const revision = task[MCP_TASK_REV_FIELD];
+
+  const attached = attachTaskFile(store, {
+    taskId: task.id,
+    uri: 'file:///Users/sorin.jurcut/Documents/Project%20Brief.md',
+    name: 'Project Brief.md',
+    size: 2048,
+    expectedRevision: revision,
+  });
+
+  assert.equal(attached.ok, true);
+  assert.equal(attached.changed, true);
+  assert.equal(attached.task.attachments.length, 1);
+  assert.equal(attached.task.attachments[0].name, 'Project Brief.md');
+  assert.equal(attached.task.attachments[0].path, '/Users/sorin.jurcut/Documents/Project Brief.md');
+  assert.equal(attached.task.attachments[0].uri, 'file:///Users/sorin.jurcut/Documents/Project%20Brief.md');
+  assert.equal(attached.task.attachments[0].size, 2048);
+  assert.equal(attached.task[MCP_TASK_REV_FIELD], revision + 1);
+
+  const duplicate = attachTaskFile(store, {
+    taskId: task.id,
+    path: '/Users/sorin.jurcut/Documents/Project Brief.md',
+    expectedRevision: revision + 1,
+  });
+
+  assert.equal(duplicate.ok, true);
+  assert.equal(duplicate.changed, false);
+  assert.equal(duplicate.task.attachments.length, 1);
+  assert.equal(duplicate.task[MCP_TASK_REV_FIELD], revision + 1);
+
+  const removed = removeTaskAttachment(store, {
+    taskId: task.id,
+    attachmentId: attached.task.attachments[0].id,
+    expectedRevision: revision + 1,
+  });
+
+  assert.equal(removed.ok, true);
+  assert.equal(removed.removedAttachment.path, '/Users/sorin.jurcut/Documents/Project Brief.md');
+  assert.deepEqual(removed.task.attachments, []);
+  assert.equal(removed.task[MCP_TASK_REV_FIELD], revision + 2);
 });
 
 test('deleteTask removes a task with revision protection', () => {

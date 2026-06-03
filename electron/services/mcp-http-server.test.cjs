@@ -75,6 +75,8 @@ test('tools/list remains available after initialize handshake', () => {
   assert.ok(response.result.tools.some(tool => tool.name === 'task_write'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks_update'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks_update_description'));
+  assert.ok(response.result.tools.some(tool => tool.name === 'tasks_attach_file'));
+  assert.ok(response.result.tools.some(tool => tool.name === 'tasks_remove_attachment'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks_delete'));
   assert.ok(response.result.tools.some(tool => tool.name === 'tasks_log_time'));
   assert.ok(response.result.tools.some(tool => tool.name === 'milestones_create'));
@@ -1047,6 +1049,64 @@ test('write tools return a consistent envelope for move, ready-review, and assig
   assert.equal(activityResponse.result.structuredContent.task.activityLog.length, 1);
   assert.equal(activityResponse.result.structuredContent.task.activityLog[0].type, 'activity');
   assert.equal(activityResponse.result.structuredContent.revision, 4);
+});
+
+test('tasks.attach_file and tasks.remove_attachment accept file URLs through MCP', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  store.set(PREFERENCES_KEY, {
+    mcpAgentAccessEnabled: true,
+    mcpCapabilityProfile: 'task_write',
+    mcpAccessToken: 'secret-token',
+    mcpAccessTokenIssuedAt: new Date().toISOString(),
+    mcpAccessTokenTtlMinutes: 60,
+  });
+
+  const dispatch = createRequestDispatcher(store);
+  const req = makeReq({ authorization: 'Bearer secret-token' }, 'http');
+
+  const attachResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'attach-1',
+    method: 'tools/call',
+    params: {
+      name: 'tasks.attach_file',
+      arguments: {
+        taskId: 'task-2',
+        uri: 'file:///Users/sorin.jurcut/Documents/Design%20Notes.md',
+        name: 'Design Notes.md',
+        expectedRevision: 0,
+      },
+    },
+  }, req);
+
+  assert.equal(attachResponse.result.structuredContent.ok, true);
+  assert.equal(attachResponse.result.structuredContent.action, 'tasks.attach_file');
+  assert.equal(attachResponse.result.structuredContent.changed, true);
+  assert.equal(attachResponse.result.structuredContent.task.attachments.length, 1);
+  assert.equal(attachResponse.result.structuredContent.task.attachments[0].path, '/Users/sorin.jurcut/Documents/Design Notes.md');
+  assert.equal(attachResponse.result.structuredContent.revision, 1);
+
+  const attachmentId = attachResponse.result.structuredContent.task.attachments[0].id;
+  const removeResponse = dispatch({
+    jsonrpc: '2.0',
+    id: 'attach-2',
+    method: 'tools/call',
+    params: {
+      name: 'tasks.remove_attachment',
+      arguments: {
+        taskId: 'task-2',
+        attachmentId,
+        expectedRevision: 1,
+      },
+    },
+  }, req);
+
+  assert.equal(removeResponse.result.structuredContent.ok, true);
+  assert.equal(removeResponse.result.structuredContent.action, 'tasks.remove_attachment');
+  assert.equal(removeResponse.result.structuredContent.changed, true);
+  assert.equal(removeResponse.result.structuredContent.result.removedAttachment.id, attachmentId);
+  assert.deepEqual(removeResponse.result.structuredContent.task.attachments, []);
+  assert.equal(removeResponse.result.structuredContent.revision, 2);
 });
 
 test('move_to_requires_human_review returns the same write envelope shape', () => {

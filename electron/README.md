@@ -18,6 +18,13 @@ Notes:
 - `openExternal` intentionally remains limited to `http` and `https`; local files are handled only through attachment-specific IPC.
 - `attachments.embed` remains available as a lower-level helper and copies a file into `app.getPath('userData')/attachments`, but the current task attachment UI stores local references only.
 
+MCP attachment tools:
+
+- `tasks.attach_file` adds a local file reference to a task from an absolute path or `file://` URL. It normalizes metadata into the same `Task.attachments` shape used by the UI.
+- `tasks.remove_attachment` removes a local file reference by `attachmentId`, absolute path, or `file://` URL.
+- Both tools are gated by the MCP write capability profile and require `expectedRevision`.
+- The tools reject non-file URL protocols and never open, read, copy, or upload the referenced files.
+
 Task attachment implementation:
 
 - Renderer model: `Task.attachments` in `src/app/types.ts`
@@ -26,6 +33,8 @@ Task attachment implementation:
 - Persistence normalization: `src/app/utils/workspaceSanitizers.ts`
 - Backup/import normalization: `src/app/services/workspaceBackup.ts`
 - Main/preload bridge: `electron/main.cjs`, `electron/preload.cjs`, and `src/electron.d.ts`
+- MCP mutation logic: `electron/services/workspace-service.cjs`
+- MCP tool exposure and JSON-RPC handlers: `electron/services/mcp-http-server.cjs`
 
 Generating icon assets:
 

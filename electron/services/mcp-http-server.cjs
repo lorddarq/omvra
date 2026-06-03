@@ -22,6 +22,8 @@ const {
   createTask,
   updateTaskDetails,
   updateTaskDescription,
+  attachTaskFile,
+  removeTaskAttachment,
   deleteTask,
   logTaskTime,
   createMilestone,
@@ -272,6 +274,45 @@ const WRITE_TOOL_DEFINITIONS = [
         taskId: { type: 'string' },
         notes: { type: 'string' },
         description: { type: 'string' },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+      },
+      required: ['taskId', 'expectedRevision'],
+    },
+  },
+  {
+    name: 'tasks.attach_file',
+    description: 'Adds a local file attachment reference to a task using an absolute path or file:// URL. This stores metadata only and does not copy or open the file.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        taskId: { type: 'string' },
+        uri: { type: 'string' },
+        fileUri: { type: 'string' },
+        url: { type: 'string' },
+        path: { type: 'string' },
+        filePath: { type: 'string' },
+        name: { type: 'string' },
+        size: { type: 'number' },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+      },
+      required: ['taskId', 'expectedRevision'],
+    },
+  },
+  {
+    name: 'tasks.remove_attachment',
+    description: 'Removes a task attachment reference by attachmentId, absolute path, or file:// URL with optimistic revision protection.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        taskId: { type: 'string' },
+        attachmentId: { type: 'string' },
+        uri: { type: 'string' },
+        fileUri: { type: 'string' },
+        url: { type: 'string' },
+        path: { type: 'string' },
+        filePath: { type: 'string' },
         expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
       },
       required: ['taskId', 'expectedRevision'],
@@ -566,6 +607,8 @@ const TOOL_NAME_ALIASES = new Map([
   ['tasks_create', 'tasks.create'],
   ['tasks_update', 'tasks.update'],
   ['tasks_update_description', 'tasks.update_description'],
+  ['tasks_attach_file', 'tasks.attach_file'],
+  ['tasks_remove_attachment', 'tasks.remove_attachment'],
   ['tasks_delete', 'tasks.delete'],
   ['tasks_log_time', 'tasks.log_time'],
   ['milestones_create', 'milestones.create'],
@@ -1223,6 +1266,89 @@ function handleToolCall(store, req, params) {
           auditId: audit?.auditId,
           task: result.task,
           revision: result.task?.__mcpRevision,
+        }),
+      };
+    }
+
+    case 'tasks.attach_file': {
+      const taskId = parseTaskId(args);
+      if (!taskId) {
+        return { error: invalidParams('Invalid params: "taskId" is required.') };
+      }
+      const result = attachTaskFile(store, {
+        ...args,
+        taskId,
+        actor: 'mcp-agent',
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, {
+          outcome: 'denied',
+          reason: result.error,
+          toolName: name,
+          taskId,
+          attachmentReference: args.uri || args.fileUri || args.url || args.path || args.filePath || null,
+        });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        taskId,
+        attachmentId: result.attachment?.id,
+        attachmentPath: result.attachment?.path,
+        nextRevision: result.task?.__mcpRevision,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: result.changed !== false,
+          auditId: audit?.auditId,
+          task: result.task,
+          revision: result.task?.__mcpRevision,
+          result: {
+            attachment: result.attachment,
+          },
+        }),
+      };
+    }
+
+    case 'tasks.remove_attachment': {
+      const taskId = parseTaskId(args);
+      if (!taskId) {
+        return { error: invalidParams('Invalid params: "taskId" is required.') };
+      }
+      const result = removeTaskAttachment(store, {
+        ...args,
+        taskId,
+        actor: 'mcp-agent',
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, {
+          outcome: 'denied',
+          reason: result.error,
+          toolName: name,
+          taskId,
+          attachmentId: args.attachmentId,
+          attachmentReference: args.uri || args.fileUri || args.url || args.path || args.filePath || null,
+        });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        taskId,
+        attachmentId: result.removedAttachment?.id,
+        attachmentPath: result.removedAttachment?.path,
+        nextRevision: result.task?.__mcpRevision,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: true,
+          auditId: audit?.auditId,
+          task: result.task,
+          revision: result.task?.__mcpRevision,
+          result: {
+            removedAttachment: result.removedAttachment,
+          },
         }),
       };
     }

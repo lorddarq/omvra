@@ -110,6 +110,13 @@ Tasks can include local file attachments. Attachments are stored as references t
 
 Because attachments point at local files, moving or deleting the original file can leave a stale reference. The app deliberately reveals file locations instead of opening files directly.
 
+MCP agents can manage the same attachment references through write tools:
+
+- `tasks.attach_file` accepts an absolute local path or `file://` URL and stores attachment metadata on the task
+- `tasks.remove_attachment` removes an attachment by `attachmentId`, absolute path, or `file://` URL
+- both tools require the current task revision, like other task writes
+- non-file URLs are rejected; MCP does not open, read, or copy attachment contents
+
 Desktop persistence is now canonical-store aware:
 
 - renderer state is mirrored through storage helpers
@@ -176,6 +183,8 @@ Current capabilities include:
   - `tasks.update_agent_summary`
   - `tasks.update_completion_description`
   - `tasks.complete_and_request_review`
+  - `tasks.attach_file`
+  - `tasks.remove_attachment`
   - `tasks.move_to_status`
   - `tasks.move_to_ready_for_human_review`
   - `tasks.move_to_requires_human_review`

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect, useMemo } from 'react';
+import { Component, lazy, Suspense, useState, useEffect, useMemo, type ReactNode } from 'react';
 import { Briefcase, CalendarDays, GitBranch, User } from 'lucide-react';
 import { Task, TaskStatus, TimelineSwimlane, Person, TaskSize, TaskComplexity, TaskPriority, StatusColumn, ProjectMilestone } from '../types';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
@@ -27,6 +27,21 @@ import { normalizeTaskNotesForSave } from '../utils/taskNotes';
 const MarkdownEditor = lazy(() =>
   import('./MarkdownEditor').then(module => ({ default: module.MarkdownEditor }))
 );
+
+class MarkdownEditorErrorBoundary extends Component<
+  { children: ReactNode; fallback: ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    return this.state.hasError ? this.props.fallback : this.props.children;
+  }
+}
 
 interface TaskDialogProps {
   isOpen: boolean;
@@ -573,20 +588,33 @@ export function TaskDialog({
                 {task ? 'Edit the task details below.' : 'Enter the task details below.'}
               </p>
             </div>
-            <Suspense
+            <MarkdownEditorErrorBoundary
+              key={task?.id || 'new-task'}
               fallback={
-                <div
-                  className="h-64 animate-pulse rounded-xl border border-gray-200 bg-gray-100"
-                  aria-label="Loading notes editor"
+                <textarea
+                  id="notes"
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  placeholder="Write notes in markdown..."
+                  className="min-h-64 w-full resize-y rounded-xl border border-gray-200 bg-white p-4 text-sm leading-relaxed text-gray-900 outline-none focus:border-gray-400"
                 />
               }
             >
-              <MarkdownEditor
-                id="notes"
-                value={notes}
-                onChange={setNotes}
-              />
-            </Suspense>
+              <Suspense
+                fallback={
+                  <div
+                    className="h-64 animate-pulse rounded-xl border border-gray-200 bg-gray-100"
+                    aria-label="Loading notes editor"
+                  />
+                }
+              >
+                <MarkdownEditor
+                  id="notes"
+                  value={notes}
+                  onChange={setNotes}
+                />
+              </Suspense>
+            </MarkdownEditorErrorBoundary>
           </div>
         </div>
 

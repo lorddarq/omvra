@@ -40,6 +40,7 @@ export function useTaskActions({
       assigneeId: taskData.assigneeId,
       milestoneId: taskData.milestoneId,
       dependencyIds: taskData.dependencyIds || [],
+      attachments: taskData.attachments || [],
       comments: taskData.comments || [],
     };
 

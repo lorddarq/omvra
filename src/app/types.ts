@@ -25,6 +25,15 @@ export interface TaskTimeEntry {
   actor?: string;
 }
 
+export interface TaskAttachment {
+  id: string;
+  name: string;
+  path: string;
+  uri: string;
+  size?: number;
+  addedAt: string;
+}
+
 export interface Person {
   id: string;
   name: string;
@@ -56,6 +65,7 @@ export interface Task {
   timeSpentMinutes?: number; // Approximate total time spent on this task
   timeSpentNote?: string; // Latest human-readable time-spent note/source
   timeEntries?: TaskTimeEntry[]; // Optional append-only approximate time log
+  attachments?: TaskAttachment[]; // Local file references attached to this task
   comments?: TaskComment[];
 }
 

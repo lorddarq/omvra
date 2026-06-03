@@ -1,6 +1,6 @@
-import { Component, lazy, Suspense, useState, useEffect, useMemo, type ReactNode } from 'react';
-import { Briefcase, CalendarDays, GitBranch, User } from 'lucide-react';
-import { Task, TaskStatus, TimelineSwimlane, Person, TaskSize, TaskComplexity, TaskPriority, StatusColumn, ProjectMilestone } from '../types';
+import { useState, useEffect, useMemo } from 'react';
+import { Briefcase, CalendarDays, GitBranch, Paperclip, Trash2, User } from 'lucide-react';
+import { Task, TaskStatus, TimelineSwimlane, Person, TaskSize, TaskComplexity, TaskPriority, StatusColumn, ProjectMilestone, TaskAttachment } from '../types';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import { toLocalISODate } from '../utils/date';
 import { getMilestoneForTask, getMilestoneProjectIds } from '../utils/roadmap';
@@ -24,23 +24,22 @@ import {
 } from '@/app/components/ui/select';
 import { normalizeTaskNotesForSave } from '../utils/taskNotes';
 
-const MarkdownEditor = lazy(() =>
-  import('./MarkdownEditor').then(module => ({ default: module.MarkdownEditor }))
-);
+function getFileNameFromPath(filePath: string): string {
+  const normalized = filePath.replace(/\\/g, '/');
+  return normalized.split('/').filter(Boolean).pop() || filePath;
+}
 
-class MarkdownEditorErrorBoundary extends Component<
-  { children: ReactNode; fallback: ReactNode },
-  { hasError: boolean }
-> {
-  state = { hasError: false };
+function toFileUri(filePath: string): string {
+  const normalized = filePath.replace(/\\/g, '/');
+  const prefixed = normalized.match(/^[A-Za-z]:\//) ? `/${normalized}` : normalized;
+  return `file://${encodeURI(prefixed)}`;
+}
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  render() {
-    return this.state.hasError ? this.props.fallback : this.props.children;
-  }
+function formatAttachmentSize(size?: number): string {
+  if (!Number.isFinite(size) || !size) return '';
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 interface TaskDialogProps {
@@ -97,6 +96,7 @@ export function TaskDialog({
   const [milestoneId, setMilestoneId] = useState(NO_MILESTONE_VALUE);
   const [dependencyIds, setDependencyIds] = useState<string[]>([]);
   const [assigneeId, setAssigneeId] = useState('unassigned');
+  const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const hasInvalidDateRange = Boolean(startDate && endDate && endDate < startDate);
   const availableMilestones = readModel
     ? readModel.milestones
@@ -169,6 +169,7 @@ export function TaskDialog({
       );
       setDependencyIds(Array.isArray(task.dependencyIds) ? task.dependencyIds : []);
       setAssigneeId(task.assigneeId || 'unassigned');
+      setAttachments(Array.isArray(task.attachments) ? task.attachments : []);
     } else {
       const initialProjectIds = defaultSwimlaneId ? [defaultSwimlaneId] : [];
       setTitle('');
@@ -183,6 +184,7 @@ export function TaskDialog({
       setMilestoneId(NO_MILESTONE_VALUE);
       setDependencyIds([]);
       setAssigneeId(defaultAssigneeId || 'unassigned');
+      setAttachments([]);
       
       if (defaultDate) {
         const dateStr = toLocalISODate(defaultDate);
@@ -222,6 +224,36 @@ export function TaskDialog({
     );
   };
 
+  const handleAddAttachments = async () => {
+    const pickedPaths = await window.electron?.attachments?.pick?.();
+    if (!Array.isArray(pickedPaths) || pickedPaths.length === 0) return;
+
+    const existingPaths = new Set(attachments.map(attachment => attachment.path));
+    const nextAttachments = await Promise.all(
+      pickedPaths
+        .filter(filePath => typeof filePath === 'string' && filePath.trim() && !existingPaths.has(filePath))
+        .map(async (filePath): Promise<TaskAttachment> => {
+          const verified = await window.electron?.attachments?.verify?.(filePath).catch(() => null);
+          return {
+            id: `attachment-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+            name: getFileNameFromPath(filePath),
+            path: filePath,
+            uri: toFileUri(filePath),
+            size: verified?.exists && Number.isFinite(Number(verified.size)) ? Number(verified.size) : undefined,
+            addedAt: new Date().toISOString(),
+          };
+        })
+    );
+
+    if (nextAttachments.length > 0) {
+      setAttachments(previousAttachments => [...previousAttachments, ...nextAttachments]);
+    }
+  };
+
+  const handleRemoveAttachment = (attachmentId: string) => {
+    setAttachments(previousAttachments => previousAttachments.filter(attachment => attachment.id !== attachmentId));
+  };
+
   const handleSave = () => {
     if (!title.trim() || hasInvalidDateRange) return;
 
@@ -244,6 +276,7 @@ export function TaskDialog({
       assigneeId: assigneeId === 'unassigned' ? undefined : assigneeId,
       milestoneId: milestoneId === NO_MILESTONE_VALUE ? undefined : milestoneId,
       dependencyIds: milestoneId === NO_MILESTONE_VALUE ? [] : dependencyIds,
+      attachments,
     };
 
     taskData.startDate = startDate || todayISO;
@@ -588,33 +621,63 @@ export function TaskDialog({
                 {task ? 'Edit the task details below.' : 'Enter the task details below.'}
               </p>
             </div>
-            <MarkdownEditorErrorBoundary
-              key={task?.id || 'new-task'}
-              fallback={
-                <textarea
-                  id="notes"
-                  value={notes}
-                  onChange={(event) => setNotes(event.target.value)}
-                  placeholder="Write notes in markdown..."
-                  className="min-h-64 w-full resize-y rounded-xl border border-gray-200 bg-white p-4 text-sm leading-relaxed text-gray-900 outline-none focus:border-gray-400"
-                />
-              }
-            >
-              <Suspense
-                fallback={
-                  <div
-                    className="h-64 animate-pulse rounded-xl border border-gray-200 bg-gray-100"
-                    aria-label="Loading notes editor"
-                  />
-                }
+            <textarea
+              id="notes"
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder="Write notes in markdown..."
+              className="min-h-64 w-full resize-y rounded-xl border border-gray-200 bg-white p-4 text-sm leading-relaxed text-gray-900 outline-none focus:border-gray-400"
+            />
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <Label>Attachments</Label>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleAddAttachments}
+                disabled={!window.electron?.attachments?.pick}
+                className="h-9 gap-2 rounded-xl"
               >
-                <MarkdownEditor
-                  id="notes"
-                  value={notes}
-                  onChange={setNotes}
-                />
-              </Suspense>
-            </MarkdownEditorErrorBoundary>
+                <Paperclip className="size-4" />
+                Add files
+              </Button>
+            </div>
+
+            {attachments.length > 0 ? (
+              <div className="space-y-2 rounded-xl border border-gray-200 bg-white p-3">
+                {attachments.map(attachment => {
+                  const sizeLabel = formatAttachmentSize(attachment.size);
+                  return (
+                    <div
+                      key={attachment.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium text-gray-900">{attachment.name}</div>
+                        <div className="truncate text-xs text-gray-500">
+                          {attachment.path}{sizeLabel ? ` - ${sizeLabel}` : ''}
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => handleRemoveAttachment(attachment.id)}
+                        className="h-8 shrink-0 gap-2 rounded-lg px-2"
+                        aria-label={`Remove ${attachment.name}`}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500">
+                No files attached.
+              </div>
+            )}
           </div>
         </div>
 

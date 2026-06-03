@@ -147,6 +147,7 @@ declare global {
         pick: () => Promise<string[]>;
         verify: (path: string) => Promise<any>;
         embed: (path: string) => Promise<any>;
+        reveal: (path: string) => Promise<{ success: boolean; error?: string }>;
       };
       openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
       mcp: {

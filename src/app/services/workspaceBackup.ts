@@ -1,4 +1,4 @@
-import { Task, TaskStatus, TimelineSwimlane, Person, StatusColumn, ProjectMilestone } from '../types';
+import { Task, TaskAttachment, TaskStatus, TimelineSwimlane, Person, StatusColumn, ProjectMilestone } from '../types';
 import {
   buildLocalMcpAddress,
   normalizeMcpBindHost,
@@ -109,6 +109,46 @@ function cloneRecord<T extends Record<string, unknown> | Record<string, string>>
   return { ...value };
 }
 
+function getFileNameFromPath(filePath: string): string {
+  const normalized = filePath.replace(/\\/g, '/');
+  return normalized.split('/').filter(Boolean).pop() || filePath;
+}
+
+function toFileUri(filePath: string): string {
+  const normalized = filePath.replace(/\\/g, '/');
+  const prefixed = normalized.match(/^[A-Za-z]:\//) ? `/${normalized}` : normalized;
+  return `file://${encodeURI(prefixed)}`;
+}
+
+function normalizeTaskAttachments(value: unknown): TaskAttachment[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter(attachment => attachment && typeof attachment === 'object')
+    .map((attachment, index): TaskAttachment | null => {
+      const candidate = attachment as Record<string, unknown>;
+      const path = typeof candidate.path === 'string' ? candidate.path : '';
+      if (!path.trim()) return null;
+
+      const size = Number(candidate.size);
+      return {
+        id: typeof candidate.id === 'string' ? candidate.id : `attachment-${index}`,
+        name: typeof candidate.name === 'string' && candidate.name.trim()
+          ? candidate.name
+          : getFileNameFromPath(path),
+        path,
+        uri: typeof candidate.uri === 'string' && candidate.uri.trim()
+          ? candidate.uri
+          : toFileUri(path),
+        size: Number.isFinite(size) && size >= 0 ? size : undefined,
+        addedAt: typeof candidate.addedAt === 'string' && candidate.addedAt.trim()
+          ? candidate.addedAt
+          : new Date().toISOString(),
+      };
+    })
+    .filter((attachment): attachment is TaskAttachment => Boolean(attachment));
+}
+
 function normalizeTask(task: Task, swimlanes: TimelineSwimlane[]): Task {
   const projectIds = task.projectIds?.length
     ? task.projectIds
@@ -143,6 +183,7 @@ function normalizeTask(task: Task, swimlanes: TimelineSwimlane[]): Task {
         }))
         .filter(entry => entry.minutes > 0)
       : [],
+    attachments: normalizeTaskAttachments(task.attachments),
   };
 }
 

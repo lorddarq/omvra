@@ -101,6 +101,15 @@ This runs `electron/scripts/generate-icons.cjs` and:
 
 Core task/workspace types live in `src/app/types.ts`.
 
+Tasks can include local file attachments. Attachments are stored as references to existing files, not as copied file contents:
+
+- `Task.attachments` contains file metadata (`id`, `name`, absolute `path`, `file://` `uri`, optional `size`, and `addedAt`)
+- task create/edit UI lets users add existing local files and remove references
+- task details shows attachment paths and reveals the selected file in Finder
+- backup/import and workspace sanitizers preserve attachment metadata
+
+Because attachments point at local files, moving or deleting the original file can leave a stale reference. The app deliberately reveals file locations instead of opening files directly.
+
 Desktop persistence is now canonical-store aware:
 
 - renderer state is mirrored through storage helpers
@@ -114,7 +123,7 @@ Key storage namespaces use versioned keys (`*.v1`) to support future migrations.
 
 - `TimelineView`: date-positioned task blocks with swimlane tracks
 - `SwimlanesView`/`KanbanView`: status columns with reorder/move behavior
-- markdown rendering is used for task details preview surfaces
+- task descriptions are edited as plain markdown text and rendered in task details preview surfaces
 - `PeoplePanel`: human and agentic team-member management, load visualization, and agent board-watch configuration
 - `PreferencesPanel`: MCP configuration, diagnostics, audit log export, backup/import, and storage usage
 

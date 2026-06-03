@@ -281,6 +281,20 @@ ipcMain.handle('attachments/embed', async (_, filePath) => {
   }
 });
 
+ipcMain.handle('attachments/reveal', async (_, filePath) => {
+  try {
+    if (typeof filePath !== 'string' || !filePath.trim()) {
+      throw new Error('Attachment path is required');
+    }
+
+    await fs.promises.stat(filePath);
+    shell.showItemInFolder(filePath);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
 // =====================
 // IPC: Open external URLs (validate protocol)
 // =====================

@@ -10,8 +10,22 @@ Build renderer and package electron:
 
 Notes:
 - In dev, Electron will load http://localhost:5173. Make sure `npm run dev` is running before starting Electron.
-- Attachments are referenced by absolute local paths by default. Embed option copies files into `app.getPath('userData')/attachments`.
+- Attachments are referenced by absolute local paths by default. The task model stores metadata only; Plumy does not copy attached files unless the optional embed IPC is used by future UI.
 - Exposed preload APIs are available under `window.electron` (storeGet/storeSet, attachments.*, openExternal).
+- `attachments.pick` opens the native file picker with multi-selection.
+- `attachments.verify` checks whether a referenced file still exists and returns file metadata such as size and mtime.
+- `attachments.reveal` uses `shell.showItemInFolder(path)` to reveal/select the attachment in Finder instead of opening the file.
+- `openExternal` intentionally remains limited to `http` and `https`; local files are handled only through attachment-specific IPC.
+- `attachments.embed` remains available as a lower-level helper and copies a file into `app.getPath('userData')/attachments`, but the current task attachment UI stores local references only.
+
+Task attachment implementation:
+
+- Renderer model: `Task.attachments` in `src/app/types.ts`
+- Add/remove UI: `src/app/components/TaskDialog.tsx`
+- Reveal UI: `src/app/components/TaskDetailsDialog.tsx`
+- Persistence normalization: `src/app/utils/workspaceSanitizers.ts`
+- Backup/import normalization: `src/app/services/workspaceBackup.ts`
+- Main/preload bridge: `electron/main.cjs`, `electron/preload.cjs`, and `src/electron.d.ts`
 
 Generating icon assets:
 

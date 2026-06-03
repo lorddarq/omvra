@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('electron', {
     pick: () => ipcRenderer.invoke('attachments/pick'),
     verify: (filePath) => ipcRenderer.invoke('attachments/verify', filePath),
     embed: (filePath) => ipcRenderer.invoke('attachments/embed', filePath),
+    reveal: (filePath) => ipcRenderer.invoke('attachments/reveal', filePath),
   },
 
   // Open external (validated in main)

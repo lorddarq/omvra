@@ -1,5 +1,6 @@
 import { Task, TimelineSwimlane, Person, TaskStatus, StatusColumn, ProjectMilestone } from '../types';
 import { useMemo, useState } from 'react';
+import { FolderSearch, Paperclip } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -35,6 +36,13 @@ function formatDate(dateValue?: string): string {
   const date = new Date(dateValue);
   if (isNaN(date.getTime())) return dateValue;
   return date.toLocaleDateString();
+}
+
+function formatAttachmentSize(size?: number): string {
+  if (!Number.isFinite(size) || !size) return '';
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export function TaskDetailsDialog({
@@ -108,6 +116,10 @@ export function TaskDetailsDialog({
     if (!task || !onAddComment || !newComment.trim()) return;
     onAddComment(task.id, newComment);
     setNewComment('');
+  };
+
+  const handleRevealAttachment = async (filePath: string) => {
+    await window.electron?.attachments?.reveal?.(filePath);
   };
 
   return (
@@ -208,6 +220,46 @@ export function TaskDetailsDialog({
                   <div className="text-sm text-gray-500">No description provided.</div>
                 )}
               </div>
+            </div>
+
+            <div className="space-y-2 rounded-md border bg-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                  <Paperclip className="size-4" />
+                  Attachments
+                </div>
+                <div className="text-xs text-gray-500">{task.attachments?.length || 0} total</div>
+              </div>
+
+              {task.attachments?.length ? (
+                <div className="space-y-2">
+                  {task.attachments.map(attachment => {
+                    const sizeLabel = formatAttachmentSize(attachment.size);
+                    return (
+                      <div key={attachment.id} className="flex items-center justify-between gap-3 rounded-md border border-gray-100 bg-gray-50 px-3 py-2">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-medium text-gray-900">{attachment.name}</div>
+                          <div className="truncate text-xs text-gray-500">
+                            {attachment.path}{sizeLabel ? ` - ${sizeLabel}` : ''}
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-8 shrink-0 gap-2 px-2"
+                          onClick={() => handleRevealAttachment(attachment.path)}
+                          disabled={!window.electron?.attachments?.reveal}
+                        >
+                          <FolderSearch className="size-4" />
+                          Show
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500">No files attached.</div>
+              )}
             </div>
 
             <div className="space-y-3 rounded-md border bg-white p-4">

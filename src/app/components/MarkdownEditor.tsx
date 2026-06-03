@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   MDXEditor,
   type MDXEditorMethods,
-  codeBlockPlugin,
   diffSourcePlugin,
   headingsPlugin,
   listsPlugin,
@@ -55,7 +54,6 @@ export function MarkdownEditor({
       headingsPlugin(),
       listsPlugin(),
       quotePlugin(),
-      codeBlockPlugin(),
       tablePlugin(),
       thematicBreakPlugin(),
       markdownShortcutPlugin(),

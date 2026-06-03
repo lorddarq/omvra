@@ -3,7 +3,6 @@ import {
   BoldItalicUnderlineToggles,
   CodeToggle,
   DiffSourceToggleWrapper,
-  InsertCodeBlock,
   InsertTable,
   InsertThematicBreak,
   ListsToggle,
@@ -23,7 +22,6 @@ export function MarkdownEditorToolbar() {
         <Separator />
         <ListsToggle options={['bullet', 'number', 'check']} />
         <Separator />
-        <InsertCodeBlock />
         <InsertTable />
         <InsertThematicBreak />
       </>

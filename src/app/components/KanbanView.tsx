@@ -36,6 +36,8 @@ import {
 } from '../utils/taskFilters';
 
 const ALL_FILTER_VALUE = '__plumy_all__';
+const COLUMN_DRAG_EDGE_SCROLL_ZONE = 96;
+const COLUMN_DRAG_EDGE_SCROLL_STEP = 28;
 
 const PRIORITY_FILTERS: { value: TaskPriority; label: string }[] = [
   { value: 'urgent', label: 'Urgent' },
@@ -300,6 +302,29 @@ export function KanbanView({
     };
   }, []);
 
+  const handleColumnDragHover = useCallback((clientX: number) => {
+    const node = containerRef.current;
+    if (!node) return;
+
+    const rect = node.getBoundingClientRect();
+    let nextScrollLeft = node.scrollLeft;
+
+    if (clientX < rect.left + COLUMN_DRAG_EDGE_SCROLL_ZONE) {
+      nextScrollLeft -= COLUMN_DRAG_EDGE_SCROLL_STEP;
+    } else if (clientX > rect.right - COLUMN_DRAG_EDGE_SCROLL_ZONE) {
+      nextScrollLeft += COLUMN_DRAG_EDGE_SCROLL_STEP;
+    } else {
+      return;
+    }
+
+    nextScrollLeft = Math.min(maxScrollLeft, Math.max(0, nextScrollLeft));
+    if (nextScrollLeft === node.scrollLeft) return;
+
+    node.scrollLeft = nextScrollLeft;
+    syncScrollMetrics(node);
+    emitScrollState(node);
+  }, [emitScrollState, maxScrollLeft, syncScrollMetrics]);
+
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-gray-50">
       <div className="border-b bg-white px-4 py-3">
@@ -444,6 +469,7 @@ export function KanbanView({
           onChangeColumnColor={onChangeColumnColor}
           onAddColumn={onAddColumn}
           onDeleteColumn={onDeleteColumn}
+          onColumnDragHover={handleColumnDragHover}
         />
       </div>
 

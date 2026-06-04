@@ -1,10 +1,32 @@
-import { useRef } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { GripVertical } from 'lucide-react';
 import { Task, TaskStatus, StatusColumn } from '../types';
 import { DroppableColumn } from './DroppableColumn';
 
 const SWIMLANE_COLUMN = 'SWIMLANE_COLUMN';
+const COLUMN_REORDER_EDGE_RATIO = 0.25;
+
+interface ColumnDragItem {
+  id: string;
+  index: number;
+}
+
+interface ColumnDropIndicator {
+  targetId: string;
+  position: 'before' | 'after';
+}
+
+function ColumnInsertionMarker() {
+  return (
+    <div
+      className="pointer-events-none relative flex w-[320px] shrink-0 items-stretch justify-center rounded-xl border-2 border-dashed border-blue-300 bg-blue-50/70"
+      aria-hidden="true"
+    >
+      <div className="absolute bottom-3 top-10 z-20 w-1 rounded-full bg-blue-500 shadow-sm" />
+    </div>
+  );
+}
 
 // Small component to encapsulate per-column hooks safely (prevents hook-order mismatches)
 function ColumnDraggable<T extends { id: string; title?: string; color?: string }>({
@@ -21,6 +43,9 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
   onChangeColumnColor,
   onDeleteColumn,
   onReorderColumns,
+  onColumnDragHover,
+  onColumnDropIndicatorChange,
+  onColumnDropIndicatorClear,
 }: {
   swimlane: T;
   index: number;
@@ -35,46 +60,77 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
   onChangeColumnColor?: (colId: string, newColor: string) => void;
   onDeleteColumn?: (colId: string) => void;
   onReorderColumns?: (fromIndex: number, toIndex: number) => void;
+  onColumnDragHover?: (clientX: number) => void;
+  onColumnDropIndicatorChange: (indicator: ColumnDropIndicator) => void;
+  onColumnDropIndicatorClear: () => void;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
-  const [{ isDragging }, drag] = useDrag({
+  const dragHandleRef = useRef<HTMLButtonElement | null>(null);
+  const [{ isDragging }, drag, preview] = useDrag({
     type: SWIMLANE_COLUMN,
     item: { id: swimlane.id, index },
     collect: (m) => ({ isDragging: m.isDragging() }),
+    end: () => {
+      onColumnDropIndicatorClear();
+    },
   });
 
   const [, drop] = useDrop({
     accept: SWIMLANE_COLUMN,
-    hover: (item: { id: string; index: number }, monitor) => {
+    hover: (item: ColumnDragItem, monitor) => {
+      const clientOffset = monitor.getClientOffset();
+      if (clientOffset) {
+        onColumnDragHover?.(clientOffset.x);
+      }
+
       const dragIndex = swimlanes.findIndex(column => column.id === item.id);
       const resolvedDragIndex = dragIndex >= 0 ? dragIndex : item.index;
       if (resolvedDragIndex === index) return;
       if (!ref.current) return;
 
       const hoverBoundingRect = ref.current.getBoundingClientRect();
-      const hoverMiddleX = (hoverBoundingRect.right - hoverBoundingRect.left) / 2;
-      const clientOffset = monitor.getClientOffset();
       if (!clientOffset) return;
 
       const hoverClientX = clientOffset.x - hoverBoundingRect.left;
-      if (resolvedDragIndex < index && hoverClientX < hoverMiddleX) return;
-      if (resolvedDragIndex > index && hoverClientX > hoverMiddleX) return;
+      const columnWidth = hoverBoundingRect.right - hoverBoundingRect.left;
+      const forwardTriggerX = columnWidth * COLUMN_REORDER_EDGE_RATIO;
+      const backwardTriggerX = columnWidth * (1 - COLUMN_REORDER_EDGE_RATIO);
+      const isMovingForward = resolvedDragIndex < index;
+
+      onColumnDropIndicatorChange({
+        targetId: swimlane.id,
+        position: isMovingForward ? 'after' : 'before',
+      });
+
+      if (isMovingForward && hoverClientX < forwardTriggerX) return;
+      if (!isMovingForward && hoverClientX > backwardTriggerX) return;
 
       onReorderColumns && onReorderColumns(resolvedDragIndex, index);
       item.index = index;
     },
   });
 
-  drag(drop(ref));
+  drag(dragHandleRef);
+  preview(drop(ref));
 
   return (
     <div
       key={swimlane.id}
       ref={ref}
-      className={`flex h-full min-h-0 flex-col ${isDragging ? 'opacity-50' : ''}`}
+      data-kanban-column-id={swimlane.id}
+      className={`relative flex h-full min-h-0 shrink-0 flex-col rounded-xl transition-[opacity,transform,box-shadow] duration-150 ${
+        isDragging ? 'w-0 overflow-hidden opacity-0' : 'w-[320px]'
+      }`}
     >
-      <div className="flex items-center gap-2 mb-2 cursor-grab select-none">
-        <div className="p-1 text-gray-500"><GripVertical className="w-4 h-4" /></div>
+      <div className="mb-2 flex items-center gap-2 select-none">
+        <button
+          ref={dragHandleRef}
+          type="button"
+          className="inline-flex size-7 cursor-grab items-center justify-center rounded-md border border-transparent text-gray-500 transition-colors hover:border-gray-200 hover:bg-white hover:text-gray-800 active:cursor-grabbing"
+          aria-label={`Drag ${swimlane.title || 'column'} column`}
+        >
+          <GripVertical className="size-4" />
+        </button>
       </div>
 
       <DroppableColumn
@@ -108,6 +164,7 @@ interface SwimlanesViewProps {
   onChangeColumnColor?: (colId: string, newColor: string) => void;
   onAddColumn?: (col: { id?: string; title: string; color?: string }) => void;
   onDeleteColumn?: (colId: string) => void;
+  onColumnDragHover?: (clientX: number) => void;
 }
 export function SwimlanesView({
   tasks,
@@ -123,7 +180,10 @@ export function SwimlanesView({
   onChangeColumnColor,
   onAddColumn,
   onDeleteColumn,
+  onColumnDragHover,
 }: SwimlanesViewProps) {
+  const [columnDropIndicator, setColumnDropIndicator] = useState<ColumnDropIndicator | null>(null);
+
   const getTasksByStatus = (status: string) => {
     return tasks.filter(task => task.status === status);
   };
@@ -160,22 +220,32 @@ export function SwimlanesView({
         {cols.map((swimlane, index) => {
             const swimlaneTasks = getTasksByStatus(swimlane.id);
             return (
-              <ColumnDraggable
-                key={swimlane.id}
-                swimlane={swimlane}
-                index={index}
-                swimlaneTasks={swimlaneTasks}
-                swimlanes={swimlanes}
-                onTaskClick={onTaskClick}
-                onEditTask={onEditTask}
-                onAddTask={onAddTask}
-                onMoveTask={onMoveTask}
-                onReorderTask={handleReorderTask}
-                onRenameColumn={onRenameColumn}
-                onChangeColumnColor={onChangeColumnColor}
-                onDeleteColumn={onDeleteColumn}
-                onReorderColumns={onReorderColumns}
-              />
+              <Fragment key={swimlane.id}>
+                {columnDropIndicator?.targetId === swimlane.id && columnDropIndicator.position === 'before' && (
+                  <ColumnInsertionMarker />
+                )}
+                <ColumnDraggable
+                  swimlane={swimlane}
+                  index={index}
+                  swimlaneTasks={swimlaneTasks}
+                  swimlanes={swimlanes}
+                  onTaskClick={onTaskClick}
+                  onEditTask={onEditTask}
+                  onAddTask={onAddTask}
+                  onMoveTask={onMoveTask}
+                  onReorderTask={handleReorderTask}
+                  onRenameColumn={onRenameColumn}
+                  onChangeColumnColor={onChangeColumnColor}
+                  onDeleteColumn={onDeleteColumn}
+                  onReorderColumns={onReorderColumns}
+                  onColumnDragHover={onColumnDragHover}
+                  onColumnDropIndicatorChange={setColumnDropIndicator}
+                  onColumnDropIndicatorClear={() => setColumnDropIndicator(null)}
+                />
+                {columnDropIndicator?.targetId === swimlane.id && columnDropIndicator.position === 'after' && (
+                  <ColumnInsertionMarker />
+                )}
+              </Fragment>
             );
           })}
 

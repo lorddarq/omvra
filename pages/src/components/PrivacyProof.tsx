@@ -18,7 +18,7 @@ const PrivacyProof = () => {
     {
       title: 'Network access stays explicit',
       description:
-        'Outbound traffic is limited to user-initiated actions such as release downloads or MCP access you explicitly enable, not background surprise uploads.',
+        'Outbound traffic is limited to user-initiated actions such as release downloads, MCP endpoints you explicitly enable, or external MCP tools you choose to connect through your assistant.',
     },
   ]
 

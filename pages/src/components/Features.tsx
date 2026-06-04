@@ -61,9 +61,24 @@ const Features = () => {
       ),
     },
     {
+      title: 'Map milestones and dependencies',
+      description:
+        'Use the roadmap view to group tasks into milestones, filter by project or delivery health, and see dependency lines across scheduled work.',
+      icon: (
+        <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M4 6h5m6 0h5M4 18h5m6 0h5M9 6a3 3 0 016 0M9 18a3 3 0 016 0M12 9v6"
+          />
+        </svg>
+      ),
+    },
+    {
       title: 'Keep context with the task',
       description:
-        'Store markdown notes, structured comments, and task details in one place so the next person has the full picture without digging through other tools.',
+        'Store markdown notes, structured comments, local file references, and task details in one place so the next person has the full picture.',
       icon: (
         <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -109,7 +124,7 @@ const Features = () => {
     {
       title: 'Bring AI in with guardrails',
       description:
-        'When you want AI help, Plumy exposes structured MCP workflows so assistants can inspect context, leave concise updates, and hand work back for human review.',
+        'Use Plumy MCP from Codex, Claude, or any MCP-capable assistant to read task context, make revision-protected updates, and hand work back for human review.',
       icon: (
         <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -191,7 +206,7 @@ const Features = () => {
 
               <article className="rounded-[30px] bg-[linear-gradient(180deg,rgba(108,79,224,0.08)_0%,rgba(108,79,224,0.03)_100%)] p-8 md:p-9">
                 <div className="mb-5 inline-flex items-center rounded-full border border-[#6c4fe0]/20 bg-white/80 px-4 py-1.5 text-sm font-medium text-[#6c4fe0]">
-                  MCP Support
+                  MCP support
                 </div>
                 <div className="w-full space-y-8">
                   <div>
@@ -199,11 +214,13 @@ const Features = () => {
                       className="mb-4 text-2xl font-medium leading-tight tracking-[-0.03em] text-[#101828] md:text-[2rem]"
                       style={{ fontFamily: 'Figtree, sans-serif' }}
                     >
-                      AI workflows when you want them, not when you do not
+                      A shared workspace for humans and MCP agents
                     </h3>
                     <p className="text-base leading-6 text-[#4a5565]">
-                      Plumy keeps the agent story visible, but deliberate. Typed task context, concise notes, and human
-                      review handoffs make the MCP path feel like a structured capability instead of a vague add-on.
+                      Plumy can expose the same planning context to local stdio clients or the local HTTP MCP endpoint.
+                      Agents can inspect resources and prompts, watch configured boards for incoming work, update tasks
+                      safely, attach local file references, log time, and maintain roadmap milestones without replacing
+                      human review.
                     </p>
                   </div>
                   <div>
@@ -214,6 +231,44 @@ const Features = () => {
                       {mcpFeature.title}
                     </p>
                     <p className="text-sm leading-5 tracking-tight text-[#4a5565]">{mcpFeature.description}</p>
+                  </div>
+                  <div className="grid gap-3 border-t border-[#d9d1f3] pt-5 sm:grid-cols-2">
+                    <div>
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#6c4fe0]">
+                        Connection
+                      </p>
+                      <p className="text-sm leading-5 text-[#4a5565]">
+                        Prefer stdio for same-machine clients, or use the local HTTP endpoint with token and capability
+                        controls when you need a URL.
+                      </p>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#6c4fe0]">
+                        Collaboration
+                      </p>
+                      <p className="text-sm leading-5 text-[#4a5565]">
+                        When your assistant has MCP servers for Glean, Atlassian Rovo, Microsoft 365, or Figma connected,
+                        it can connect planning tasks to the wider work context.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid gap-3 border-t border-[#d9d1f3] pt-5 sm:grid-cols-2">
+                    <div>
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#6c4fe0]">
+                        Visibility
+                      </p>
+                      <p className="text-sm leading-5 text-[#4a5565]">
+                        Audit logs, listener status, and health checks make agent access easier to inspect and debug.
+                      </p>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#6c4fe0]">
+                        Watches
+                      </p>
+                      <p className="text-sm leading-5 text-[#4a5565]">
+                        Agentic people can watch a chosen board, project, and search filter for new or changed work.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </article>

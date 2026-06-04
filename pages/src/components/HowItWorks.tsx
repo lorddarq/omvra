@@ -25,7 +25,7 @@ const steps = [
     number: '03',
     title: 'Review and hand off cleanly',
     description:
-      'Use comments, markdown details, and optional MCP-powered agent workflows to keep handoffs concise, visible, and easy for humans to review.',
+      'Use comments, markdown details, and optional MCP-powered assistant workflows to pull in context from tools like Figma or Microsoft 365, then hand work back for human review.',
     icon: (
       <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 26 26">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13L11.6667 15.6667L17 10.3333M13 1C22.6 1 25 3.4 25 13C25 22.6 22.6 25 13 25C3.4 25 1 22.6 1 13C1 3.4 3.4 1 13 1Z" />

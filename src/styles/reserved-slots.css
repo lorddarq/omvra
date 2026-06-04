@@ -1,0 +1,45 @@
+.reserved-slot {
+  border: 2px dotted rgb(59 130 246);
+  background: rgb(59 130 246 / 0.2);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.08);
+  pointer-events: none;
+}
+
+.reserved-slot--interactive {
+  pointer-events: auto;
+}
+
+.reserved-slot--kanban-column {
+  position: relative;
+  display: flex;
+  width: 320px;
+  flex-shrink: 0;
+  align-items: stretch;
+  justify-content: center;
+  border-color: rgb(147 197 253);
+  border-radius: 0.75rem;
+  background: rgb(59 130 246 / 0.2);
+}
+
+.reserved-slot--kanban-task {
+  border-color: rgb(147 197 253);
+  border-radius: 0.5rem;
+  background: rgb(59 130 246 / 0.2);
+}
+
+.reserved-slot--timeline-task {
+  position: absolute;
+  z-index: 30;
+  height: 2rem;
+  border-radius: 0.375rem;
+  background: rgb(59 130 246 / 0.3);
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 0.08),
+    0 0 0 4px rgb(219 234 254 / 0.9);
+}
+
+.reserved-slot--timeline-swimlane {
+  border-color: rgb(147 197 253);
+  border-radius: 0.375rem;
+  background: rgb(59 130 246 / 0.2);
+}

@@ -1,5 +1,5 @@
 import { Fragment, useRef, useState } from 'react';
-import { useDrag, useDrop } from 'react-dnd';
+import { useDrag, useDragLayer, useDrop } from 'react-dnd';
 import { GripVertical } from 'lucide-react';
 import { Task, TaskStatus, StatusColumn } from '../types';
 import { DroppableColumn } from './DroppableColumn';
@@ -17,14 +17,40 @@ interface ColumnDropIndicator {
   position: 'before' | 'after';
 }
 
-function ColumnInsertionMarker() {
+function ColumnInsertionMarker({
+  indicator,
+  onColumnDragHover,
+  onColumnDrop,
+  onColumnDropIndicatorClear,
+}: {
+  indicator: ColumnDropIndicator;
+  onColumnDragHover?: (clientX: number) => void;
+  onColumnDrop: (draggedId: string, indicator: ColumnDropIndicator) => void;
+  onColumnDropIndicatorClear: () => void;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [, drop] = useDrop({
+    accept: SWIMLANE_COLUMN,
+    hover: (_item: ColumnDragItem, monitor) => {
+      const clientOffset = monitor.getClientOffset();
+      if (clientOffset) {
+        onColumnDragHover?.(clientOffset.x);
+      }
+    },
+    drop: (item: ColumnDragItem) => {
+      onColumnDrop(item.id, indicator);
+      onColumnDropIndicatorClear();
+    },
+  });
+
+  drop(ref);
+
   return (
     <div
-      className="pointer-events-none relative flex w-[320px] shrink-0 items-stretch justify-center rounded-xl border-2 border-dashed border-blue-300 bg-blue-50/70"
+      ref={ref}
+      className="reserved-slot reserved-slot--interactive reserved-slot--kanban-column"
       aria-hidden="true"
-    >
-      <div className="absolute bottom-3 top-10 z-20 w-1 rounded-full bg-blue-500 shadow-sm" />
-    </div>
+    />
   );
 }
 
@@ -38,7 +64,7 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
   onEditTask,
   onAddTask,
   onMoveTask,
-  onReorderTask,
+  onDropTask,
   onRenameColumn,
   onChangeColumnColor,
   onDeleteColumn,
@@ -46,6 +72,7 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
   onColumnDragHover,
   onColumnDropIndicatorChange,
   onColumnDropIndicatorClear,
+  onColumnDrop,
 }: {
   swimlane: T;
   index: number;
@@ -55,7 +82,7 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
   onEditTask?: (task: Task) => void;
   onAddTask: (status: TaskStatus) => void;
   onMoveTask: (taskId: string, newStatus: TaskStatus) => void;
-  onReorderTask: (dragIndex: number, hoverIndex: number, status: TaskStatus) => void;
+  onDropTask: (draggedTask: Task, targetStatus: TaskStatus, targetIndex: number) => void;
   onRenameColumn?: (colId: string, newTitle: string) => void;
   onChangeColumnColor?: (colId: string, newColor: string) => void;
   onDeleteColumn?: (colId: string) => void;
@@ -63,12 +90,16 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
   onColumnDragHover?: (clientX: number) => void;
   onColumnDropIndicatorChange: (indicator: ColumnDropIndicator) => void;
   onColumnDropIndicatorClear: () => void;
+  onColumnDrop: (draggedId: string, indicator: ColumnDropIndicator) => void;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const dragHandleRef = useRef<HTMLButtonElement | null>(null);
   const [{ isDragging }, drag, preview] = useDrag({
     type: SWIMLANE_COLUMN,
-    item: { id: swimlane.id, index },
+    item: () => {
+      onColumnDropIndicatorClear();
+      return { id: swimlane.id, index };
+    },
     collect: (m) => ({ isDragging: m.isDragging() }),
     end: () => {
       onColumnDropIndicatorClear();
@@ -108,6 +139,24 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
       onReorderColumns && onReorderColumns(resolvedDragIndex, index);
       item.index = index;
     },
+    drop: (item: ColumnDragItem, monitor) => {
+      const clientOffset = monitor.getClientOffset();
+      if (ref.current && clientOffset) {
+        const hoverBoundingRect = ref.current.getBoundingClientRect();
+        const dragIndex = swimlanes.findIndex(column => column.id === item.id);
+        const targetIndex = swimlanes.findIndex(column => column.id === swimlane.id);
+        const hoverClientX = clientOffset.x - hoverBoundingRect.left;
+        const isMovingForward = dragIndex < targetIndex;
+        const fallbackIndicator = {
+          targetId: swimlane.id,
+          position: isMovingForward || hoverClientX > hoverBoundingRect.width / 2 ? 'after' : 'before',
+        } satisfies ColumnDropIndicator;
+
+        onColumnDrop(item.id, fallbackIndicator);
+      }
+
+      onColumnDropIndicatorClear();
+    },
   });
 
   drag(dragHandleRef);
@@ -141,7 +190,7 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
         onEditTask={onEditTask}
         onAddTask={onAddTask}
         onMoveTask={onMoveTask}
-        onReorderTask={onReorderTask}
+        onDropTask={onDropTask}
         onRenameColumn={onRenameColumn}
         onChangeColumnColor={onChangeColumnColor}
         onDeleteColumn={onDeleteColumn}
@@ -183,23 +232,50 @@ export function SwimlanesView({
   onColumnDragHover,
 }: SwimlanesViewProps) {
   const [columnDropIndicator, setColumnDropIndicator] = useState<ColumnDropIndicator | null>(null);
+  const isColumnDragging = useDragLayer((monitor) => (
+    monitor.isDragging() && monitor.getItemType() === SWIMLANE_COLUMN
+  ));
+  const visibleColumnDropIndicator = isColumnDragging ? columnDropIndicator : null;
 
   const getTasksByStatus = (status: string) => {
     return tasks.filter(task => task.status === status);
   };
 
-  const handleReorderTask = (dragIndex: number, hoverIndex: number, status: TaskStatus) => {
-    // Reordering while filtered can mismatch visible indices with the full task order.
-    if (isFilterActive) return;
+  const handleDropTask = (draggedTask: Task, targetStatus: TaskStatus, targetIndex: number) => {
+    if (isFilterActive) {
+      onMoveTask(draggedTask.id, targetStatus);
+      return;
+    }
 
-    const statusTasks = getTasksByStatus(status);
-    const reorderedTasks = [...statusTasks];
-    const [draggedTask] = reorderedTasks.splice(dragIndex, 1);
-    reorderedTasks.splice(hoverIndex, 0, draggedTask);
+    const targetTasksWithoutDragged = tasks.filter(task => (
+      task.status === targetStatus && task.id !== draggedTask.id
+    ));
+    const insertionIndex = Math.max(0, Math.min(targetIndex, targetTasksWithoutDragged.length));
+    const movedTask = { ...draggedTask, status: targetStatus };
+    const reorderedTargetTasks = [...targetTasksWithoutDragged];
+    reorderedTargetTasks.splice(insertionIndex, 0, movedTask);
 
-    // Merge reordered tasks with tasks from other statuses
-    const otherTasks = tasks.filter(task => task.status !== status);
-    onReorderTasks([...otherTasks, ...reorderedTasks]);
+    const otherTasks = tasks.filter(task => task.status !== targetStatus && task.id !== draggedTask.id);
+    onReorderTasks([...otherTasks, ...reorderedTargetTasks]);
+  };
+
+  const handleColumnDrop = (draggedId: string, fallbackIndicator: ColumnDropIndicator) => {
+    if (!onReorderColumns) return;
+
+    const indicator = columnDropIndicator ?? fallbackIndicator;
+    const dragIndex = cols.findIndex(column => column.id === draggedId);
+    const targetIndex = cols.findIndex(column => column.id === indicator.targetId);
+    if (dragIndex < 0 || targetIndex < 0) return;
+
+    let insertionIndex = indicator.position === 'before' ? targetIndex : targetIndex + 1;
+    if (dragIndex < insertionIndex) {
+      insertionIndex -= 1;
+    }
+
+    const toIndex = Math.max(0, Math.min(cols.length - 1, insertionIndex));
+    if (dragIndex !== toIndex) {
+      onReorderColumns(dragIndex, toIndex);
+    }
   };
 
   // Defensive: ensure we have an array to map over
@@ -221,8 +297,13 @@ export function SwimlanesView({
             const swimlaneTasks = getTasksByStatus(swimlane.id);
             return (
               <Fragment key={swimlane.id}>
-                {columnDropIndicator?.targetId === swimlane.id && columnDropIndicator.position === 'before' && (
-                  <ColumnInsertionMarker />
+                {visibleColumnDropIndicator?.targetId === swimlane.id && visibleColumnDropIndicator.position === 'before' && (
+                  <ColumnInsertionMarker
+                    indicator={visibleColumnDropIndicator}
+                    onColumnDragHover={onColumnDragHover}
+                    onColumnDrop={handleColumnDrop}
+                    onColumnDropIndicatorClear={() => setColumnDropIndicator(null)}
+                  />
                 )}
                 <ColumnDraggable
                   swimlane={swimlane}
@@ -233,7 +314,7 @@ export function SwimlanesView({
                   onEditTask={onEditTask}
                   onAddTask={onAddTask}
                   onMoveTask={onMoveTask}
-                  onReorderTask={handleReorderTask}
+                  onDropTask={handleDropTask}
                   onRenameColumn={onRenameColumn}
                   onChangeColumnColor={onChangeColumnColor}
                   onDeleteColumn={onDeleteColumn}
@@ -241,9 +322,15 @@ export function SwimlanesView({
                   onColumnDragHover={onColumnDragHover}
                   onColumnDropIndicatorChange={setColumnDropIndicator}
                   onColumnDropIndicatorClear={() => setColumnDropIndicator(null)}
+                  onColumnDrop={handleColumnDrop}
                 />
-                {columnDropIndicator?.targetId === swimlane.id && columnDropIndicator.position === 'after' && (
-                  <ColumnInsertionMarker />
+                {visibleColumnDropIndicator?.targetId === swimlane.id && visibleColumnDropIndicator.position === 'after' && (
+                  <ColumnInsertionMarker
+                    indicator={visibleColumnDropIndicator}
+                    onColumnDragHover={onColumnDragHover}
+                    onColumnDrop={handleColumnDrop}
+                    onColumnDropIndicatorClear={() => setColumnDropIndicator(null)}
+                  />
                 )}
               </Fragment>
             );

@@ -408,39 +408,9 @@
   border-bottom: 1px solid #f3f4f6;
 }
 
-.swimlane-row.dragging-over {
-  background-color: rgba(191, 219, 254, 0.5) !important;
-}
-
 .swimlane-row-timeline {
   position: relative;
   flex: 1;
-}
-
-.swimlane-row-timeline.drop-target {
-  background-color: #f0fdf4 !important;
-  border: 2px solid #4ade80;
-}
-
-.swimlane-row-timeline.drop-target::after {
-  position: absolute;
-  inset: 0;
-  background-color: #dcfce7;
-  opacity: 0.2;
-  pointer-events: none;
-  z-index: 10;
-  content: '';
-  border-radius: 4px;
-}
-
-.drop-indicator-line {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 0.25rem;
-  background-color: #16a34a;
-  pointer-events: none;
-  z-index: 20;
 }
 
 .month-swimlane-cell {

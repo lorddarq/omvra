@@ -3,7 +3,18 @@ import { useDrag, useDrop } from 'react-dnd';
 import { Edit2, GripVertical, User } from 'lucide-react';
 import { TimelineSwimlane } from '../types';
 
-const ITEM_TYPE = 'SWIMLANE_ROW';
+export const SWIMLANE_ROW_ITEM_TYPE = 'SWIMLANE_ROW';
+
+export interface SwimlaneRowDragItem {
+  type: string;
+  index: number;
+  swimlane: TimelineSwimlane;
+}
+
+export interface SwimlaneRowDropIndicator {
+  targetId: string;
+  position: 'before' | 'after';
+}
 
 interface DraggableSwimlaneLabelProps {
   swimlane: TimelineSwimlane;
@@ -11,46 +22,77 @@ interface DraggableSwimlaneLabelProps {
   leftColWidth: number;
   rowHeight?: number;
   onEditSwimlane: (swimlane: TimelineSwimlane) => void;
-  onMoveSwimlane: (dragIndex: number, hoverIndex: number) => void;
+  onSwimlaneDropIndicatorChange: (indicator: SwimlaneRowDropIndicator) => void;
+  onSwimlaneDropIndicatorClear: () => void;
+  onSwimlaneDrop: (draggedId: string, indicator: SwimlaneRowDropIndicator) => void;
+  onSwimlaneDragStart: (draggedId: string) => void;
+  onSwimlaneDragEnd: () => void;
   mode?: 'projects' | 'people';
   taskCount?: number;
 }
 
-interface DragItem {
-  type: string;
-  index: number;
-  swimlane: TimelineSwimlane;
-}
-
-export function DraggableSwimlaneLabel({ swimlane, index, leftColWidth, rowHeight, onEditSwimlane, onMoveSwimlane, mode = 'projects', taskCount = 0 }: DraggableSwimlaneLabelProps) {  const ref = useRef<HTMLDivElement>(null);
+export function DraggableSwimlaneLabel({
+  swimlane,
+  index,
+  leftColWidth,
+  rowHeight,
+  onEditSwimlane,
+  onSwimlaneDropIndicatorChange,
+  onSwimlaneDropIndicatorClear,
+  onSwimlaneDrop,
+  onSwimlaneDragStart,
+  onSwimlaneDragEnd,
+  mode = 'projects',
+  taskCount = 0,
+}: DraggableSwimlaneLabelProps) {
+  const ref = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
 
   const [{ isDragging }, drag, preview] = useDrag({
-    type: ITEM_TYPE,
-    item: { type: ITEM_TYPE, index, swimlane },
+    type: SWIMLANE_ROW_ITEM_TYPE,
+    item: () => {
+      onSwimlaneDropIndicatorClear();
+      onSwimlaneDragStart(swimlane.id);
+      return { type: SWIMLANE_ROW_ITEM_TYPE, index, swimlane };
+    },
     collect: (monitor) => ({ isDragging: monitor.isDragging() }),
+    end: () => {
+      onSwimlaneDropIndicatorClear();
+      onSwimlaneDragEnd();
+    },
   });
 
-  const [{ isOver }, drop] = useDrop({
-    accept: ITEM_TYPE,
-    hover: (item: DragItem, monitor) => {
+  const [, drop] = useDrop({
+    accept: SWIMLANE_ROW_ITEM_TYPE,
+    hover: (item: SwimlaneRowDragItem, monitor) => {
       if (!ref.current) return;
-      const dragIndex = item.index;
-      const hoverIndex = index;
-      if (dragIndex === hoverIndex) return;
+      if (item.swimlane.id === swimlane.id) return;
 
       const hoverBoundingRect = ref.current.getBoundingClientRect();
       const hoverMiddleY = (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
       const clientOffset = monitor.getClientOffset();
-      const hoverClientY = (clientOffset as any).y - hoverBoundingRect.top;
+      if (!clientOffset) return;
+      const hoverClientY = clientOffset.y - hoverBoundingRect.top;
 
-      if (dragIndex < hoverIndex && hoverClientY < hoverMiddleY) return;
-      if (dragIndex > hoverIndex && hoverClientY > hoverMiddleY) return;
-
-      onMoveSwimlane(dragIndex, hoverIndex);
-      item.index = hoverIndex;
+      onSwimlaneDropIndicatorChange({
+        targetId: swimlane.id,
+        position: hoverClientY > hoverMiddleY ? 'after' : 'before',
+      });
     },
-    collect: (monitor) => ({ isOver: monitor.isOver() }),
+    drop: (item: SwimlaneRowDragItem, monitor) => {
+      const hoverBoundingRect = ref.current?.getBoundingClientRect();
+      const clientOffset = monitor.getClientOffset();
+      const fallbackIndicator: SwimlaneRowDropIndicator = {
+        targetId: swimlane.id,
+        position: hoverBoundingRect && clientOffset && clientOffset.y > hoverBoundingRect.top + hoverBoundingRect.height / 2
+          ? 'after'
+          : 'before',
+      };
+
+      onSwimlaneDrop(item.swimlane.id, fallbackIndicator);
+      onSwimlaneDropIndicatorClear();
+      onSwimlaneDragEnd();
+    },
   });
 
   preview(drop(ref));
@@ -60,7 +102,9 @@ export function DraggableSwimlaneLabel({ swimlane, index, leftColWidth, rowHeigh
   return (
     <div
       ref={ref}
-      className={`flex flex-col justify-center px-5 py-3 group bg-white ${isOver ? 'bg-blue-50/50' : ''}`}
+      className={`flex flex-col justify-center px-5 py-3 group bg-white transition-[opacity] duration-150 ${
+        isDragging ? 'opacity-40' : ''
+      }`}
       style={{ 
         width: `${leftColWidth}px`, 
         height: `${rowHeight || 48}px`, 

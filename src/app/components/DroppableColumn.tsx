@@ -1,8 +1,13 @@
-import { useRef, useState } from 'react';
-import { useDrop } from 'react-dnd';
+import { Fragment, useRef, useState } from 'react';
+import { useDragLayer, useDrop } from 'react-dnd';
 import { Plus, Edit2 } from 'lucide-react';
 import { Task, TaskStatus, StatusColumn } from '../types';
-import { DraggableTaskCard } from '../components/DraggableTaskCard';
+import {
+  DraggableTaskCard,
+  TASK_ITEM_TYPE,
+  type TaskDragItem,
+  type TaskDropIndicator,
+} from '../components/DraggableTaskCard';
 import { getReadableTextClassFor } from '../utils/contrast';
 import { ColumnDialog } from '../components/ColumnDialog';
 
@@ -14,10 +19,40 @@ interface DroppableColumnProps {
   onEditTask?: (task: Task) => void;
   onAddTask: (status: TaskStatus) => void;
   onMoveTask: (taskId: string, newStatus: TaskStatus) => void;
-  onReorderTask: (dragIndex: number, hoverIndex: number, status: TaskStatus) => void;
+  onDropTask: (draggedTask: Task, targetStatus: TaskStatus, targetIndex: number) => void;
   onRenameColumn?: (colId: string, newTitle: string) => void;
   onChangeColumnColor?: (colId: string, newColor: string) => void;
   onDeleteColumn?: (colId: string) => void;
+}
+
+function TaskInsertionMarker({
+  indicator,
+  onTaskDrop,
+  onTaskDropIndicatorClear,
+}: {
+  indicator: TaskDropIndicator;
+  onTaskDrop: (draggedTask: Task, targetStatus: TaskStatus, indicator: TaskDropIndicator) => void;
+  onTaskDropIndicatorClear: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [, drop] = useDrop({
+    accept: TASK_ITEM_TYPE,
+    drop: (item: TaskDragItem) => {
+      onTaskDrop(item.task, indicator.status, indicator);
+      onTaskDropIndicatorClear();
+    },
+  });
+
+  drop(ref);
+
+  return (
+    <div
+      ref={ref}
+      className="reserved-slot reserved-slot--interactive reserved-slot--kanban-task"
+      style={{ height: `${indicator.draggedSize?.height ?? 92}px` }}
+      aria-hidden="true"
+    />
+  );
 }
 
 export function DroppableColumn({
@@ -28,19 +63,42 @@ export function DroppableColumn({
   onEditTask,
   onAddTask,
   onMoveTask,
-  onReorderTask,
+  onDropTask,
   onRenameColumn,
   onChangeColumnColor,
   onDeleteColumn,
 }: DroppableColumnProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const [taskDropIndicator, setTaskDropIndicator] = useState<TaskDropIndicator | null>(null);
+  const isTaskDragging = useDragLayer((monitor) => (
+    monitor.isDragging() && monitor.getItemType() === TASK_ITEM_TYPE
+  ));
+  const visibleTaskDropIndicator = isTaskDragging ? taskDropIndicator : null;
+
+  const getDropIndex = (indicator: TaskDropIndicator): number => {
+    const targetIndex = swimlaneTasks.findIndex(task => task.id === indicator.targetTaskId);
+    if (targetIndex < 0) return swimlaneTasks.length;
+    return indicator.position === 'before' ? targetIndex : targetIndex + 1;
+  };
+
+  const handleTaskDrop = (draggedTask: Task, targetStatus: TaskStatus, fallbackIndicator: TaskDropIndicator) => {
+    const indicator = taskDropIndicator?.status === targetStatus ? taskDropIndicator : fallbackIndicator;
+    let insertionIndex = getDropIndex(indicator);
+    const dragIndex = swimlaneTasks.findIndex(task => task.id === draggedTask.id);
+    if (draggedTask.status === targetStatus && dragIndex >= 0 && dragIndex < insertionIndex) {
+      insertionIndex -= 1;
+    }
+
+    onDropTask(draggedTask, targetStatus, insertionIndex);
+  };
 
   const [{ isOver, canDrop }, drop] = useDrop({
-    accept: 'TASK_CARD',
-    drop: (item: { task: Task }) => {
-      if (item.task.status !== swimlane.id) {
-        onMoveTask(item.task.id, swimlane.id as TaskStatus);
-      }
+    accept: TASK_ITEM_TYPE,
+    drop: (item: TaskDragItem, monitor) => {
+      if (monitor.didDrop()) return;
+
+      onDropTask(item.task, swimlane.id as TaskStatus, swimlaneTasks.length);
+      setTaskDropIndicator(null);
     },
     collect: (monitor) => ({
       isOver: monitor.isOver(),
@@ -114,16 +172,33 @@ export function DroppableColumn({
         </button>
 
         {swimlaneTasks.map((task, index) => (
-          <DraggableTaskCard
-            key={task.id}
-            task={task}
-            index={index}
-            onTaskClick={onTaskClick}
-            onEditTask={onEditTask}
-            onMoveTask={onMoveTask}
-            onReorderTask={onReorderTask}
-            swimlanes={swimlanes}
-          />
+          <Fragment key={task.id}>
+            {visibleTaskDropIndicator?.targetTaskId === task.id && visibleTaskDropIndicator.position === 'before' && (
+              <TaskInsertionMarker
+                indicator={visibleTaskDropIndicator}
+                onTaskDrop={handleTaskDrop}
+                onTaskDropIndicatorClear={() => setTaskDropIndicator(null)}
+              />
+            )}
+            <DraggableTaskCard
+              task={task}
+              index={index}
+              onTaskClick={onTaskClick}
+              onEditTask={onEditTask}
+              onMoveTask={onMoveTask}
+              onTaskDropIndicatorChange={setTaskDropIndicator}
+              onTaskDropIndicatorClear={() => setTaskDropIndicator(null)}
+              onTaskDrop={handleTaskDrop}
+              swimlanes={swimlanes}
+            />
+            {visibleTaskDropIndicator?.targetTaskId === task.id && visibleTaskDropIndicator.position === 'after' && (
+              <TaskInsertionMarker
+                indicator={visibleTaskDropIndicator}
+                onTaskDrop={handleTaskDrop}
+                onTaskDropIndicatorClear={() => setTaskDropIndicator(null)}
+              />
+            )}
+          </Fragment>
         ))}
       </div>
     </div>

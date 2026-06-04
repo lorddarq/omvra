@@ -1,5 +1,5 @@
 import { useRef, useMemo, useState, useCallback, useEffect } from 'react';
-import { useDrag, useDrop } from 'react-dnd';
+import { useDrag, useDragLayer, useDrop } from 'react-dnd';
 import { Edit2, GripVertical } from 'lucide-react';
 import { Task, TimelineSwimlane } from '../types';
 import { Button } from '../components/ui/button';
@@ -46,6 +46,13 @@ interface DragItem {
 interface TaskDragItem {
   type: string;
   task: Task;
+  dragOffsetX?: number;
+}
+
+interface TimelineDropPreview {
+  left: number;
+  width: number;
+  top: string;
 }
 
 export function DraggableSwimlaneRow({
@@ -144,14 +151,23 @@ export function DraggableSwimlaneRow({
     [dates]
   );
 
+  const getTaskDurationDays = useCallback((task: Task): number => {
+    const MS_PER_DAY = 1000 * 60 * 60 * 24;
+    const origStart = parseISODateLocal(task.startDate);
+    const origEnd = parseISODateLocal(task.endDate);
+    if (!origStart || !origEnd) return 1;
+
+    return Math.max(1, Math.floor((origEnd.getTime() - origStart.getTime()) / MS_PER_DAY) + 1);
+  }, []);
+
   // Helper function to calculate drop line position from client coordinates
-  const calculateDropPosition = (clientOffset: { x: number; y: number } | null) => {
+  const calculateDropPosition = (clientOffset: { x: number; y: number } | null, dragOffsetX = 0) => {
     if (!clientOffset || !scrollContainerRef?.current) return null;
 
     const scrollContainer = scrollContainerRef.current;
     const scrollLeft = scrollContainer.scrollLeft;
     const containerRect = scrollContainer.getBoundingClientRect();
-    const localX = clientOffset.x - containerRect.left + scrollLeft;
+    const localX = clientOffset.x - containerRect.left + scrollLeft - dragOffsetX;
 
     if (localX < 0) return null;
 
@@ -183,6 +199,44 @@ export function DraggableSwimlaneRow({
     // Return the pixel position where the drop line should be
     // This is the start of the target day
     return prefix[dayIdx] ?? 0;
+  };
+
+  const calculateTimelineDropPreview = (
+    clientOffset: { x: number; y: number } | null,
+    task: Task | null,
+    dragOffsetX = 0
+  ): TimelineDropPreview | null => {
+    if (!task) return null;
+
+    const left = calculateDropPosition(clientOffset, dragOffsetX);
+    if (left === null) return null;
+
+    const dayWidthsLocal = (dateWidths && dateWidths.length === dates.length) ? dateWidths : dates.map(() => 60);
+    const prefix: number[] = [0];
+    for (let i = 0; i < dayWidthsLocal.length; i++) {
+      prefix.push(prefix[i] + (dayWidthsLocal[i] ?? 60));
+    }
+    const matchedStartIdx = prefix.findIndex((value, index) => (
+      index < prefix.length - 1 && left >= value && left < prefix[index + 1]
+    ));
+    const startIdx = matchedStartIdx >= 0 ? matchedStartIdx : Math.max(0, dates.length - 1);
+    const fallbackDayWidth = dayWidthsLocal[startIdx] ?? dayWidthsLocal[0] ?? 60;
+    const durationDays = getTaskDurationDays(task);
+    let previewWidth = 0;
+
+    for (let i = 0; i < durationDays; i++) {
+      previewWidth += dayWidthsLocal[Math.min(startIdx + i, dayWidthsLocal.length - 1)] ?? fallbackDayWidth;
+    }
+
+    const TASK_RENDER_HEIGHT = 32;
+    const TRACK_HEIGHT = 40;
+    const trackIndex = trackAssignments[task.id] || 0;
+
+    return {
+      left,
+      width: Math.max(8, previewWidth - 8),
+      top: `calc(${trackIndex * TRACK_HEIGHT}px + (${TRACK_HEIGHT}px - ${TASK_RENDER_HEIGHT}px) / 2)`,
+    };
   };
 
   // Handle date range selection via click-drag
@@ -228,8 +282,20 @@ export function DraggableSwimlaneRow({
     };
   }, [isSelecting, handleSelectionEnd]);
 
+  const liveTimelineDrag = useDragLayer((monitor) => {
+    const item = monitor.getItem<TaskDragItem | null>();
+    const clientOffset = monitor.getClientOffset();
+    const isDraggingTimelineTask = monitor.isDragging() && monitor.getItemType() === TIMELINE_TASK_TYPE;
+
+    return {
+      item,
+      clientOffset,
+      isDraggingTimelineTask,
+    };
+  });
+
   // Drop zone for timeline tasks — row handles task drops and repositioning
-  const [{ isOver: isTaskOver, canDrop, dropLinePosition }, dropTask] = useDrop({
+  const [{ isOver: isTaskOver, canDrop }, dropTask] = useDrop({
     accept: TIMELINE_TASK_TYPE,
     canDrop: (item: TaskDragItem) => canDropTimelineTaskInRow(item.task, swimlane.id, mode),
     drop: (item: TaskDragItem, monitor) => {
@@ -261,7 +327,7 @@ export function DraggableSwimlaneRow({
       // Calculate position within the scrolled content:
       // clientOffset.x - containerRect.left = position within the visible container
       // + scrollLeft = position within the entire scrolled content
-      const localX = clientOffset.x - containerRect.left + scrollLeft;
+      const localX = clientOffset.x - containerRect.left + scrollLeft - (item.dragOffsetX ?? 0);
 
       // Compute prefix sums for day widths to find which day slot the drop is over
       const dayWidthsLocal = (dateWidths && dateWidths.length === dates.length) ? dateWidths : dates.map(() => 60);
@@ -304,14 +370,7 @@ export function DraggableSwimlaneRow({
         return;
       }
 
-      // Compute original task duration to preserve it
-      const MS_PER_DAY = 1000 * 60 * 60 * 24;
-      const origStart = parseISODateLocal(task.startDate);
-      const origEnd = parseISODateLocal(task.endDate);
-      let durationDays = 1;
-      if (origStart && origEnd) {
-        durationDays = Math.floor((origEnd.getTime() - origStart.getTime()) / MS_PER_DAY) + 1;
-      }
+      const durationDays = getTaskDurationDays(task);
 
       // Calculate new dates based on the dropped day index
       const newEnd = new Date(newStart);
@@ -325,16 +384,19 @@ export function DraggableSwimlaneRow({
         onRevealDate?.(newStartISO);
       }
     },
-    collect: (monitor) => {
-      const offset = calculateDropPosition(monitor.getClientOffset());
-      return {
-        isOver: monitor.isOver(),
-        canDrop: monitor.canDrop(),
-        dropLinePosition: offset,
-        clientOffset: monitor.getClientOffset(),
-      };
-    },
+    collect: (monitor) => ({
+      isOver: monitor.isOver(),
+      canDrop: monitor.canDrop(),
+    }),
   });
+
+  const liveDropPreview = isTaskOver && canDrop && liveTimelineDrag.isDraggingTimelineTask
+    ? calculateTimelineDropPreview(
+      liveTimelineDrag.clientOffset,
+      liveTimelineDrag.item?.task ?? null,
+      liveTimelineDrag.item?.dragOffsetX ?? 0
+    )
+    : null;
 
   // Apply task drop to timeline area
   dropTask(timelineRef);
@@ -358,7 +420,7 @@ export function DraggableSwimlaneRow({
   return (
     <div
       ref={ref}
-      className={`swimlane-row ${isTaskOver && canDrop ? 'dragging-over' : ''}`}
+      className="swimlane-row"
       style={{ 
         height: `${rowHeight || 48}px`
       }}
@@ -368,32 +430,24 @@ export function DraggableSwimlaneRow({
       {/* Timeline grid for this swimlane */}
       <div
         ref={timelineRef}
-        className={`swimlane-row-timeline ${
-          isTaskOver && canDrop ? 'drop-target' : ''
-        }`}
+        className="swimlane-row-timeline"
         style={{
           backgroundColor: getRowBackgroundColor(swimlane.color)
         }}
       >
-        {/* Drop indicator line when dragging over - positioned in viewport coordinates */}
-        {isTaskOver && canDrop && typeof dropLinePosition === 'number' && scrollContainerRef?.current && (
+        {/* Task-shaped drop preview when dragging over - positioned in timeline content coordinates */}
+        {liveDropPreview && scrollContainerRef?.current && (
           (() => {
-            const scrollLeft = scrollContainerRef.current?.scrollLeft ?? 0;
-            const containerRect = scrollContainerRef.current?.getBoundingClientRect();
-            const timelineRect = timelineRef.current?.getBoundingClientRect();
-            
-            // Convert from content space to viewport space
-            // dropLinePosition is in content coords, subtract scrollLeft to get viewport offset
-            // then add container's left position to get absolute viewport position
-            const viewportLeft = dropLinePosition - scrollLeft;
-            
             return (
-              <>
-                <div 
-                  className="drop-indicator-line" 
-                  style={{ left: `${viewportLeft}px` }}
-                />
-              </>
+              <div
+                className="reserved-slot reserved-slot--timeline-task"
+                style={{
+                  left: `${liveDropPreview.left + 4}px`,
+                  top: liveDropPreview.top,
+                  width: `${liveDropPreview.width}px`,
+                }}
+                aria-hidden="true"
+              />
             );
           })()
         )}

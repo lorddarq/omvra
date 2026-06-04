@@ -13,11 +13,16 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
 import { Task, TimelineSwimlane, TaskStatus, Person, StatusColumn } from '../types';
-import { DndProvider } from 'react-dnd';
+import { DndProvider, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { Plus } from 'lucide-react';
 import { TimelineHeader } from './TimelineHeader';
-import { DraggableSwimlaneLabel } from './DraggableSwimlaneLabel';
+import {
+  DraggableSwimlaneLabel,
+  SWIMLANE_ROW_ITEM_TYPE,
+  type SwimlaneRowDragItem,
+  type SwimlaneRowDropIndicator,
+} from './DraggableSwimlaneLabel';
 import { DraggableSwimlaneRow } from './DraggableSwimlaneRow';
 import { allocateTasksToTracks, calculateSwimlaneHeight } from '../utils/trackAllocation';
 import { getReadableTextClassFor } from '../utils/contrast';
@@ -34,6 +39,44 @@ const MONTH_WIDTHS_KEY = 'plumy.monthWidths.v1';
 const LEFT_COL_WIDTH_KEY = 'plumy.leftColWidth.v1';
 const HORIZONTAL_RENDER_BUFFER_PX = 1200;
 const MIN_TOTAL_MONTHS = 12;
+
+function TimelineSwimlaneInsertionMarker({
+  height,
+  width,
+  indicator,
+  onSwimlaneDrop,
+  onSwimlaneDropIndicatorClear,
+}: {
+  height: number;
+  width?: number | string;
+  indicator: SwimlaneRowDropIndicator;
+  onSwimlaneDrop: (draggedId: string, indicator: SwimlaneRowDropIndicator) => void;
+  onSwimlaneDropIndicatorClear: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [, drop] = useDrop({
+    accept: SWIMLANE_ROW_ITEM_TYPE,
+    drop: (item: SwimlaneRowDragItem) => {
+      onSwimlaneDrop(item.swimlane.id, indicator);
+      onSwimlaneDropIndicatorClear();
+    },
+  });
+
+  drop(ref);
+
+  return (
+    <div
+      ref={ref}
+      className="reserved-slot reserved-slot--interactive reserved-slot--timeline-swimlane"
+      style={{
+        height: `${height}px`,
+        minHeight: `${height}px`,
+        width,
+      }}
+      aria-hidden="true"
+    />
+  );
+}
 
 interface TimelineViewProps {
   tasks: Task[];
@@ -89,6 +132,9 @@ export function TimelineView({
     scrollLeft: 0,
     viewportWidth: 0,
   });
+  const [swimlaneDropIndicator, setSwimlaneDropIndicator] = useState<SwimlaneRowDropIndicator | null>(null);
+  const [draggingSwimlaneId, setDraggingSwimlaneId] = useState<string | null>(null);
+  const visibleSwimlaneDropIndicator = draggingSwimlaneId ? swimlaneDropIndicator : null;
 
   // Display swimlanes based on mode
   const displaySwimlanes = useMemo<TimelineSwimlane[]>(() => {
@@ -826,6 +872,29 @@ export function TimelineView({
     }
   }, [mode, people, swimlanes, onReorderPeople, onReorderSwimlanes]);
 
+  const handleSwimlaneDrop = useCallback((draggedId: string, fallbackIndicator: SwimlaneRowDropIndicator) => {
+    const indicator = swimlaneDropIndicator ?? fallbackIndicator;
+    const dragIndex = displaySwimlanes.findIndex(swimlane => swimlane.id === draggedId);
+    const targetIndex = displaySwimlanes.findIndex(swimlane => swimlane.id === indicator.targetId);
+    if (dragIndex < 0 || targetIndex < 0) {
+      setDraggingSwimlaneId(null);
+      setSwimlaneDropIndicator(null);
+      return;
+    }
+
+    let insertionIndex = indicator.position === 'before' ? targetIndex : targetIndex + 1;
+    if (dragIndex < insertionIndex) {
+      insertionIndex -= 1;
+    }
+
+    const toIndex = Math.max(0, Math.min(displaySwimlanes.length - 1, insertionIndex));
+    if (dragIndex !== toIndex) {
+      handleMoveSwimlane(dragIndex, toIndex);
+    }
+    setDraggingSwimlaneId(null);
+    setSwimlaneDropIndicator(null);
+  }, [displaySwimlanes, handleMoveSwimlane, swimlaneDropIndicator]);
+
   // Sync vertical scroll between left column and rows container
   const handleLeftScroll = useCallback(() => {
     if (!leftListRef.current || !rowsContainerRef.current || isScrollingRef.current) return;
@@ -1028,18 +1097,48 @@ export function TimelineView({
                   : tasks.filter(t => t.swimlaneId === swimlane.id).length;
                 
                 return (
-                  <div key={swimlane.id} className="timeline-swimlane-label-container" style={{ height: `${height}px`, minHeight: `${height}px` }}>
-                    <DraggableSwimlaneLabel
-                      swimlane={swimlane}
-                      index={index}
-                      leftColWidth={leftColWidth}
-                      rowHeight={height}
-                      onEditSwimlane={mode === 'projects' ? onEditSwimlane : () => {}}
-                      onMoveSwimlane={handleMoveSwimlane}
-                      mode={mode}
-                      taskCount={taskCount}
-                    />
-                  </div>
+                  <React.Fragment key={swimlane.id}>
+                    {visibleSwimlaneDropIndicator?.targetId === swimlane.id && visibleSwimlaneDropIndicator.position === 'before' && (
+                      <TimelineSwimlaneInsertionMarker
+                        height={height}
+                        width={`${leftColWidth}px`}
+                        indicator={visibleSwimlaneDropIndicator}
+                        onSwimlaneDrop={handleSwimlaneDrop}
+                        onSwimlaneDropIndicatorClear={() => setSwimlaneDropIndicator(null)}
+                      />
+                    )}
+                    <div
+                      className="timeline-swimlane-label-container"
+                      style={{
+                        height: `${height}px`,
+                        minHeight: `${height}px`,
+                      }}
+                    >
+                      <DraggableSwimlaneLabel
+                        swimlane={swimlane}
+                        index={index}
+                        leftColWidth={leftColWidth}
+                        rowHeight={height}
+                        onEditSwimlane={mode === 'projects' ? onEditSwimlane : () => {}}
+                        onSwimlaneDropIndicatorChange={setSwimlaneDropIndicator}
+                        onSwimlaneDropIndicatorClear={() => setSwimlaneDropIndicator(null)}
+                        onSwimlaneDrop={handleSwimlaneDrop}
+                        onSwimlaneDragStart={setDraggingSwimlaneId}
+                        onSwimlaneDragEnd={() => setDraggingSwimlaneId(null)}
+                        mode={mode}
+                        taskCount={taskCount}
+                      />
+                    </div>
+                    {visibleSwimlaneDropIndicator?.targetId === swimlane.id && visibleSwimlaneDropIndicator.position === 'after' && (
+                      <TimelineSwimlaneInsertionMarker
+                        height={height}
+                        width={`${leftColWidth}px`}
+                        indicator={visibleSwimlaneDropIndicator}
+                        onSwimlaneDrop={handleSwimlaneDrop}
+                        onSwimlaneDropIndicatorClear={() => setSwimlaneDropIndicator(null)}
+                      />
+                    )}
+                  </React.Fragment>
                 );
               })}
             </div>
@@ -1109,30 +1208,43 @@ export function TimelineView({
                 const height = swimlaneHeights[swimlane.id] || DEFAULT_ROW_HEIGHT;
 
                 return (
-                  <div
-                    key={swimlane.id}
-                    className="swimlane-row relative"
-                    style={{ height: `${height}px`, minHeight: `${height}px` }}
-                  >
-                    <DraggableSwimlaneRow
-                      swimlane={swimlane}
-                      index={idx}
-                      mode={mode}
-                      tasks={swimlaneTasks}
-                      dates={dates}
-                      dateWidths={dayWidths}
-                      monthKeys={visibleMonthKeys}
-                      monthWidths={monthWidths}
-                      datesByMonth={datesByMonth}
-                      leadingSpacerWidth={leadingSpacerWidth}
-                      trailingSpacerWidth={trailingSpacerWidth + endPadding}
-                      totalTimelineWidth={totalTimelineWidth}
-                      rowHeight={height}
-                      onTaskClick={onTaskClick}
-                      onAddTask={(date, swimlaneId, endDate) => onAddTask(date, swimlaneId, endDate, mode)}
-                      onEditSwimlane={onEditSwimlane}
-                      onMoveSwimlane={handleMoveSwimlane}
-                      onMoveTaskToSwimlane={(taskId, swimlaneId, newStartDate, newEndDate) => {
+                  <React.Fragment key={swimlane.id}>
+                    {visibleSwimlaneDropIndicator?.targetId === swimlane.id && visibleSwimlaneDropIndicator.position === 'before' && (
+                      <TimelineSwimlaneInsertionMarker
+                        height={height}
+                        width={`${totalTimelineWidth + endPadding}px`}
+                        indicator={visibleSwimlaneDropIndicator}
+                        onSwimlaneDrop={handleSwimlaneDrop}
+                        onSwimlaneDropIndicatorClear={() => setSwimlaneDropIndicator(null)}
+                      />
+                    )}
+                    <div
+                      className="swimlane-row relative"
+                      style={{
+                        height: `${height}px`,
+                        minHeight: `${height}px`,
+                        opacity: draggingSwimlaneId === swimlane.id ? 0.4 : undefined,
+                      }}
+                    >
+                      <DraggableSwimlaneRow
+                        swimlane={swimlane}
+                        index={idx}
+                        mode={mode}
+                        tasks={swimlaneTasks}
+                        dates={dates}
+                        dateWidths={dayWidths}
+                        monthKeys={visibleMonthKeys}
+                        monthWidths={monthWidths}
+                        datesByMonth={datesByMonth}
+                        leadingSpacerWidth={leadingSpacerWidth}
+                        trailingSpacerWidth={trailingSpacerWidth + endPadding}
+                        totalTimelineWidth={totalTimelineWidth}
+                        rowHeight={height}
+                        onTaskClick={onTaskClick}
+                        onAddTask={(date, swimlaneId, endDate) => onAddTask(date, swimlaneId, endDate, mode)}
+                        onEditSwimlane={onEditSwimlane}
+                        onMoveSwimlane={handleMoveSwimlane}
+                        onMoveTaskToSwimlane={(taskId, swimlaneId, newStartDate, newEndDate) => {
                         const task = tasks.find(t => t.id === taskId);
                         if (task) {
                           const updated = applyTimelineTaskDrop(
@@ -1163,11 +1275,21 @@ export function TimelineView({
                           initialEndDate: task.endDate || '',
                         });
                       }}
-                      resizingTaskId={resizingTask?.taskId ?? null}
-                      ignoreAddTaskUntil={ignoreAddTaskUntil}
-                      scrollContainerRef={rowsContainerRef}
-                    />
-                  </div>
+                        resizingTaskId={resizingTask?.taskId ?? null}
+                        ignoreAddTaskUntil={ignoreAddTaskUntil}
+                        scrollContainerRef={rowsContainerRef}
+                      />
+                    </div>
+                    {visibleSwimlaneDropIndicator?.targetId === swimlane.id && visibleSwimlaneDropIndicator.position === 'after' && (
+                      <TimelineSwimlaneInsertionMarker
+                        height={height}
+                        width={`${totalTimelineWidth + endPadding}px`}
+                        indicator={visibleSwimlaneDropIndicator}
+                        onSwimlaneDrop={handleSwimlaneDrop}
+                        onSwimlaneDropIndicatorClear={() => setSwimlaneDropIndicator(null)}
+                      />
+                    )}
+                  </React.Fragment>
                 );
               })}
             </div>

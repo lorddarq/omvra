@@ -29,10 +29,15 @@ export function DraggableTimelineTask({
 }: DraggableTimelineTaskProps) {
   const ref = useRef<HTMLDivElement>(null);
   const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
+  const dragOffsetXRef = useRef(0);
 
   const [{ isDragging }, drag] = useDrag({
     type: TIMELINE_TASK_TYPE,
-    item: { type: TIMELINE_TASK_TYPE, task },
+    item: () => ({
+      type: TIMELINE_TASK_TYPE,
+      task,
+      dragOffsetX: dragOffsetXRef.current,
+    }),
     canDrag: () => !resizingTaskId, // disable dragging while any task is being resized
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
@@ -46,6 +51,8 @@ export function DraggableTimelineTask({
 
   function handleMouseDown(e: React.MouseEvent) {
     mouseDownPos.current = { x: e.clientX, y: e.clientY };
+    const rect = ref.current?.getBoundingClientRect();
+    dragOffsetXRef.current = rect ? e.clientX - rect.left : 0;
   }
 
   function handleMouseUp(e: React.MouseEvent) {
@@ -67,7 +74,7 @@ export function DraggableTimelineTask({
       ref={ref}
       className={`absolute h-8 rounded-md px-3 flex items-center gap-2 shadow-sm cursor-pointer pointer-events-auto group/task ${textClass} text-xs transition-all ${
         resizingTaskId === task.id ? 'shadow-lg z-10' : ''
-      } ${isDragging ? 'opacity-50' : ''}`}
+      } ${isDragging ? 'opacity-0' : ''}`}
       style={{
         left: `${position.left + 4}px`,
         width: `${position.width}px`,

@@ -1,10 +1,27 @@
 import { useRef } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { Task, TaskStatus, StatusColumn } from '../types';
-import { Button } from '@/app/components/ui/button';
 import { TaskCard } from './TaskCard';
 
-const TASK_ITEM_TYPE = 'TASK_CARD';
+export const TASK_ITEM_TYPE = 'TASK_CARD';
+
+export interface TaskDragItem {
+  type: string;
+  task: Task;
+  index: number;
+  status: TaskStatus;
+  size?: {
+    height: number;
+    width: number;
+  };
+}
+
+export interface TaskDropIndicator {
+  targetTaskId: string;
+  status: TaskStatus;
+  position: 'before' | 'after';
+  draggedSize?: TaskDragItem['size'];
+}
 
 interface DraggableTaskCardProps {
   task: Task;
@@ -12,15 +29,10 @@ interface DraggableTaskCardProps {
   onTaskClick: (task: Task) => void;
   onEditTask?: (task: Task) => void;
   onMoveTask: (taskId: string, newStatus: TaskStatus) => void;
-  onReorderTask: (dragIndex: number, hoverIndex: number, status: TaskStatus) => void;
+  onTaskDropIndicatorChange: (indicator: TaskDropIndicator) => void;
+  onTaskDropIndicatorClear: () => void;
+  onTaskDrop: (draggedTask: Task, status: TaskStatus, indicator: TaskDropIndicator) => void;
   swimlanes: StatusColumn[];
-}
-
-interface DragItem {
-  type: string;
-  task: Task;
-  index: number;
-  status: TaskStatus;
 }
 
 export function DraggableTaskCard({
@@ -29,49 +41,70 @@ export function DraggableTaskCard({
   onTaskClick,
   onEditTask,
   onMoveTask,
-  onReorderTask,
+  onTaskDropIndicatorChange,
+  onTaskDropIndicatorClear,
+  onTaskDrop,
   swimlanes,
 }: DraggableTaskCardProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   const [{ isDragging }, drag] = useDrag({
     type: TASK_ITEM_TYPE,
-    item: { type: TASK_ITEM_TYPE, task, index, status: task.status },
+    item: () => {
+      onTaskDropIndicatorClear();
+      const rect = ref.current?.getBoundingClientRect();
+      return {
+        type: TASK_ITEM_TYPE,
+        task,
+        index,
+        status: task.status,
+        size: rect ? { height: rect.height, width: rect.width } : undefined,
+      };
+    },
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),
+    end: () => {
+      onTaskDropIndicatorClear();
+    },
   });
 
-  const [{ isOver }, drop] = useDrop({
+  const [, drop] = useDrop({
     accept: TASK_ITEM_TYPE,
-    hover: (item: DragItem, monitor) => {
+    hover: (item: TaskDragItem, monitor) => {
       if (!ref.current) return;
 
-      const dragIndex = item.index;
-      const hoverIndex = index;
-      const dragStatus = item.status;
       const hoverStatus = task.status;
+      const hoverBoundingRect = ref.current.getBoundingClientRect();
+      const clientOffset = monitor.getClientOffset();
+      if (!clientOffset) return;
 
-      // Don't replace items with themselves
-      if (dragIndex === hoverIndex && dragStatus === hoverStatus) return;
+      const hoverClientY = clientOffset.y - hoverBoundingRect.top;
+      const hoverMiddleY = (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
+      const position = hoverClientY > hoverMiddleY ? 'after' : 'before';
 
-      // Only reorder within same status
-      if (dragStatus === hoverStatus) {
-        const hoverBoundingRect = ref.current?.getBoundingClientRect();
-        const hoverMiddleY = (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
-        const clientOffset = monitor.getClientOffset();
-        const hoverClientY = clientOffset!.y - hoverBoundingRect.top;
-
-        if (dragIndex < hoverIndex && hoverClientY < hoverMiddleY) return;
-        if (dragIndex > hoverIndex && hoverClientY > hoverMiddleY) return;
-
-        onReorderTask(dragIndex, hoverIndex, hoverStatus);
-        item.index = hoverIndex;
-      }
+      onTaskDropIndicatorChange({
+        targetTaskId: task.id,
+        status: hoverStatus,
+        position,
+        draggedSize: item.size,
+      });
     },
-    collect: (monitor) => ({
-      isOver: monitor.isOver(),
-    }),
+    drop: (item: TaskDragItem, monitor) => {
+      const hoverBoundingRect = ref.current?.getBoundingClientRect();
+      const clientOffset = monitor.getClientOffset();
+      const fallbackIndicator: TaskDropIndicator = {
+        targetTaskId: task.id,
+        status: task.status,
+        position: hoverBoundingRect && clientOffset && clientOffset.y > hoverBoundingRect.top + hoverBoundingRect.height / 2
+          ? 'after'
+          : 'before',
+        draggedSize: item.size,
+      };
+
+      onTaskDrop(item.task, task.status, fallbackIndicator);
+      onTaskDropIndicatorClear();
+    },
   });
 
   // Combine drag and drop refs
@@ -80,7 +113,7 @@ export function DraggableTaskCard({
   return (
     <div
       ref={ref}
-      className={`${isDragging ? 'opacity-50' : ''} ${isOver ? 'border-blue-400 border-2' : ''} min-w-0 w-full`}
+      className={`${isDragging ? 'h-0 overflow-hidden opacity-0' : ''} min-w-0 w-full transition-[opacity] duration-150`}
     >
       <TaskCard
         title={task.title}

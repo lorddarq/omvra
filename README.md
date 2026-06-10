@@ -1,9 +1,10 @@
 # Plumy
 
-Plumy is an Electron desktop project-management app with two synchronized planning surfaces:
+Plumy is an Electron desktop project-management app with synchronized planning surfaces:
 
 - Timeline view: calendar-like scheduling across project swimlanes
 - Kanban view: status-column workflow management
+- Roadmap view: milestones, linked tasks, and intertask dependencies
 
 The app is designed so contributors and agents can reason about the same task dataset through UI and MCP projections.
 
@@ -112,10 +113,20 @@ Because attachments point at local files, moving or deleting the original file c
 
 MCP agents can manage the same attachment references through write tools:
 
-- `tasks.attach_file` accepts an absolute local path or `file://` URL and stores attachment metadata on the task
-- `tasks.remove_attachment` removes an attachment by `attachmentId`, absolute path, or `file://` URL
+- `tasks_attach_file` accepts an absolute local path or `file://` URL and stores attachment metadata on the task
+- `tasks_remove_attachment` removes an attachment by `attachmentId`, absolute path, or `file://` URL
 - both tools require the current task revision, like other task writes
 - non-file URLs are rejected; MCP does not open, read, or copy attachment contents
+
+Tasks can also carry roadmap and approximate effort metadata:
+
+- `milestoneId` links a task to a roadmap milestone
+- `dependencyIds` records dependencies on other tasks
+- `timeSpentMinutes` stores the approximate cumulative effort
+- `timeSpentNote` stores the latest effort note
+- `timeEntries` stores append-only effort entries with minutes, note, timestamp, and actor
+
+These fields are preserved by workspace sanitizers, backup/import, app restarts, task reads, and the MCP workspace snapshot. Time logging is intentionally estimate-based; Plumy does not provide a stopwatch or billing workflow.
 
 Desktop persistence is now canonical-store aware:
 
@@ -130,6 +141,7 @@ Key storage namespaces use versioned keys (`*.v1`) to support future migrations.
 
 - `TimelineView`: date-positioned task blocks with swimlane tracks
 - `SwimlanesView`/`KanbanView`: status columns with reorder/move behavior
+- `RoadmapView`: milestone scheduling, linked work, and task dependencies
 - task descriptions are edited as plain markdown text and rendered in task details preview surfaces
 - `PeoplePanel`: human and agentic team-member management, load visualization, and agent board-watch configuration
 - `PreferencesPanel`: MCP configuration, diagnostics, audit log export, backup/import, and storage usage
@@ -145,6 +157,8 @@ Backups now include:
 - people
 - projects/swimlanes
 - status columns
+- roadmap milestones and task dependency metadata
+- approximate task time totals and entries
 - preferences
 - MCP settings
 - timeline and kanban UI state
@@ -161,10 +175,11 @@ Plumy includes an MCP endpoint served by Electron main process (`/mcp`, local bi
 Current capabilities include:
 
 - read tools/resources:
-  - `workspace.get_snapshot`
-  - `tasks.list`, `tasks.get`
-  - `cards.kanban.list`, `cards.timeline.list`
-  - `boards.watch.poll`
+  - `workspace_get_snapshot`
+  - `tasks_list`, `tasks_get`
+  - `cards_kanban_list`, `cards_timeline_list`
+  - `boards_watch_poll`
+  - `milestones_list`, `milestones_get`
   - prompts:
     - `agent.find_assigned_work`
     - `agent.execute_task`
@@ -179,18 +194,30 @@ Current capabilities include:
     - `plumy://projects/{projectId}/tasks`
     - `plumy://boards/{statusId}/tasks`
 - gated safe write tools (capability-profile dependent):
-  - `tasks.transition_under_review`
-  - `tasks.update_agent_summary`
-  - `tasks.update_completion_description`
-  - `tasks.complete_and_request_review`
-  - `tasks.attach_file`
-  - `tasks.remove_attachment`
-  - `tasks.move_to_status`
-  - `tasks.move_to_ready_for_human_review`
-  - `tasks.move_to_requires_human_review`
-  - `tasks.assign`
-  - `tasks.add_comment`
-  - `tasks.add_activity_entry`
+  - task lifecycle: `task_write`, `tasks_create`, `tasks_update`, `tasks_update_description`, `tasks_delete`
+  - task files: `tasks_attach_file`, `tasks_remove_attachment`
+  - task effort: `tasks_log_time`
+  - roadmap: `milestones_create`, `milestones_update`, `milestones_link_tasks`, `milestones_delete`
+  - review workflow: `tasks_transition_under_review`, `tasks_complete_and_request_review`, `tasks_move_to_status`, `tasks_move_to_ready_for_human_review`, `tasks_move_to_requires_human_review`
+  - task context: `tasks_update_agent_summary`, `tasks_update_completion_description`, `tasks_assign`, `tasks_add_comment`, `tasks_add_activity_entry`
+
+Client-facing tool names use underscores so they remain compatible with clients that require names matching `^[a-zA-Z0-9_-]{1,64}$`. Internally, the server maps them to the equivalent dotted operation names.
+
+### Roadmap, dependencies, and time logging
+
+`workspace_get_snapshot` and `plumy://workspace` include milestones plus each task's roadmap and time fields. `milestones_list` and `milestones_get` provide targeted roadmap reads.
+
+For roadmap writes:
+
+1. Create standalone tasks with `task_write` or `tasks_create`.
+2. Create a milestone with `milestones_create`; `title` and `endDate` are required.
+3. Use `milestones_link_tasks` as the canonical atomic operation for adding existing tasks to a milestone and setting `dependencyIds`. It requires only the current milestone revision.
+4. Use `milestones_update` for milestone metadata and replace/remove link operations.
+5. Use `milestones_delete` to remove a milestone. It clears affected task `milestoneId` values and roadmap dependency metadata to match the UI deletion behavior.
+
+Milestone and task updates use optimistic revision protection through `expectedRevision`. Invalid task, project, milestone, or dependency references are rejected before the write is committed.
+
+Use `tasks_log_time` with `taskId`, positive `minutes`, optional `note`, and `expectedRevision` to append an approximate time entry and increment `timeSpentMinutes`. Direct task create/update calls may also set the current total and latest note.
 
 Security controls include:
 
@@ -206,16 +233,18 @@ Recommended workflow:
 - agents should start with `plumy://agent/guide` and `plumy://schema/task-execution`
 - use `resources/templates/list` to discover stable lookup URIs before guessing paths
 - use `prompts/list` and `prompts/get` when the MCP client supports prompt-driven workflows
-- use `workspace.get_snapshot` or `plumy://workspace` for the canonical top-level read
+- use `workspace_get_snapshot` or `plumy://workspace` for the canonical top-level read
 - use `plumy://agents/{personId}/assigned` to find assigned work without guessing filter shapes
-- use `tasks.list`, `tasks.get`, `cards.kanban.list`, and `cards.timeline.list` for targeted reads
-- use `boards.watch.poll` when an agent needs to monitor a specific status/board without duplicate processing
+- use `tasks_list`, `tasks_get`, `cards_kanban_list`, and `cards_timeline_list` for targeted reads
+- use `milestones_list` and `milestones_get` for targeted roadmap reads
+- use `boards_watch_poll` when an agent needs to monitor a specific status/board without duplicate processing
 - use revision-protected write tools only after reading the current task revision
+- use `milestones_link_tasks` instead of ordinary task updates for milestone membership and dependency changes
 - keep the task description focused on the problem statement and use:
   - `agentSummary` for brief execution summary
   - comments for human-readable conversation
   - activity entries for structured machine-side progress notes
-- when work is complete, prefer `tasks.complete_and_request_review` for a single safe handoff path
+- when work is complete, prefer `tasks_complete_and_request_review` for a single safe handoff path
 - if a more manual flow is needed, update the description briefly and move the task into the review board explicitly
 
 Operational checks:

@@ -57,6 +57,10 @@ test('workspace snapshot contract has expected keys and stable counts', () => {
   assert.ok(Array.isArray(snapshot.workspace.people));
   assert.ok(Array.isArray(snapshot.workspace.projects));
   assert.ok(Array.isArray(snapshot.workspace.statusColumns));
+  assert.equal(
+    snapshot.workspace.people.find(person => person.id === 'agent-1')?.agentInstructions,
+    'Use the durable Codex persona instructions when working assigned tasks.'
+  );
   assert.equal(snapshot.meta.counts.tasks, snapshot.workspace.tasks.length);
   assert.equal(snapshot.meta.counts.milestones, snapshot.workspace.milestones.length);
   assert.equal(snapshot.meta.counts.people, snapshot.workspace.people.length);

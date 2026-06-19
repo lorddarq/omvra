@@ -1,6 +1,6 @@
 import { Task, TimelineSwimlane, Person, TaskStatus, StatusColumn, ProjectMilestone } from '../types';
 import { useMemo, useState } from 'react';
-import { FolderSearch, Paperclip } from 'lucide-react';
+import { Check, Copy, FolderSearch, Paperclip, TriangleAlert } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,7 @@ import { Textarea } from '@/app/components/ui/textarea';
 import { MarkdownContent } from './MarkdownContent';
 import { getTaskLoadContributionPercent, getTaskLoadPoints, PERSON_CAPACITY_POINTS } from '../utils/taskLoad';
 import { getMilestoneForTask } from '../utils/roadmap';
+import { formatTaskDetailsForClipboard } from '../utils/taskClipboard';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 
 interface TaskDetailsDialogProps {
@@ -60,6 +61,7 @@ export function TaskDetailsDialog({
   readModel,
 }: TaskDetailsDialogProps) {
   const [newComment, setNewComment] = useState('');
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const enrichedTask = task ? readModel?.tasksById.get(task.id) : undefined;
   const primaryTimelineProject = enrichedTask?.primaryTimelineProject?.name
     ?? (task?.swimlaneId
@@ -118,6 +120,41 @@ export function TaskDetailsDialog({
     setNewComment('');
   };
 
+  const handleCopyTaskDetails = async () => {
+    if (!task) return;
+
+    const text = formatTaskDetailsForClipboard({
+      taskId: task.id,
+      title: task.title,
+      assigneeLabel: personLabel,
+      projectLabels,
+      statusLabel,
+    });
+
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else if (typeof window !== 'undefined') {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      } else {
+        throw new Error('Clipboard is unavailable');
+      }
+
+      setCopyState('copied');
+      window.setTimeout(() => setCopyState('idle'), 1400);
+    } catch {
+      setCopyState('failed');
+      window.setTimeout(() => setCopyState('idle'), 1800);
+    }
+  };
+
   const handleRevealAttachment = async (filePath: string) => {
     await window.electron?.attachments?.reveal?.(filePath);
   };
@@ -126,7 +163,31 @@ export function TaskDetailsDialog({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-[760px]">
         <DialogHeader>
-          <DialogTitle>{task?.title || 'Task details'}</DialogTitle>
+          <div className="flex items-start justify-between gap-3 pr-8">
+            <DialogTitle className="break-words [overflow-wrap:anywhere]">
+              {task?.title || 'Task details'}
+            </DialogTitle>
+            {task && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-[-2px] shrink-0"
+                aria-label="Copy task details"
+                title="Copy task details"
+                onClick={handleCopyTaskDetails}
+              >
+                {copyState === 'copied' ? (
+                  <Check className="size-4" />
+                ) : copyState === 'failed' ? (
+                  <TriangleAlert className="size-4" />
+                ) : (
+                  <Copy className="size-4" />
+                )}
+                {copyState === 'copied' ? 'Copied' : copyState === 'failed' ? 'Failed' : 'Copy'}
+              </Button>
+            )}
+          </div>
           <DialogDescription>Review task details and markdown description.</DialogDescription>
         </DialogHeader>
 

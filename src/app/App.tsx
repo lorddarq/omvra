@@ -174,14 +174,7 @@ function App() {
   
   const [people, setPeople] = useState<Person[]>(() => {
     const stored = readInitialWorkspaceJSON<Person[]>(PEOPLE_KEY, DEFAULT_PEOPLE_SEED);
-    
-    // Migrate: Ensure all people have colors
-    const defaultColors = ['#ec4899', '#f97316', '#eab308', '#06b6d4', '#8b5cf6', '#10b981'];
-    return stored.map((person, index) => ({
-      ...person,
-      kind: person.kind === 'agentic' ? 'agentic' : 'human',
-      color: person.color || defaultColors[index % defaultColors.length]
-    }));
+    return sanitizePeople(stored, DEFAULT_PEOPLE_SEED);
   });
 
   const [milestones, setMilestones] = useState<ProjectMilestone[]>(() => {

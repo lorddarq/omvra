@@ -15,7 +15,14 @@
   ],
   "plumy.people.v1": [
     { "id": "person-1", "name": "Alex", "kind": "human", "role": "Designer", "color": "#ec4899" },
-    { "id": "agent-1", "name": "Codex", "kind": "agentic", "role": "Agent", "color": "#f97316" }
+    {
+      "id": "agent-1",
+      "name": "Codex",
+      "kind": "agentic",
+      "role": "Agent",
+      "color": "#f97316",
+      "agentInstructions": "Use the durable Codex persona instructions when working assigned tasks."
+    }
   ],
   "plumy.tasks.v1": [
     {

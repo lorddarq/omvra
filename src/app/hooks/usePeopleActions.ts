@@ -19,6 +19,7 @@ export function usePeopleActions({
       role: personData.role,
       kind: personData.kind === 'agentic' ? 'agentic' : 'human',
       avatar: personData.avatar,
+      agentInstructions: personData.kind === 'agentic' ? personData.agentInstructions?.trim() || undefined : undefined,
     };
     setPeople(prevPeople => [...prevPeople, newPerson]);
   }, [setPeople]);
@@ -29,8 +30,20 @@ export function usePeopleActions({
     onDeleteAgentWatchConfig(personId);
   }, [onDeleteAgentWatchConfig, setPeople, setTasks]);
 
-  const updatePerson = useCallback((personId: string, updates: Pick<Person, 'name' | 'role' | 'kind'>) => {
-    setPeople(prevPeople => prevPeople.map(p => (p.id === personId ? { ...p, ...updates } : p)));
+  const updatePerson = useCallback((
+    personId: string,
+    updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions'>
+  ) => {
+    setPeople(prevPeople => prevPeople.map(p => {
+      if (p.id !== personId) return p;
+      const nextKind = updates.kind === 'agentic' ? 'agentic' : 'human';
+      return {
+        ...p,
+        ...updates,
+        kind: nextKind,
+        agentInstructions: nextKind === 'agentic' ? updates.agentInstructions?.trim() || undefined : undefined,
+      };
+    }));
   }, [setPeople]);
 
   const reorderPeople = useCallback((reorderedPeople: Person[]) => {

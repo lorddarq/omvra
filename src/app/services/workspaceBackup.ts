@@ -271,6 +271,9 @@ export function sanitizePeople(value: unknown, fallback: Person[] = []): Person[
         kind: (candidate.kind === 'agentic' ? 'agentic' : 'human') as Person['kind'],
         avatar: typeof candidate.avatar === 'string' ? candidate.avatar : undefined,
         color: typeof candidate.color === 'string' ? candidate.color : defaultColors[index % defaultColors.length],
+        agentInstructions: candidate.kind === 'agentic' && typeof candidate.agentInstructions === 'string'
+          ? candidate.agentInstructions.trim() || undefined
+          : undefined,
       };
     })
     .filter((item): item is NonNullable<typeof item> => item !== null);

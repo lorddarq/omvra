@@ -4,6 +4,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
+import { Textarea } from './ui/textarea';
 import { Edit2, Plus, User, Bot, Trash2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { getLoadPercentageForTasks } from '../utils/taskLoad';
@@ -37,7 +38,7 @@ interface PeoplePanelProps {
     error?: string;
   }>;
   onAddPerson: (person: Omit<Person, 'id'>) => void;
-  onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind'>) => void;
+  onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions'>) => void;
   onDeletePerson: (personId: string) => void;
   onSaveAgentWatchConfig: (config: {
     personId: string;
@@ -73,10 +74,12 @@ export function PeoplePanel({
   const [newName, setNewName] = useState('');
   const [newRole, setNewRole] = useState('');
   const [newKind, setNewKind] = useState<'human' | 'agentic'>('human');
+  const [newAgentInstructions, setNewAgentInstructions] = useState('');
   const [editingPersonId, setEditingPersonId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editRole, setEditRole] = useState('');
   const [editKind, setEditKind] = useState<'human' | 'agentic'>('human');
+  const [editAgentInstructions, setEditAgentInstructions] = useState('');
 
   function getAgentWatchConfig(personId: string) {
     return agentWatchConfigs.find(config => config.personId === personId) || {
@@ -120,10 +123,12 @@ export function PeoplePanel({
       name: newName.trim(),
       role: newRole.trim() || 'Team Member',
       kind: newKind,
+      agentInstructions: newKind === 'agentic' ? newAgentInstructions.trim() || undefined : undefined,
     });
     setNewName('');
     setNewRole('');
     setNewKind('human');
+    setNewAgentInstructions('');
     setIsAdding(false);
   }
 
@@ -132,6 +137,7 @@ export function PeoplePanel({
     setEditName(person.name);
     setEditRole(person.role);
     setEditKind(person.kind === 'agentic' ? 'agentic' : 'human');
+    setEditAgentInstructions(person.agentInstructions || '');
   }
 
   function cancelEditPerson() {
@@ -139,6 +145,7 @@ export function PeoplePanel({
     setEditName('');
     setEditRole('');
     setEditKind('human');
+    setEditAgentInstructions('');
   }
 
   function saveEditedPerson(personId: string) {
@@ -147,6 +154,7 @@ export function PeoplePanel({
       name: editName.trim(),
       role: editRole.trim() || 'Team Member',
       kind: editKind,
+      agentInstructions: editKind === 'agentic' ? editAgentInstructions.trim() || undefined : undefined,
     });
     cancelEditPerson();
   }
@@ -196,6 +204,21 @@ export function PeoplePanel({
                   </SelectContent>
                 </Select>
               </div>
+              {newKind === 'agentic' && (
+                <div className="space-y-2">
+                  <Label htmlFor="person-agent-instructions">Agent instructions</Label>
+                  <Textarea
+                    id="person-agent-instructions"
+                    value={newAgentInstructions}
+                    onChange={(e) => setNewAgentInstructions(e.target.value)}
+                    placeholder="Describe how this agent should approach assigned tasks..."
+                    className="min-h-[120px] resize-y"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Reused whenever tasks are assigned to this agentic persona.
+                  </p>
+                </div>
+              )}
               <div className="flex gap-2">
                 <Button onClick={handleAddPerson} size="sm">Add</Button>
                 <Button
@@ -204,6 +227,7 @@ export function PeoplePanel({
                     setNewName('');
                     setNewRole('');
                     setNewKind('human');
+                    setNewAgentInstructions('');
                   }}
                   variant="outline"
                   size="sm"
@@ -240,6 +264,7 @@ export function PeoplePanel({
                     : 'text-emerald-600';
               const watchConfig = getAgentWatchConfig(person.id);
               const watchRuntime = agentWatchRuntime[person.id];
+              const editInstructionsId = `person-agent-instructions-${person.id}`;
               
               return (
                 <div key={person.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
@@ -253,7 +278,7 @@ export function PeoplePanel({
                         )}
                       </div>
                       {isEditing ? (
-                        <div className="space-y-2">
+                        <div className="min-w-[240px] flex-1 space-y-2">
                           <Input
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
@@ -275,6 +300,21 @@ export function PeoplePanel({
                               <SelectItem value="agentic">Agentic (sub-agent)</SelectItem>
                             </SelectContent>
                           </Select>
+                          {editKind === 'agentic' && (
+                            <div className="space-y-1">
+                              <Label htmlFor={editInstructionsId} className="text-xs">Agent instructions</Label>
+                              <Textarea
+                                id={editInstructionsId}
+                                value={editAgentInstructions}
+                                onChange={(e) => setEditAgentInstructions(e.target.value)}
+                                placeholder="Describe how this agent should approach assigned tasks..."
+                                className="min-h-[112px] resize-y text-sm"
+                              />
+                              <p className="text-xs text-gray-500">
+                                Reused whenever tasks are assigned to this agentic persona.
+                              </p>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div>

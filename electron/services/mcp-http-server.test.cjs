@@ -750,6 +750,7 @@ test('template resources resolve assigned work, project work, and board work', (
     name: 'Codex',
     role: 'Agent',
     kind: 'agentic',
+    agentInstructions: 'Use the durable Codex persona instructions when working assigned tasks.',
   });
   assert.equal(assignedWork.summary.totalTasks, 2);
   assert.deepEqual(

@@ -250,6 +250,9 @@ export function sanitizePeople(value: unknown, fallback: Person[] = []): Person[
         kind: (item.kind === 'agentic' ? 'agentic' : 'human') as Person['kind'],
         avatar: typeof item.avatar === 'string' ? item.avatar : undefined,
         color: typeof item.color === 'string' ? item.color : defaultColors[index % defaultColors.length],
+        agentInstructions: item.kind === 'agentic' && typeof item.agentInstructions === 'string'
+          ? item.agentInstructions.trim() || undefined
+          : undefined,
       };
     })
     .filter(item => item !== null) as Person[];

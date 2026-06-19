@@ -625,12 +625,26 @@ function getMilestoneById(store, milestoneId) {
   return listMilestones(store).find(milestone => milestone.id === normalizedMilestoneId) || null;
 }
 
+function normalizePersonForMcp(person) {
+  if (!person || typeof person !== 'object') return person;
+  const kind = person.kind === 'agentic' ? 'agentic' : 'human';
+  const agentInstructions = kind === 'agentic'
+    ? normalizeString(person.agentInstructions).trim()
+    : '';
+
+  return {
+    ...person,
+    kind,
+    agentInstructions: agentInstructions || undefined,
+  };
+}
+
 function getWorkspaceSnapshot(store) {
   // TODO(next-phase): unify storage source of truth. The renderer currently persists
   // most workspace state in localStorage; MCP should read from a canonical backend store.
   const tasks = readArray(store, TASKS_KEY).map(normalizeTaskForMcp);
   const milestones = listMilestones(store);
-  const people = readArray(store, PEOPLE_KEY);
+  const people = readArray(store, PEOPLE_KEY).map(normalizePersonForMcp);
   const projects = readArray(store, SWIMLANES_KEY);
   const statusColumns = readArray(store, STATUS_COLUMNS_KEY);
 
@@ -776,6 +790,7 @@ function listAssignedWorkForAgent(store, {
       name: person.name,
       role: person.role,
       kind: person.kind,
+      agentInstructions: normalizeString(person.agentInstructions).trim() || undefined,
     },
     filters: {
       status: filters.status || null,
@@ -888,6 +903,7 @@ function buildMcpAgentGuide() {
       'Read the guide and task-execution schema before taking action.',
       'Use resources/templates/list to discover stable lookup URIs.',
       'Inspect plumy://workspace for the overall state, then read the assigned task resource.',
+      'Resolve durable persona instructions from task.assigneeId -> workspace.people/person -> agentInstructions when present.',
       'Read current task data before writing, and pass expectedRevision on every write.',
       'For roadmap membership and intertask dependencies, use milestones.link_tasks as the single canonical write path.',
       'Keep completion notes brief, then move the task to the appropriate review board.',
@@ -967,6 +983,7 @@ function buildMcpTaskExecutionSchema() {
     ],
     lookupHints: [
       'Use tasks.list with assigneeId to find assigned work.',
+      'Use plumy://agents/{personId}/assigned to read the agentic persona metadata, including agentInstructions when present.',
       'Use task_write to log new bug-hunting or follow-up tasks with metadata.',
       'Use boards.watch.poll to watch a board for changes.',
       'Use cards.kanban.list for board-friendly projections.',

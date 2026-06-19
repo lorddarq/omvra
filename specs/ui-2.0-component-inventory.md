@@ -20,20 +20,24 @@ The app already has useful surface-level composition, but most panel and dialog 
 | People and agents | `src/app/components/PeoplePanel.tsx` | One large `Sheet` with person create/edit cards, load badges, agent instructions, and agent board watch controls. | Split into People/Agents settings sections. Move board-watch controls into Tasks settings. |
 | Task edit | `src/app/components/TaskDialog.tsx` | Large dialog with form state, project/milestone/dependency logic, attachments, and footer actions. Already partly styled toward UI 2.0. | Reuse form logic initially; wrap in anchored panel shell later. Extract sections after Settings proves the primitive. |
 | Task details | `src/app/components/TaskDetailsDialog.tsx` | Dialog with summary grid, projects, markdown description, attachments, comments, copy, and agent review action. | Good candidate for detail/read-only anchored panel sections. |
+| Task details action menu | `src/app/components/TaskDetailsDialog.tsx` | Task details currently exposes actions directly in the dialog surface. | Split as a small structural task before PDF export and before final task-details styling. |
 | Kanban | `src/app/components/KanbanView.tsx`, `SwimlanesView.tsx`, `DroppableColumn.tsx`, `TaskCard.tsx` | Modular by board/column/card, with drag/reorder and filter logic spread across view/column components. | Mostly visual refresh after inventory. Keep behavior in place. |
 | Timeline | `src/app/components/TimelineView.tsx` and timeline subcomponents | Most modular view, but `TimelineView` still owns scroll, sizing, persistence, virtualization, drag resize, and mode state. | Visual refresh and later layout extraction; avoid moving logic before anchored panel work is proven. |
+| Agent/MCP status bar | App shell/header area, likely near `src/app/components/AppHeader.tsx` | New compact shell surface from UI 2.0 showing active/inactive agents and MCP running state. | Mostly presentational. Build after inventory; no anchored panel dependency unless shell extraction reveals one. |
 | Milestones/Roadmap | `src/app/components/RoadmapView.tsx`, `MilestoneDialog.tsx`, `MilestoneDetailsDialog.tsx` | Roadmap has timeline/chart helpers and filters. Dialogs have summary/link/dependency sections. | Secondary rollout after core panels; extract reusable milestone cards/sections if styling work repeats. |
 
 ## Recommended Implementation Sequence
 
-1. Build shared anchored panel primitives.
-2. Migrate Settings to anchored sections, including moving board watch controls into Tasks settings.
-3. Componentize People and Agents cards/editors and mount them as Settings sections.
-4. Reuse the anchored panel shell for Task Details and Task Edit.
-5. Refresh Kanban styling with existing board/column/card behavior intact.
-6. Refresh Timeline styling with existing timeline behavior intact.
-7. Roll out shared styling to Milestones, dialogs, empty states, and diagnostics.
-8. Run visual readiness QA and create follow-up tasks for any missed states.
+1. Build the small UI 2.0 shell/status-bar surface after this inventory, because it is mostly UI and has low behavior risk.
+2. Build shared anchored panel primitives.
+3. Migrate Settings to anchored sections, including moving board watch controls into Tasks settings.
+4. Componentize People and Agents cards/editors and mount them as Settings sections.
+5. Build the consolidated task details action menu before PDF export and before broad task details styling.
+6. Reuse the anchored panel shell for Task Details and Task Edit.
+7. Refresh Kanban styling with existing board/column/card behavior intact.
+8. Refresh Timeline styling with existing timeline behavior intact.
+9. Roll out shared styling to Milestones, dialogs, empty states, and diagnostics.
+10. Run visual readiness QA and create follow-up tasks for any missed states.
 
 ## Shared Primitives to Add
 
@@ -219,6 +223,7 @@ Primary sources:
 | --- | --- | --- | --- |
 | `TaskPanel` | container | New after Settings | Anchored panel wrapper for read/edit modes. |
 | `TaskPanelNav` | configuration | New | Basic Information, Dependencies, Attachments, Comments, Activity/Agent Summary. |
+| `TaskDetailsActionMenu` | component | Extract before PDF export | Three-dot menu with Edit, Copy Task Info, and Export PDF. Keep Delete and Close outside unless design changes. |
 | `TaskSummarySection` | section | Extract from details | Status, assignee, priority, blocked, dates, size, complexity. |
 | `TaskProjectsSection` | section | Extract/shared | Project pills and primary timeline project. |
 | `TaskDescriptionSection` | section | Extract/shared | Markdown read mode and textarea edit mode. |
@@ -238,6 +243,8 @@ Primary sources:
 - Markdown normalization on save.
 - Agentic task "Move to In Review" behavior.
 - Details copy behavior.
+- Existing edit entry point behavior when moved into the three-dot menu.
+- Export PDF action placement as a menu item, without implementing PDF generation in the menu task.
 
 ### Visual Readiness States
 
@@ -251,6 +258,46 @@ Primary sources:
 - Dependency candidate empty/populated/cycle-disabled.
 - Invalid date range.
 - Footer with delete, update, close, and move-to-review combinations.
+- Three-dot action menu closed/open, keyboard-focused, Escape-dismissed, and narrow-width states.
+
+## Agent and MCP Status Bar Inventory
+
+Primary likely source:
+- `src/app/components/AppHeader.tsx`
+
+Related state sources to verify during implementation:
+- People/agent list state from `App.tsx` and `PeoplePanel` data flow.
+- MCP listener and health state currently passed through `PreferencesPanel`/MCP hooks.
+
+### Current Componentization
+
+There is not yet a dedicated status bar component. The current app shell has header/view controls and the MCP/agent state exists elsewhere in settings and runtime hooks. UI 2.0 adds a small shell area that should summarize this state without becoming a management surface.
+
+### Extraction Candidates
+
+| Candidate | Type | Recommendation | Notes |
+| --- | --- | --- | --- |
+| `AppStatusBar` | component | New early shell component | Compact visual row for agent and MCP status. |
+| `AgentAvailabilityIndicator` | component | New or inline first | Shows active and inactive/unavailable agent counts from existing people state. |
+| `McpStatusIndicator` | component | New or inline first | Shows MCP running/offline/unknown from existing renderer state. |
+
+### Behavior to Preserve
+
+- Do not introduce noisy polling if existing MCP state or health checks are enough.
+- Do not move MCP configuration into the status bar.
+- Do not move agent management into the status bar.
+- Keep the header/view switching behavior unchanged.
+
+### Visual Readiness States
+
+- MCP running.
+- MCP offline/unavailable.
+- MCP unknown/loading.
+- Zero agents.
+- Some active and some inactive agents.
+- All active agents.
+- All inactive/unavailable agents.
+- Narrow app width without overlapping view controls.
 
 ## Kanban Inventory
 

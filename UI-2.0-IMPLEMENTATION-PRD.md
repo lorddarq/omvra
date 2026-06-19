@@ -206,7 +206,30 @@ Advanced
 
 The existing task save, update, delete, dependency, attachment, and comment behavior must remain intact.
 
-### 8.4 Kanban relationship to UI 2.0
+Task details should also gain a small consolidated action menu before PDF export and before broad styling polish:
+
+```text
+...
+Edit
+Copy Task Info
+Export PDF
+```
+
+This menu is a structural action-surface task, not the PDF export implementation itself. Delete and Close should stay outside the menu unless a later design explicitly moves them.
+
+### 8.4 App status bar
+
+UI 2.0 includes a compact status bar area for operational awareness:
+
+```text
+Active agents
+Inactive agents
+MCP running/offline
+```
+
+This should be an early, mostly-presentational shell task after component inventory. It should reuse existing people/agent and MCP state where available, avoid noisy polling, and avoid becoming a management or configuration surface.
+
+### 8.5 Kanban relationship to UI 2.0
 
 Kanban should remain a horizontal board/work surface. It should not use the anchored panel pattern for the board itself.
 
@@ -265,7 +288,27 @@ Acceptance:
 - [ ] The first anchored-panel adoption target is identified.
 - [ ] Known risky behavior paths are documented.
 
-### Phase 2: Add Shared Anchored Panel Primitive
+### Phase 2: App Status Bar
+
+Goal: add the low-risk UI 2.0 shell/status surface before the heavier anchored-panel refactor.
+
+Tasks:
+
+- [ ] Confirm status bar placement from the Figma node and current app shell.
+- [ ] Add a compact status bar component.
+- [ ] Show active agent count.
+- [ ] Show inactive/unavailable agent count.
+- [ ] Show MCP running/offline/unknown state.
+- [ ] Reuse existing app state or lightweight health state.
+- [ ] Verify narrow-width behavior.
+
+Acceptance:
+
+- [ ] Status bar displays agent availability and MCP status.
+- [ ] The component stays utilitarian and does not introduce management workflows.
+- [ ] No unrelated app shell refactor is required.
+
+### Phase 3: Add Shared Anchored Panel Primitive
 
 Goal: introduce the shared layout shell without changing major feature behavior.
 
@@ -288,7 +331,7 @@ Acceptance:
 - [ ] The active nav item updates when users navigate or scroll.
 - [ ] The primitive is not hard-coded to Settings.
 
-### Phase 3: Settings IA Refactor and Board Watch Move
+### Phase 4: Settings IA Refactor and Board Watch Move
 
 Goal: migrate Settings into anchored sections and move board watch controls into Tasks settings.
 
@@ -312,7 +355,7 @@ Acceptance:
 - [ ] Back closes Settings.
 - [ ] Direct anchors can open Settings at Tasks, MCP, Data, MCP Activity, or MCP Testing.
 
-### Phase 4: People and Agents Componentization
+### Phase 5: People and Agents Componentization
 
 Goal: move occasional people/agent management into Settings and prepare for agent persona instructions.
 
@@ -335,7 +378,26 @@ Acceptance:
 - [ ] Existing add/edit/delete behavior still works.
 - [ ] Agent cards and editor forms are ready for `agentInstructions` in a separate feature slice.
 
-### Phase 5: Task Details/Edit Anchored Panel Refactor
+### Phase 6: Consolidated Task Details Action Menu
+
+Goal: create the task-details three-dot menu that downstream task actions use.
+
+Tasks:
+
+- [ ] Add a top-right three-dot action menu to Task Details.
+- [ ] Move Edit into the menu while preserving the existing edit flow.
+- [ ] Move Copy Task Info into the menu while preserving the current copied payload.
+- [ ] Add Export PDF as the designated menu item for the PDF export task.
+- [ ] Keep Delete and Close outside the menu.
+- [ ] Verify keyboard focus, Escape, outside click, and narrow-width behavior.
+
+Acceptance:
+
+- [ ] Task Details exposes Edit, Copy Task Info, and Export PDF from one menu.
+- [ ] Existing edit and copy behavior still works.
+- [ ] PDF export has a clear action surface before its implementation task begins.
+
+### Phase 7: Task Details/Edit Anchored Panel Refactor
 
 Goal: reuse the anchored panel architecture for task details and task editing.
 
@@ -355,7 +417,7 @@ Acceptance:
 - [ ] Long notes, dependencies, attachments, and comments remain usable.
 - [ ] Existing task tests and manual flows continue to pass.
 
-### Phase 6: Kanban Visual Refresh
+### Phase 8: Kanban Visual Refresh
 
 Goal: align Kanban with UI 2.0 styling while leaving board semantics intact.
 
@@ -376,7 +438,7 @@ Acceptance:
 - [ ] Real long task titles and multi-project cards do not break layout.
 - [ ] The board remains a working surface, not an anchored panel.
 
-### Phase 7: Progressive Styling Rollout
+### Phase 9: Progressive Styling Rollout
 
 Goal: apply visual refinements view by view after the layout architecture is stable.
 
@@ -475,12 +537,14 @@ Overall: medium-high.
 Suggested effort:
 
 - Phase 1: 0.5-1 day.
-- Phase 2: 1-2 days.
-- Phase 3: 1.5-3 days.
+- Phase 2: 0.5-1 day.
+- Phase 3: 1-2 days.
 - Phase 4: 1.5-3 days.
-- Phase 5: 2-4 days.
-- Phase 6: 1-2 days.
-- Phase 7: ongoing, view-by-view.
+- Phase 5: 1.5-3 days.
+- Phase 6: 0.5-1 day.
+- Phase 7: 2-4 days.
+- Phase 8: 1-2 days.
+- Phase 9: ongoing, view-by-view.
 
 Practical first slice:
 
@@ -499,4 +563,3 @@ Estimated first slice: 3-5 days.
 3. Should task edit and task details share one container with mode-specific sections, or remain two shells that reuse the same primitives?
 4. Should MCP Activity remain in Settings long term, or become an operational debug surface accessible from the status bar?
 5. Should board watch remain global in Tasks settings after UI 2.0, or should a later PRD move it to column-level metadata?
-

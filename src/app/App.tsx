@@ -1041,6 +1041,11 @@ function App() {
         tasks={tasks}
         timelineSwimlanes={timelineSwimlanes}
         people={people}
+        agentWatchConfigs={agentWatchConfigs}
+        agentWatchRuntime={agentWatchRuntime}
+        mcpAgentAccessEnabled={preferences.mcpAgentAccessEnabled}
+        mcpListenerStatus={mcpListenerStatus}
+        mcpRestartPending={isMcpRestartPending}
         statusColumns={statusColumns}
         milestones={milestones}
         readModel={workspaceReadModel}

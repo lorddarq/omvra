@@ -4,7 +4,6 @@ import {
   Sheet,
   SheetContent,
   SheetDescription,
-  SheetHeader,
   SheetTitle,
 } from './ui/sheet';
 import { Label } from './ui/label';
@@ -13,6 +12,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Copy, Download, RefreshCcw } from 'lucide-react';
 import { McpHealthCheckResult } from '../services/mcp/types';
+import { AnchoredPanel, AnchoredPanelSection } from './AnchoredPanel';
 
 interface PreferencesPanelProps {
   isOpen: boolean;
@@ -159,6 +159,33 @@ export function PreferencesPanel({
 
   const retryGuidance = 'If a write returns REVISION_MISMATCH, re-read the task, use the latest __mcpRevision, then retry once.';
   const auditLogJson = JSON.stringify(mcpAuditLog, null, 2);
+  const panelNavGroups = [
+    {
+      label: 'Settings',
+      items: [
+        {
+          id: 'mcp-access',
+          label: 'MCP access',
+          description: 'Agent access, listener, and commands',
+        },
+        {
+          id: 'task-load',
+          label: 'Task load',
+          description: 'Execution and pipeline columns',
+        },
+      ],
+    },
+    {
+      label: 'Data',
+      items: [
+        {
+          id: 'storage',
+          label: 'Storage',
+          description: 'Usage, backup, and reset',
+        },
+      ],
+    },
+  ];
 
   const isRemoteMcpAddress = (() => {
     try {
@@ -352,15 +379,23 @@ export function PreferencesPanel({
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
-        <SheetHeader className="px-6">
-          <SheetTitle>Preferences</SheetTitle>
-          <SheetDescription>
-            Configure how team load is calculated in the People panel.
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-6 px-6 space-y-6">
+      <SheetContent className="w-[min(980px,calc(100vw-32px))] gap-0 overflow-hidden p-0 sm:max-w-none" showClose={false}>
+        <SheetTitle className="sr-only">Preferences</SheetTitle>
+        <SheetDescription className="sr-only">
+          Configure agent access, task load, and local workspace data.
+        </SheetDescription>
+        <AnchoredPanel
+          title="Preferences"
+          description="Configure agent access, task load, and local workspace data."
+          navGroups={panelNavGroups}
+          initialAnchor="mcp-access"
+          onClose={onClose}
+        >
+          <AnchoredPanelSection
+            id="mcp-access"
+            title="MCP access"
+            description="Configure the local MCP listener, external access, and generated agent commands."
+          >
           <div className="space-y-3 rounded-lg border p-4">
             <div className="text-sm font-semibold text-gray-900">Agent MCP access</div>
             <div className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-2">
@@ -678,7 +713,13 @@ export function PreferencesPanel({
               </div>
             )}
           </div>
+          </AnchoredPanelSection>
 
+          <AnchoredPanelSection
+            id="task-load"
+            title="Task load"
+            description="Choose which status columns count toward execution and pipeline load."
+          >
           <div className="space-y-2">
             <Label htmlFor="execution-load-status">Execution load column</Label>
             <Select
@@ -722,7 +763,13 @@ export function PreferencesPanel({
               Tasks in this column count toward pipeline pressure.
             </p>
           </div>
+          </AnchoredPanelSection>
 
+          <AnchoredPanelSection
+            id="storage"
+            title="Storage"
+            description="Review local storage usage and manage workspace backups."
+          >
           <div className="space-y-3 rounded-lg border p-4">
             <div className="text-sm font-semibold text-gray-900">Storage usage</div>
             <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
@@ -773,7 +820,8 @@ export function PreferencesPanel({
               Nuke local storage
             </Button>
           </div>
-        </div>
+          </AnchoredPanelSection>
+        </AnchoredPanel>
       </SheetContent>
     </Sheet>
   );

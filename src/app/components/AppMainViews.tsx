@@ -3,6 +3,8 @@ import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { Task, TimelineSwimlane, Person, TaskStatus, StatusColumn, ProjectMilestone } from '../types';
 import { ViewType } from '../hooks/useViewState';
+import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
+import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import { TimelineView } from './TimelineView';
 import { KanbanView } from './KanbanView';
@@ -17,6 +19,11 @@ export interface AppMainViewsProps {
   tasks: Task[];
   timelineSwimlanes: TimelineSwimlane[];
   people: Person[];
+  agentWatchConfigs: AgentWatchConfig[];
+  agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
+  mcpAgentAccessEnabled: boolean;
+  mcpListenerStatus: McpListenerStatus | null;
+  mcpRestartPending: boolean;
   statusColumns: StatusColumn[];
   milestones: ProjectMilestone[];
   readModel: WorkspaceReadModel;
@@ -54,6 +61,11 @@ export function AppMainViews({
   tasks,
   timelineSwimlanes,
   people,
+  agentWatchConfigs,
+  agentWatchRuntime,
+  mcpAgentAccessEnabled,
+  mcpListenerStatus,
+  mcpRestartPending,
   statusColumns,
   milestones,
   readModel,
@@ -89,6 +101,11 @@ export function AppMainViews({
             tasks={tasks}
             swimlanes={timelineSwimlanes}
             people={people}
+            agentWatchConfigs={agentWatchConfigs}
+            agentWatchRuntime={agentWatchRuntime}
+            mcpAgentAccessEnabled={mcpAgentAccessEnabled}
+            mcpListenerStatus={mcpListenerStatus}
+            mcpRestartPending={mcpRestartPending}
             statusColumns={statusColumns}
             initialScrollLeft={timelineInitialScrollLeft}
             onTaskClick={onTimelineTaskClick}

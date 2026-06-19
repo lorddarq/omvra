@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { generateMcpAccessToken, getMcpSettingsSignature } from '../utils/mcpPreferences.ts';
 import type { McpPreferencesShape } from '../utils/mcpPreferences.ts';
 
@@ -54,6 +54,33 @@ export function useMcpPanelState<TPreferences extends McpPreferencesShape>({
       // Keep the last known audit log if the bridge is temporarily unavailable.
     }
   }, []);
+
+  useEffect(() => {
+    if (!preferences.mcpAgentAccessEnabled) return;
+
+    let cancelled = false;
+    const refreshStatus = async () => {
+      if (cancelled) return;
+      await refreshMcpListenerStatus();
+    };
+
+    void refreshStatus();
+
+    if (mcpListenerStatus?.status !== 'starting') {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const intervalId = window.setInterval(() => {
+      void refreshStatus();
+    }, 750);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [mcpListenerStatus?.status, preferences.mcpAgentAccessEnabled, refreshMcpListenerStatus]);
 
   const handleRestartMcpServer = useCallback(async () => {
     try {

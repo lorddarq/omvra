@@ -158,6 +158,8 @@ test('useMcpPanelState tracks listener status, audit logs, and restart flow', as
       },
     },
     alert: () => {},
+    setInterval: global.setInterval.bind(global),
+    clearInterval: global.clearInterval.bind(global),
   });
 
   try {
@@ -213,6 +215,78 @@ test('useMcpPanelState tracks listener status, audit logs, and restart flow', as
     const restarted = harness.result();
     assert.equal(healthCheckRuns, 1);
     assert.equal(restarted.isMcpRestartPending, false);
+
+    await harness.unmount();
+  } finally {
+    (globalThis as any).window = originalWindow;
+  }
+});
+
+test('useMcpPanelState refreshes listener status while MCP is starting', async () => {
+  const originalWindow = setWindowMock({
+    electron: {
+      mcp: {
+        getListenerStatus: async () => ({
+          ok: true,
+          data: {
+            enabled: true,
+            status: 'running',
+            listening: true,
+            boundUrl: 'http://127.0.0.1:3456/mcp',
+          },
+        }),
+        getAuditLog: async () => ({
+          ok: true,
+          data: [],
+        }),
+        restartServer: async () => ({
+          success: true,
+          listenerStatus: {
+            enabled: true,
+            status: 'starting',
+            listening: false,
+          },
+        }),
+      },
+    },
+    alert: () => {},
+    setInterval: global.setInterval.bind(global),
+    clearInterval: global.clearInterval.bind(global),
+  });
+
+  try {
+    const preferences: McpPreferencesShape = {
+      mcpAgentAccessEnabled: true,
+      mcpCapabilityProfile: 'task_write',
+      mcpBindHost: '127.0.0.1',
+      mcpPort: 3456,
+      mcpServerAddress: 'http://127.0.0.1:3456/mcp',
+      mcpAccessToken: '',
+      mcpAccessTokenTtlMinutes: 60,
+    };
+    const setPreferences: React.Dispatch<React.SetStateAction<McpPreferencesShape>> = () => {};
+    const runHealthCheck = async () => {};
+
+    const harness = await renderHook(
+      ({ nextPreferences }: { nextPreferences: McpPreferencesShape }) =>
+        useMcpPanelState({
+          preferences: nextPreferences,
+          setPreferences,
+          runHealthCheck,
+        }),
+      { nextPreferences: preferences }
+    );
+
+    await harness.result().handleRestartMcpServer();
+    await harness.rerender({ nextPreferences: preferences });
+
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 850));
+    });
+    await harness.rerender({ nextPreferences: preferences });
+
+    assert.equal(harness.result().mcpListenerStatus?.status, 'running');
+    assert.equal(harness.result().mcpListenerStatus?.listening, true);
 
     await harness.unmount();
   } finally {

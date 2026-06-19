@@ -70,6 +70,12 @@ export function AnchoredPanel({
     const sections = Array.from(
       scrollNode.querySelectorAll<HTMLElement>('[data-anchored-panel-section]')
     );
+    const lastSection = sections[sections.length - 1];
+    if (lastSection && scrollNode.scrollTop + scrollNode.clientHeight >= scrollNode.scrollHeight - 8) {
+      setActiveAnchor(lastSection.dataset.anchoredPanelSection ?? '');
+      return;
+    }
+
     const scrollTop = scrollNode.scrollTop;
     const nextSection = sections
       .map(section => ({

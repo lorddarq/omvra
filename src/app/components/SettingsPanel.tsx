@@ -16,24 +16,24 @@ const SETTINGS_PANEL_NAV_GROUPS = [
     label: 'Settings',
     items: [
       {
-        id: 'mcp-access',
-        label: 'MCP access',
-        description: 'Agent access, listener, and commands',
+        id: 'task-load',
+        label: 'Tasks',
+        icon: CheckCircleIcon,
       },
       {
-        id: 'task-load',
-        label: 'Task load',
-        description: 'Execution and pipeline columns',
+        id: 'mcp-access',
+        label: 'MCP',
+        icon: CodeBracketSquareIcon,
       },
     ],
   },
   {
-    label: 'Data',
+    label: 'Storage',
     items: [
       {
         id: 'storage',
-        label: 'Storage',
-        description: 'Usage, backup, and reset',
+        label: 'Data',
+        icon: CircleStackIcon,
       },
     ],
   },
@@ -48,14 +48,16 @@ interface SettingsPanelProps {
 export function SettingsPanel({ isOpen, onClose, children }: SettingsPanelProps) {
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent className="w-[min(980px,calc(100vw-32px))] gap-0 overflow-hidden p-0 sm:max-w-none" showClose={false}>
+      <SheetContent
+        className="!bottom-2 !left-auto !right-2 !top-2 !h-auto !w-[min(636px,calc(100vw-16px))] !translate-x-0 !translate-y-0 gap-0 overflow-hidden rounded-[24px] border-0 bg-white p-2 shadow-[0_2px_8px_rgba(0,0,0,0.10),0_-6px_12px_rgba(0,0,0,0.10),0_14px_28px_rgba(0,0,0,0.10)] sm:max-w-none"
+        showClose={false}
+      >
         <SheetTitle className="sr-only">Preferences</SheetTitle>
         <SheetDescription className="sr-only">
           Configure agent access, task load, and local workspace data.
         </SheetDescription>
         <AnchoredPanel
           title="Preferences"
-          description="Configure agent access, task load, and local workspace data."
           navGroups={SETTINGS_PANEL_NAV_GROUPS}
           initialAnchor="mcp-access"
           onClose={onClose}
@@ -73,11 +75,7 @@ interface McpSettingsSectionProps {
 
 export function McpSettingsSection({ children }: McpSettingsSectionProps) {
   return (
-    <AnchoredPanelSection
-      id="mcp-access"
-      title="MCP access"
-      description="Configure the local MCP listener, external access, and generated agent commands."
-    >
+    <AnchoredPanelSection id="mcp-access" title="MCP">
       {children}
     </AnchoredPanelSection>
   );
@@ -99,11 +97,7 @@ export function TasksSettingsSection({
   onPipelineLoadStatusChange,
 }: TasksSettingsSectionProps) {
   return (
-    <AnchoredPanelSection
-      id="task-load"
-      title="Task load"
-      description="Choose which status columns count toward execution and pipeline load."
-    >
+    <AnchoredPanelSection id="task-load" title="Tasks">
       <div className="space-y-2">
         <Label htmlFor="execution-load-status">Execution load column</Label>
         <Select
@@ -167,11 +161,7 @@ export function DataSettingsSection({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <AnchoredPanelSection
-      id="storage"
-      title="Storage"
-      description="Review local storage usage and manage workspace backups."
-    >
+    <AnchoredPanelSection id="storage" title="Data">
       <div className="space-y-3 rounded-lg border p-4">
         <div className="text-sm font-semibold text-gray-900">Storage usage</div>
         <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
@@ -230,4 +220,38 @@ function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function CheckCircleIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
+      <path
+        fillRule="evenodd"
+        d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53-1.684-1.684a.75.75 0 1 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.81-5.19Z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+
+function CodeBracketSquareIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
+      <path
+        fillRule="evenodd"
+        d="M3 6.75A3.75 3.75 0 0 1 6.75 3h10.5A3.75 3.75 0 0 1 21 6.75v10.5A3.75 3.75 0 0 1 17.25 21H6.75A3.75 3.75 0 0 1 3 17.25V6.75Zm6.22 3.22a.75.75 0 0 1 0 1.06L8.25 12l.97.97a.75.75 0 1 1-1.06 1.06l-1.5-1.5a.75.75 0 0 1 0-1.06l1.5-1.5a.75.75 0 0 1 1.06 0Zm5.56 0a.75.75 0 0 1 1.06 0l1.5 1.5a.75.75 0 0 1 0 1.06l-1.5 1.5a.75.75 0 1 1-1.06-1.06l.97-.97-.97-.97a.75.75 0 0 1 0-1.06Zm-1.56-.22a.75.75 0 0 1 .53.92l-1.5 5.5a.75.75 0 1 1-1.45-.4l1.5-5.5a.75.75 0 0 1 .92-.52Z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+
+function CircleStackIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
+      <path d="M12 2.25c-4.97 0-9 1.68-9 3.75s4.03 3.75 9 3.75 9-1.68 9-3.75-4.03-3.75-9-3.75Z" />
+      <path d="M3 9.75c0 2.07 4.03 3.75 9 3.75s9-1.68 9-3.75v2.5c0 2.07-4.03 3.75-9 3.75s-9-1.68-9-3.75v-2.5Z" />
+      <path d="M3 15.75c0 2.07 4.03 3.75 9 3.75s9-1.68 9-3.75v2.25c0 2.07-4.03 3.75-9 3.75s-9-1.68-9-3.75v-2.25Z" />
+    </svg>
+  );
 }

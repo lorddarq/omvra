@@ -1,5 +1,4 @@
-import { ArrowLeft, X } from 'lucide-react';
-import type { ComponentPropsWithoutRef, ReactNode } from 'react';
+import type { ComponentPropsWithoutRef, ComponentType, ReactNode } from 'react';
 import { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from './ui/button';
 import { cn } from './ui/utils';
@@ -7,7 +6,7 @@ import { cn } from './ui/utils';
 export interface AnchoredPanelNavItem {
   id: string;
   label: string;
-  description?: string;
+  icon?: ComponentType<{ className?: string }>;
   disabled?: boolean;
 }
 
@@ -90,33 +89,37 @@ export function AnchoredPanel({
   };
 
   return (
-    <div className={cn('flex h-full min-h-0 flex-col bg-white', className)}>
-      <div className="flex shrink-0 items-start justify-between gap-4 border-b px-6 py-4">
-        <div className="flex min-w-0 items-start gap-3">
-          {onBack && (
-            <Button type="button" variant="ghost" size="icon" onClick={onBack} aria-label="Go back">
-              <ArrowLeft className="size-4" />
-            </Button>
-          )}
-          <div className="min-w-0 space-y-1">
-            <h2 className="text-lg font-semibold text-gray-950">{title}</h2>
-            {description && <p className="text-sm text-gray-500">{description}</p>}
-          </div>
-        </div>
-        {onClose && (
-          <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Close panel">
-            <X className="size-4" />
-          </Button>
-        )}
+    <div
+      className={cn(
+        'flex h-full min-h-0 flex-col overflow-hidden rounded-[16px] bg-gradient-to-b from-[#f0f0f0] to-[#f0f0f0]/0 p-[2px] shadow-[0_0_1px_rgba(0,0,0,0.25)]',
+        className
+      )}
+    >
+      <div className="sr-only">
+        <h2>{title}</h2>
+        {description && <p>{description}</p>}
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] sm:grid-cols-[176px_minmax(0,1fr)] sm:grid-rows-none">
+      <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] sm:grid-cols-[187px_minmax(0,1fr)] sm:grid-rows-none">
         <AnchoredPanelNav
           groups={navGroups}
           activeAnchor={activeAnchor}
           onSelect={scrollToSection}
+          onBack={onBack}
         />
         <AnchoredPanelScrollView ref={scrollRef} onScroll={syncActiveSection}>
+          {onClose && (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={onClose}
+              aria-label="Close panel"
+              className="absolute right-2 top-2 z-10 size-8 rounded-full border-black/10 bg-zinc-500/10 text-gray-900 shadow-none hover:bg-zinc-500/15"
+            >
+              <XMarkIcon className="size-4" />
+            </Button>
+          )}
           {children}
         </AnchoredPanelScrollView>
       </div>
@@ -134,42 +137,54 @@ interface AnchoredPanelNavProps {
   groups: AnchoredPanelNavGroup[];
   activeAnchor: string;
   onSelect: (anchorId: string) => void;
+  onBack?: () => void;
 }
 
-export function AnchoredPanelNav({ groups, activeAnchor, onSelect }: AnchoredPanelNavProps) {
+export function AnchoredPanelNav({ groups, activeAnchor, onSelect, onBack }: AnchoredPanelNavProps) {
   return (
-    <nav className="min-h-0 overflow-y-auto border-b bg-gray-50 px-3 py-4 sm:border-b-0 sm:border-r" aria-label="Panel sections">
-      <div className="flex gap-3 sm:block sm:space-y-5">
-        {groups.map(group => (
-          <div key={group.label} className="min-w-36 space-y-2 sm:min-w-0">
-            <p className="px-2 text-xs font-semibold uppercase text-gray-500">
+    <nav className="min-h-0 overflow-hidden px-2 pb-2 pt-7" aria-label="Panel sections">
+      <div className="flex gap-4 sm:block">
+        {onBack && (
+          <Button type="button" variant="ghost" onClick={onBack} className="justify-start px-3">
+            Back
+          </Button>
+        )}
+        {groups.map((group, groupIndex) => (
+          <div
+            key={group.label}
+            className={cn(
+              'min-w-36 space-y-3 sm:min-w-0',
+              groupIndex > 0 && 'mt-3 border-t border-zinc-500/10 pt-3'
+            )}
+          >
+            <p className="px-2 text-[10px] font-semibold uppercase tracking-normal text-[#a5a5ac]">
               {group.label}
             </p>
             <div className="space-y-1">
-              {group.items.map(item => (
-                <button
-                  key={item.id}
-                  type="button"
-                  disabled={item.disabled}
-                  aria-current={activeAnchor === item.id ? 'true' : undefined}
-                  onClick={() => onSelect(item.id)}
-                  className={cn(
-                    'flex w-full flex-col rounded-md px-2 py-2 text-left text-sm outline-none transition-colors',
-                    'focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2',
-                    activeAnchor === item.id
-                      ? 'bg-white font-medium text-gray-950 shadow-sm'
-                      : 'text-gray-600 hover:bg-white hover:text-gray-950',
-                    item.disabled && 'cursor-not-allowed opacity-50 hover:bg-transparent'
-                  )}
-                >
-                  <span className="truncate">{item.label}</span>
-                  {item.description && (
-                    <span className="mt-0.5 line-clamp-2 text-xs font-normal text-gray-500">
-                      {item.description}
-                    </span>
-                  )}
-                </button>
-              ))}
+              {group.items.map(item => {
+                const Icon = item.icon;
+
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    disabled={item.disabled}
+                    aria-current={activeAnchor === item.id ? 'true' : undefined}
+                    onClick={() => onSelect(item.id)}
+                    className={cn(
+                      'flex h-8 w-full items-center gap-2 rounded-xl px-2 text-left text-xs font-medium outline-none transition-colors',
+                      'focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2',
+                      activeAnchor === item.id
+                        ? 'bg-zinc-500/15 text-[#71717a]'
+                        : 'text-[#71717a] hover:bg-zinc-500/10',
+                      item.disabled && 'cursor-not-allowed opacity-50 hover:bg-transparent'
+                    )}
+                  >
+                    {Icon && <Icon className="size-4 shrink-0" />}
+                    <span className="min-w-0 truncate">{item.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         ))}
@@ -186,10 +201,13 @@ export const AnchoredPanelScrollView = forwardRef<HTMLDivElement, AnchoredPanelS
   ({ children, className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('min-h-0 overflow-y-auto px-6 py-6', className)}
+      className={cn(
+        'relative h-full min-h-0 overflow-y-auto rounded-[14px] bg-white p-8 shadow-[0_0_1px_rgba(0,0,0,0.20)]',
+        className
+      )}
       {...props}
     >
-      <div className="mx-auto w-full max-w-3xl space-y-6">
+      <div className="mx-auto w-full max-w-3xl space-y-8">
         {children}
       </div>
     </div>
@@ -219,16 +237,28 @@ export function AnchoredPanelSection({
       id={id}
       data-anchored-panel-section={id}
       aria-labelledby={titleId}
-      className={cn('scroll-mt-6 space-y-3', className)}
+      className={cn('scroll-mt-8 space-y-8', className)}
       {...props}
     >
-      <div className="space-y-1">
-        <h3 id={titleId} className="text-sm font-semibold text-gray-950">
+      <div className="space-y-2">
+        <h3 id={titleId} className="text-lg font-normal text-[#58585f]">
           {title}
         </h3>
         {description && <p className="text-sm text-gray-500">{description}</p>}
       </div>
       {children}
     </section>
+  );
+}
+
+function XMarkIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
+      <path
+        fillRule="evenodd"
+        d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z"
+        clipRule="evenodd"
+      />
+    </svg>
   );
 }

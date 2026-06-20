@@ -12,6 +12,7 @@ import {
   SettingsPanel,
   TasksSettingsSection,
 } from './SettingsPanel';
+import { McpCommandBlock } from './McpCommandBlock';
 
 interface PreferencesPanelProps {
   isOpen: boolean;
@@ -473,38 +474,29 @@ export function PreferencesPanel({
               </p>
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>MCP Test Command</Label>
-                <Button type="button" variant="outline" onClick={copyMcpCommand}>
-                  <Copy className="mr-2 h-4 w-4" />
-                  {copiedCommand ? 'Copied' : 'Copy command'}
-                </Button>
-              </div>
-              <pre className="overflow-x-auto rounded-md border bg-gray-50 p-3 text-xs text-gray-700">
-{curlCommand}
-              </pre>
-              <p className="text-xs text-gray-500">
-                Generated from current MCP host, port, and token settings.
-              </p>
-            </div>
+            <McpCommandBlock
+              title="MCP Test Command"
+              command={curlCommand}
+              onCopy={copyMcpCommand}
+              copied={copiedCommand}
+              description="Generated from current MCP host, port, and token settings."
+            />
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>MCP Write Examples</Label>
-                <Button type="button" variant="outline" onClick={copyWriteCommand}>
-                  <Copy className="mr-2 h-4 w-4" />
-                  {copiedWriteCommand ? 'Copied' : 'Copy examples'}
-                </Button>
-              </div>
-              <pre className="overflow-x-auto rounded-md border bg-gray-50 p-3 text-xs text-gray-700">
-{writeCommand}
-              </pre>
-              <p className="text-xs text-gray-500">
-                Replace `&lt;task-id&gt;` and `&lt;revision&gt;` with values from `workspace.get_snapshot`.
-              </p>
-              <p className="text-xs text-gray-500">{retryGuidance}</p>
-            </div>
+            <McpCommandBlock
+              title="MCP Write Examples"
+              command={writeCommand}
+              onCopy={copyWriteCommand}
+              copied={copiedWriteCommand}
+              copyLabel="Copy examples"
+              footer={(
+                <>
+                  <p>
+                    Replace `&lt;task-id&gt;` and `&lt;revision&gt;` with values from `workspace.get_snapshot`.
+                  </p>
+                  <p>{retryGuidance}</p>
+                </>
+              )}
+            />
 
             <div className="space-y-2 rounded-lg border bg-gray-50 p-4">
               <div className="flex items-center justify-between gap-3">
@@ -575,44 +567,30 @@ export function PreferencesPanel({
               </p>
             )}
 
-            <div className="space-y-2 rounded-lg border bg-gray-50 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-gray-900">Local MCP (stdio)</div>
-                  <p className="text-xs text-gray-500">
-                    Use this when your client supports command-based MCP servers. It avoids ports and tunnels.
-                  </p>
-                </div>
-                <Button type="button" variant="outline" onClick={copyStdioCommand}>
-                  <Copy className="mr-2 h-4 w-4" />
-                  {copiedStdioCommand ? 'Copied' : 'Copy command'}
-                </Button>
-              </div>
-              <pre className="overflow-x-auto rounded-md border bg-white p-3 text-xs text-gray-700">
-{stdioCommand}
-              </pre>
-              <p className="text-[11px] text-gray-500">
-                Run this from the repository root.
-              </p>
-            </div>
+            <McpCommandBlock
+              title="Local MCP (stdio)"
+              command={stdioCommand}
+              onCopy={copyStdioCommand}
+              copied={copiedStdioCommand}
+              description="Use this when your client supports command-based MCP servers. It avoids ports and tunnels."
+              footer={<p className="text-[11px]">Run this from the repository root.</p>}
+              variant="subtle"
+            />
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>LocalTunnel Command</Label>
-                <Button type="button" variant="outline" onClick={copyTunnelCommand}>
-                  <Copy className="mr-2 h-4 w-4" />
-                  {copiedTunnelCommand ? 'Copied' : 'Copy tunnel command'}
-                </Button>
-              </div>
-              <pre className="overflow-x-auto rounded-md border bg-gray-50 p-3 text-xs text-gray-700">
-{tunnelCommand}
-              </pre>
-              <div className="space-y-1 text-xs text-gray-500">
-                <p>Run this in Terminal to expose your local MCP endpoint publicly.</p>
-                <p>To close localtunnel: press `Ctrl + C` in that terminal window.</p>
-                <p>If it was started in background: `pkill -f localtunnel`.</p>
-              </div>
-            </div>
+            <McpCommandBlock
+              title="LocalTunnel Command"
+              command={tunnelCommand}
+              onCopy={copyTunnelCommand}
+              copied={copiedTunnelCommand}
+              copyLabel="Copy tunnel command"
+              footer={(
+                <>
+                  <p>Run this in Terminal to expose your local MCP endpoint publicly.</p>
+                  <p>To close localtunnel: press `Ctrl + C` in that terminal window.</p>
+                  <p>If it was started in background: `pkill -f localtunnel`.</p>
+                </>
+              )}
+            />
 
             {showMcpHealthDiagnostics && (
               <div className="space-y-2 rounded-md border border-dashed p-3">

@@ -24,18 +24,39 @@ export function useMcpPanelState<TPreferences extends McpPreferencesShape>({
   const [mcpListenerStatus, setMcpListenerStatus] = useState<McpListenerStatus | null>(null);
   const [mcpAuditLog, setMcpAuditLog] = useState<McpAuditSummaryEntry[]>([]);
 
+  const adoptAppliedSignatureFromListener = useCallback((listenerStatus: McpListenerStatus | null) => {
+    if (!listenerStatus || !preferences.mcpAgentAccessEnabled) return;
+    if (listenerStatus.status !== 'running' || !listenerStatus.listening) return;
+    if (listenerStatus.restartRequired) return;
+    if (listenerStatus.host !== preferences.mcpBindHost) return;
+    if (listenerStatus.port !== preferences.mcpPort) return;
+    if (listenerStatus.expectedAddress !== preferences.mcpServerAddress) return;
+    if (listenerStatus.capabilityProfile !== preferences.mcpCapabilityProfile) return;
+
+    const token = listenerStatus.token;
+    const tokenMatches = preferences.mcpAccessToken
+      ? Boolean(token?.configured)
+        && token.issuedAt === (preferences.mcpAccessTokenIssuedAt || null)
+        && token.ttlMinutes === preferences.mcpAccessTokenTtlMinutes
+      : !token?.configured;
+    if (!tokenMatches) return;
+
+    setAppliedMcpSettingsSignature(getMcpSettingsSignature(preferences));
+  }, [preferences]);
+
   const refreshMcpListenerStatus = useCallback(async () => {
     try {
       if (window.electron?.mcp?.getListenerStatus) {
         const result = await window.electron.mcp.getListenerStatus();
         if (result?.ok) {
           setMcpListenerStatus(result.data);
+          adoptAppliedSignatureFromListener(result.data);
         }
       }
     } catch {
       // Keep the last known listener state if the bridge is temporarily unavailable.
     }
-  }, []);
+  }, [adoptAppliedSignatureFromListener]);
 
   const refreshMcpAuditLog = useCallback(async () => {
     try {
@@ -81,6 +102,10 @@ export function useMcpPanelState<TPreferences extends McpPreferencesShape>({
       window.clearInterval(intervalId);
     };
   }, [mcpListenerStatus?.status, preferences.mcpAgentAccessEnabled, refreshMcpListenerStatus]);
+
+  useEffect(() => {
+    adoptAppliedSignatureFromListener(mcpListenerStatus);
+  }, [adoptAppliedSignatureFromListener, mcpListenerStatus]);
 
   const handleRestartMcpServer = useCallback(async () => {
     try {

@@ -294,6 +294,98 @@ test('useMcpPanelState refreshes listener status while MCP is starting', async (
   }
 });
 
+test('useMcpPanelState adopts a running startup listener after preferences hydrate', async () => {
+  const hydratedPreferences: McpPreferencesShape = {
+    mcpAgentAccessEnabled: true,
+    mcpCapabilityProfile: 'task_write',
+    mcpBindHost: '127.0.0.1',
+    mcpPort: 3456,
+    mcpServerAddress: 'http://127.0.0.1:3456/mcp',
+    mcpAccessToken: '',
+    mcpAccessTokenTtlMinutes: 60,
+  };
+  const originalWindow = setWindowMock({
+    electron: {
+      mcp: {
+        getListenerStatus: async () => ({
+          ok: true,
+          data: {
+            enabled: true,
+            status: 'running',
+            listening: true,
+            host: '127.0.0.1',
+            port: 3456,
+            path: '/mcp',
+            expectedAddress: 'http://127.0.0.1:3456/mcp',
+            boundAddress: '127.0.0.1:3456',
+            boundUrl: 'http://127.0.0.1:3456/mcp',
+            capabilityProfile: 'task_write',
+            authMode: 'none',
+            token: {
+              configured: false,
+              status: 'none',
+              expired: false,
+              issuedAt: null,
+              expiresAt: null,
+              remainingMinutes: null,
+              ttlMinutes: 60,
+            },
+            error: null,
+            lastStartedAt: '2026-06-20T09:00:00.000Z',
+            lastStoppedAt: null,
+            lastUpdatedAt: '2026-06-20T09:00:00.000Z',
+            restartRequired: false,
+          },
+        }),
+        getAuditLog: async () => ({
+          ok: true,
+          data: [],
+        }),
+      },
+    },
+    alert: () => {},
+    setInterval: global.setInterval.bind(global),
+    clearInterval: global.clearInterval.bind(global),
+  });
+
+  try {
+    const initialPreferences: McpPreferencesShape = {
+      mcpAgentAccessEnabled: false,
+      mcpCapabilityProfile: 'read_only',
+      mcpBindHost: '127.0.0.1',
+      mcpPort: 3456,
+      mcpServerAddress: 'http://127.0.0.1:3456/mcp',
+      mcpAccessToken: '',
+      mcpAccessTokenTtlMinutes: 60,
+    };
+    const setPreferences: React.Dispatch<React.SetStateAction<McpPreferencesShape>> = () => {};
+    const runHealthCheck = async () => {};
+
+    const harness = await renderHook(
+      ({ nextPreferences }: { nextPreferences: McpPreferencesShape }) =>
+        useMcpPanelState({
+          preferences: nextPreferences,
+          setPreferences,
+          runHealthCheck,
+        }),
+      { nextPreferences: initialPreferences }
+    );
+
+    await harness.rerender({ nextPreferences: hydratedPreferences });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await harness.rerender({ nextPreferences: hydratedPreferences });
+
+    assert.equal(harness.result().mcpListenerStatus?.status, 'running');
+    assert.equal(harness.result().isMcpRestartPending, false);
+
+    await harness.unmount();
+  } finally {
+    (globalThis as any).window = originalWindow;
+  }
+});
+
 test('useAgentWatchRuntime polls, persists runtime state, and manages watcher configs', async () => {
   const originalWindow = setWindowMock({
     setInterval: global.setInterval.bind(global),

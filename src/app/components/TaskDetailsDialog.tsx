@@ -1,6 +1,6 @@
 import { Task, TimelineSwimlane, Person, TaskStatus, StatusColumn, ProjectMilestone } from '../types';
 import { useMemo, useState } from 'react';
-import { Check, Copy, FolderSearch, Paperclip, TriangleAlert } from 'lucide-react';
+import { FolderSearch, Paperclip } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,7 @@ import { MarkdownContent } from './MarkdownContent';
 import { getTaskLoadContributionPercent, getTaskLoadPoints, PERSON_CAPACITY_POINTS } from '../utils/taskLoad';
 import { getMilestoneForTask } from '../utils/roadmap';
 import { formatTaskDetailsForClipboard } from '../utils/taskClipboard';
+import { TaskDetailsActionMenu } from './TaskDetailsActionMenu';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 
 interface TaskDetailsDialogProps {
@@ -159,6 +160,11 @@ export function TaskDetailsDialog({
     await window.electron?.attachments?.reveal?.(filePath);
   };
 
+  const handleEditTask = () => {
+    if (!task || !onEdit) return;
+    onEdit(task);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] min-w-0 overflow-x-hidden overflow-y-auto sm:max-w-[760px]">
@@ -168,24 +174,12 @@ export function TaskDetailsDialog({
               {task?.title || 'Task details'}
             </DialogTitle>
             {task && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="mt-[-2px] shrink-0"
-                aria-label="Copy task details"
-                title="Copy task details"
-                onClick={handleCopyTaskDetails}
-              >
-                {copyState === 'copied' ? (
-                  <Check className="size-4" />
-                ) : copyState === 'failed' ? (
-                  <TriangleAlert className="size-4" />
-                ) : (
-                  <Copy className="size-4" />
-                )}
-                {copyState === 'copied' ? 'Copied' : copyState === 'failed' ? 'Failed' : 'Copy'}
-              </Button>
+              <TaskDetailsActionMenu
+                copyState={copyState}
+                canEdit={Boolean(onEdit)}
+                onEdit={handleEditTask}
+                onCopy={handleCopyTaskDetails}
+              />
             )}
           </div>
           <DialogDescription className="min-w-0 break-words [overflow-wrap:anywhere]">Review task details and markdown description.</DialogDescription>

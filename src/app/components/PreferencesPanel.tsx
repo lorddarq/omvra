@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { StorageMeter, TaskStatus, StatusColumn } from '../types';
+import { Person, StorageMeter, TaskStatus, StatusColumn } from '../types';
+import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
+import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import { McpHealthCheckResult } from '../services/mcp/types';
 import {
   DataSettingsSection,
@@ -17,8 +19,14 @@ interface PreferencesPanelProps {
   statusColumns: StatusColumn[];
   executionLoadStatusId: TaskStatus;
   pipelineLoadStatusId: TaskStatus;
+  people: Person[];
+  agentWatchConfigs: AgentWatchConfig[];
+  agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
   onExecutionLoadStatusChange: (statusId: TaskStatus) => void;
   onPipelineLoadStatusChange: (statusId: TaskStatus) => void;
+  onSaveAgentWatchConfig: (config: AgentWatchConfig) => void;
+  onRemoveAgentWatchConfig: (personId: string) => void;
+  onPollAgentWatch: (personId: string) => void;
   onNukeLocalData: () => void;
   onExportTasksAndProjects: () => void;
   onImportTasksAndProjects: (file: File) => void;
@@ -56,8 +64,14 @@ export function PreferencesPanel({
   statusColumns,
   executionLoadStatusId,
   pipelineLoadStatusId,
+  people,
+  agentWatchConfigs,
+  agentWatchRuntime,
   onExecutionLoadStatusChange,
   onPipelineLoadStatusChange,
+  onSaveAgentWatchConfig,
+  onRemoveAgentWatchConfig,
+  onPollAgentWatch,
   onNukeLocalData,
   onExportTasksAndProjects,
   onImportTasksAndProjects,
@@ -309,8 +323,14 @@ export function PreferencesPanel({
         statusColumns={statusColumns}
         executionLoadStatusId={executionLoadStatusId}
         pipelineLoadStatusId={pipelineLoadStatusId}
+        people={people}
+        agentWatchConfigs={agentWatchConfigs}
+        agentWatchRuntime={agentWatchRuntime}
         onExecutionLoadStatusChange={onExecutionLoadStatusChange}
         onPipelineLoadStatusChange={onPipelineLoadStatusChange}
+        onSaveAgentWatchConfig={onSaveAgentWatchConfig}
+        onRemoveAgentWatchConfig={onRemoveAgentWatchConfig}
+        onPollAgentWatch={onPollAgentWatch}
       />
 
       <DataSettingsSection

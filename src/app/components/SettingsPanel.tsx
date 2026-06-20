@@ -1,6 +1,9 @@
 import { useRef, type ReactNode } from 'react';
-import { StorageMeter, StatusColumn, TaskStatus } from '../types';
+import { Person, StorageMeter, StatusColumn, TaskStatus } from '../types';
+import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
+import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import { AnchoredPanel, AnchoredPanelSection } from './AnchoredPanel';
+import { AgentBoardWatchSettings } from './AgentBoardWatchSettings';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -49,7 +52,7 @@ export function SettingsPanel({ isOpen, onClose, children }: SettingsPanelProps)
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent
-        className="plumy-settings-sheet !bottom-2 !left-auto !right-2 !top-2 !h-auto !w-[min(636px,calc(100vw-16px))] !translate-x-0 !translate-y-0 gap-0 overflow-hidden rounded-[24px] border-0 bg-white p-2 shadow-[0_2px_8px_rgba(0,0,0,0.10),0_-6px_12px_rgba(0,0,0,0.10),0_14px_28px_rgba(0,0,0,0.10)] sm:max-w-none"
+        className="plumy-settings-sheet !bottom-2 !left-auto !right-2 !top-2 !h-auto !w-[min(800px,calc(100vw-16px))] !translate-x-0 !translate-y-0 gap-0 overflow-hidden rounded-[24px] border-0 bg-white p-2 shadow-[0_2px_8px_rgba(0,0,0,0.10),0_-6px_12px_rgba(0,0,0,0.10),0_14px_28px_rgba(0,0,0,0.10)] sm:max-w-none"
         overlayClassName="plumy-settings-overlay"
         showClose={false}
       >
@@ -86,17 +89,41 @@ interface TasksSettingsSectionProps {
   statusColumns: StatusColumn[];
   executionLoadStatusId: TaskStatus;
   pipelineLoadStatusId: TaskStatus;
+  people: Person[];
+  agentWatchConfigs: AgentWatchConfig[];
+  agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
   onExecutionLoadStatusChange: (statusId: TaskStatus) => void;
   onPipelineLoadStatusChange: (statusId: TaskStatus) => void;
+  onSaveAgentWatchConfig: (config: AgentWatchConfig) => void;
+  onRemoveAgentWatchConfig: (personId: string) => void;
+  onPollAgentWatch: (personId: string) => void;
 }
 
 export function TasksSettingsSection({
   statusColumns,
   executionLoadStatusId,
   pipelineLoadStatusId,
+  people,
+  agentWatchConfigs,
+  agentWatchRuntime,
   onExecutionLoadStatusChange,
   onPipelineLoadStatusChange,
+  onSaveAgentWatchConfig,
+  onRemoveAgentWatchConfig,
+  onPollAgentWatch,
 }: TasksSettingsSectionProps) {
+  const agenticPeople = people.filter(person => person.kind === 'agentic');
+
+  function getAgentWatchConfig(personId: string): AgentWatchConfig {
+    return agentWatchConfigs.find(config => config.personId === personId) || {
+      personId,
+      enabled: false,
+      statusId: statusColumns[0]?.id || 'open',
+      action: 'inspect_and_work',
+      intervalSeconds: 60,
+    };
+  }
+
   return (
     <AnchoredPanelSection id="task-load" title="Tasks">
       <div className="space-y-2">
@@ -141,6 +168,36 @@ export function TasksSettingsSection({
         <p className="text-xs text-gray-500">
           Tasks in this column count toward pipeline pressure.
         </p>
+      </div>
+
+      <div className="space-y-3 rounded-lg border p-4">
+        <div>
+          <div className="text-sm font-semibold text-gray-900">Agent board watch</div>
+          <p className="text-xs text-gray-500">
+            Configure which task boards agentic people monitor through MCP.
+          </p>
+        </div>
+
+        {agenticPeople.length > 0 ? (
+          <div className="space-y-3">
+            {agenticPeople.map(agent => (
+              <AgentBoardWatchSettings
+                key={agent.id}
+                agent={agent}
+                statusColumns={statusColumns}
+                watchConfig={getAgentWatchConfig(agent.id)}
+                watchRuntime={agentWatchRuntime[agent.id]}
+                onSave={onSaveAgentWatchConfig}
+                onRemove={onRemoveAgentWatchConfig}
+                onPoll={onPollAgentWatch}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-gray-500">
+            Add an agentic person to configure board watching.
+          </p>
+        )}
       </div>
     </AnchoredPanelSection>
   );

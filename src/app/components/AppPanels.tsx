@@ -256,14 +256,9 @@ export function AppPanels({
         statusColumns={statusColumns}
         executionLoadStatusId={executionLoadStatusId}
         pipelineLoadStatusId={pipelineLoadStatusId}
-        agentWatchConfigs={agentWatchConfigs}
-        agentWatchRuntime={agentWatchRuntime}
         onAddPerson={onAddPerson}
         onUpdatePerson={onUpdatePerson}
         onDeletePerson={onDeletePerson}
-        onSaveAgentWatchConfig={onSaveAgentWatchConfig}
-        onRemoveAgentWatchConfig={onRemoveAgentWatchConfig}
-        onPollAgentWatch={onPollAgentWatch}
       />
 
       <PreferencesPanel
@@ -272,12 +267,18 @@ export function AppPanels({
         statusColumns={statusColumns}
         executionLoadStatusId={executionLoadStatusId}
         pipelineLoadStatusId={pipelineLoadStatusId}
+        people={people}
+        agentWatchConfigs={agentWatchConfigs}
+        agentWatchRuntime={agentWatchRuntime}
         storageMeter={storageMeter}
         onNukeLocalData={onNukeLocalData}
         onExportTasksAndProjects={onExportTasksAndProjects}
         onImportTasksAndProjects={onImportTasksAndProjects}
         onExecutionLoadStatusChange={onExecutionLoadStatusChange}
         onPipelineLoadStatusChange={onPipelineLoadStatusChange}
+        onSaveAgentWatchConfig={onSaveAgentWatchConfig}
+        onRemoveAgentWatchConfig={onRemoveAgentWatchConfig}
+        onPollAgentWatch={onPollAgentWatch}
         mcpAgentAccessEnabled={mcpAgentAccessEnabled}
         mcpAddress={mcpAddress}
         mcpBindHost={mcpBindHost}

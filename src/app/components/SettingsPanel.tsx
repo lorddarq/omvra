@@ -1,4 +1,5 @@
 import { useRef, type ReactNode } from 'react';
+import { Activity, Bot, Terminal, Users } from 'lucide-react';
 import { Person, StorageMeter, StatusColumn, TaskStatus } from '../types';
 import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
@@ -24,9 +25,29 @@ const SETTINGS_PANEL_NAV_GROUPS = [
         icon: CheckCircleIcon,
       },
       {
+        id: 'people',
+        label: 'People',
+        icon: Users,
+      },
+      {
+        id: 'agents',
+        label: 'Agents',
+        icon: Bot,
+      },
+      {
         id: 'mcp-access',
         label: 'MCP',
         icon: CodeBracketSquareIcon,
+      },
+      {
+        id: 'mcp-testing',
+        label: 'MCP Testing',
+        icon: Terminal,
+      },
+      {
+        id: 'mcp-activity',
+        label: 'MCP Activity',
+        icon: Activity,
       },
     ],
   },
@@ -45,10 +66,11 @@ const SETTINGS_PANEL_NAV_GROUPS = [
 interface SettingsPanelProps {
   isOpen: boolean;
   onClose: () => void;
+  initialAnchor?: string;
   children: ReactNode;
 }
 
-export function SettingsPanel({ isOpen, onClose, children }: SettingsPanelProps) {
+export function SettingsPanel({ isOpen, onClose, initialAnchor = 'task-load', children }: SettingsPanelProps) {
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent
@@ -63,7 +85,7 @@ export function SettingsPanel({ isOpen, onClose, children }: SettingsPanelProps)
         <AnchoredPanel
           title="Preferences"
           navGroups={SETTINGS_PANEL_NAV_GROUPS}
-          initialAnchor="task-load"
+          initialAnchor={initialAnchor}
           onClose={onClose}
         >
           {children}
@@ -80,6 +102,22 @@ interface McpSettingsSectionProps {
 export function McpSettingsSection({ children }: McpSettingsSectionProps) {
   return (
     <AnchoredPanelSection id="mcp-access" title="MCP">
+      {children}
+    </AnchoredPanelSection>
+  );
+}
+
+export function McpTestingSettingsSection({ children }: McpSettingsSectionProps) {
+  return (
+    <AnchoredPanelSection id="mcp-testing" title="MCP Testing">
+      {children}
+    </AnchoredPanelSection>
+  );
+}
+
+export function McpActivitySettingsSection({ children }: McpSettingsSectionProps) {
+  return (
+    <AnchoredPanelSection id="mcp-activity" title="MCP Activity">
       {children}
     </AnchoredPanelSection>
   );

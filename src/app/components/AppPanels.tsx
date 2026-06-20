@@ -17,6 +17,7 @@ interface AppPanelsProps {
   isSwimlaneDialogOpen: boolean;
   isPeoplePanelOpen: boolean;
   isPreferencesOpen: boolean;
+  preferencesInitialAnchor?: string;
   selectedTask: Task | null;
   detailsTask: Task | null;
   selectedMilestone: ProjectMilestone | null;
@@ -102,6 +103,7 @@ export function AppPanels({
   isSwimlaneDialogOpen,
   isPeoplePanelOpen,
   isPreferencesOpen,
+  preferencesInitialAnchor,
   selectedTask,
   detailsTask,
   selectedMilestone,
@@ -264,10 +266,12 @@ export function AppPanels({
       <PreferencesPanel
         isOpen={isPreferencesOpen}
         onClose={onClosePreferences}
+        initialAnchor={preferencesInitialAnchor}
         statusColumns={statusColumns}
         executionLoadStatusId={executionLoadStatusId}
         pipelineLoadStatusId={pipelineLoadStatusId}
         people={people}
+        tasks={tasks}
         agentWatchConfigs={agentWatchConfigs}
         agentWatchRuntime={agentWatchRuntime}
         storageMeter={storageMeter}
@@ -276,6 +280,9 @@ export function AppPanels({
         onImportTasksAndProjects={onImportTasksAndProjects}
         onExecutionLoadStatusChange={onExecutionLoadStatusChange}
         onPipelineLoadStatusChange={onPipelineLoadStatusChange}
+        onAddPerson={onAddPerson}
+        onUpdatePerson={onUpdatePerson}
+        onDeletePerson={onDeletePerson}
         onSaveAgentWatchConfig={onSaveAgentWatchConfig}
         onRemoveAgentWatchConfig={onRemoveAgentWatchConfig}
         onPollAgentWatch={onPollAgentWatch}

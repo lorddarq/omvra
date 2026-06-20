@@ -1,29 +1,37 @@
 import { useState } from 'react';
-import { Person, StorageMeter, TaskStatus, StatusColumn } from '../types';
+import { Person, StorageMeter, Task, TaskStatus, StatusColumn } from '../types';
 import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import { McpHealthCheckResult } from '../services/mcp/types';
 import {
   DataSettingsSection,
+  McpActivitySettingsSection,
   McpSettingsSection,
+  McpTestingSettingsSection,
   SettingsPanel,
   TasksSettingsSection,
 } from './SettingsPanel';
 import { McpAccessSettingsSection } from './McpAccessSettingsSection';
 import { McpCommandSettingsSection } from './McpCommandSettingsSection';
 import { McpActivityLogSection, McpHealthDiagnosticsSection } from './McpDiagnosticsSections';
+import { PeopleManagementSections } from './PeopleSettingsSections';
 
 interface PreferencesPanelProps {
   isOpen: boolean;
   onClose: () => void;
+  initialAnchor?: string;
   statusColumns: StatusColumn[];
   executionLoadStatusId: TaskStatus;
   pipelineLoadStatusId: TaskStatus;
   people: Person[];
+  tasks: Task[];
   agentWatchConfigs: AgentWatchConfig[];
   agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
   onExecutionLoadStatusChange: (statusId: TaskStatus) => void;
   onPipelineLoadStatusChange: (statusId: TaskStatus) => void;
+  onAddPerson: (person: Omit<Person, 'id'>) => void;
+  onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions'>) => void;
+  onDeletePerson: (personId: string) => void;
   onSaveAgentWatchConfig: (config: AgentWatchConfig) => void;
   onRemoveAgentWatchConfig: (personId: string) => void;
   onPollAgentWatch: (personId: string) => void;
@@ -61,14 +69,19 @@ interface PreferencesPanelProps {
 export function PreferencesPanel({
   isOpen,
   onClose,
+  initialAnchor,
   statusColumns,
   executionLoadStatusId,
   pipelineLoadStatusId,
   people,
+  tasks,
   agentWatchConfigs,
   agentWatchRuntime,
   onExecutionLoadStatusChange,
   onPipelineLoadStatusChange,
+  onAddPerson,
+  onUpdatePerson,
+  onDeletePerson,
   onSaveAgentWatchConfig,
   onRemoveAgentWatchConfig,
   onPollAgentWatch,
@@ -255,7 +268,7 @@ export function PreferencesPanel({
   };
 
   return (
-    <SettingsPanel isOpen={isOpen} onClose={onClose}>
+    <SettingsPanel isOpen={isOpen} onClose={onClose} initialAnchor={initialAnchor}>
       <TasksSettingsSection
         statusColumns={statusColumns}
         executionLoadStatusId={executionLoadStatusId}
@@ -270,68 +283,83 @@ export function PreferencesPanel({
         onPollAgentWatch={onPollAgentWatch}
       />
 
+      <PeopleManagementSections
+        people={people}
+        tasks={tasks}
+        statusColumns={statusColumns}
+        executionLoadStatusId={executionLoadStatusId}
+        pipelineLoadStatusId={pipelineLoadStatusId}
+        onAddPerson={onAddPerson}
+        onUpdatePerson={onUpdatePerson}
+        onDeletePerson={onDeletePerson}
+      />
+
       <McpSettingsSection>
-          <div className="space-y-3 rounded-lg border p-4">
-            <McpAccessSettingsSection
-              agentAccessEnabled={mcpAgentAccessEnabled}
-              address={mcpAddress}
-              bindHost={mcpBindHost}
-              port={mcpPort}
-              accessToken={mcpAccessToken}
-              accessTokenTtlMinutes={mcpAccessTokenTtlMinutes}
-              capabilityProfile={mcpCapabilityProfile}
-              copiedAddress={copied}
-              listenerStatus={mcpListenerStatus}
-              listenerStatusLabel={listenerStatusLabel}
-              connectionStatusLabel={connectionStatusLabel}
-              tokenExpiryLabel={tokenExpiryLabel}
-              restartPending={mcpRestartPending}
-              remoteTokenWarning={remoteTokenWarning}
-              onAgentAccessToggle={onMcpAgentAccessToggle}
-              onAddressChange={onMcpAddressChange}
-              onBindHostChange={onMcpBindHostChange}
-              onPortChange={onMcpPortChange}
-              onAccessTokenChange={onMcpAccessTokenChange}
-              onAccessTokenRotate={onMcpAccessTokenRotate}
-              onAccessTokenTtlMinutesChange={onMcpAccessTokenTtlMinutesChange}
-              onCapabilityProfileChange={onMcpCapabilityProfileChange}
-              onRestartServer={onRestartMcpServer}
-              onCopyAddress={copyMcpAddress}
-            />
+        <div className="space-y-3 rounded-lg border p-4">
+          <McpAccessSettingsSection
+            agentAccessEnabled={mcpAgentAccessEnabled}
+            address={mcpAddress}
+            bindHost={mcpBindHost}
+            port={mcpPort}
+            accessToken={mcpAccessToken}
+            accessTokenTtlMinutes={mcpAccessTokenTtlMinutes}
+            capabilityProfile={mcpCapabilityProfile}
+            copiedAddress={copied}
+            listenerStatus={mcpListenerStatus}
+            listenerStatusLabel={listenerStatusLabel}
+            connectionStatusLabel={connectionStatusLabel}
+            tokenExpiryLabel={tokenExpiryLabel}
+            restartPending={mcpRestartPending}
+            remoteTokenWarning={remoteTokenWarning}
+            onAgentAccessToggle={onMcpAgentAccessToggle}
+            onAddressChange={onMcpAddressChange}
+            onBindHostChange={onMcpBindHostChange}
+            onPortChange={onMcpPortChange}
+            onAccessTokenChange={onMcpAccessTokenChange}
+            onAccessTokenRotate={onMcpAccessTokenRotate}
+            onAccessTokenTtlMinutesChange={onMcpAccessTokenTtlMinutesChange}
+            onCapabilityProfileChange={onMcpCapabilityProfileChange}
+            onRestartServer={onRestartMcpServer}
+            onCopyAddress={copyMcpAddress}
+          />
 
-            <McpCommandSettingsSection
-              testCommand={curlCommand}
-              writeCommand={writeCommand}
-              stdioCommand={stdioCommand}
-              tunnelCommand={tunnelCommand}
-              retryGuidance={retryGuidance}
-              copiedTestCommand={copiedCommand}
-              copiedWriteCommand={copiedWriteCommand}
-              copiedStdioCommand={copiedStdioCommand}
-              copiedTunnelCommand={copiedTunnelCommand}
-              onCopyTestCommand={copyMcpCommand}
-              onCopyWriteCommand={copyWriteCommand}
-              onCopyStdioCommand={copyStdioCommand}
-              onCopyTunnelCommand={copyTunnelCommand}
+          {showMcpHealthDiagnostics && (
+            <McpHealthDiagnosticsSection
+              result={mcpHealthResult}
+              running={mcpHealthCheckRunning}
+              onRun={onRunMcpHealthCheck}
             />
-
-            <McpActivityLogSection
-              auditLog={mcpAuditLog}
-              copied={copiedAuditLog}
-              onRefresh={onRefreshMcpAuditLog}
-              onCopy={copyAuditLog}
-              onExport={exportAuditLog}
-            />
-
-            {showMcpHealthDiagnostics && (
-              <McpHealthDiagnosticsSection
-                result={mcpHealthResult}
-                running={mcpHealthCheckRunning}
-                onRun={onRunMcpHealthCheck}
-              />
-            )}
-          </div>
+          )}
+        </div>
       </McpSettingsSection>
+
+      <McpTestingSettingsSection>
+        <McpCommandSettingsSection
+          testCommand={curlCommand}
+          writeCommand={writeCommand}
+          stdioCommand={stdioCommand}
+          tunnelCommand={tunnelCommand}
+          retryGuidance={retryGuidance}
+          copiedTestCommand={copiedCommand}
+          copiedWriteCommand={copiedWriteCommand}
+          copiedStdioCommand={copiedStdioCommand}
+          copiedTunnelCommand={copiedTunnelCommand}
+          onCopyTestCommand={copyMcpCommand}
+          onCopyWriteCommand={copyWriteCommand}
+          onCopyStdioCommand={copyStdioCommand}
+          onCopyTunnelCommand={copyTunnelCommand}
+        />
+      </McpTestingSettingsSection>
+
+      <McpActivitySettingsSection>
+        <McpActivityLogSection
+          auditLog={mcpAuditLog}
+          copied={copiedAuditLog}
+          onRefresh={onRefreshMcpAuditLog}
+          onCopy={copyAuditLog}
+          onExport={exportAuditLog}
+        />
+      </McpActivitySettingsSection>
 
       <DataSettingsSection
         storageMeter={storageMeter}

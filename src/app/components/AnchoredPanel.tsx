@@ -46,11 +46,6 @@ export function AnchoredPanel({
   const firstAnchor = enabledItems[0]?.id;
   const [activeAnchor, setActiveAnchor] = useState(initialAnchor ?? firstAnchor ?? '');
 
-  useEffect(() => {
-    const nextAnchor = initialAnchor ?? firstAnchor ?? '';
-    setActiveAnchor(nextAnchor);
-  }, [firstAnchor, initialAnchor]);
-
   const scrollToSection = (anchorId: string) => {
     const scrollNode = scrollRef.current;
     if (!scrollNode) return;
@@ -61,6 +56,17 @@ export function AnchoredPanel({
     section.scrollIntoView({ block: 'start', behavior: 'auto' });
     setActiveAnchor(anchorId);
   };
+
+  useEffect(() => {
+    const nextAnchor = initialAnchor ?? firstAnchor ?? '';
+    setActiveAnchor(nextAnchor);
+    if (!nextAnchor) return undefined;
+
+    const frame = window.requestAnimationFrame(() => {
+      scrollToSection(nextAnchor);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [firstAnchor, initialAnchor]);
 
   const syncActiveSection = () => {
     const scrollNode = scrollRef.current;

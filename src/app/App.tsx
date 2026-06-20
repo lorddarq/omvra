@@ -661,8 +661,10 @@ function App() {
     agentWatchConfigs,
     setAgentWatchConfigs,
   });
+  const [preferencesInitialAnchor, setPreferencesInitialAnchor] = useState('task-load');
 
   const handleOpenPreferences = useCallback(() => {
+    setPreferencesInitialAnchor('task-load');
     setIsPreferencesOpen(true);
   }, []);
 
@@ -671,7 +673,13 @@ function App() {
   }, []);
 
   const handleOpenPeoplePanel = useCallback(() => {
-    setIsPeoplePanelOpen(true);
+    setPreferencesInitialAnchor('people');
+    setIsPreferencesOpen(true);
+  }, []);
+
+  const handleOpenAgentsPanel = useCallback(() => {
+    setPreferencesInitialAnchor('agents');
+    setIsPreferencesOpen(true);
   }, []);
 
   const handleClosePeoplePanel = useCallback(() => {
@@ -1030,6 +1038,7 @@ function App() {
         }}
         onOpenPreferences={handleOpenPreferences}
         onOpenPeople={handleOpenPeoplePanel}
+        onOpenAgents={handleOpenAgentsPanel}
       />
 
       <AppMainViews
@@ -1080,6 +1089,7 @@ function App() {
         isSwimlaneDialogOpen={isSwimlaneDialogOpen}
         isPeoplePanelOpen={isPeoplePanelOpen}
         isPreferencesOpen={isPreferencesOpen}
+        preferencesInitialAnchor={preferencesInitialAnchor}
         selectedTask={selectedTask}
         detailsTask={detailsTask}
         selectedMilestone={selectedMilestone}

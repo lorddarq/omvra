@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Bot, Edit2, Trash2, Users } from 'lucide-react';
+import { Bot, Users } from 'lucide-react';
 import type { Person, PersonKind, StatusColumn, Task, TaskStatus } from '../types';
 import { getLoadPercentageForTasks } from '../utils/taskLoad';
 import { AnchoredPanelSection } from './AnchoredPanel';
 import { AgentCard, PersonCard } from './PersonCards';
 import { AgentEditorCard, PersonEditorCard } from './PersonEditorCards';
-import { PersonLoadSummary } from './PersonLoadSummary';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -145,81 +144,70 @@ export function PeopleManagementSections({
       onRoleChange: setEditRole,
       onKindChange: setEditKind,
     };
+    const displayActions = (
+      <div className="flex items-center gap-2 text-xs font-semibold leading-5 text-[#1a60cb]">
+        <button
+          type="button"
+          onClick={() => startEditPerson(person)}
+          className="rounded-sm hover:text-[#164ea4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
+        >
+          Edit
+        </button>
+        <button
+          type="button"
+          onClick={() => onDeletePerson(person.id)}
+          className="rounded-sm hover:text-[#164ea4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
+        >
+          Delete
+        </button>
+      </div>
+    );
+
+    if (!isEditing) {
+      const cardProps = {
+        person,
+        totalTasks,
+        statusCounts,
+        executionLoadPercentage,
+        pipelineLoadPercentage,
+        actions: displayActions,
+      };
+
+      return person.kind === 'agentic' ? (
+        <AgentCard key={person.id} {...cardProps} />
+      ) : (
+        <PersonCard key={person.id} {...cardProps} />
+      );
+    }
 
     return (
       <div key={person.id} className="rounded-lg border p-4 transition-colors hover:bg-gray-50">
         <div className="mb-3 flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            {isEditing && editKind === 'agentic' ? (
+            {editKind === 'agentic' ? (
               <AgentEditorCard
                 {...editCardProps}
                 agentInstructions={editAgentInstructions}
                 agentInstructionsInputId={editInstructionsId}
                 onAgentInstructionsChange={setEditAgentInstructions}
               />
-            ) : isEditing ? (
-              <PersonEditorCard {...editCardProps} />
-            ) : person.kind === 'agentic' ? (
-              <AgentCard
-                person={person}
-                totalTasks={totalTasks}
-                statusCounts={statusCounts}
-              />
             ) : (
-              <PersonCard
-                person={person}
-                totalTasks={totalTasks}
-                statusCounts={statusCounts}
-              />
+              <PersonEditorCard {...editCardProps} />
             )}
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            {isEditing ? (
-              <>
-                <Button
-                  type="button"
-                  onClick={() => saveEditedPerson(person.id)}
-                  size="sm"
-                  disabled={!editName.trim()}
-                >
-                  Save
-                </Button>
-                <Button type="button" onClick={cancelEditPerson} variant="outline" size="sm">
-                  Cancel
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button
-                  type="button"
-                  onClick={() => startEditPerson(person)}
-                  variant="ghost"
-                  size="sm"
-                  className="text-gray-400 hover:text-gray-700"
-                  aria-label={`Edit ${person.name}`}
-                >
-                  <Edit2 className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => onDeletePerson(person.id)}
-                  variant="ghost"
-                  size="sm"
-                  className="text-gray-400 hover:text-red-600"
-                  aria-label={`Delete ${person.name}`}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </>
-            )}
+            <Button
+              type="button"
+              onClick={() => saveEditedPerson(person.id)}
+              size="sm"
+              disabled={!editName.trim()}
+            >
+              Save
+            </Button>
+            <Button type="button" onClick={cancelEditPerson} variant="outline" size="sm">
+              Cancel
+            </Button>
           </div>
-        </div>
-
-        <div className="mt-3 flex justify-end">
-          <PersonLoadSummary
-            executionLoadPercentage={executionLoadPercentage}
-            pipelineLoadPercentage={pipelineLoadPercentage}
-          />
         </div>
       </div>
     );
@@ -590,7 +578,7 @@ export function PeopleSettingsSection({ children, empty = false, action, popupOp
       <div className="space-y-6">
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
-            <h4 className="text-sm font-semibold leading-5 text-[#71717a]">Active People</h4>
+            <h4 className="text-sm font-semibold leading-5 text-[#71717a]">Available People</h4>
             {action}
           </div>
           <p className="text-xs leading-4 text-[#6a7282]">Manage humans for task assignment.</p>
@@ -614,7 +602,7 @@ export function AgentsSettingsSection({ children, empty = false, action, popupOp
       <div className="space-y-6">
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
-            <h4 className="text-sm font-semibold leading-5 text-[#71717a]">Active Agents</h4>
+            <h4 className="text-sm font-semibold leading-5 text-[#71717a]">Available Agents</h4>
             {action}
           </div>
           <p className="text-xs leading-4 text-[#6a7282]">Manage agentic sub-agents for task assignment.</p>

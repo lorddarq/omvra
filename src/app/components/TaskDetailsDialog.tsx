@@ -161,10 +161,10 @@ export function TaskDetailsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-[760px]">
-        <DialogHeader>
-          <div className="flex items-start justify-between gap-3 pr-8">
-            <DialogTitle className="break-words [overflow-wrap:anywhere]">
+      <DialogContent className="max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] min-w-0 overflow-x-hidden overflow-y-auto sm:max-w-[760px]">
+        <DialogHeader className="min-w-0">
+          <div className="flex min-w-0 items-start justify-between gap-3 pr-8">
+            <DialogTitle className="min-w-0 break-words [overflow-wrap:anywhere]">
               {task?.title || 'Task details'}
             </DialogTitle>
             {task && (
@@ -188,81 +188,81 @@ export function TaskDetailsDialog({
               </Button>
             )}
           </div>
-          <DialogDescription>Review task details and markdown description.</DialogDescription>
+          <DialogDescription className="min-w-0 break-words [overflow-wrap:anywhere]">Review task details and markdown description.</DialogDescription>
         </DialogHeader>
 
         {task && (
-          <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-3 rounded-md bg-gray-50 p-3">
-              <div>
+          <div className="min-w-0 space-y-4 py-2">
+            <div className="grid min-w-0 grid-cols-1 gap-3 rounded-md bg-gray-50 p-3 sm:grid-cols-2">
+              <div className="min-w-0">
                 <div className="text-xs uppercase tracking-wide text-gray-500">Status</div>
-                <div className="text-xs font-medium text-gray-900">{statusLabel}</div>
+                <div className="break-words text-xs font-medium text-gray-900 [overflow-wrap:anywhere]">{statusLabel}</div>
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="text-xs uppercase tracking-wide text-gray-500">Primary Timeline Project</div>
-                <div className="text-xs font-medium text-gray-900">{primaryTimelineProject}</div>
+                <div className="break-words text-xs font-medium text-gray-900 [overflow-wrap:anywhere]">{primaryTimelineProject}</div>
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="text-xs uppercase tracking-wide text-gray-500">Assignee</div>
-                <div className="text-xs font-medium text-gray-900">
+                <div className="break-words text-xs font-medium text-gray-900 [overflow-wrap:anywhere]">
                   {personLabel}
                   {assignee ? ` (${assignee.kind === 'agentic' ? 'Agentic' : 'Human'})` : ''}
                 </div>
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="text-xs uppercase tracking-wide text-gray-500">Timeline</div>
-                <div className="text-xs font-medium text-gray-900">
+                <div className="break-words text-xs font-medium text-gray-900 [overflow-wrap:anywhere]">
                   {formatDate(task.startDate)} - {formatDate(task.endDate)}
                 </div>
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="text-xs uppercase tracking-wide text-gray-500">Task Size</div>
-                <div className="text-sm font-medium text-gray-900">{(task.size || 'm').toUpperCase()}</div>
+                <div className="break-words text-sm font-medium text-gray-900 [overflow-wrap:anywhere]">{(task.size || 'm').toUpperCase()}</div>
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="text-xs uppercase tracking-wide text-gray-500">Complexity</div>
-                <div className="text-sm font-medium text-gray-900 capitalize">{task.complexity || 'medium'}</div>
+                <div className="break-words text-sm font-medium capitalize text-gray-900 [overflow-wrap:anywhere]">{task.complexity || 'medium'}</div>
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="text-xs uppercase tracking-wide text-gray-500">Priority</div>
-                <div className="text-sm font-medium text-gray-900">{priorityLabel}</div>
+                <div className="break-words text-sm font-medium text-gray-900 [overflow-wrap:anywhere]">{priorityLabel}</div>
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="text-xs uppercase tracking-wide text-gray-500">Blocked</div>
-                <div className="text-sm font-medium text-gray-900">{task.blocked ? 'Yes' : 'No'}</div>
+                <div className="break-words text-sm font-medium text-gray-900 [overflow-wrap:anywhere]">{task.blocked ? 'Yes' : 'No'}</div>
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="text-xs uppercase tracking-wide text-gray-500">Roadmap Milestone</div>
-                <div className="text-sm font-medium text-gray-900">
+                <div className="break-words text-sm font-medium text-gray-900 [overflow-wrap:anywhere]">
                   {milestone ? `${milestone.title} (${formatDate(milestone.endDate)})` : 'No roadmap milestone'}
                 </div>
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="text-xs uppercase tracking-wide text-gray-500">Roadmap Dependencies</div>
-                <div className="text-sm font-medium text-gray-900">
+                <div className="break-words text-sm font-medium text-gray-900 [overflow-wrap:anywhere]">
                   {dependencyTasks.length > 0
                     ? dependencyTasks.map(dependencyTask => dependencyTask.title).join(', ')
                     : 'No roadmap dependencies'}
                 </div>
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="text-xs uppercase tracking-wide text-gray-500">Load Points</div>
-                <div className="text-sm font-medium text-gray-900">{taskLoadPoints.toFixed(1)} / {PERSON_CAPACITY_POINTS}</div>
+                <div className="break-words text-sm font-medium text-gray-900 [overflow-wrap:anywhere]">{taskLoadPoints.toFixed(1)} / {PERSON_CAPACITY_POINTS}</div>
               </div>
               {taskLoadContribution !== null && (
-                <div className="col-span-2">
+                <div className="min-w-0 sm:col-span-2">
                   <div className="text-xs uppercase tracking-wide text-gray-500">Person Load Contribution</div>
-                  <div className="text-sm font-medium text-gray-900">{taskLoadContribution}%</div>
+                  <div className="break-words text-sm font-medium text-gray-900 [overflow-wrap:anywhere]">{taskLoadContribution}%</div>
                 </div>
               )}
             </div>
 
-            <div className="space-y-2 rounded-md border bg-white p-4">
+            <div className="min-w-0 space-y-2 rounded-md border bg-white p-4">
               <div className="text-sm font-semibold text-gray-900">Projects</div>
               {projectLabels.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex min-w-0 flex-wrap gap-2">
                   {projectLabels.map(projectName => (
-                    <span key={projectName} className="rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700">
+                    <span key={projectName} className="max-w-full break-words rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700 [overflow-wrap:anywhere]">
                       {projectName}
                     </span>
                   ))}
@@ -272,9 +272,9 @@ export function TaskDetailsDialog({
               )}
             </div>
 
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <div className="text-sm font-semibold text-gray-900">Description</div>
-              <div className="rounded-md border bg-white p-4">
+              <div className="min-w-0 max-w-full overflow-hidden rounded-md border bg-white p-4">
                 {task.notes?.trim() ? (
                   <MarkdownContent content={task.notes} />
                 ) : (
@@ -283,7 +283,7 @@ export function TaskDetailsDialog({
               </div>
             </div>
 
-            <div className="space-y-2 rounded-md border bg-white p-4">
+            <div className="min-w-0 space-y-2 rounded-md border bg-white p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
                   <Paperclip className="size-4" />
@@ -297,7 +297,7 @@ export function TaskDetailsDialog({
                   {task.attachments.map(attachment => {
                     const sizeLabel = formatAttachmentSize(attachment.size);
                     return (
-                      <div key={attachment.id} className="flex items-center justify-between gap-3 rounded-md border border-gray-100 bg-gray-50 px-3 py-2">
+                      <div key={attachment.id} className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-gray-100 bg-gray-50 px-3 py-2">
                         <div className="min-w-0">
                           <div className="truncate text-sm font-medium text-gray-900">{attachment.name}</div>
                           <div className="truncate text-xs text-gray-500">
@@ -323,7 +323,7 @@ export function TaskDetailsDialog({
               )}
             </div>
 
-            <div className="space-y-3 rounded-md border bg-white p-4">
+            <div className="min-w-0 space-y-3 rounded-md border bg-white p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-sm font-semibold text-gray-900">Comments</div>
                 <div className="text-xs text-gray-500">{sortedComments.length} total</div>
@@ -346,12 +346,12 @@ export function TaskDetailsDialog({
               {sortedComments.length > 0 ? (
                 <div className="space-y-2">
                   {sortedComments.map((comment) => (
-                    <div key={comment.id} className="rounded-md border border-gray-100 bg-gray-50 px-3 py-2">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-sm font-medium text-gray-900">{comment.author}</div>
+                    <div key={comment.id} className="min-w-0 rounded-md border border-gray-100 bg-gray-50 px-3 py-2">
+                      <div className="flex min-w-0 items-center justify-between gap-3">
+                        <div className="min-w-0 break-words text-sm font-medium text-gray-900 [overflow-wrap:anywhere]">{comment.author}</div>
                         <div className="text-xs text-gray-500">{formatDate(comment.createdAt)}</div>
                       </div>
-                      <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">{comment.content}</p>
+                      <p className="mt-1 min-w-0 whitespace-pre-wrap break-words text-sm text-gray-700 [overflow-wrap:anywhere]">{comment.content}</p>
                     </div>
                   ))}
                 </div>
@@ -362,7 +362,7 @@ export function TaskDetailsDialog({
           </div>
         )}
 
-        <DialogFooter>
+        <DialogFooter className="min-w-0">
           {task && canMoveAgentTaskToReview && onMoveAgentTaskToReview && (
             <Button
               variant="outline"

@@ -58,7 +58,7 @@ export function AnchoredPanel({
     const section = scrollNode.querySelector<HTMLElement>(`[data-anchored-panel-section="${anchorId}"]`);
     if (!section) return;
 
-    section.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    section.scrollIntoView({ block: 'start', behavior: 'auto' });
     setActiveAnchor(anchorId);
   };
 
@@ -92,6 +92,7 @@ export function AnchoredPanel({
     <div
       className={cn(
         'flex h-full min-h-0 flex-col overflow-hidden rounded-[16px] bg-gradient-to-b from-[#f0f0f0] to-[#f0f0f0]/0 p-[2px] shadow-[0_0_1px_rgba(0,0,0,0.25)]',
+        'plumy-settings-panel',
         className
       )}
     >
@@ -107,7 +108,7 @@ export function AnchoredPanel({
           onSelect={scrollToSection}
           onBack={onBack}
         />
-        <AnchoredPanelScrollView ref={scrollRef} onScroll={syncActiveSection}>
+        <div className="plumy-settings-content relative min-h-0 overflow-hidden rounded-[14px] bg-white shadow-[0_0_1px_rgba(0,0,0,0.20)]">
           {onClose && (
             <Button
               type="button"
@@ -115,13 +116,15 @@ export function AnchoredPanel({
               size="icon"
               onClick={onClose}
               aria-label="Close panel"
-              className="absolute right-2 top-2 z-10 size-8 rounded-full border-black/10 bg-zinc-500/10 text-gray-900 shadow-none hover:bg-zinc-500/15"
+              className="plumy-settings-close absolute right-2 top-2 z-10 size-8 rounded-full border-black/10 bg-zinc-500/10 text-gray-900 shadow-none hover:bg-zinc-500/15"
             >
               <XMarkIcon className="size-4" />
             </Button>
           )}
-          {children}
-        </AnchoredPanelScrollView>
+          <AnchoredPanelScrollView ref={scrollRef} onScroll={syncActiveSection}>
+            {children}
+          </AnchoredPanelScrollView>
+        </div>
       </div>
 
       {footer && (
@@ -142,7 +145,7 @@ interface AnchoredPanelNavProps {
 
 export function AnchoredPanelNav({ groups, activeAnchor, onSelect, onBack }: AnchoredPanelNavProps) {
   return (
-    <nav className="min-h-0 overflow-hidden px-2 pb-2 pt-7" aria-label="Panel sections">
+    <nav className="plumy-settings-nav min-h-0 overflow-hidden px-2 pb-2 pt-7" aria-label="Panel sections">
       <div className="flex gap-4 sm:block">
         {onBack && (
           <Button type="button" variant="ghost" onClick={onBack} className="justify-start px-3">
@@ -154,6 +157,7 @@ export function AnchoredPanelNav({ groups, activeAnchor, onSelect, onBack }: Anc
             key={group.label}
             className={cn(
               'min-w-36 space-y-3 sm:min-w-0',
+              'plumy-settings-nav-group',
               groupIndex > 0 && 'mt-3 border-t border-zinc-500/10 pt-3'
             )}
           >
@@ -173,9 +177,10 @@ export function AnchoredPanelNav({ groups, activeAnchor, onSelect, onBack }: Anc
                     onClick={() => onSelect(item.id)}
                     className={cn(
                       'flex h-8 w-full items-center gap-2 rounded-xl px-2 text-left text-xs font-medium outline-none transition-colors',
+                      'plumy-settings-nav-item',
                       'focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2',
                       activeAnchor === item.id
-                        ? 'bg-zinc-500/15 text-[#71717a]'
+                        ? 'active bg-zinc-500/15 text-[#71717a]'
                         : 'text-[#71717a] hover:bg-zinc-500/10',
                       item.disabled && 'cursor-not-allowed opacity-50 hover:bg-transparent'
                     )}
@@ -202,7 +207,8 @@ export const AnchoredPanelScrollView = forwardRef<HTMLDivElement, AnchoredPanelS
     <div
       ref={ref}
       className={cn(
-        'relative h-full min-h-0 overflow-y-auto rounded-[14px] bg-white p-8 shadow-[0_0_1px_rgba(0,0,0,0.20)]',
+        'h-full min-h-0 overflow-y-auto p-8',
+        'plumy-settings-scroll',
         className
       )}
       {...props}

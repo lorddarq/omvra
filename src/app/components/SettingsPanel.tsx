@@ -49,7 +49,8 @@ export function SettingsPanel({ isOpen, onClose, children }: SettingsPanelProps)
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent
-        className="!bottom-2 !left-auto !right-2 !top-2 !h-auto !w-[min(636px,calc(100vw-16px))] !translate-x-0 !translate-y-0 gap-0 overflow-hidden rounded-[24px] border-0 bg-white p-2 shadow-[0_2px_8px_rgba(0,0,0,0.10),0_-6px_12px_rgba(0,0,0,0.10),0_14px_28px_rgba(0,0,0,0.10)] sm:max-w-none"
+        className="plumy-settings-sheet !bottom-2 !left-auto !right-2 !top-2 !h-auto !w-[min(636px,calc(100vw-16px))] !translate-x-0 !translate-y-0 gap-0 overflow-hidden rounded-[24px] border-0 bg-white p-2 shadow-[0_2px_8px_rgba(0,0,0,0.10),0_-6px_12px_rgba(0,0,0,0.10),0_14px_28px_rgba(0,0,0,0.10)] sm:max-w-none"
+        overlayClassName="plumy-settings-overlay"
         showClose={false}
       >
         <SheetTitle className="sr-only">Preferences</SheetTitle>

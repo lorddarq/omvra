@@ -63,7 +63,7 @@ export function SettingsPanel({ isOpen, onClose, children }: SettingsPanelProps)
         <AnchoredPanel
           title="Preferences"
           navGroups={SETTINGS_PANEL_NAV_GROUPS}
-          initialAnchor="mcp-access"
+          initialAnchor="task-load"
           onClose={onClose}
         >
           {children}

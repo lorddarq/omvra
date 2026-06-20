@@ -1,21 +1,22 @@
 import { Task, TimelineSwimlane, Person, TaskStatus, StatusColumn, ProjectMilestone } from '../types';
 import { useMemo, useState } from 'react';
-import { FolderSearch, Paperclip } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from '@/app/components/ui/dialog';
-import { Button } from '@/app/components/ui/button';
-import { Textarea } from '@/app/components/ui/textarea';
-import { MarkdownContent } from './MarkdownContent';
-import { getTaskLoadContributionPercent, getTaskLoadPoints, PERSON_CAPACITY_POINTS } from '../utils/taskLoad';
+import { getTaskLoadContributionPercent, getTaskLoadPoints } from '../utils/taskLoad';
 import { getMilestoneForTask } from '../utils/roadmap';
 import { formatTaskDetailsForClipboard } from '../utils/taskClipboard';
+import { TaskAttachmentsSection } from './TaskAttachmentsSection';
+import { TaskCommentsSection } from './TaskCommentsSection';
+import { TaskDescriptionSection } from './TaskDescriptionSection';
 import { TaskDetailsActionMenu } from './TaskDetailsActionMenu';
+import { TaskFooterActions } from './TaskFooterActions';
+import { TaskProjectsSection } from './TaskProjectsSection';
+import { TaskSummarySection } from './TaskSummarySection';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 
 interface TaskDetailsDialogProps {
@@ -38,13 +39,6 @@ function formatDate(dateValue?: string): string {
   const date = new Date(dateValue);
   if (isNaN(date.getTime())) return dateValue;
   return date.toLocaleDateString();
-}
-
-function formatAttachmentSize(size?: number): string {
-  if (!Number.isFinite(size) || !size) return '';
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export function TaskDetailsDialog({
@@ -96,6 +90,12 @@ export function TaskDetailsDialog({
   const taskLoadContribution = task && task.assigneeId
     ? getTaskLoadContributionPercent(task)
     : null;
+  const assigneeLabel = `${personLabel}${assignee ? ` (${assignee.kind === 'agentic' ? 'Agentic' : 'Human'})` : ''}`;
+  const timelineLabel = task ? `${formatDate(task.startDate)} - ${formatDate(task.endDate)}` : '';
+  const milestoneLabel = milestone ? `${milestone.title} (${formatDate(milestone.endDate)})` : 'No roadmap milestone';
+  const dependencyLabel = dependencyTasks.length > 0
+    ? dependencyTasks.map(dependencyTask => dependencyTask.title).join(', ')
+    : 'No roadmap dependencies';
   const priorityLabel = task
     ? ({
         urgent: 'Urgent',
@@ -165,6 +165,11 @@ export function TaskDetailsDialog({
     onEdit(task);
   };
 
+  const handleMoveAgentTaskToReview = () => {
+    if (!task || !onMoveAgentTaskToReview) return;
+    onMoveAgentTaskToReview(task.id);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] min-w-0 overflow-x-hidden overflow-y-auto sm:max-w-[760px]">
@@ -187,196 +192,50 @@ export function TaskDetailsDialog({
 
         {task && (
           <div className="min-w-0 space-y-4 py-2">
-            <div className="grid min-w-0 grid-cols-1 gap-3 rounded-md bg-gray-50 p-3 sm:grid-cols-2">
-              <div className="min-w-0">
-                <div className="text-xs uppercase tracking-wide text-gray-500">Status</div>
-                <div className="break-words text-xs font-medium text-gray-900 [overflow-wrap:anywhere]">{statusLabel}</div>
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs uppercase tracking-wide text-gray-500">Primary Timeline Project</div>
-                <div className="break-words text-xs font-medium text-gray-900 [overflow-wrap:anywhere]">{primaryTimelineProject}</div>
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs uppercase tracking-wide text-gray-500">Assignee</div>
-                <div className="break-words text-xs font-medium text-gray-900 [overflow-wrap:anywhere]">
-                  {personLabel}
-                  {assignee ? ` (${assignee.kind === 'agentic' ? 'Agentic' : 'Human'})` : ''}
-                </div>
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs uppercase tracking-wide text-gray-500">Timeline</div>
-                <div className="break-words text-xs font-medium text-gray-900 [overflow-wrap:anywhere]">
-                  {formatDate(task.startDate)} - {formatDate(task.endDate)}
-                </div>
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs uppercase tracking-wide text-gray-500">Task Size</div>
-                <div className="break-words text-sm font-medium text-gray-900 [overflow-wrap:anywhere]">{(task.size || 'm').toUpperCase()}</div>
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs uppercase tracking-wide text-gray-500">Complexity</div>
-                <div className="break-words text-sm font-medium capitalize text-gray-900 [overflow-wrap:anywhere]">{task.complexity || 'medium'}</div>
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs uppercase tracking-wide text-gray-500">Priority</div>
-                <div className="break-words text-sm font-medium text-gray-900 [overflow-wrap:anywhere]">{priorityLabel}</div>
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs uppercase tracking-wide text-gray-500">Blocked</div>
-                <div className="break-words text-sm font-medium text-gray-900 [overflow-wrap:anywhere]">{task.blocked ? 'Yes' : 'No'}</div>
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs uppercase tracking-wide text-gray-500">Roadmap Milestone</div>
-                <div className="break-words text-sm font-medium text-gray-900 [overflow-wrap:anywhere]">
-                  {milestone ? `${milestone.title} (${formatDate(milestone.endDate)})` : 'No roadmap milestone'}
-                </div>
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs uppercase tracking-wide text-gray-500">Roadmap Dependencies</div>
-                <div className="break-words text-sm font-medium text-gray-900 [overflow-wrap:anywhere]">
-                  {dependencyTasks.length > 0
-                    ? dependencyTasks.map(dependencyTask => dependencyTask.title).join(', ')
-                    : 'No roadmap dependencies'}
-                </div>
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs uppercase tracking-wide text-gray-500">Load Points</div>
-                <div className="break-words text-sm font-medium text-gray-900 [overflow-wrap:anywhere]">{taskLoadPoints.toFixed(1)} / {PERSON_CAPACITY_POINTS}</div>
-              </div>
-              {taskLoadContribution !== null && (
-                <div className="min-w-0 sm:col-span-2">
-                  <div className="text-xs uppercase tracking-wide text-gray-500">Person Load Contribution</div>
-                  <div className="break-words text-sm font-medium text-gray-900 [overflow-wrap:anywhere]">{taskLoadContribution}%</div>
-                </div>
-              )}
-            </div>
+            <TaskSummarySection
+              statusLabel={statusLabel}
+              primaryTimelineProject={primaryTimelineProject}
+              assigneeLabel={assigneeLabel}
+              timelineLabel={timelineLabel}
+              taskSizeLabel={(task.size || 'm').toUpperCase()}
+              complexityLabel={task.complexity || 'medium'}
+              priorityLabel={priorityLabel}
+              blockedLabel={task.blocked ? 'Yes' : 'No'}
+              milestoneLabel={milestoneLabel}
+              dependencyLabel={dependencyLabel}
+              taskLoadPoints={taskLoadPoints}
+              taskLoadContribution={taskLoadContribution}
+            />
 
-            <div className="min-w-0 space-y-2 rounded-md border bg-white p-4">
-              <div className="text-sm font-semibold text-gray-900">Projects</div>
-              {projectLabels.length > 0 ? (
-                <div className="flex min-w-0 flex-wrap gap-2">
-                  {projectLabels.map(projectName => (
-                    <span key={projectName} className="max-w-full break-words rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700 [overflow-wrap:anywhere]">
-                      {projectName}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-gray-500">No projects assigned.</div>
-              )}
-            </div>
+            <TaskProjectsSection projectLabels={projectLabels} />
 
-            <div className="min-w-0 space-y-2">
-              <div className="text-sm font-semibold text-gray-900">Description</div>
-              <div className="min-w-0 max-w-full overflow-hidden rounded-md border bg-white p-4">
-                {task.notes?.trim() ? (
-                  <MarkdownContent content={task.notes} />
-                ) : (
-                  <div className="text-sm text-gray-500">No description provided.</div>
-                )}
-              </div>
-            </div>
+            <TaskDescriptionSection notes={task.notes} />
 
-            <div className="min-w-0 space-y-2 rounded-md border bg-white p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
-                  <Paperclip className="size-4" />
-                  Attachments
-                </div>
-                <div className="text-xs text-gray-500">{task.attachments?.length || 0} total</div>
-              </div>
+            <TaskAttachmentsSection
+              attachments={task.attachments}
+              canReveal={Boolean(window.electron?.attachments?.reveal)}
+              onRevealAttachment={handleRevealAttachment}
+            />
 
-              {task.attachments?.length ? (
-                <div className="space-y-2">
-                  {task.attachments.map(attachment => {
-                    const sizeLabel = formatAttachmentSize(attachment.size);
-                    return (
-                      <div key={attachment.id} className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-gray-100 bg-gray-50 px-3 py-2">
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-medium text-gray-900">{attachment.name}</div>
-                          <div className="truncate text-xs text-gray-500">
-                            {attachment.path}{sizeLabel ? ` - ${sizeLabel}` : ''}
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-8 shrink-0 gap-2 px-2"
-                          onClick={() => handleRevealAttachment(attachment.path)}
-                          disabled={!window.electron?.attachments?.reveal}
-                        >
-                          <FolderSearch className="size-4" />
-                          Show
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-sm text-gray-500">No files attached.</div>
-              )}
-            </div>
-
-            <div className="min-w-0 space-y-3 rounded-md border bg-white p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold text-gray-900">Comments</div>
-                <div className="text-xs text-gray-500">{sortedComments.length} total</div>
-              </div>
-
-              <div className="space-y-2">
-                <Textarea
-                  value={newComment}
-                  onChange={(event) => setNewComment(event.target.value)}
-                  placeholder="Add a comment..."
-                  className="min-h-[96px] resize-y"
-                />
-                <div className="flex justify-end">
-                  <Button variant="outline" onClick={handleAddComment} disabled={!newComment.trim() || !task}>
-                    Add comment
-                  </Button>
-                </div>
-              </div>
-
-              {sortedComments.length > 0 ? (
-                <div className="space-y-2">
-                  {sortedComments.map((comment) => (
-                    <div key={comment.id} className="min-w-0 rounded-md border border-gray-100 bg-gray-50 px-3 py-2">
-                      <div className="flex min-w-0 items-center justify-between gap-3">
-                        <div className="min-w-0 break-words text-sm font-medium text-gray-900 [overflow-wrap:anywhere]">{comment.author}</div>
-                        <div className="text-xs text-gray-500">{formatDate(comment.createdAt)}</div>
-                      </div>
-                      <p className="mt-1 min-w-0 whitespace-pre-wrap break-words text-sm text-gray-700 [overflow-wrap:anywhere]">{comment.content}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-gray-500">No comments yet.</div>
-              )}
-            </div>
+            <TaskCommentsSection
+              comments={sortedComments}
+              newComment={newComment}
+              onNewCommentChange={setNewComment}
+              onAddComment={handleAddComment}
+              formatDate={formatDate}
+              canAddComment={Boolean(newComment.trim() && task)}
+            />
           </div>
         )}
 
-        <DialogFooter className="min-w-0">
-          {task && canMoveAgentTaskToReview && onMoveAgentTaskToReview && (
-            <Button
-              variant="outline"
-              className="mr-auto"
-              onClick={() => onMoveAgentTaskToReview(task.id)}
-            >
-              Move to In Review
-            </Button>
-          )}
-          {task && onEdit && (
-            <Button
-              variant="outline"
-              className={canMoveAgentTaskToReview ? '' : 'mr-auto'}
-              onClick={() => onEdit(task)}
-            >
-              Edit
-            </Button>
-          )}
-          <Button variant="outline" onClick={onClose}>Close</Button>
-        </DialogFooter>
+        <TaskFooterActions
+          canMoveToReview={Boolean(task && canMoveAgentTaskToReview && onMoveAgentTaskToReview)}
+          canEdit={Boolean(task && onEdit)}
+          editAlignsLeft={!canMoveAgentTaskToReview}
+          onMoveToReview={handleMoveAgentTaskToReview}
+          onEdit={handleEditTask}
+          onClose={onClose}
+        />
       </DialogContent>
     </Dialog>
   );

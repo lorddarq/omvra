@@ -256,6 +256,20 @@ export function PreferencesPanel({
 
   return (
     <SettingsPanel isOpen={isOpen} onClose={onClose}>
+      <TasksSettingsSection
+        statusColumns={statusColumns}
+        executionLoadStatusId={executionLoadStatusId}
+        pipelineLoadStatusId={pipelineLoadStatusId}
+        people={people}
+        agentWatchConfigs={agentWatchConfigs}
+        agentWatchRuntime={agentWatchRuntime}
+        onExecutionLoadStatusChange={onExecutionLoadStatusChange}
+        onPipelineLoadStatusChange={onPipelineLoadStatusChange}
+        onSaveAgentWatchConfig={onSaveAgentWatchConfig}
+        onRemoveAgentWatchConfig={onRemoveAgentWatchConfig}
+        onPollAgentWatch={onPollAgentWatch}
+      />
+
       <McpSettingsSection>
           <div className="space-y-3 rounded-lg border p-4">
             <McpAccessSettingsSection
@@ -318,20 +332,6 @@ export function PreferencesPanel({
             )}
           </div>
       </McpSettingsSection>
-
-      <TasksSettingsSection
-        statusColumns={statusColumns}
-        executionLoadStatusId={executionLoadStatusId}
-        pipelineLoadStatusId={pipelineLoadStatusId}
-        people={people}
-        agentWatchConfigs={agentWatchConfigs}
-        agentWatchRuntime={agentWatchRuntime}
-        onExecutionLoadStatusChange={onExecutionLoadStatusChange}
-        onPipelineLoadStatusChange={onPipelineLoadStatusChange}
-        onSaveAgentWatchConfig={onSaveAgentWatchConfig}
-        onRemoveAgentWatchConfig={onRemoveAgentWatchConfig}
-        onPollAgentWatch={onPollAgentWatch}
-      />
 
       <DataSettingsSection
         storageMeter={storageMeter}

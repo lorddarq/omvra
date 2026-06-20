@@ -116,7 +116,7 @@ export function AnchoredPanel({
               size="icon"
               onClick={onClose}
               aria-label="Close panel"
-              className="plumy-settings-close absolute right-2 top-2 z-10 size-8 rounded-full border-black/10 bg-zinc-500/10 text-gray-900 shadow-none hover:bg-zinc-500/15"
+              className="plumy-settings-close absolute right-2 top-2 z-10 size-8 rounded-full border-black/10 bg-white text-gray-900 shadow-none hover:bg-white"
             >
               <XMarkIcon className="size-4" />
             </Button>

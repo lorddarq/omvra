@@ -5,10 +5,11 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-import { Edit2, Plus, User, Bot, Trash2 } from 'lucide-react';
+import { Edit2, Plus, Trash2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { getLoadPercentageForTasks } from '../utils/taskLoad';
-import { getReadableTextClassFor } from '../utils/contrast';
+import { AgentCard, PersonCard } from './PersonCards';
+import { PersonLoadSummary } from './PersonLoadSummary';
 
 interface PeoplePanelProps {
   isOpen: boolean;
@@ -250,18 +251,9 @@ export function PeoplePanel({
               const isEditing = editingPersonId === person.id;
               const executionLoadPercentage = getLoadPercentageForPerson(person.id, executionLoadStatusId);
               const pipelineLoadPercentage = getLoadPercentageForPerson(person.id, pipelineLoadStatusId);
-              const executionLoadColorClass =
-                executionLoadPercentage > 120
-                  ? 'text-red-600'
-                  : executionLoadPercentage >= 80
-                    ? 'text-amber-600'
-                    : 'text-emerald-600';
-              const pipelineLoadColorClass =
-                pipelineLoadPercentage > 120
-                  ? 'text-red-600'
-                  : pipelineLoadPercentage >= 80
-                    ? 'text-amber-600'
-                    : 'text-emerald-600';
+              const statusCounts = statusColumns
+                .map(column => ({ column, count: getTaskCountForPerson(person.id, column.id) }))
+                .filter(({ count }) => count > 0);
               const watchConfig = getAgentWatchConfig(person.id);
               const watchRuntime = agentWatchRuntime[person.id];
               const editInstructionsId = `person-agent-instructions-${person.id}`;
@@ -269,14 +261,7 @@ export function PeoplePanel({
               return (
                 <div key={person.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                   <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                        {person.kind === 'agentic' ? (
-                          <Bot className="w-5 h-5 text-blue-600" />
-                        ) : (
-                          <User className="w-5 h-5 text-blue-600" />
-                        )}
-                      </div>
+                    <div>
                       {isEditing ? (
                         <div className="min-w-[240px] flex-1 space-y-2">
                           <Input
@@ -316,13 +301,18 @@ export function PeoplePanel({
                             </div>
                           )}
                         </div>
+                      ) : person.kind === 'agentic' ? (
+                        <AgentCard
+                          person={person}
+                          totalTasks={totalTasks}
+                          statusCounts={statusCounts}
+                        />
                       ) : (
-                        <div>
-                          <div className="font-medium">{person.name}</div>
-                          <div className="text-sm text-gray-500">
-                            {person.role} • {person.kind === 'agentic' ? 'Agentic' : 'Human'}
-                          </div>
-                        </div>
+                        <PersonCard
+                          person={person}
+                          totalTasks={totalTasks}
+                          statusCounts={statusCounts}
+                        />
                       )}
                     </div>
                     <div className="flex items-center gap-1">
@@ -354,28 +344,6 @@ export function PeoplePanel({
                         </>
                       )}
                     </div>
-                  </div>
-
-                  {/* Task count by status */}
-                  <div className="flex flex-wrap gap-2">
-                    <div className="text-xs px-2 py-1 bg-gray-100 rounded">
-                      Total: {totalTasks}
-                    </div>
-                    {statusColumns.map(col => {
-                      const count = getTaskCountForPerson(person.id, col.id);
-                      if (count === 0) return null;
-                      const bgColor = col.color || '#9ca3af';
-                      const textClass = getReadableTextClassFor(bgColor, bgColor);
-                      return (
-                        <div
-                          key={col.id}
-                          className={`text-xs px-2 py-1 rounded ${textClass}`}
-                          style={{ backgroundColor: bgColor }}
-                        >
-                          {col.title}: {count}
-                        </div>
-                      );
-                    })}
                   </div>
 
                   {person.kind === 'agentic' && (
@@ -541,14 +509,10 @@ export function PeoplePanel({
                   )}
 
                   <div className="mt-3 flex justify-end">
-                    <div className="text-right">
-                      <div className={`text-sm font-semibold ${executionLoadColorClass}`}>
-                        Execution: {executionLoadPercentage}%
-                      </div>
-                      <div className={`text-xs font-medium ${pipelineLoadColorClass}`}>
-                        Pipeline: {pipelineLoadPercentage}%
-                      </div>
-                    </div>
+                    <PersonLoadSummary
+                      executionLoadPercentage={executionLoadPercentage}
+                      pipelineLoadPercentage={pipelineLoadPercentage}
+                    />
                   </div>
                 </div>
               );

@@ -40,10 +40,10 @@
   top: 50%;
   transform: translate(-50%, -50%);
   margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 0.8rem;
+  font-weight: 500;
   line-height: 1.25rem;
-  color: #7b7b82;
+  color: #7E7E7E;
   white-space: nowrap;
   pointer-events: none;
 }

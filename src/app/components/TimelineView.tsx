@@ -225,7 +225,7 @@ export function TimelineView({
   const isScrollingRef = useRef<boolean>(false); // Flag to prevent feedback loops
   const scrollNotifyRafRef = useRef<number | null>(null);
   const resizeUpdateRafRef = useRef<number | null>(null);
-  const pendingDateUpdateRef = useRef<{ taskId: string; startDate: string; endDate: string } | null>(null);
+  const pendingResizePreviewRef = useRef<{ taskId: string; left: number; width: number } | null>(null);
   const pendingRevealDateRef = useRef<string | null>(null);
   const isHeaderScrubbingRef = useRef<boolean>(false);
   const scrubStartXRef = useRef<number>(0);
@@ -269,6 +269,11 @@ export function TimelineView({
     initialX: number;
     initialStartDate: string;
     initialEndDate: string;
+  } | null>(null);
+  const [taskResizePreview, setTaskResizePreview] = useState<{
+    taskId: string;
+    left: number;
+    width: number;
   } | null>(null);
 
   // State for click suppression after resize
@@ -586,19 +591,19 @@ export function TimelineView({
     [dates]
   );
 
-  const queueTaskDateUpdate = useCallback((taskId: string, startDate: string, endDate: string) => {
-    pendingDateUpdateRef.current = { taskId, startDate, endDate };
+  const queueTaskResizePreview = useCallback((preview: { taskId: string; left: number; width: number }) => {
+    pendingResizePreviewRef.current = preview;
     if (resizeUpdateRafRef.current == null) {
       resizeUpdateRafRef.current = requestAnimationFrame(() => {
-        const pending = pendingDateUpdateRef.current;
+        const pending = pendingResizePreviewRef.current;
         if (pending) {
-          onUpdateTaskDates(pending.taskId, pending.startDate, pending.endDate);
+          setTaskResizePreview(pending);
         }
-        pendingDateUpdateRef.current = null;
+        pendingResizePreviewRef.current = null;
         resizeUpdateRafRef.current = null;
       });
     }
-  }, [onUpdateTaskDates]);
+  }, []);
 
   // Handle left column resize
   const handleLeftResizeStart = (e: React.MouseEvent) => {
@@ -666,18 +671,18 @@ export function TimelineView({
     };
   }, []);
 
-  // Handle task resize with 60px grid snapping
+  // Handle task resize with fluid preview and snap-on-release commit.
   useEffect(() => {
     if (!resizingTask) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const buildResizeGeometry = (clientX: number) => {
       const task = tasks.find(t => t.id === resizingTask.taskId);
       if (!task) return;
 
-      const parsedStart = parseISODateLocal(task.startDate);
+      const parsedStart = parseISODateLocal(resizingTask.initialStartDate || task.startDate);
       if (!parsedStart) return;
       const startDate = new Date(parsedStart.getFullYear(), parsedStart.getMonth(), parsedStart.getDate());
-      const parsedEnd = parseISODateLocal(task.endDate);
+      const parsedEnd = parseISODateLocal(resizingTask.initialEndDate || task.endDate);
       const endDate = parsedEnd
         ? new Date(parsedEnd.getFullYear(), parsedEnd.getMonth(), parsedEnd.getDate())
         : startDate;
@@ -695,50 +700,78 @@ export function TimelineView({
 
       const rect = scrollEl.getBoundingClientRect();
       const scrollLeft = scrollEl.scrollLeft;
-      const localX = e.clientX - rect.left + scrollLeft;
+      const localX = clientX - rect.left + scrollLeft;
+      const originalLeft = prefix[startIdx];
+      const originalRight = prefix[Math.min(endIdx + 1, prefix.length - 1)];
+      const minWidth = 8;
 
-      // Snap to 60px grid
-      const snappedX = Math.round(localX / DEFAULT_DAY_WIDTH) * DEFAULT_DAY_WIDTH;
+      const previewLeft = resizingTask.edge === 'start'
+        ? Math.max(prefix[0], Math.min(localX, originalRight - minWidth))
+        : originalLeft;
+      const previewRight = resizingTask.edge === 'end'
+        ? Math.min(prefix[prefix.length - 1], Math.max(localX, originalLeft + minWidth))
+        : originalRight;
 
-      let newIdx = 0;
-      for (let i = 0; i < prefix.length - 1; i++) {
-        if (snappedX >= prefix[i] && snappedX < prefix[i + 1]) {
-          newIdx = i;
-          break;
-        }
-      }
-
-      if (resizingTask.edge === 'start') {
-        // Drag start date (can't go past end)
-        if (newIdx <= endIdx && newIdx >= 0 && newIdx < dates.length) {
-          const newDate = new Date(dates[newIdx]);
-          const newISO = toLocalISODate(newDate);
-          if (newISO !== task.startDate) {
-            queueTaskDateUpdate(task.id, newISO, task.endDate || '');
-          }
-        }
+      let boundaryIndex = 0;
+      if (localX >= prefix[prefix.length - 1]) {
+        boundaryIndex = dates.length;
       } else {
-        // Drag end date (can't go before start)
-        if (newIdx >= startIdx && newIdx >= 0 && newIdx < dates.length) {
-          const newDate = new Date(dates[newIdx]);
-          const newISO = toLocalISODate(newDate);
-          if (newISO !== task.endDate) {
-            queueTaskDateUpdate(task.id, task.startDate || '', newISO);
+        for (let i = 0; i < prefix.length - 1; i++) {
+          if (localX >= prefix[i] && localX < prefix[i + 1]) {
+            const cellMiddle = prefix[i] + ((dayWidths[i] ?? DEFAULT_DAY_WIDTH) / 2);
+            boundaryIndex = localX < cellMiddle ? i : i + 1;
+            break;
           }
         }
       }
+
+      return {
+        task,
+        startIdx,
+        endIdx,
+        boundaryIndex,
+        preview: {
+          taskId: task.id,
+          left: previewLeft,
+          width: Math.max(minWidth, previewRight - previewLeft),
+        },
+      };
     };
 
-    const handleMouseUp = () => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const geometry = buildResizeGeometry(e.clientX);
+      if (!geometry) return;
+      queueTaskResizePreview(geometry.preview);
+      e.preventDefault();
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      const geometry = buildResizeGeometry(e.clientX);
+
       if (resizeUpdateRafRef.current != null) {
         cancelAnimationFrame(resizeUpdateRafRef.current);
         resizeUpdateRafRef.current = null;
       }
-      const pending = pendingDateUpdateRef.current;
-      if (pending) {
-        onUpdateTaskDates(pending.taskId, pending.startDate, pending.endDate);
+
+      if (geometry) {
+        const { task, startIdx, endIdx, boundaryIndex } = geometry;
+        if (resizingTask.edge === 'start') {
+          const newIdx = Math.max(0, Math.min(endIdx, boundaryIndex));
+          const newISO = toLocalISODate(new Date(dates[newIdx]));
+          if (newISO !== task.startDate) {
+            onUpdateTaskDates(task.id, newISO, task.endDate || '');
+          }
+        } else {
+          const newIdx = Math.max(startIdx, Math.min(dates.length - 1, boundaryIndex - 1));
+          const newISO = toLocalISODate(new Date(dates[newIdx]));
+          if (newISO !== task.endDate) {
+            onUpdateTaskDates(task.id, task.startDate || '', newISO);
+          }
+        }
       }
-      pendingDateUpdateRef.current = null;
+
+      pendingResizePreviewRef.current = null;
+      setTaskResizePreview(null);
       setResizingTask(null);
       setIgnoreAddTaskUntil(Date.now() + 300);
     };
@@ -750,7 +783,7 @@ export function TimelineView({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [resizingTask, tasks, dates, dayWidths, onUpdateTaskDates, getVisibleIndexForDate, queueTaskDateUpdate]);
+  }, [resizingTask, tasks, dates, dayWidths, onUpdateTaskDates, getVisibleIndexForDate, queueTaskResizePreview]);
 
   // Scroll to today
   const scrollToToday = useCallback((opts?: { smooth?: boolean }) => {
@@ -1272,37 +1305,38 @@ export function TimelineView({
                         onEditSwimlane={onEditSwimlane}
                         onMoveSwimlane={handleMoveSwimlane}
                         onMoveTaskToSwimlane={(taskId, swimlaneId, newStartDate, newEndDate) => {
-                        const task = tasks.find(t => t.id === taskId);
-                        if (task) {
-                          const updated = applyTimelineTaskDrop(
-                            task,
-                            swimlaneId,
-                            mode,
-                            newStartDate,
-                            newEndDate
-                          );
-                          
-                          if (updated === task) {
-                            return;
-                          }
+                          const task = tasks.find(t => t.id === taskId);
+                          if (task) {
+                            const updated = applyTimelineTaskDrop(
+                              task,
+                              swimlaneId,
+                              mode,
+                              newStartDate,
+                              newEndDate
+                            );
 
-                          onReorderTasks(tasks.map(t => (t.id === taskId ? updated : t)));
-                        }
-                      }}
-                      onRevealDate={(dateISO) => {
-                        pendingRevealDateRef.current = dateISO;
-                      }}
-                      getTaskColor={getTaskColor}
-                      handleResizeStart={(e, task, edge) => {
-                        setResizingTask({
-                          taskId: task.id,
-                          edge,
-                          initialX: e.clientX,
-                          initialStartDate: task.startDate || '',
-                          initialEndDate: task.endDate || '',
-                        });
-                      }}
+                            if (updated === task) {
+                              return;
+                            }
+
+                            onReorderTasks(tasks.map(t => (t.id === taskId ? updated : t)));
+                          }
+                        }}
+                        onRevealDate={(dateISO) => {
+                          pendingRevealDateRef.current = dateISO;
+                        }}
+                        getTaskColor={getTaskColor}
+                        handleResizeStart={(e, task, edge) => {
+                          setResizingTask({
+                            taskId: task.id,
+                            edge,
+                            initialX: e.clientX,
+                            initialStartDate: task.startDate || '',
+                            initialEndDate: task.endDate || '',
+                          });
+                        }}
                         resizingTaskId={resizingTask?.taskId ?? null}
+                        taskResizePreview={taskResizePreview}
                         ignoreAddTaskUntil={ignoreAddTaskUntil}
                         scrollContainerRef={rowsContainerRef}
                       />

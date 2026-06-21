@@ -31,21 +31,6 @@
 .timeline-scroll-btn:focus-visible { outline: 2px solid rgba(59,130,246,0.45); outline-offset: 2px; }
 .timeline-scroll-btn:disabled { opacity: 0.5; pointer-events: none; }
 
-/* Paint-hints to reduce rendering artifacts when resizing */
-.timeline-viewport, .month-column, .day-row, .swimlane-rows {
-  will-change: transform, opacity;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  transform: translateZ(0);
-}
-
-/* Temporary CSS hook to nudge repaint/composition when needed */
-.timeline-redraw-flash {
-  /* No visual change but forces GPU/compositor layer and repaint */
-  transform: translateZ(0) scale(1);
-  will-change: transform, opacity;
-}
-
 /* Fallback line-clamp utilities (used when Tailwind line-clamp plugin isn't enabled) */
 .line-clamp-3 {
   display: -webkit-box;

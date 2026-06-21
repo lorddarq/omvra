@@ -1,14 +1,19 @@
 import React, { memo } from 'react';
-import { Badge } from './ui/badge';
 import { TaskPriority } from '../types';
 import { extractTaskCardContent } from '../utils/taskNotes';
+import urgentIcon from '../images/icons/icon-urgent.svg';
+import highIcon from '../images/icons/icon-high.svg';
+import normalIcon from '../images/icons/icon-normal.svg';
+import lowIcon from '../images/icons/icon-low.svg';
 
-const PRIORITY_STYLES: Record<TaskPriority, { label: string; className: string }> = {
-  urgent: { label: 'Urgent', className: 'bg-red-500 text-white border-white/10' },
-  moderate: { label: 'Moderate', className: 'bg-orange-500 text-white border-white/10' },
-  normal: { label: 'Normal', className: 'bg-blue-500 text-white border-white/10' },
-  low: { label: 'Low', className: 'bg-green-500 text-white border-white/10' },
+const PRIORITY_ICONS: Record<TaskPriority, { label: string; src: string }> = {
+  urgent: { label: 'Urgent priority', src: urgentIcon },
+  moderate: { label: 'High priority', src: highIcon },
+  normal: { label: 'Normal priority', src: normalIcon },
+  low: { label: 'Low priority', src: lowIcon },
 };
+
+const VISIBLE_PROJECT_COUNT = 2;
 
 interface TaskCardProps {
   title: string;
@@ -24,20 +29,29 @@ function TaskCardComponent({ title, notes, color, project, priority = 'normal', 
   const projectLabels = project
     ? project.split(',').map(label => label.trim()).filter(Boolean)
     : [];
-  const priorityStyle = PRIORITY_STYLES[priority];
+  const priorityIcon = PRIORITY_ICONS[priority];
   const { bodyPreview, checklistItems } = extractTaskCardContent(notes);
   const checklistPreview = checklistItems.slice(0, 3);
   const remainingChecklistCount = Math.max(0, checklistItems.length - checklistPreview.length);
+  const visibleProjectLabels = projectLabels.slice(0, VISIBLE_PROJECT_COUNT);
+  const remainingProjectCount = Math.max(0, projectLabels.length - visibleProjectLabels.length);
 
   return (
     <div
       onClick={(e) => { e.stopPropagation(); onClick?.(); }}
-      className="bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-gray-200 max-w-[320px] min-h-[170px] overflow-hidden"
+      className="kanban-task-card-ui"
+      data-priority={priority}
     >
       <div className="space-y-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-medium text-gray-900 truncate-anywhere">
+        <div className="kanban-task-title-container">
+          <div className="kanban-task-title-content">
+            <img
+              src={priorityIcon.src}
+              alt=""
+              aria-hidden="true"
+              className="kanban-task-priority-icon"
+            />
+            <p className="kanban-task-title-ui truncate-anywhere">
               {title}
             </p>
           </div>
@@ -45,7 +59,7 @@ function TaskCardComponent({ title, notes, color, project, priority = 'normal', 
           {onEdit && (
             <button
               onClick={(e) => { e.stopPropagation(); onEdit(); }}
-              className="shrink-0 rounded border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
+              className="kanban-task-edit-button"
               aria-label="Edit task"
             >
               Edit
@@ -53,56 +67,53 @@ function TaskCardComponent({ title, notes, color, project, priority = 'normal', 
           )}
         </div>
 
-        <p className="min-h-[4.5rem] text-sm leading-6 text-gray-600 line-clamp-3">
+        <p className="kanban-task-description-ui">
           {bodyPreview || 'No description provided.'}
         </p>
 
         {checklistPreview.length > 0 && (
-          <div className="space-y-2">
-            <div className="text-sm font-semibold text-gray-900">Checklist</div>
+          <div className="kanban-task-checklist-preview">
+            <div className="kanban-task-section-label">Checklist</div>
             <div className="space-y-2">
               {checklistPreview.map((item, idx) => (
-                <label key={`${item.text}-${idx}`} className="flex items-center gap-2 text-sm text-gray-900">
-                  <input
-                    type="checkbox"
-                    checked={item.checked}
-                    readOnly
-                    className="h-4 w-4 shrink-0 rounded border-gray-300"
+                <label key={`${item.text}-${idx}`} className="kanban-task-checklist-item">
+                  <span
+                    className="kanban-task-checklist-checkbox"
+                    data-checked={item.checked ? 'true' : 'false'}
+                    aria-hidden="true"
                   />
                   <span className="truncate-anywhere">{item.text}</span>
                 </label>
               ))}
               {remainingChecklistCount > 0 && (
-                <div className="text-sm text-gray-500">{remainingChecklistCount} more</div>
+                <div className="kanban-task-more-count">{remainingChecklistCount} more</div>
               )}
             </div>
           </div>
         )}
 
-        <div className="flex items-center gap-3">
-          <div className="w-[96px] shrink-0">
-            <Badge className={priorityStyle.className}>
-              {priorityStyle.label}
-            </Badge>
-          </div>
-          <div className="min-w-0 flex-1">
-            {projectLabels.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {projectLabels.map(label => (
-                  <Badge
-                    key={label}
-                    variant="outline"
-                    className="max-w-[150px] justify-start overflow-hidden"
-                    title={label}
-                  >
-                    <span className="block truncate">{label}</span>
-                  </Badge>
-                ))}
-              </div>
-            ) : (
-              <div className="text-sm text-gray-500">No projects</div>
-            )}
-          </div>
+        <div className="kanban-task-projects-section">
+          <div className="kanban-task-section-label">Projects:</div>
+          {projectLabels.length > 0 ? (
+            <div className="kanban-task-project-list">
+              {visibleProjectLabels.map(label => (
+                <span
+                  key={label}
+                  className="kanban-task-project-pill"
+                  title={label}
+                >
+                  {label}
+                </span>
+              ))}
+              {remainingProjectCount > 0 && (
+                <span className="kanban-task-project-pill">
+                  {remainingProjectCount} More
+                </span>
+              )}
+            </div>
+          ) : (
+            <div className="kanban-task-no-project">No projects</div>
+          )}
         </div>
       </div>
     </div>

@@ -5,10 +5,10 @@ import type { Person, PersonKind, StatusColumn, Task, TaskStatus } from '../type
 import { getLoadPercentageForTasks } from '../utils/taskLoad';
 import { AnchoredPanelSection } from './AnchoredPanel';
 import { AgentCard, PersonCard } from './PersonCards';
-import { AgentEditorCard, PersonEditorCard } from './PersonEditorCards';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
 
 interface PeopleManagementSectionsProps {
@@ -133,26 +133,30 @@ export function PeopleManagementSections({
       .map(column => ({ column, count: getTaskCountForPerson(person.id, column.id) }))
       .filter(({ count }) => count > 0);
     const editInstructionsId = `person-agent-instructions-${person.id}`;
-    const editCardProps = {
-      name: editName,
-      role: editRole,
-      kind: editKind,
-      namePlaceholder: 'Name',
-      rolePlaceholder: 'Role',
-      compact: true,
-      onNameChange: setEditName,
-      onRoleChange: setEditRole,
-      onKindChange: setEditKind,
-    };
     const displayActions = (
       <div className="flex items-center gap-2 text-xs font-semibold leading-5 text-[#1a60cb]">
-        <button
-          type="button"
-          onClick={() => startEditPerson(person)}
-          className="rounded-sm hover:text-[#164ea4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
-        >
-          Edit
-        </button>
+        <EditPersonPopover
+          open={isEditing}
+          person={person}
+          name={editName}
+          role={editRole}
+          kind={editKind}
+          agentInstructions={editAgentInstructions}
+          agentInstructionsInputId={editInstructionsId}
+          onOpenChange={(open) => {
+            if (open) {
+              startEditPerson(person);
+              return;
+            }
+            cancelEditPerson();
+          }}
+          onNameChange={setEditName}
+          onRoleChange={setEditRole}
+          onKindChange={setEditKind}
+          onAgentInstructionsChange={setEditAgentInstructions}
+          onCancel={cancelEditPerson}
+          onSubmit={() => saveEditedPerson(person.id)}
+        />
         <button
           type="button"
           onClick={() => onDeletePerson(person.id)}
@@ -163,53 +167,19 @@ export function PeopleManagementSections({
       </div>
     );
 
-    if (!isEditing) {
-      const cardProps = {
-        person,
-        totalTasks,
-        statusCounts,
-        executionLoadPercentage,
-        pipelineLoadPercentage,
-        actions: displayActions,
-      };
+    const cardProps = {
+      person,
+      totalTasks,
+      statusCounts,
+      executionLoadPercentage,
+      pipelineLoadPercentage,
+      actions: displayActions,
+    };
 
-      return person.kind === 'agentic' ? (
-        <AgentCard key={person.id} {...cardProps} />
-      ) : (
-        <PersonCard key={person.id} {...cardProps} />
-      );
-    }
-
-    return (
-      <div key={person.id} className="rounded-lg border p-4 transition-colors hover:bg-gray-50">
-        <div className="mb-3 flex items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            {editKind === 'agentic' ? (
-              <AgentEditorCard
-                {...editCardProps}
-                agentInstructions={editAgentInstructions}
-                agentInstructionsInputId={editInstructionsId}
-                onAgentInstructionsChange={setEditAgentInstructions}
-              />
-            ) : (
-              <PersonEditorCard {...editCardProps} />
-            )}
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <Button
-              type="button"
-              onClick={() => saveEditedPerson(person.id)}
-              size="sm"
-              disabled={!editName.trim()}
-            >
-              Save
-            </Button>
-            <Button type="button" onClick={cancelEditPerson} variant="outline" size="sm">
-              Cancel
-            </Button>
-          </div>
-        </div>
-      </div>
+    return person.kind === 'agentic' ? (
+      <AgentCard key={person.id} {...cardProps} />
+    ) : (
+      <PersonCard key={person.id} {...cardProps} />
     );
   }
 
@@ -217,7 +187,7 @@ export function PeopleManagementSections({
     <>
       <PeopleSettingsSection
         empty={humanPeople.length === 0}
-        popupOpen={addingSection === 'people'}
+        popupOpen={addingSection === 'people' || humanPeople.some(person => person.id === editingPersonId)}
         action={(
           <AddPersonPopover
             open={addingSection === 'people'}
@@ -238,7 +208,7 @@ export function PeopleManagementSections({
 
       <AgentsSettingsSection
         empty={agenticPeople.length === 0}
-        popupOpen={addingSection === 'agents'}
+        popupOpen={addingSection === 'agents' || agenticPeople.some(person => person.id === editingPersonId)}
         action={(
           <AddAgentPopover
             open={addingSection === 'agents'}
@@ -416,6 +386,115 @@ function AddAgentPopover({
   );
 }
 
+interface EditPersonPopoverProps {
+  open: boolean;
+  person: Person;
+  name: string;
+  role: string;
+  kind: PersonKind;
+  agentInstructions: string;
+  agentInstructionsInputId: string;
+  onOpenChange: (open: boolean) => void;
+  onNameChange: (name: string) => void;
+  onRoleChange: (role: string) => void;
+  onKindChange: (kind: PersonKind) => void;
+  onAgentInstructionsChange: (instructions: string) => void;
+  onCancel: () => void;
+  onSubmit: () => void;
+}
+
+function EditPersonPopover({
+  open,
+  person,
+  name,
+  role,
+  kind,
+  agentInstructions,
+  agentInstructionsInputId,
+  onOpenChange,
+  onNameChange,
+  onRoleChange,
+  onKindChange,
+  onAgentInstructionsChange,
+  onCancel,
+  onSubmit,
+}: EditPersonPopoverProps) {
+  const entityLabel = person.kind === 'agentic' ? 'agent' : 'person';
+
+  return (
+    <SettingsAddPopupShell open={open} onOpenChange={onOpenChange}>
+      <SettingsAddPopupTrigger>
+        <button
+          type="button"
+          onClick={() => onOpenChange(!open)}
+          className="rounded-sm hover:text-[#164ea4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
+          aria-expanded={open}
+        >
+          Edit
+        </button>
+      </SettingsAddPopupTrigger>
+      <SettingsAddPopupContent open={open}>
+        <div className="grid gap-3 px-4 pb-5 pt-4 sm:grid-cols-2">
+          <SettingsPopoverField
+            id={`settings-edit-person-name-${person.id}`}
+            label="Name"
+            value={name}
+            placeholder={`Enter ${entityLabel} name...`}
+            autoFocus
+            onChange={onNameChange}
+          />
+          <div className="space-y-1">
+            <Label htmlFor={`settings-edit-person-kind-${person.id}`} className="text-xs font-medium leading-5 text-[#71717a]">
+              Type
+            </Label>
+            <Select value={kind} onValueChange={(value) => onKindChange(value as PersonKind)}>
+              <SelectTrigger
+                id={`settings-edit-person-kind-${person.id}`}
+                className="h-8 rounded-xl border-black/10 bg-white/10 px-2 text-sm focus-visible:ring-gray-300"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="human">Human</SelectItem>
+                <SelectItem value="agentic">Agentic</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="px-4 pb-4">
+          <SettingsPopoverField
+            id={`settings-edit-person-role-${person.id}`}
+            label="Role"
+            value={role}
+            placeholder="Enter role..."
+            onChange={onRoleChange}
+          />
+        </div>
+        {kind === 'agentic' && (
+          <div className="space-y-2 px-4 pb-5">
+            <Label htmlFor={agentInstructionsInputId} className="text-xs font-medium leading-5 text-[#71717a]">
+              Optional Prompt
+            </Label>
+            <Textarea
+              id={agentInstructionsInputId}
+              value={agentInstructions}
+              onChange={(event) => onAgentInstructionsChange(event.target.value)}
+              placeholder="Enter prompt..."
+              className="min-h-[125px] resize-none rounded-xl border-black/10 bg-white/10 p-3 text-sm placeholder:text-[#b5b5ba] focus-visible:ring-gray-300"
+            />
+          </div>
+        )}
+        <SettingsPopoverActions
+          addDisabled={!name.trim()}
+          submitLabel="Save"
+          onCancel={onCancel}
+          onSubmit={onSubmit}
+        />
+      </SettingsAddPopupContent>
+    </SettingsAddPopupShell>
+  );
+}
+
 interface SettingsAddPopupShellProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -506,11 +585,12 @@ function SettingsPopoverField({
 
 interface SettingsPopoverActionsProps {
   addDisabled: boolean;
+  submitLabel?: string;
   onCancel: () => void;
   onSubmit: () => void;
 }
 
-function SettingsPopoverActions({ addDisabled, onCancel, onSubmit }: SettingsPopoverActionsProps) {
+function SettingsPopoverActions({ addDisabled, submitLabel = 'Add', onCancel, onSubmit }: SettingsPopoverActionsProps) {
   return (
     <div className="flex justify-end gap-2 border-t border-zinc-500/10 px-4 py-3">
       <Button
@@ -529,7 +609,7 @@ function SettingsPopoverActions({ addDisabled, onCancel, onSubmit }: SettingsPop
         disabled={addDisabled}
         className="h-7 rounded-xl bg-zinc-500/15 px-3 text-sm font-medium text-[#67676f] hover:bg-zinc-500/20 disabled:opacity-50"
       >
-        Add
+        {submitLabel}
       </Button>
     </div>
   );

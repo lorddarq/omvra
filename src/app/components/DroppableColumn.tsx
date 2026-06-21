@@ -1,6 +1,6 @@
-import { Fragment, useRef, useState } from 'react';
+import { Fragment, useRef, useState, type RefObject } from 'react';
 import { useDragLayer, useDrop } from 'react-dnd';
-import { Plus, Edit2 } from 'lucide-react';
+import { GripVertical } from 'lucide-react';
 import { Task, TaskStatus, StatusColumn } from '../types';
 import {
   DraggableTaskCard,
@@ -8,13 +8,13 @@ import {
   type TaskDragItem,
   type TaskDropIndicator,
 } from '../components/DraggableTaskCard';
-import { getReadableTextClassFor } from '../utils/contrast';
 import { ColumnDialog } from '../components/ColumnDialog';
 
 interface DroppableColumnProps {
   swimlane: StatusColumn;
   tasks: Task[];
   swimlanes: StatusColumn[];
+  columnDragHandleRef?: RefObject<HTMLButtonElement | null>;
   onTaskClick: (task: Task) => void;
   onEditTask?: (task: Task) => void;
   onAddTask: (status: TaskStatus) => void;
@@ -55,10 +55,81 @@ function TaskInsertionMarker({
   );
 }
 
+function getColumnAccentStyle(color: string | undefined): React.CSSProperties | undefined {
+  if (!color?.startsWith('#')) return undefined;
+  return { '--kanban-column-accent': color } as React.CSSProperties;
+}
+
+function getColumnAccentClass(color: string | undefined): string {
+  if (!color || color.startsWith('#')) return '';
+  return color;
+}
+
+interface KanbanColumnHeaderProps {
+  swimlane: StatusColumn;
+  taskCount: number;
+  columnDragHandleRef?: RefObject<HTMLButtonElement | null>;
+  onEdit: () => void;
+}
+
+function KanbanColumnHeader({
+  swimlane,
+  taskCount,
+  columnDragHandleRef,
+  onEdit,
+}: KanbanColumnHeaderProps) {
+  return (
+    <div className="kanban-column-header-ui">
+      {columnDragHandleRef && (
+        <button
+          ref={columnDragHandleRef}
+          type="button"
+          className="kanban-column-drag-handle"
+          aria-label={`Drag ${swimlane.title || 'column'} column`}
+        >
+          <GripVertical className="size-4" />
+        </button>
+      )}
+      <div className={`kanban-column-accent ${getColumnAccentClass(swimlane.color)}`} aria-hidden="true" />
+      <div className="min-w-0 flex-1">
+        <div className="kanban-column-title-row">
+          <span className="kanban-column-title-text">{swimlane.title}</span>
+          <span className="kanban-column-count-pill">{taskCount}</span>
+        </div>
+      </div>
+      <button
+        className="kanban-column-edit-control"
+        onClick={onEdit}
+        aria-label={`Edit ${swimlane.title} column`}
+        type="button"
+      >
+        Edit
+      </button>
+    </div>
+  );
+}
+
+interface KanbanAddTaskRowProps {
+  onAddTask: () => void;
+}
+
+function KanbanAddTaskRow({ onAddTask }: KanbanAddTaskRowProps) {
+  return (
+    <button
+      onClick={onAddTask}
+      className="kanban-add-task-row"
+      type="button"
+    >
+      <span>Add Task</span>
+    </button>
+  );
+}
+
 export function DroppableColumn({
   swimlane,
   tasks: swimlaneTasks,
   swimlanes,
+  columnDragHandleRef,
   onTaskClick,
   onEditTask,
   onAddTask,
@@ -111,12 +182,6 @@ export function DroppableColumn({
   // Column dialog state
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const headerStyle = (color: string | undefined) => {
-    if (!color) return undefined;
-    if (color.startsWith('#')) return { backgroundColor: color } as React.CSSProperties;
-    return undefined;
-  };
-
   const handleSaveColumn = (title: string, color: string) => {
     if (onRenameColumn && title.trim()) onRenameColumn(swimlane.id, title.trim());
     if (onChangeColumnColor && color) onChangeColumnColor(swimlane.id, color);
@@ -128,23 +193,15 @@ export function DroppableColumn({
 
   return (
     <div
-      className="min-w-[280px] max-w-[320px] bg-gray-100 rounded-lg flex flex-col h-full"
+      className="kanban-column-shell"
+      style={getColumnAccentStyle(swimlane.color)}
     >
-      {/* Swimlane header */}
-      <div className={`${!swimlane.color?.startsWith('#') ? swimlane.color : ''} ${(() => {
-        const key = swimlane.color || '';
-        return key ? getReadableTextClassFor(key, key.startsWith('#') ? key : undefined) : 'text-white';
-      })()} p-3 rounded-t-lg flex items-center justify-between`} style={headerStyle(swimlane.color)}>
-        <div className="flex items-center gap-2">
-          <span className="font-medium">{swimlane.title}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm">{swimlaneTasks.length}</span>
-          <button className="p-1 ml-2 hover:bg-white/10 rounded" onClick={() => setIsDialogOpen(true)} aria-label="Edit column">
-            <Edit2 className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
+      <KanbanColumnHeader
+        swimlane={swimlane}
+        taskCount={swimlaneTasks.length}
+        columnDragHandleRef={columnDragHandleRef}
+        onEdit={() => setIsDialogOpen(true)}
+      />
 
       {/* Column Dialog */}
       <ColumnDialog
@@ -158,18 +215,9 @@ export function DroppableColumn({
       {/* Task cards */}
       <div
         ref={ref}
-        className={`flex-1 p-3 space-y-2 overflow-y-auto transition-colors ${
-          isOver && canDrop ? 'bg-blue-50' : ''
-        }`}
+        className={`kanban-column-task-list ${isOver && canDrop ? 'is-over' : ''}`}
       >
-        {/* Add task button */}
-        <button
-          onClick={() => onAddTask(swimlane.id as TaskStatus)}
-          className="w-full p-3 rounded-lg border-2 border-dashed border-gray-300 hover:border-gray-400 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 text-gray-500 hover:text-gray-700"
-        >
-          <Plus className="w-4 h-4" />
-          <span className="text-sm">Add task</span>
-        </button>
+        <KanbanAddTaskRow onAddTask={() => onAddTask(swimlane.id as TaskStatus)} />
 
         {swimlaneTasks.map((task, index) => (
           <Fragment key={task.id}>

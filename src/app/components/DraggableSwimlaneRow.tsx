@@ -35,7 +35,14 @@ interface DraggableSwimlaneRowProps {
   getTaskColor: (status: string) => { className?: string; style?: React.CSSProperties };
   handleResizeStart: (e: React.MouseEvent, task: Task, edge: 'start' | 'end') => void;
   resizingTaskId: string | null;
+  taskResizePreview?: TaskResizePreview | null;
 } 
+
+interface TaskResizePreview {
+  taskId: string;
+  left: number;
+  width: number;
+}
 
 interface DragItem {
   type: string;
@@ -77,6 +84,7 @@ export function DraggableSwimlaneRow({
   getTaskColor,
   handleResizeStart,
   resizingTaskId,
+  taskResizePreview,
   rowHeight,
   ignoreAddTaskUntil,
   scrollContainerRef,
@@ -565,13 +573,28 @@ export function DraggableSwimlaneRow({
                     {tasksRanges.map(({ task, startIndex, endIndex }) => {
                       if (startIndex < 0 || endIndex < 0) return null;
 
-                      const overlapStart = Math.max(startIndex, startIdx);
-                      const overlapEnd = Math.min(endIndex, startIdx + len - 1);
-                      if (overlapStart > overlapEnd) return null;
+                      const preview = taskResizePreview?.taskId === task.id ? taskResizePreview : null;
+                      let leftWithin: number;
+                      let widthWithin: number;
 
-                      const leftWithin = prefix[overlapStart] - monthLeft;
-                      let widthWithin = prefix[overlapEnd + 1] - prefix[overlapStart];
-                      widthWithin = Math.max(8, widthWithin - 8); // small padding like before
+                      if (preview) {
+                        const previewLeft = preview.left;
+                        const previewRight = preview.left + preview.width;
+                        const monthRight = monthLeft + monthWidth;
+                        const fragmentLeft = Math.max(previewLeft, monthLeft);
+                        const fragmentRight = Math.min(previewRight, monthRight);
+                        if (fragmentLeft >= fragmentRight) return null;
+                        leftWithin = fragmentLeft - monthLeft;
+                        widthWithin = Math.max(8, fragmentRight - fragmentLeft);
+                      } else {
+                        const overlapStart = Math.max(startIndex, startIdx);
+                        const overlapEnd = Math.min(endIndex, startIdx + len - 1);
+                        if (overlapStart > overlapEnd) return null;
+
+                        leftWithin = prefix[overlapStart] - monthLeft;
+                        widthWithin = prefix[overlapEnd + 1] - prefix[overlapStart];
+                        widthWithin = Math.max(8, widthWithin - 8); // small padding like before
+                      }
 
                       // Use track index for vertical positioning
                       const TASK_RENDER_HEIGHT = 32; // matches h-8 in tailwind (8 * 4px)

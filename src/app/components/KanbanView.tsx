@@ -9,21 +9,10 @@
  */
 
 import { useRef, useEffect, useLayoutEffect, useCallback, useMemo, useState } from 'react';
-import { Task, TaskStatus, StatusColumn, TimelineSwimlane, Person, TaskPriority } from '../types';
+import { Task, TaskStatus, StatusColumn, TimelineSwimlane, Person } from '../types';
 import { SwimlanesView } from './SwimlanesView';
-import { Input } from './ui/input';
-import { Button } from './ui/button';
+import { ALL_FILTER_VALUE, KanbanToolbar } from './KanbanToolbar';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from './ui/select';
-import { Filter, Plus, Search, X } from 'lucide-react';
-import {
-  EMPTY_KANBAN_TASK_FILTERS,
-  UNASSIGNED_ASSIGNEE_FILTER_VALUE,
   clearAllKanbanTaskFilters,
   clearKanbanTaskFilter,
   filterKanbanTasks,
@@ -35,16 +24,8 @@ import {
   type KanbanTaskFilters,
 } from '../utils/taskFilters';
 
-const ALL_FILTER_VALUE = '__plumy_all__';
 const COLUMN_DRAG_EDGE_SCROLL_ZONE = 96;
 const COLUMN_DRAG_EDGE_SCROLL_STEP = 28;
-
-const PRIORITY_FILTERS: { value: TaskPriority; label: string }[] = [
-  { value: 'urgent', label: 'Urgent' },
-  { value: 'moderate', label: 'Moderate' },
-  { value: 'normal', label: 'Normal' },
-  { value: 'low', label: 'Low' },
-];
 
 interface KanbanViewProps {
   tasks: Task[];
@@ -147,14 +128,6 @@ export function KanbanView({
   const clearAllFilters = () => {
     setFilters(clearAllKanbanTaskFilters());
   };
-
-  const getFilterSelectClassName = (isActive: boolean) => (
-    isActive ? 'w-[150px] border-gray-400 bg-white' : 'w-[150px] bg-white'
-  );
-
-  const getPrioritySelectClassName = (isActive: boolean) => (
-    isActive ? 'w-[140px] border-gray-400 bg-white' : 'w-[140px] bg-white'
-  );
 
   const syncScrollMetrics = useCallback((node?: HTMLDivElement | null) => {
     const target = node ?? containerRef.current;
@@ -326,133 +299,28 @@ export function KanbanView({
   }, [emitScrollState, maxScrollLeft, syncScrollMetrics]);
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col bg-gray-50">
-      <div className="border-b bg-white px-4 py-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative min-w-[220px] max-w-md flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search tasks by title or details..."
-              className="pl-9"
-            />
-          </div>
-          <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-3">
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <div className="flex items-center gap-1">
-                <Select value={projectFilterValue} onValueChange={(value) => setFilterValue('projectId', value)}>
-                  <SelectTrigger size="sm" className={getFilterSelectClassName(Boolean(activeFilters.projectId))}>
-                    <SelectValue placeholder="Project" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL_FILTER_VALUE}>All projects</SelectItem>
-                    {projects.map(project => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {activeFilters.projectId && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => clearFilter('projectId')}
-                    className="size-8"
-                    aria-label="Clear project filter"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-
-              <div className="flex items-center gap-1">
-                <Select value={priorityFilterValue} onValueChange={(value) => setFilterValue('priority', value)}>
-                  <SelectTrigger size="sm" className={getPrioritySelectClassName(Boolean(activeFilters.priority))}>
-                    <SelectValue placeholder="Priority" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL_FILTER_VALUE}>All priorities</SelectItem>
-                    {PRIORITY_FILTERS.map(priority => (
-                      <SelectItem key={priority.value} value={priority.value}>
-                        {priority.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {activeFilters.priority && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => clearFilter('priority')}
-                    className="size-8"
-                    aria-label="Clear priority filter"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-
-              <div className="flex items-center gap-1">
-                <Select value={assigneeFilterValue} onValueChange={(value) => setFilterValue('assigneeId', value)}>
-                  <SelectTrigger size="sm" className={getFilterSelectClassName(Boolean(activeFilters.assigneeId))}>
-                    <SelectValue placeholder="Assignee" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL_FILTER_VALUE}>All assignees</SelectItem>
-                    <SelectItem value={UNASSIGNED_ASSIGNEE_FILTER_VALUE}>Unassigned</SelectItem>
-                    {people.map(person => (
-                      <SelectItem key={person.id} value={person.id}>
-                        {person.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {activeFilters.assigneeId && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => clearFilter('assigneeId')}
-                    className="size-8"
-                    aria-label="Clear assignee filter"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-
-              {hasActiveFilters && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={clearAllFilters}
-                  className="gap-2"
-                >
-                  <Filter className="h-4 w-4" />
-                  Clear filters
-                </Button>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={() => onAddColumn && onAddColumn({ title: 'New Column' })}
-              className="inline-flex shrink-0 items-center gap-2 rounded-md bg-[#111111] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#222222]"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Add Board</span>
-            </button>
-          </div>
-        </div>
-      </div>
+    <div className="kanban-shell">
+      <KanbanToolbar
+        searchQuery={searchQuery}
+        projectFilterValue={projectFilterValue}
+        priorityFilterValue={priorityFilterValue}
+        assigneeFilterValue={assigneeFilterValue}
+        hasActiveFilters={hasActiveFilters}
+        activeProjectId={activeFilters.projectId}
+        activePriority={activeFilters.priority}
+        activeAssigneeId={activeFilters.assigneeId}
+        projects={projects}
+        people={people}
+        onSearchQueryChange={setSearchQuery}
+        onFilterValueChange={setFilterValue}
+        onClearFilter={clearFilter}
+        onClearAllFilters={clearAllFilters}
+        onAddColumn={onAddColumn ? () => onAddColumn({ title: 'New Column' }) : undefined}
+      />
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="kanban-native-scrollbar-hidden min-h-0 flex-1 overflow-x-auto overflow-y-hidden"
+        className="kanban-board-scroll kanban-native-scrollbar-hidden"
         style={{ scrollbarGutter: 'stable both-edges' }}
       >
         <SwimlanesView
@@ -474,15 +342,15 @@ export function KanbanView({
       </div>
 
       {hasHorizontalOverflow && (
-        <div className="border-t border-gray-200 bg-white px-6 py-3">
+        <div className="kanban-scrollbar-shell">
           <div
             ref={scrollbarTrackRef}
             onMouseDown={handleTrackMouseDown}
-            className="relative h-3 cursor-pointer rounded-full bg-gray-200"
+            className="kanban-scrollbar-track"
           >
             <div
               onMouseDown={handleThumbMouseDown}
-              className="absolute top-0 h-3 rounded-full bg-gray-500 transition-colors hover:bg-gray-600"
+              className="kanban-scrollbar-thumb"
               style={{
                 left: `${thumbLeftPercent}%`,
                 width: `${thumbWidthPercent}%`,

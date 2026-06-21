@@ -1,15 +1,17 @@
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Person, ProjectMilestone, StorageMeter, Task, TaskStatus, TimelineSwimlane, StatusColumn } from '../types';
 import { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
-import { TaskDialog } from './TaskDialog';
-import { TaskDetailsDialog } from './TaskDetailsDialog';
 import { MilestoneDialog } from './MilestoneDialog';
 import { MilestoneDetailsDialog } from './MilestoneDetailsDialog';
 import { SwimlaneDialog } from './SwimlaneDialog';
 import { PeoplePanel } from './PeoplePanel';
 import { PreferencesPanel } from './PreferencesPanel';
 import { McpHealthCheckResult } from '../services/mcp/types';
+
+const TaskDialog = lazy(() => import('./TaskDialog').then(module => ({ default: module.TaskDialog })));
+const TaskDetailsDialog = lazy(() => import('./TaskDetailsDialog').then(module => ({ default: module.TaskDetailsDialog })));
 
 interface AppPanelsProps {
   isTaskDialogOpen: boolean;
@@ -182,41 +184,64 @@ export function AppPanels({
   onRunMcpHealthCheck,
   onRefreshMcpAuditLog,
 }: AppPanelsProps) {
+  const [shouldRenderTaskDialog, setShouldRenderTaskDialog] = useState(false);
+  const [shouldRenderTaskDetailsDialog, setShouldRenderTaskDetailsDialog] = useState(false);
+
+  useEffect(() => {
+    if (isTaskDialogOpen) {
+      setShouldRenderTaskDialog(true);
+    }
+  }, [isTaskDialogOpen]);
+
+  useEffect(() => {
+    if (isTaskDetailsOpen) {
+      setShouldRenderTaskDetailsDialog(true);
+    }
+  }, [isTaskDetailsOpen]);
+
   return (
     <>
-      <TaskDialog
-        isOpen={isTaskDialogOpen}
-        onClose={onCloseTaskDialog}
-        onSave={onSaveTask}
-        onDelete={onDeleteTask}
-        task={selectedTask}
-        defaultStatus={defaultStatus}
-        defaultDate={defaultDate}
-        defaultEndDate={defaultEndDate}
-        defaultSwimlaneId={defaultSwimlaneId}
-        defaultAssigneeId={defaultAssigneeId}
-        swimlanes={timelineSwimlanes}
-        statusColumns={statusColumns}
-        people={people}
-        tasks={tasks}
-        milestones={milestones}
-        readModel={readModel}
-      />
+      <Suspense fallback={null}>
+        {shouldRenderTaskDialog && (
+          <TaskDialog
+            isOpen={isTaskDialogOpen}
+            onClose={onCloseTaskDialog}
+            onSave={onSaveTask}
+            onDelete={onDeleteTask}
+            task={selectedTask}
+            defaultStatus={defaultStatus}
+            defaultDate={defaultDate}
+            defaultEndDate={defaultEndDate}
+            defaultSwimlaneId={defaultSwimlaneId}
+            defaultAssigneeId={defaultAssigneeId}
+            swimlanes={timelineSwimlanes}
+            statusColumns={statusColumns}
+            people={people}
+            tasks={tasks}
+            milestones={milestones}
+            readModel={readModel}
+          />
+        )}
+      </Suspense>
 
-      <TaskDetailsDialog
-        isOpen={isTaskDetailsOpen}
-        onClose={onCloseTaskDetails}
-        onEdit={onEditTaskFromDetails}
-        onMoveAgentTaskToReview={onMoveAgentTaskToReview}
-        onAddComment={onAddTaskComment}
-        task={detailsTask}
-        swimlanes={timelineSwimlanes}
-        people={people}
-        statusColumns={statusColumns}
-        tasks={tasks}
-        milestones={milestones}
-        readModel={readModel}
-      />
+      <Suspense fallback={null}>
+        {shouldRenderTaskDetailsDialog && (
+          <TaskDetailsDialog
+            isOpen={isTaskDetailsOpen}
+            onClose={onCloseTaskDetails}
+            onEdit={onEditTaskFromDetails}
+            onMoveAgentTaskToReview={onMoveAgentTaskToReview}
+            onAddComment={onAddTaskComment}
+            task={detailsTask}
+            swimlanes={timelineSwimlanes}
+            people={people}
+            statusColumns={statusColumns}
+            tasks={tasks}
+            milestones={milestones}
+            readModel={readModel}
+          />
+        )}
+      </Suspense>
 
       <MilestoneDetailsDialog
         isOpen={Boolean(detailsMilestone)}

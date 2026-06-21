@@ -117,7 +117,12 @@ export function DraggableSwimlaneLabel({
       } as CSSProperties}
     >
       <div className="flex items-center justify-between w-full gap-2">
-        <div ref={dragHandleRef} className="timeline-swimlane-drag-handle cursor-move flex-shrink-0">
+        <div
+          ref={dragHandleRef}
+          className="timeline-swimlane-drag-handle cursor-move flex-shrink-0"
+          aria-label={`Drag ${mode === 'people' ? 'person' : 'project'} row ${swimlane.name}`}
+          title={`Drag ${mode === 'people' ? 'person' : 'project'} row`}
+        >
           <span className="timeline-drag-bars" aria-hidden="true">
             <span />
             <span />
@@ -152,10 +157,12 @@ export function DraggableSwimlaneLabel({
         )}
 
         {mode === 'projects' && (
-            <button
-              type="button"
-            className="timeline-row-edit-button h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0 inline-flex items-center justify-center rounded-md transition-colors"
+          <button
+            type="button"
+            className="timeline-row-edit-button h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0 inline-flex items-center justify-center rounded-md"
             onClick={() => onEditSwimlane(swimlane)}
+            aria-label={`Edit project ${swimlane.name}`}
+            title={`Edit ${swimlane.name}`}
           >
             <Edit2 className="w-3 h-3" />
           </button>

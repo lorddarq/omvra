@@ -113,7 +113,7 @@ export function DraggableTaskCard({
   return (
     <div
       ref={ref}
-      className={`${isDragging ? 'h-0 overflow-hidden opacity-0' : ''} min-w-0 w-full transition-[opacity] duration-150`}
+      className={`kanban-task-card-frame ${isDragging ? 'is-dragging' : ''}`}
     >
       <TaskCard
         title={task.title}

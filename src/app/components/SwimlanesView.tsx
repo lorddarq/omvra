@@ -1,6 +1,5 @@
 import { Fragment, useRef, useState } from 'react';
 import { useDrag, useDragLayer, useDrop } from 'react-dnd';
-import { GripVertical } from 'lucide-react';
 import { Task, TaskStatus, StatusColumn } from '../types';
 import { DroppableColumn } from './DroppableColumn';
 
@@ -167,25 +166,15 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
       key={swimlane.id}
       ref={ref}
       data-kanban-column-id={swimlane.id}
-      className={`relative flex h-full min-h-0 shrink-0 flex-col rounded-xl transition-[opacity,transform,box-shadow] duration-150 ${
-        isDragging ? 'w-0 overflow-hidden opacity-0' : 'w-[320px]'
+      className={`kanban-column-frame ${
+        isDragging ? 'is-dragging' : ''
       }`}
     >
-      <div className="mb-2 flex items-center gap-2 select-none">
-        <button
-          ref={dragHandleRef}
-          type="button"
-          className="inline-flex size-7 cursor-grab items-center justify-center rounded-md border border-transparent text-gray-500 transition-colors hover:border-gray-200 hover:bg-white hover:text-gray-800 active:cursor-grabbing"
-          aria-label={`Drag ${swimlane.title || 'column'} column`}
-        >
-          <GripVertical className="size-4" />
-        </button>
-      </div>
-
       <DroppableColumn
         swimlane={swimlane as any}
         tasks={swimlaneTasks}
         swimlanes={swimlanes}
+        columnDragHandleRef={dragHandleRef}
         onTaskClick={onTaskClick}
         onEditTask={onEditTask}
         onAddTask={onAddTask}
@@ -286,13 +275,13 @@ export function SwimlanesView({
   }
 
   return (
-      <div className="h-full min-h-0 bg-gray-50 p-6 pb-3">
+      <div className="kanban-board-surface">
         {isFilterActive && tasks.length === 0 && (
-          <div className="mb-4 rounded-md border border-dashed border-gray-300 bg-white px-4 py-3 text-sm text-gray-600">
+          <div className="kanban-filter-empty-state">
             No tasks match the current filters.
           </div>
         )}
-        <div className="flex h-full min-h-0 min-w-max items-stretch gap-4">
+        <div className="kanban-columns-track">
         {cols.map((swimlane, index) => {
             const swimlaneTasks = getTasksByStatus(swimlane.id);
             return (

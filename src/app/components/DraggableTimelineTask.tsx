@@ -69,12 +69,23 @@ export function DraggableTimelineTask({
     mouseDownPos.current = null;
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    onTaskClick(task);
+  }
+
+  const isResizing = resizingTaskId === task.id;
+
   return (
     <div
       ref={ref}
+      role="button"
+      tabIndex={0}
+      aria-label={`Open task ${task.title}`}
       className={`timeline-task-bar absolute h-8 rounded-md px-3 flex items-center gap-2 cursor-pointer pointer-events-auto group/task ${textClass} text-xs ${
-        resizingTaskId === task.id ? 'shadow-lg z-10' : ''
-      } ${isDragging ? 'opacity-0' : ''}`}
+        isResizing ? 'is-resizing shadow-lg z-10' : ''
+      } ${isDragging ? 'is-dragging opacity-0' : ''}`}
       style={{
         left: `${position.left + 4}px`,
         width: `${position.width}px`,
@@ -82,6 +93,7 @@ export function DraggableTimelineTask({
       }}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
+      onKeyDown={handleKeyDown}
     >
       {/* Left resize handle */}
       <div
@@ -92,7 +104,7 @@ export function DraggableTimelineTask({
           handleResizeStart(e, task, 'start');
         }}
       >
-        <div className="w-0.5 h-4 bg-white/50 rounded"></div>
+        <div className="timeline-task-resize-grip-indicator w-0.5 h-4 bg-white/50 rounded"></div>
       </div>
 
       <span
@@ -111,7 +123,7 @@ export function DraggableTimelineTask({
           handleResizeStart(e, task, 'end');
         }}
       >
-        <div className="w-0.5 h-4 bg-white/50 rounded"></div>
+        <div className="timeline-task-resize-grip-indicator w-0.5 h-4 bg-white/50 rounded"></div>
       </div>
     </div>
   );

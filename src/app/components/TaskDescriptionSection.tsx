@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { MarkdownContent } from './MarkdownContent';
 
 interface TaskDescriptionSectionProps {
@@ -5,16 +6,40 @@ interface TaskDescriptionSectionProps {
 }
 
 export function TaskDescriptionSection({ notes }: TaskDescriptionSectionProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const normalizedNotes = notes?.trim() || '';
+  const isLongDescription = normalizedNotes.length > 900 || normalizedNotes.split('\n').length > 14;
+
   return (
-    <div className="min-w-0 space-y-2">
-      <div className="text-sm font-semibold text-gray-900">Description</div>
-      <div className="min-w-0 max-w-full overflow-hidden rounded-md border bg-white p-4">
-        {notes?.trim() ? (
-          <MarkdownContent content={notes} />
-        ) : (
-          <div className="text-sm text-gray-500">No description provided.</div>
+    <div className="min-w-0 space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-sm font-semibold leading-5 text-[#71717a]">Description</div>
+        {isLongDescription && (
+          <button
+            type="button"
+            className="rounded-full border border-black/10 px-3 py-1 text-xs font-medium text-[#71717a] hover:bg-[#71717a]/5"
+            onClick={() => setIsExpanded(value => !value)}
+          >
+            {isExpanded ? 'Collapse' : 'Expand'}
+          </button>
         )}
       </div>
+      <div
+        className={`relative min-w-0 max-w-full overflow-hidden rounded-xl border border-[#71717a]/10 bg-white p-4 text-xs leading-4 text-[#6a7282] ${
+          isLongDescription && !isExpanded ? 'max-h-[300px]' : ''
+        }`}
+      >
+        {normalizedNotes ? (
+          <MarkdownContent content={normalizedNotes} />
+        ) : (
+          <div className="text-sm text-[#71717a]">No description provided.</div>
+        )}
+      </div>
+      {isLongDescription && !isExpanded && (
+        <div className="-mt-8 h-8 rounded-b-xl bg-gradient-to-b from-white/0 to-white px-4 py-2 text-center text-xs text-[#71717a]">
+          Long description collapsed.
+        </div>
+      )}
     </div>
   );
 }

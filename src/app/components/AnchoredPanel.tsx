@@ -24,6 +24,7 @@ interface AnchoredPanelProps {
   onClose?: () => void;
   children: ReactNode;
   footer?: ReactNode;
+  headerAction?: ReactNode;
   className?: string;
 }
 
@@ -36,6 +37,7 @@ export function AnchoredPanel({
   onClose,
   children,
   footer,
+  headerAction,
   className,
 }: AnchoredPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -53,7 +55,11 @@ export function AnchoredPanel({
     const section = scrollNode.querySelector<HTMLElement>(`[data-anchored-panel-section="${anchorId}"]`);
     if (!section) return;
 
-    section.scrollIntoView({ block: 'start', behavior: 'auto' });
+    const sectionTop = section.getBoundingClientRect().top - scrollNode.getBoundingClientRect().top + scrollNode.scrollTop;
+    scrollNode.scrollTo({
+      top: Math.max(0, sectionTop - 82),
+      behavior: 'auto',
+    });
     setActiveAnchor(anchorId);
   };
 
@@ -81,11 +87,10 @@ export function AnchoredPanel({
       return;
     }
 
-    const scrollTop = scrollNode.scrollTop;
     const nextSection = sections
       .map(section => ({
         id: section.dataset.anchoredPanelSection ?? '',
-        distance: Math.abs(section.offsetTop - scrollTop - 24),
+        distance: Math.abs(section.getBoundingClientRect().top - scrollNode.getBoundingClientRect().top - 82),
       }))
       .sort((a, b) => a.distance - b.distance)[0];
 
@@ -97,7 +102,7 @@ export function AnchoredPanel({
   return (
     <div
       className={cn(
-        'flex h-full min-h-0 flex-col overflow-hidden rounded-[16px] bg-gradient-to-b from-[#f0f0f0] to-[#f0f0f0]/0 p-[2px] shadow-[0_0_1px_rgba(0,0,0,0.25)]',
+        'flex h-full min-h-0 flex-col overflow-hidden rounded-2xl bg-gradient-to-b from-[#f0f0f0] to-[#f0f0f0]/0 p-[2px] shadow-[0_0_1px_rgba(0,0,0,0.25)]',
         'plumy-settings-panel',
         className
       )}
@@ -114,7 +119,13 @@ export function AnchoredPanel({
           onSelect={scrollToSection}
           onBack={onBack}
         />
-        <div className="plumy-settings-content relative min-h-0 overflow-hidden rounded-[14px] bg-white shadow-[0_0_1px_rgba(0,0,0,0.20)]">
+        <div className="plumy-settings-content relative h-full min-h-0 overflow-hidden rounded-[14px] bg-white shadow-[0_0_1px_rgba(0,0,0,0.20)]">
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex h-20 items-start gap-4 bg-gradient-to-b from-white via-white to-white/0 px-8 pt-4">
+            <div className="min-w-0 flex-1 truncate text-sm font-semibold leading-[22px] text-[#71717a]">
+              {title}
+            </div>
+            {headerAction && <div className="pointer-events-auto">{headerAction}</div>}
+          </div>
           {onClose && (
             <Button
               type="button"
@@ -127,17 +138,22 @@ export function AnchoredPanel({
               <XMarkIcon className="size-4" />
             </Button>
           )}
-          <AnchoredPanelScrollView ref={scrollRef} onScroll={syncActiveSection}>
+          <AnchoredPanelScrollView
+            ref={scrollRef}
+            onScroll={syncActiveSection}
+            className={footer ? 'pb-28' : undefined}
+          >
             {children}
           </AnchoredPanelScrollView>
+          {footer && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex h-20 items-end bg-gradient-to-t from-white via-white to-white/0 px-8 pb-4">
+              <div className="pointer-events-auto w-full">
+                {footer}
+              </div>
+            </div>
+          )}
         </div>
       </div>
-
-      {footer && (
-        <div className="shrink-0 border-t bg-white px-6 py-3">
-          {footer}
-        </div>
-      )}
     </div>
   );
 }
@@ -213,13 +229,13 @@ export const AnchoredPanelScrollView = forwardRef<HTMLDivElement, AnchoredPanelS
     <div
       ref={ref}
       className={cn(
-        'h-full min-h-0 overflow-y-auto p-8',
+        'h-full min-h-0 overflow-y-auto px-8 pb-8 pt-[82px]',
         'plumy-settings-scroll',
         className
       )}
       {...props}
     >
-      <div className="mx-auto w-full max-w-3xl space-y-8">
+      <div className="mx-auto w-full max-w-[566px] space-y-8">
         {children}
       </div>
     </div>
@@ -249,14 +265,14 @@ export function AnchoredPanelSection({
       id={id}
       data-anchored-panel-section={id}
       aria-labelledby={titleId}
-      className={cn('scroll-mt-8 space-y-8', className)}
+      className={cn('scroll-mt-8 space-y-4', className)}
       {...props}
     >
-      <div className="space-y-2">
-        <h3 id={titleId} className="text-lg font-normal text-[#58585f]">
+      <div className="space-y-1">
+        <h3 id={titleId} className="text-sm font-semibold leading-5 text-[#71717a]">
           {title}
         </h3>
-        {description && <p className="text-sm text-gray-500">{description}</p>}
+        {description && <p className="text-xs leading-5 text-[#8a8a92]">{description}</p>}
       </div>
       {children}
     </section>

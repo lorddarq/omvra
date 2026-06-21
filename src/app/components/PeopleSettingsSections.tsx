@@ -24,6 +24,9 @@ interface PeopleManagementSectionsProps {
 
 type AddSection = 'people' | 'agents';
 
+const SETTINGS_POPOVER_FIELD_CLASS = 'h-8 rounded-xl border-black/10 bg-white/10 px-2 text-sm font-normal text-[#303038] caret-[#303038] placeholder:text-[#b5b5ba] focus-visible:ring-gray-300';
+const SETTINGS_POPOVER_PROMPT_CLASS = 'max-h-[min(220px,32vh)] min-h-[125px] resize-none overflow-y-auto rounded-xl border-black/10 bg-white/10 p-3 text-sm font-normal leading-5 text-[#303038] caret-[#303038] placeholder:text-[#b5b5ba] focus-visible:ring-gray-300';
+
 export function PeopleManagementSections({
   people,
   tasks,
@@ -348,7 +351,7 @@ function AddAgentPopover({
             </Label>
             <div
               id="settings-agent-kind"
-              className="flex h-8 items-center gap-1 rounded-xl bg-white px-2 text-sm font-medium text-[#67676f] shadow-[0_0_1px_1px_rgba(0,0,0,0.05),0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06)]"
+              className="flex h-8 items-center gap-1 rounded-xl bg-white px-2 text-sm font-normal text-[#303038] shadow-[0_0_1px_1px_rgba(0,0,0,0.05),0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06)]"
             >
               <Bot className="size-4 shrink-0" />
               <span className="min-w-0 flex-1 truncate">Agentic</span>
@@ -373,7 +376,7 @@ function AddAgentPopover({
             value={agentInstructions}
             onChange={(event) => onAgentInstructionsChange(event.target.value)}
             placeholder="Enter prompt..."
-            className="min-h-[125px] resize-none rounded-xl border-black/10 bg-white/10 p-3 text-sm placeholder:text-[#b5b5ba] focus-visible:ring-gray-300"
+            className={SETTINGS_POPOVER_PROMPT_CLASS}
           />
         </div>
         <SettingsPopoverActions
@@ -450,7 +453,7 @@ function EditPersonPopover({
             <Select value={kind} onValueChange={(value) => onKindChange(value as PersonKind)}>
               <SelectTrigger
                 id={`settings-edit-person-kind-${person.id}`}
-                className="h-8 rounded-xl border-black/10 bg-white/10 px-2 text-sm focus-visible:ring-gray-300"
+                className={SETTINGS_POPOVER_FIELD_CLASS}
               >
                 <SelectValue />
               </SelectTrigger>
@@ -480,7 +483,7 @@ function EditPersonPopover({
               value={agentInstructions}
               onChange={(event) => onAgentInstructionsChange(event.target.value)}
               placeholder="Enter prompt..."
-              className="min-h-[125px] resize-none rounded-xl border-black/10 bg-white/10 p-3 text-sm placeholder:text-[#b5b5ba] focus-visible:ring-gray-300"
+              className={SETTINGS_POPOVER_PROMPT_CLASS}
             />
           </div>
         )}
@@ -542,7 +545,7 @@ function SettingsAddPopupContent({ open, children }: { open: boolean; children: 
   if (!open) return null;
 
   return (
-    <div className="absolute right-0 top-[34px] z-[120] w-[min(calc(100vw-2rem),365px)] rounded-xl border border-black/15 bg-white p-0 shadow-[0_2px_4px_rgba(0,0,0,0.10),0_2px_2px_rgba(0,0,0,0.04),0_1px_1px_rgba(0,0,0,0.06),0_0_20.5px_rgba(0,0,0,0.10)]">
+    <div className="absolute right-0 top-[34px] z-[120] max-h-[min(calc(100vh-7rem),520px)] w-[min(calc(100vw-2rem),365px)] overflow-y-auto rounded-xl border border-black/15 bg-white p-0 shadow-[0_2px_4px_rgba(0,0,0,0.10),0_2px_2px_rgba(0,0,0,0.04),0_1px_1px_rgba(0,0,0,0.06),0_0_20.5px_rgba(0,0,0,0.10)]">
       <PopoverArrow />
       {children}
     </div>
@@ -577,7 +580,7 @@ function SettingsPopoverField({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         autoFocus={autoFocus}
-        className="h-8 rounded-xl border-black/10 bg-white/10 px-2 text-sm placeholder:text-[#b5b5ba] focus-visible:ring-gray-300"
+        className={SETTINGS_POPOVER_FIELD_CLASS}
       />
     </div>
   );
@@ -592,7 +595,7 @@ interface SettingsPopoverActionsProps {
 
 function SettingsPopoverActions({ addDisabled, submitLabel = 'Add', onCancel, onSubmit }: SettingsPopoverActionsProps) {
   return (
-    <div className="flex justify-end gap-2 border-t border-zinc-500/10 px-4 py-3">
+    <div className="sticky bottom-0 flex justify-end gap-2 border-t border-zinc-500/10 bg-white px-4 py-3">
       <Button
         type="button"
         variant="outline"

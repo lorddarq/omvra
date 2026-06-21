@@ -1,5 +1,6 @@
 import { Task, TimelineSwimlane, Person, TaskStatus, StatusColumn, ProjectMilestone } from '../types';
 import { useMemo, useState } from 'react';
+import { Activity, FileText, FolderKanban, GitBranch, Info, MessageSquare, Paperclip } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -16,7 +17,8 @@ import { TaskDescriptionSection } from './TaskDescriptionSection';
 import { TaskDetailsActionMenu } from './TaskDetailsActionMenu';
 import { TaskFooterActions } from './TaskFooterActions';
 import { TaskProjectsSection } from './TaskProjectsSection';
-import { TaskSummarySection } from './TaskSummarySection';
+import { TaskDependencyDetailsSection, TaskLoadDetailsSection, TaskSummarySection } from './TaskSummarySection';
+import { AnchoredPanel, AnchoredPanelSection } from './AnchoredPanel';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 
 interface TaskDetailsDialogProps {
@@ -93,9 +95,6 @@ export function TaskDetailsDialog({
   const assigneeLabel = `${personLabel}${assignee ? ` (${assignee.kind === 'agentic' ? 'Agentic' : 'Human'})` : ''}`;
   const timelineLabel = task ? `${formatDate(task.startDate)} - ${formatDate(task.endDate)}` : '';
   const milestoneLabel = milestone ? `${milestone.title} (${formatDate(milestone.endDate)})` : 'No roadmap milestone';
-  const dependencyLabel = dependencyTasks.length > 0
-    ? dependencyTasks.map(dependencyTask => dependencyTask.title).join(', ')
-    : 'No roadmap dependencies';
   const priorityLabel = task
     ? ({
         urgent: 'Urgent',
@@ -113,6 +112,23 @@ export function TaskDetailsDialog({
   const sortedComments = useMemo(
     () => [...(task?.comments || [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     [task?.comments]
+  );
+  const detailsNavGroups = useMemo(
+    () => [
+      {
+        label: 'Task Details',
+        items: [
+          { id: 'task-basic', label: 'Basic Info', icon: Info },
+          { id: 'task-projects', label: 'Projects', icon: FolderKanban },
+          { id: 'task-description', label: 'Description', icon: FileText },
+          { id: 'task-load', label: 'Load', icon: Activity },
+          { id: 'task-dependencies', label: 'Dependencies', icon: GitBranch },
+          { id: 'task-attachments', label: 'Attachments', icon: Paperclip },
+          { id: 'task-comments', label: 'Comments', icon: MessageSquare },
+        ],
+      },
+    ],
+    []
   );
 
   const handleAddComment = () => {
@@ -172,51 +188,108 @@ export function TaskDetailsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] min-w-0 overflow-x-hidden overflow-y-auto sm:max-w-[760px]">
-        <DialogHeader className="min-w-0">
-          <div className="flex min-w-0 items-start justify-between gap-3 pr-8">
-            <DialogTitle className="min-w-0 break-words [overflow-wrap:anywhere]">
-              {task?.title || 'Task details'}
-            </DialogTitle>
-            {task && (
-              <TaskDetailsActionMenu
-                copyState={copyState}
-                canEdit={Boolean(onEdit)}
-                onEdit={handleEditTask}
-                onCopy={handleCopyTaskDetails}
-              />
-            )}
-          </div>
-          <DialogDescription className="min-w-0 break-words [overflow-wrap:anywhere]">Review task details and markdown description.</DialogDescription>
+      <DialogContent
+        showClose={false}
+        overlayClassName="plumy-settings-overlay"
+        className="h-[min(920px,calc(100vh-2rem))] w-[min(837px,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] gap-0 overflow-hidden rounded-[24px] border-0 bg-white p-2 shadow-[0_2px_8px_rgba(0,0,0,0.10),0_-6px_12px_rgba(0,0,0,0.10),0_14px_28px_rgba(0,0,0,0.10)] sm:max-w-none"
+      >
+        <DialogHeader className="sr-only">
+          <DialogTitle>{task?.title || 'Task details'}</DialogTitle>
+          <DialogDescription>Review task details and markdown description.</DialogDescription>
         </DialogHeader>
 
-        {task && (
-          <div className="min-w-0 space-y-4 py-2">
-            <TaskSummarySection
-              statusLabel={statusLabel}
-              primaryTimelineProject={primaryTimelineProject}
-              assigneeLabel={assigneeLabel}
-              timelineLabel={timelineLabel}
-              taskSizeLabel={(task.size || 'm').toUpperCase()}
-              complexityLabel={task.complexity || 'medium'}
-              priorityLabel={priorityLabel}
-              blockedLabel={task.blocked ? 'Yes' : 'No'}
-              milestoneLabel={milestoneLabel}
-              dependencyLabel={dependencyLabel}
+        <AnchoredPanel
+          title={task?.title || 'Task details'}
+          description="Review task details and markdown description."
+          navGroups={detailsNavGroups}
+          headerAction={task && (
+            <TaskDetailsActionMenu
+              copyState={copyState}
+              canEdit={Boolean(onEdit)}
+              onEdit={handleEditTask}
+              onCopy={handleCopyTaskDetails}
+            />
+          )}
+          footer={(
+            <TaskFooterActions
+              canMoveToReview={Boolean(task && canMoveAgentTaskToReview && onMoveAgentTaskToReview)}
+              onMoveToReview={handleMoveAgentTaskToReview}
+              onClose={onClose}
+            />
+          )}
+        >
+          <AnchoredPanelSection
+            id="task-basic"
+            title="Basic Information"
+          >
+            {task && (
+              <TaskSummarySection
+                statusLabel={statusLabel}
+                primaryTimelineProject={primaryTimelineProject}
+                assigneeLabel={assigneeLabel}
+                timelineLabel={timelineLabel}
+                taskSizeLabel={(task.size || 'm').toUpperCase()}
+                complexityLabel={task.complexity || 'medium'}
+                priorityLabel={priorityLabel}
+                blockedLabel={task.blocked ? 'Yes' : 'No'}
+                milestoneLabel={milestoneLabel}
+              />
+            )}
+          </AnchoredPanelSection>
+
+          <AnchoredPanelSection
+            id="task-projects"
+            title="Projects"
+          >
+            <TaskProjectsSection projectLabels={projectLabels} />
+          </AnchoredPanelSection>
+
+          <AnchoredPanelSection
+            id="task-description"
+            title="Description"
+          >
+            <TaskDescriptionSection notes={task?.notes} />
+          </AnchoredPanelSection>
+
+          <AnchoredPanelSection
+            id="task-load"
+            title="Load"
+          >
+            <TaskLoadDetailsSection
               taskLoadPoints={taskLoadPoints}
               taskLoadContribution={taskLoadContribution}
             />
+          </AnchoredPanelSection>
 
-            <TaskProjectsSection projectLabels={projectLabels} />
+          <AnchoredPanelSection
+            id="task-dependencies"
+            title="Dependencies"
+          >
+            <TaskDependencyDetailsSection
+              dependencies={dependencyTasks.map(dependencyTask => ({
+                id: dependencyTask.id,
+                title: dependencyTask.title,
+                status: statusColumns.find(column => column.id === dependencyTask.status)?.title ?? dependencyTask.status,
+                statusColor: statusColumns.find(column => column.id === dependencyTask.status)?.color,
+              }))}
+            />
+          </AnchoredPanelSection>
 
-            <TaskDescriptionSection notes={task.notes} />
-
+          <AnchoredPanelSection
+            id="task-attachments"
+            title="Attachments"
+          >
             <TaskAttachmentsSection
-              attachments={task.attachments}
+              attachments={task?.attachments}
               canReveal={Boolean(window.electron?.attachments?.reveal)}
               onRevealAttachment={handleRevealAttachment}
             />
+          </AnchoredPanelSection>
 
+          <AnchoredPanelSection
+            id="task-comments"
+            title="Comments"
+          >
             <TaskCommentsSection
               comments={sortedComments}
               newComment={newComment}
@@ -225,17 +298,8 @@ export function TaskDetailsDialog({
               formatDate={formatDate}
               canAddComment={Boolean(newComment.trim() && task)}
             />
-          </div>
-        )}
-
-        <TaskFooterActions
-          canMoveToReview={Boolean(task && canMoveAgentTaskToReview && onMoveAgentTaskToReview)}
-          canEdit={Boolean(task && onEdit)}
-          editAlignsLeft={!canMoveAgentTaskToReview}
-          onMoveToReview={handleMoveAgentTaskToReview}
-          onEdit={handleEditTask}
-          onClose={onClose}
-        />
+          </AnchoredPanelSection>
+        </AnchoredPanel>
       </DialogContent>
     </Dialog>
   );

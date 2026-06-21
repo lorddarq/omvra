@@ -379,6 +379,7 @@
 }
 
 .timeline-grid-container {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 100%;
@@ -911,15 +912,15 @@
 }
 
 .day-label.today {
-  border: 1px solid #3b82f6;
-  color: rgba(43, 127, 255, 0.9);
-  background-color: transparent;
-  border-radius: 9999px;
-  width: 2rem;
-  height: 2rem;
+  color: #ffffff;
+  background-color: #1a60cb;
+  border-radius: 0.5rem;
+  width: min(3.75rem, calc(100% - 0.5rem));
+  height: 2.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 2px 5px rgba(26, 96, 203, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.16);
 }
 
 .day-label.today.highlight {
@@ -934,6 +935,17 @@
   width: 2px;
   background-color: #008ff5;
   pointer-events: none;
+}
+
+.timeline-today-lane-indicator {
+  position: absolute;
+  top: var(--timeline-header-height);
+  bottom: 0;
+  width: 2px;
+  background-color: #1a60cb;
+  pointer-events: none;
+  transform: translateX(-50%);
+  z-index: 9;
 }
 
 /* Swimlane Row */
@@ -1080,17 +1092,17 @@
   height: 4px;
   border-radius: 2px;
   background-color: currentColor;
-  opacity: 0.78;
+  opacity: 1;
 }
 
 .timeline-project-icon span:nth-child(1) {
   top: 1px;
-  opacity: 0.36;
+  opacity: 0.40;
 }
 
 .timeline-project-icon span:nth-child(2) {
   top: 6px;
-  opacity: 0.58;
+  opacity: 0.60;
 }
 
 .timeline-project-icon span:nth-child(3) {

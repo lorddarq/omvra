@@ -44,6 +44,7 @@ const LEFT_WIDTH = 280;
 const HEADER_HEIGHT = 82;
 const MILESTONE_ROW_HEIGHT = 52;
 const TASK_ROW_HEIGHT = 48;
+const MILESTONE_ROW_GAP = 14;
 const CHART_PADDING_BOTTOM = 24;
 
 const STATUS_SEGMENT_CLASSES: Record<TaskStatus, string> = {
@@ -195,6 +196,10 @@ function sortRoadmapTasks(tasks: Task[]): Task[] {
   return orderedTasks;
 }
 
+function getRoadmapRowHeight(taskCount: number): number {
+  return MILESTONE_ROW_HEIGHT + Math.max(1, taskCount) * TASK_ROW_HEIGHT + MILESTONE_ROW_GAP;
+}
+
 function MilestoneRollupBar({
   counts,
   totalTasks,
@@ -244,6 +249,7 @@ export function RoadmapView({
   const [healthFilter, setHealthFilter] = useState<MilestoneHealth | 'all'>('all');
   const [dateWindow, setDateWindow] = useState<RoadmapDateWindow>('all');
   const [isHeaderScrubbing, setIsHeaderScrubbing] = useState(false);
+  const [chartScrollLeft, setChartScrollLeft] = useState(0);
   const enrichedMilestoneById = readModel?.milestonesById;
 
   const filteredMilestones = useMemo(() => {
@@ -314,14 +320,14 @@ export function RoadmapView({
         summary,
         top,
       };
-      top += MILESTONE_ROW_HEIGHT + Math.max(1, summary.linkedTasks.length) * TASK_ROW_HEIGHT + 14;
+      top += getRoadmapRowHeight(summary.linkedTasks.length);
       return row;
     });
   }, [enrichedMilestoneById, filteredMilestones, projects, tasks]);
   const timelineWidth = allDates.length * DAY_WIDTH;
   const chartHeight = rows.length === 0
     ? 360
-    : rows[rows.length - 1].top + MILESTONE_ROW_HEIGHT + Math.max(1, rows[rows.length - 1].summary.linkedTasks.length) * TASK_ROW_HEIGHT + CHART_PADDING_BOTTOM;
+    : rows[rows.length - 1].top + getRoadmapRowHeight(rows[rows.length - 1].summary.linkedTasks.length) + CHART_PADDING_BOTTOM;
   const todayIndex = daysBetween(range.start, startOfDay(new Date()));
   const todayLeft = todayIndex >= 0 && todayIndex < allDates.length ? todayIndex * DAY_WIDTH + DAY_WIDTH / 2 : null;
 
@@ -331,14 +337,6 @@ export function RoadmapView({
     setHealthFilter('all');
     setDateWindow('all');
   };
-
-  const getFilterSelectClassName = (isActive: boolean) => (
-    isActive ? 'w-[150px] border-gray-400 bg-white' : 'w-[150px] bg-white'
-  );
-
-  const getDateSelectClassName = (isActive: boolean) => (
-    isActive ? 'w-[140px] border-gray-400 bg-white' : 'w-[140px] bg-white'
-  );
 
   useEffect(() => {
     const handleMove = (event: MouseEvent) => {
@@ -376,13 +374,21 @@ export function RoadmapView({
     event.preventDefault();
   };
 
+  const handleChartScroll = () => {
+    const nextScrollLeft = chartScrollRef.current?.scrollLeft || 0;
+    setChartScrollLeft(currentScrollLeft => (
+      currentScrollLeft === nextScrollLeft ? currentScrollLeft : nextScrollLeft
+    ));
+  };
+
   const scrollToDay = (date: Date, behavior: ScrollBehavior = 'smooth') => {
     if (!chartScrollRef.current) return;
     const dayIndex = daysBetween(range.start, startOfDay(date));
     if (dayIndex < 0 || dayIndex >= allDates.length) return;
 
     const viewportWidth = chartScrollRef.current.clientWidth;
-    const targetLeft = LEFT_WIDTH + dayIndex * DAY_WIDTH + DAY_WIDTH / 2 - viewportWidth / 2;
+    const dayCenter = dayIndex * DAY_WIDTH + DAY_WIDTH / 2;
+    const targetLeft = dayCenter - (viewportWidth + LEFT_WIDTH) / 2;
     chartScrollRef.current.scrollTo({
       left: Math.max(0, targetLeft),
       behavior,
@@ -410,129 +416,129 @@ export function RoadmapView({
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-gray-50">
-      <div className="border-b bg-white px-4 py-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative min-w-[220px] max-w-md flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
-            <Input
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search milestones, projects, or linked tasks..."
-              className="pl-9"
-            />
+      <div className="kanban-toolbar">
+        <div className="kanban-toolbar-search">
+          <Search className="kanban-toolbar-search-icon" />
+          <Input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search milestones, projects, or linked tasks..."
+            className="kanban-toolbar-search-input"
+          />
+        </div>
+        <div className="kanban-toolbar-actions">
+          <div className="kanban-filter-control">
+            <Select value={projectFilter} onValueChange={setProjectFilter}>
+              <SelectTrigger size="sm" className={`kanban-filter-trigger ${projectFilter !== 'all' ? 'is-active' : ''}`}>
+                <SelectValue placeholder="Project" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All projects</SelectItem>
+                {projects.map(project => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {projectFilter !== 'all' && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setProjectFilter('all')}
+                className="kanban-filter-clear"
+                aria-label="Clear project filter"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
           </div>
-          <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-3">
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <div className="flex items-center gap-1">
-                <Select value={projectFilter} onValueChange={setProjectFilter}>
-                  <SelectTrigger size="sm" className={getFilterSelectClassName(projectFilter !== 'all')}>
-                    <SelectValue placeholder="Project" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All projects</SelectItem>
-                    {projects.map(project => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {projectFilter !== 'all' && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setProjectFilter('all')}
-                    className="size-8"
-                    aria-label="Clear project filter"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
 
-              <div className="flex items-center gap-1">
-                <Select
-                  value={healthFilter}
-                  onValueChange={(value) => setHealthFilter(value as MilestoneHealth | 'all')}
-                >
-                  <SelectTrigger size="sm" className={getFilterSelectClassName(healthFilter !== 'all')}>
-                    <SelectValue placeholder="Health" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All health</SelectItem>
-                    {(Object.keys(HEALTH_LABELS) as MilestoneHealth[]).map(health => (
-                      <SelectItem key={health} value={health}>
-                        {HEALTH_LABELS[health]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {healthFilter !== 'all' && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setHealthFilter('all')}
-                    className="size-8"
-                    aria-label="Clear health filter"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
+          <div className="kanban-filter-control">
+            <Select
+              value={healthFilter}
+              onValueChange={(value) => setHealthFilter(value as MilestoneHealth | 'all')}
+            >
+              <SelectTrigger size="sm" className={`kanban-filter-trigger ${healthFilter !== 'all' ? 'is-active' : ''}`}>
+                <SelectValue placeholder="Health" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All health</SelectItem>
+                {(Object.keys(HEALTH_LABELS) as MilestoneHealth[]).map(health => (
+                  <SelectItem key={health} value={health}>
+                    {HEALTH_LABELS[health]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {healthFilter !== 'all' && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setHealthFilter('all')}
+                className="kanban-filter-clear"
+                aria-label="Clear health filter"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
 
-              <div className="flex items-center gap-1">
-                <Select
-                  value={dateWindow}
-                  onValueChange={(value) => setDateWindow(value as RoadmapDateWindow)}
-                >
-                  <SelectTrigger size="sm" className={getDateSelectClassName(dateWindow !== 'all')}>
-                    <SelectValue placeholder="Date" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All dates</SelectItem>
-                    <SelectItem value="30">Next 30 days</SelectItem>
-                    <SelectItem value="90">Next 90 days</SelectItem>
-                    <SelectItem value="overdue">Overdue</SelectItem>
-                  </SelectContent>
-                </Select>
-                {dateWindow !== 'all' && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setDateWindow('all')}
-                    className="size-8"
-                    aria-label="Clear date filter"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
+          <div className="kanban-filter-control">
+            <Select
+              value={dateWindow}
+              onValueChange={(value) => setDateWindow(value as RoadmapDateWindow)}
+            >
+              <SelectTrigger size="sm" className={`kanban-filter-trigger ${dateWindow !== 'all' ? 'is-active' : ''}`}>
+                <SelectValue placeholder="Date" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All dates</SelectItem>
+                <SelectItem value="30">Next 30 days</SelectItem>
+                <SelectItem value="90">Next 90 days</SelectItem>
+                <SelectItem value="overdue">Overdue</SelectItem>
+              </SelectContent>
+            </Select>
+            {dateWindow !== 'all' && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setDateWindow('all')}
+                className="kanban-filter-clear"
+                aria-label="Clear date filter"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
 
-              {hasActiveFilters && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={resetFilters}
-                  className="gap-2"
-                >
-                  <Filter className="h-4 w-4" />
-                  Clear filters
-                </Button>
-              )}
-            </div>
-            <Button onClick={onAddMilestone}>
-              <Plus className="size-4" />
-              Add milestone
+          {hasActiveFilters && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={resetFilters}
+              className="kanban-toolbar-clear"
+            >
+              <Filter className="h-4 w-4" />
+              Clear
             </Button>
-          </div>
+          )}
+          <button
+            type="button"
+            onClick={onAddMilestone}
+            className="kanban-toolbar-add-board"
+          >
+            <Plus className="size-4" />
+            <span>Add milestone</span>
+          </button>
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto p-4">
+      <div className="min-h-0 flex-1 overflow-hidden p-4">
 
         {milestones.length === 0 ? (
           <section className="rounded-2xl border border-dashed border-gray-300 bg-white p-8 text-center">
@@ -555,7 +561,7 @@ export function RoadmapView({
             </Button>
           </section>
         ) : (
-          <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
             <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
               <div className="text-sm text-gray-600">
                 Showing {filteredMilestones.length} of {milestones.length} milestone{milestones.length === 1 ? '' : 's'}
@@ -573,30 +579,26 @@ export function RoadmapView({
               </div>
             </div>
 
-            <div ref={chartScrollRef} className="overflow-auto">
+            <div className="relative min-h-0 flex-1 overflow-hidden">
               <div
-                className="relative"
-                style={{
-                  width: LEFT_WIDTH + timelineWidth,
-                  height: chartHeight,
-                }}
+                className={`absolute inset-x-0 top-0 z-50 h-[82px] select-none border-b border-gray-200 bg-white ${
+                  isHeaderScrubbing ? 'cursor-grabbing' : 'cursor-grab'
+                }`}
+                onMouseDown={handleHeaderScrubStart}
               >
                 <div
-                  className={`sticky left-0 top-0 z-40 select-none border-r border-gray-200 bg-white ${
-                    isHeaderScrubbing ? 'cursor-grabbing' : 'cursor-grab'
-                  }`}
+                  className="absolute left-0 top-0 z-10 border-r border-gray-200 bg-white"
                   style={{ width: LEFT_WIDTH, height: HEADER_HEIGHT }}
-                  onMouseDown={handleHeaderScrubStart}
                 >
                   <div className="px-4 py-4 text-sm font-semibold text-gray-900">Milestones</div>
                 </div>
-
                 <div
-                  className={`absolute top-0 z-30 select-none border-b border-gray-200 bg-white ${
-                    isHeaderScrubbing ? 'cursor-grabbing' : 'cursor-grab'
-                  }`}
-                  style={{ left: LEFT_WIDTH, width: timelineWidth, height: HEADER_HEIGHT }}
-                  onMouseDown={handleHeaderScrubStart}
+                  className="absolute left-0 top-0"
+                  style={{
+                    width: timelineWidth,
+                    height: HEADER_HEIGHT,
+                    transform: `translate3d(${-chartScrollLeft}px, 0, 0)`,
+                  }}
                 >
                   {monthGroups.map(month => (
                     <div
@@ -624,21 +626,20 @@ export function RoadmapView({
                       </div>
                     );
                   })}
-                  {todayLeft !== null && (
-                    <button
-                      type="button"
-                      onClick={scrollToToday}
-                      className="absolute right-3 top-3 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-900 hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20"
-                      aria-label="Today marker"
-                    >
-                      Today
-                    </button>
-                  )}
                 </div>
+              </div>
 
+              <div ref={chartScrollRef} className="absolute inset-0 overflow-auto" onScroll={handleChartScroll}>
+                <div
+                  className="relative"
+                  style={{
+                    width: timelineWidth,
+                    height: chartHeight,
+                  }}
+                >
                 <div
                   className="absolute"
-                  style={{ left: LEFT_WIDTH, top: HEADER_HEIGHT, width: timelineWidth, height: chartHeight - HEADER_HEIGHT }}
+                  style={{ left: 0, top: HEADER_HEIGHT, width: timelineWidth, height: chartHeight - HEADER_HEIGHT }}
                 >
                   {allDates.map((date, index) => (
                     <div
@@ -652,7 +653,7 @@ export function RoadmapView({
                 {todayLeft !== null && (
                   <div
                     className="absolute z-10 w-px bg-gray-900"
-                    style={{ left: LEFT_WIDTH + todayLeft, top: HEADER_HEIGHT, height: chartHeight - HEADER_HEIGHT }}
+                    style={{ left: todayLeft, top: HEADER_HEIGHT, height: chartHeight - HEADER_HEIGHT }}
                   >
                     <span className="absolute -top-1 left-1/2 size-2 -translate-x-1/2 rounded-full bg-gray-900" />
                   </div>
@@ -660,7 +661,7 @@ export function RoadmapView({
 
                 <svg
                   className="pointer-events-none absolute z-10"
-                  style={{ left: LEFT_WIDTH, top: HEADER_HEIGHT, width: timelineWidth, height: chartHeight - HEADER_HEIGHT }}
+                  style={{ left: 0, top: HEADER_HEIGHT, width: timelineWidth, height: chartHeight - HEADER_HEIGHT }}
                 >
                   <defs>
                     <marker id="roadmap-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
@@ -702,51 +703,57 @@ export function RoadmapView({
                   const milestoneLeft = daysBetween(range.start, parseISODateLocal(row.milestone.endDate) || range.start) * DAY_WIDTH + DAY_WIDTH / 2;
                   const lateTaskIds = new Set(row.summary.lateTasks.map(task => task.id));
                   const sortedTasks = sortRoadmapTasks(row.summary.linkedTasks);
+                  const rowHeight = getRoadmapRowHeight(sortedTasks.length);
 
                   return (
                     <div key={row.milestone.id}>
                       <div
-                        className="sticky left-0 z-40 border-r border-t border-gray-200 bg-white"
-                        style={{ top: row.top, width: LEFT_WIDTH, height: MILESTONE_ROW_HEIGHT + Math.max(1, sortedTasks.length) * TASK_ROW_HEIGHT }}
+                        className="absolute left-0 z-40"
+                        style={{ top: row.top, width: LEFT_WIDTH, height: rowHeight }}
                       >
-                        <button
-                          type="button"
-                          onClick={() => onMilestoneClick(row.milestone)}
-                          className="flex w-full flex-col gap-2 px-4 py-3 text-left hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20"
+                        <div
+                          className="sticky left-0 h-full border-r border-t border-gray-200 bg-white"
+                          style={{ width: LEFT_WIDTH }}
                         >
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="size-3 rounded-full"
-                              style={{ backgroundColor: row.milestone.color || row.projects[0]?.color || '#6b7280' }}
-                              aria-hidden="true"
-                            />
-                            <span className="truncate text-sm font-semibold text-gray-950">{row.milestone.title}</span>
-                          </div>
-                          <div className="flex flex-wrap gap-1.5">
-                            <Badge variant="outline" className="max-w-full truncate text-gray-600">
-                              {row.projects.length > 0
-                                ? row.projects.map(project => project.name).join(', ')
-                                : 'Unknown project'}
-                            </Badge>
-                            <Badge className={HEALTH_CLASSES[row.summary.health]} variant="outline">
-                              {HEALTH_LABELS[row.summary.health]}
-                            </Badge>
-                          </div>
-                          <MilestoneRollupBar counts={row.summary.counts} totalTasks={row.summary.totalTasks} />
-                          <div className="text-xs text-gray-500">
-                            {row.summary.completedTasks} of {row.summary.totalTasks} tasks done
-                          </div>
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => onMilestoneClick(row.milestone)}
+                            className="flex h-full w-full flex-col gap-2 px-4 py-3 text-left hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="size-3 rounded-full"
+                                style={{ backgroundColor: row.milestone.color || row.projects[0]?.color || '#6b7280' }}
+                                aria-hidden="true"
+                              />
+                              <span className="truncate text-sm font-semibold text-gray-950">{row.milestone.title}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              <Badge variant="outline" className="max-w-full truncate text-gray-600">
+                                {row.projects.length > 0
+                                  ? row.projects.map(project => project.name).join(', ')
+                                  : 'Unknown project'}
+                              </Badge>
+                              <Badge className={HEALTH_CLASSES[row.summary.health]} variant="outline">
+                                {HEALTH_LABELS[row.summary.health]}
+                              </Badge>
+                            </div>
+                            <MilestoneRollupBar counts={row.summary.counts} totalTasks={row.summary.totalTasks} />
+                            <div className="text-xs text-gray-500">
+                              {row.summary.completedTasks} of {row.summary.totalTasks} tasks done
+                            </div>
+                          </button>
+                        </div>
                       </div>
 
                       <div
                         className="absolute border-t border-gray-200"
-                        style={{ left: LEFT_WIDTH, top: row.top, width: timelineWidth, height: MILESTONE_ROW_HEIGHT + Math.max(1, sortedTasks.length) * TASK_ROW_HEIGHT }}
+                        style={{ left: 0, top: row.top, width: timelineWidth, height: rowHeight }}
                       >
                         <button
                           type="button"
                           onClick={() => onMilestoneClick(row.milestone)}
-                          className="absolute top-4 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-900 shadow-sm hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20"
+                          className="absolute top-4 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-900 shadow-sm hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20"
                           style={{ left: milestoneLeft }}
                         >
                           <span
@@ -797,6 +804,7 @@ export function RoadmapView({
                   );
                 })}
               </div>
+            </div>
             </div>
           </section>
         )}

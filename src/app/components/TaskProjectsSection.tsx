@@ -4,21 +4,21 @@ interface TaskProjectsSectionProps {
 
 export function TaskProjectsSection({ projectLabels }: TaskProjectsSectionProps) {
   return (
-    <div className="min-w-0 space-y-2 rounded-md border bg-white p-4">
-      <div className="text-sm font-semibold text-gray-900">Projects</div>
+    <div className="min-w-0 space-y-3 rounded-xl border border-[#71717a]/10 bg-white p-4">
+      <div className="text-sm font-semibold leading-5 text-[#71717a]">Projects</div>
       {projectLabels.length > 0 ? (
         <div className="flex min-w-0 flex-wrap gap-2">
           {projectLabels.map(projectName => (
             <span
               key={projectName}
-              className="max-w-full break-words rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700 [overflow-wrap:anywhere]"
+              className="inline-flex min-h-5 max-w-full items-center break-words rounded-full border border-black/10 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-[#71717a] [overflow-wrap:anywhere]"
             >
               {projectName}
             </span>
           ))}
         </div>
       ) : (
-        <div className="text-sm text-gray-500">No projects assigned.</div>
+        <div className="text-sm text-[#71717a]">No projects assigned.</div>
       )}
     </div>
   );

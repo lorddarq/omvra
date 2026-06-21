@@ -564,6 +564,11 @@ export function TimelineView({
     return dayWidths.slice(0, todayIndex).reduce((a, b) => a + b, 0);
   }, [todayIndex, dayWidths]);
 
+  const todayCenterOffset = useMemo(() => {
+    if (todayOffset === null || todayIndex < 0) return null;
+    return todayOffset + (dayWidths[todayIndex] ?? DEFAULT_DAY_WIDTH) / 2;
+  }, [dayWidths, todayIndex, todayOffset]);
+
   // Calculate total timeline width
   const totalTimelineWidth = useMemo(() => {
     return dayWidths.reduce((a, b) => a + b, 0);
@@ -1238,7 +1243,6 @@ export function TimelineView({
                 trailingSpacerWidth={trailingSpacerWidth}
                 rowHeight={DEFAULT_ROW_HEIGHT}
                 swimlaneCount={displaySwimlanes.length}
-                todayOffset={todayOffset}
                 highlightToday={true}
                 headerRef={headerRef}
                 onMonthResizeStart={(monthKey, e) => {
@@ -1258,6 +1262,14 @@ export function TimelineView({
                 }}
               />
             </div>
+
+            {todayCenterOffset !== null && (
+              <div
+                className="timeline-today-lane-indicator"
+                style={{ left: `${todayCenterOffset}px` }}
+                aria-hidden="true"
+              />
+            )}
 
             {/* Swimlane rows: tasks */}
             <div className="timeline-rows-container">

@@ -3,19 +3,13 @@ import { Button } from '@/app/components/ui/button';
 
 interface TaskFooterActionsProps {
   canMoveToReview?: boolean;
-  canEdit?: boolean;
-  editAlignsLeft?: boolean;
   onMoveToReview?: () => void;
-  onEdit?: () => void;
   onClose: () => void;
 }
 
 export function TaskFooterActions({
   canMoveToReview = false,
-  canEdit = false,
-  editAlignsLeft = false,
   onMoveToReview,
-  onEdit,
   onClose,
 }: TaskFooterActionsProps) {
   return (
@@ -27,15 +21,6 @@ export function TaskFooterActions({
           onClick={onMoveToReview}
         >
           Move to In Review
-        </Button>
-      )}
-      {canEdit && onEdit && (
-        <Button
-          variant="outline"
-          className={editAlignsLeft ? 'mr-auto' : ''}
-          onClick={onEdit}
-        >
-          Edit
         </Button>
       )}
       <Button variant="outline" onClick={onClose}>Close</Button>

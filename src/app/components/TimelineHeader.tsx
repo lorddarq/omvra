@@ -24,7 +24,6 @@ interface TimelineHeaderProps {
   trailingSpacerWidth?: number;
   rowHeight: number;
   swimlaneCount: number;
-  todayOffset?: number | null;
   highlightToday?: boolean;
   headerRef: React.RefObject<HTMLDivElement>;
   onMonthResizeStart?: (monthKey: string, e: React.MouseEvent<HTMLDivElement>) => void;
@@ -60,7 +59,6 @@ export function TimelineHeader({
   trailingSpacerWidth = 0,
   rowHeight,
   swimlaneCount,
-  todayOffset,
   highlightToday = true,
   headerRef,
   onMonthResizeStart,
@@ -202,16 +200,6 @@ export function TimelineHeader({
               style={{ width: `${trailingSpacerWidth + endPadding}px` }}
               aria-hidden
             />
-
-            {/* Global today indicator - positioned relative to entire timeline */}
-            {typeof todayOffset !== 'undefined' &&
-              todayOffset !== null && (
-                <div
-                  className="today-indicator"
-                  style={{ left: `${todayOffset}px` }}
-                  aria-hidden
-                />
-              )}
           </div>
         </div>
       </div>

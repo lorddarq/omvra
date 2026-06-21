@@ -1,6 +1,7 @@
 import { useRef } from 'react';
+import type { CSSProperties } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
-import { Edit2, GripVertical, User } from 'lucide-react';
+import { Edit2, User } from 'lucide-react';
 import { TimelineSwimlane } from '../types';
 
 export const SWIMLANE_ROW_ITEM_TYPE = 'SWIMLANE_ROW';
@@ -99,10 +100,12 @@ export function DraggableSwimlaneLabel({
   // attach drag to the handle
   drag(dragHandleRef);
 
+  const projectIconStyle = swimlane.color ? { color: swimlane.color } : undefined;
+
   return (
     <div
       ref={ref}
-      className={`flex flex-col justify-center px-5 py-3 group bg-white transition-[opacity] duration-150 ${
+      className={`timeline-swimlane-label flex flex-col justify-center px-5 py-3 group transition-[opacity] duration-150 ${
         isDragging ? 'opacity-40' : ''
       }`}
       style={{ 
@@ -110,18 +113,22 @@ export function DraggableSwimlaneLabel({
         height: `${rowHeight || 48}px`, 
         boxSizing: 'border-box', 
         minHeight: `${rowHeight || 48}px`,
-        borderLeft: swimlane.color ? `4px solid ${swimlane.color}` : undefined
-      }}
+        '--timeline-row-accent': swimlane.color || '#4f7eff',
+      } as CSSProperties}
     >
       <div className="flex items-center justify-between w-full gap-2">
-        <div ref={dragHandleRef} className="cursor-move flex-shrink-0">
-          <GripVertical className="w-4 h-4 text-gray-400" />
+        <div ref={dragHandleRef} className="timeline-swimlane-drag-handle cursor-move flex-shrink-0">
+          <span className="timeline-drag-bars" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </span>
         </div>
         
         {mode === 'people' ? (
           <>
             <div className="flex items-center gap-3 flex-1 min-w-0">
-              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+              <div className="timeline-person-avatar w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0">
                 <User className="w-4 h-4 text-blue-600" />
               </div>
               <div className="min-w-0">
@@ -134,13 +141,20 @@ export function DraggableSwimlaneLabel({
             <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0">{taskCount} {taskCount === 1 ? 'task' : 'tasks'}</span>
           </>
         ) : (
-          <span className="text-sm font-semibold text-gray-700 flex-1 break-words line-clamp-3">{swimlane.name}</span>
+          <>
+            <span className="timeline-project-icon" style={projectIconStyle} aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+            <span className="min-w-0 flex-1 truncate pr-7 text-sm font-normal text-black">{swimlane.name}</span>
+          </>
         )}
 
         {mode === 'projects' && (
-          <button
-            type="button"
-            className="h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0 inline-flex items-center justify-center rounded-md hover:bg-gray-100 transition-colors"
+            <button
+              type="button"
+            className="timeline-row-edit-button h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0 inline-flex items-center justify-center rounded-md transition-colors"
             onClick={() => onEditSwimlane(swimlane)}
           >
             <Edit2 className="w-3 h-3" />

@@ -72,7 +72,7 @@ export function DraggableTimelineTask({
   return (
     <div
       ref={ref}
-      className={`absolute h-8 rounded-md px-3 flex items-center gap-2 shadow-sm cursor-pointer pointer-events-auto group/task ${textClass} text-xs transition-all ${
+      className={`timeline-task-bar absolute h-8 rounded-md px-3 flex items-center gap-2 cursor-pointer pointer-events-auto group/task ${textClass} text-xs ${
         resizingTaskId === task.id ? 'shadow-lg z-10' : ''
       } ${isDragging ? 'opacity-0' : ''}`}
       style={{
@@ -85,7 +85,7 @@ export function DraggableTimelineTask({
     >
       {/* Left resize handle */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-black/20 flex items-center justify-center opacity-0 group-hover/task:opacity-100"
+        className="timeline-task-resize-grip left-0 absolute top-0 bottom-0 w-2 cursor-ew-resize flex items-center justify-center opacity-0 group-hover/task:opacity-100"
         onMouseDown={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -96,7 +96,7 @@ export function DraggableTimelineTask({
       </div>
 
       <span
-        className={`shrink-0 rounded-xl outline-3 outline-white/25 w-3 h-3 ${
+        className={`timeline-task-priority shrink-0 rounded-xl outline-3 outline-white/25 w-3 h-3 ${
           PRIORITY_STYLES[task.priority || 'normal']?.className || PRIORITY_STYLES.normal.className
         }`}
       />
@@ -104,7 +104,7 @@ export function DraggableTimelineTask({
 
       {/* Right resize handle */}
       <div
-        className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-black/20 flex items-center justify-center opacity-0 group-hover/task:opacity-100"
+        className="timeline-task-resize-grip right-0 absolute top-0 bottom-0 w-2 cursor-ew-resize flex items-center justify-center opacity-0 group-hover/task:opacity-100"
         onMouseDown={(e) => {
           e.preventDefault();
           e.stopPropagation();

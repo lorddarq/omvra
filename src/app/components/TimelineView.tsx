@@ -19,6 +19,7 @@ import { Plus } from 'lucide-react';
 import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import { TimelineHeader } from './TimelineHeader';
+import { TimelineToolbar } from './TimelineToolbar';
 import { AppStatusBar } from './AppStatusBar';
 import {
   DraggableSwimlaneLabel,
@@ -33,11 +34,15 @@ import { parseISODateLocal, toLocalISODate } from '../utils/date';
 import { getJSON, persistRawWithElectronMirror } from '../utils/storage';
 import { shouldBootstrapFromLocalStorage } from '../utils/canonicalHydration.js';
 import { applyTimelineTaskDrop } from '../utils/timelineTaskDrop';
+import { resolveReorderDropIndex } from '../utils/swimlaneReorder';
 
 const PAD_DAYS = 7;
 const DEFAULT_ROW_HEIGHT = 48;
-const HEADER_HEIGHT = 72;
+const HEADER_HEIGHT = 89;
 const DEFAULT_DAY_WIDTH = 60;
+const DEFAULT_LEFT_COL_WIDTH = 282;
+const MIN_LEFT_COL_WIDTH = 260;
+const MAX_LEFT_COL_WIDTH = 420;
 const MONTH_WIDTHS_KEY = 'plumy.monthWidths.v1';
 const LEFT_COL_WIDTH_KEY = 'plumy.leftColWidth.v1';
 const HORIZONTAL_RENDER_BUFFER_PX = 1200;
@@ -76,6 +81,51 @@ function TimelineSwimlaneInsertionMarker({
         minHeight: `${height}px`,
         width,
       }}
+      aria-hidden="true"
+    />
+  );
+}
+
+function TimelineSwimlaneEndDropZone({
+  width,
+  lastSwimlaneId,
+  onSwimlaneDrop,
+  onSwimlaneDropIndicatorChange,
+  onSwimlaneDropIndicatorClear,
+}: {
+  width?: number | string;
+  lastSwimlaneId?: string;
+  onSwimlaneDrop: (draggedId: string, indicator: SwimlaneRowDropIndicator) => void;
+  onSwimlaneDropIndicatorChange: (indicator: SwimlaneRowDropIndicator | null) => void;
+  onSwimlaneDropIndicatorClear: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [, drop] = useDrop({
+    accept: SWIMLANE_ROW_ITEM_TYPE,
+    hover: () => {
+      if (!lastSwimlaneId) return;
+      onSwimlaneDropIndicatorChange({
+        targetId: lastSwimlaneId,
+        position: 'after',
+      });
+    },
+    drop: (item: SwimlaneRowDragItem) => {
+      if (!lastSwimlaneId) return;
+      onSwimlaneDrop(item.swimlane.id, {
+        targetId: lastSwimlaneId,
+        position: 'after',
+      });
+      onSwimlaneDropIndicatorClear();
+    },
+  });
+
+  drop(ref);
+
+  return (
+    <div
+      ref={ref}
+      className="timeline-swimlane-end-drop-zone"
+      style={{ width }}
       aria-hidden="true"
     />
   );
@@ -126,10 +176,12 @@ export function TimelineView({
 }: TimelineViewProps) {
   // Left column width state
   const [leftColWidth, setLeftColWidth] = useState<number>(() => {
-    if (!shouldBootstrapFromLocalStorage()) return 200;
+    if (!shouldBootstrapFromLocalStorage()) return DEFAULT_LEFT_COL_WIDTH;
     const raw = window.localStorage.getItem(LEFT_COL_WIDTH_KEY);
     const parsed = raw ? Number(raw) : NaN;
-    return Number.isFinite(parsed) ? Math.max(120, Math.min(480, parsed)) : 200;
+    return Number.isFinite(parsed)
+      ? Math.max(MIN_LEFT_COL_WIDTH, Math.min(MAX_LEFT_COL_WIDTH, parsed))
+      : DEFAULT_LEFT_COL_WIDTH;
   });
   const [isResizingLeft, setIsResizingLeft] = useState<boolean>(false);
   const leftResizeRef = useRef<{ startX: number; startWidth: number; pendingWidth?: number } | null>(null);
@@ -148,7 +200,7 @@ export function TimelineView({
   const [swimlaneDropIndicator, setSwimlaneDropIndicator] = useState<SwimlaneRowDropIndicator | null>(null);
   const [draggingSwimlaneId, setDraggingSwimlaneId] = useState<string | null>(null);
   const visibleSwimlaneDropIndicator = draggingSwimlaneId ? swimlaneDropIndicator : null;
-
+  
   // Display swimlanes based on mode
   const displaySwimlanes = useMemo<TimelineSwimlane[]>(() => {
     if (mode === 'people') {
@@ -161,6 +213,7 @@ export function TimelineView({
     }
     return swimlanes;
   }, [mode, people, swimlanes]);
+  const lastDisplaySwimlaneId = displaySwimlanes[displaySwimlanes.length - 1]?.id;
 
   // Refs
   const timelineContainerRef = useRef<HTMLDivElement>(null);
@@ -194,7 +247,7 @@ export function TimelineView({
       if (cancelled) return;
 
       if (Number.isFinite(Number(storedLeftColWidth))) {
-        setLeftColWidth(Math.max(120, Math.min(480, Number(storedLeftColWidth))));
+        setLeftColWidth(Math.max(MIN_LEFT_COL_WIDTH, Math.min(MAX_LEFT_COL_WIDTH, Number(storedLeftColWidth))));
       }
 
       if (storedMonthWidths && typeof storedMonthWidths === 'object') {
@@ -472,7 +525,7 @@ export function TimelineView({
   const [syncedHeaderHeight, setSyncedHeaderHeight] = useState<number | null>(null);
   
   useLayoutEffect(() => {
-    const leftHeaderEl = document.querySelector('.left-col-header') as HTMLElement | null;
+    const leftHeaderEl = document.querySelector('.timeline-left-header') as HTMLElement | null;
     const timelineHeaderEl = document.querySelector('.timeline-header-container') as HTMLElement | null;
     
     if (timelineHeaderEl) {
@@ -561,7 +614,7 @@ export function TimelineView({
       if (!leftResizeRef.current) return;
       const delta = e.clientX - leftResizeRef.current.startX;
       let newWidth = Math.round(leftResizeRef.current.startWidth + delta);
-      newWidth = Math.max(120, Math.min(480, newWidth));
+      newWidth = Math.max(MIN_LEFT_COL_WIDTH, Math.min(MAX_LEFT_COL_WIDTH, newWidth));
       leftResizeRef.current.pendingWidth = newWidth;
 
       if (resizeRafRef.current == null) {
@@ -886,27 +939,22 @@ export function TimelineView({
   }, [mode, people, swimlanes, onReorderPeople, onReorderSwimlanes]);
 
   const handleSwimlaneDrop = useCallback((draggedId: string, fallbackIndicator: SwimlaneRowDropIndicator) => {
-    const indicator = swimlaneDropIndicator ?? fallbackIndicator;
-    const dragIndex = displaySwimlanes.findIndex(swimlane => swimlane.id === draggedId);
-    const targetIndex = displaySwimlanes.findIndex(swimlane => swimlane.id === indicator.targetId);
-    if (dragIndex < 0 || targetIndex < 0) {
+    const ids = displaySwimlanes.map(swimlane => swimlane.id);
+    const dragIndex = ids.indexOf(draggedId);
+    const toIndex = resolveReorderDropIndex(ids, draggedId, fallbackIndicator);
+
+    if (dragIndex < 0 || toIndex === null) {
       setDraggingSwimlaneId(null);
       setSwimlaneDropIndicator(null);
       return;
     }
 
-    let insertionIndex = indicator.position === 'before' ? targetIndex : targetIndex + 1;
-    if (dragIndex < insertionIndex) {
-      insertionIndex -= 1;
-    }
-
-    const toIndex = Math.max(0, Math.min(displaySwimlanes.length - 1, insertionIndex));
     if (dragIndex !== toIndex) {
       handleMoveSwimlane(dragIndex, toIndex);
     }
     setDraggingSwimlaneId(null);
     setSwimlaneDropIndicator(null);
-  }, [displaySwimlanes, handleMoveSwimlane, swimlaneDropIndicator]);
+  }, [displaySwimlanes, handleMoveSwimlane]);
 
   // Sync vertical scroll between left column and rows container
   const handleLeftScroll = useCallback(() => {
@@ -1029,56 +1077,15 @@ export function TimelineView({
   return (
     <DndProvider backend={HTML5Backend}>
       <div ref={timelineContainerRef} className="timeline-container">
-        {/* Header with controls */}
-        <div className="timeline-toolbar">
-          <h3 className="timeline-toolbar-title">Timeline</h3>
-          <button onClick={handleScrollLeft} className="timeline-toolbar-button">
-            ◀
-          </button>
-          <button onClick={() => scrollToToday({ smooth: false })} className="timeline-toolbar-button-primary">
-            Today
-          </button>
-          <button onClick={handleScrollRight} className="timeline-toolbar-button">
-            ▶
-          </button>
-
-          {/* Weekend toggle */}
-          <button
-            onClick={() => setShowWeekends(!showWeekends)}
-            className={`px-3 py-1 text-sm rounded font-medium transition-all ${
-              showWeekends
-                ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-            }`}
-            title={showWeekends ? 'Hide weekends' : 'Show weekends'}
-          >
-            {showWeekends ? '7 days' : '5 days'}
-          </button>
-          
-          {/* Mode toggle */}
-          <div className="ml-auto flex items-center gap-1 bg-gray-100 p-1 rounded-md">
-            <button
-              onClick={() => setMode('projects')}
-              className={`px-3 py-1 text-sm rounded-sm font-medium transition-all ${
-                mode === 'projects'
-                  ? 'bg-white shadow-sm text-gray-900'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Projects
-            </button>
-            <button
-              onClick={() => setMode('people')}
-              className={`px-3 py-1 text-sm rounded-sm font-medium transition-all ${
-                mode === 'people'
-                  ? 'bg-white shadow-sm text-gray-900'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              People
-            </button>
-          </div>
-        </div>
+        <TimelineToolbar
+          mode={mode}
+          showWeekends={showWeekends}
+          onModeChange={setMode}
+          onShowWeekendsChange={setShowWeekends}
+          onScrollLeft={handleScrollLeft}
+          onScrollRight={handleScrollRight}
+          onScrollToToday={() => scrollToToday({ smooth: false })}
+        />
 
         {/* Main content */}
         <div className="timeline-main-content">
@@ -1087,7 +1094,7 @@ export function TimelineView({
             {/* Combined header matching month + day header height */}
             <div className="timeline-left-header">
               <span className="timeline-left-header-title">
-                {mode === 'people' ? 'People' : 'Swimlanes'}
+                {mode === 'people' ? 'People' : 'Projects'}
               </span>
               {mode === 'projects' && (
                 <button onClick={onAddSwimlane} className="timeline-left-header-button">
@@ -1154,6 +1161,13 @@ export function TimelineView({
                   </React.Fragment>
                 );
               })}
+              <TimelineSwimlaneEndDropZone
+                width={`${leftColWidth}px`}
+                lastSwimlaneId={lastDisplaySwimlaneId}
+                onSwimlaneDrop={handleSwimlaneDrop}
+                onSwimlaneDropIndicatorChange={setSwimlaneDropIndicator}
+                onSwimlaneDropIndicatorClear={() => setSwimlaneDropIndicator(null)}
+              />
             </div>
           </div>
 
@@ -1305,6 +1319,13 @@ export function TimelineView({
                   </React.Fragment>
                 );
               })}
+              <TimelineSwimlaneEndDropZone
+                width={`${totalTimelineWidth + endPadding}px`}
+                lastSwimlaneId={lastDisplaySwimlaneId}
+                onSwimlaneDrop={handleSwimlaneDrop}
+                onSwimlaneDropIndicatorChange={setSwimlaneDropIndicator}
+                onSwimlaneDropIndicatorClear={() => setSwimlaneDropIndicator(null)}
+              />
             </div>
             </div>
           </div>

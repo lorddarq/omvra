@@ -404,19 +404,6 @@ export function DraggableSwimlaneRow({
   // Tasks are already filtered by the parent (TimelineView) based on mode
   const timelineTasks = tasks;
 
-  // Helper to convert hex color to rgba with opacity
-  const getRowBackgroundColor = (color?: string) => {
-    if (!color) return undefined;
-    
-    // Parse hex color to RGB
-    const hex = color.replace('#', '');
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-    
-    return `rgba(${r}, ${g}, ${b}, 0.08)`;
-  };
-
   return (
     <div
       ref={ref}
@@ -431,9 +418,6 @@ export function DraggableSwimlaneRow({
       <div
         ref={timelineRef}
         className="swimlane-row-timeline"
-        style={{
-          backgroundColor: getRowBackgroundColor(swimlane.color)
-        }}
       >
         {/* Task-shaped drop preview when dragging over - positioned in timeline content coordinates */}
         {liveDropPreview && scrollContainerRef?.current && (

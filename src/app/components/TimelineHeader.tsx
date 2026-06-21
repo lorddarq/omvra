@@ -179,7 +179,7 @@ export function TimelineHeader({
                 </div>
 
                 {/* Per-month swimlane placeholders (background grid) */}
-                <div className="month-swimlanes absolute left-0 right-0 top-[calc(var(--row-height)*2)] flex flex-col pointer-events-none">
+                <div className="month-swimlanes absolute left-0 right-0 flex flex-col pointer-events-none">
                   {Array.from({ length: swimlaneCount }).map((_, si) => (
                     <div
                       key={si}

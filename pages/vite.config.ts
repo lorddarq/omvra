@@ -4,8 +4,8 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
-  // GitHub Pages will serve from /Omvra/ path
-  base: '/Omvra/',
+  // GitHub Pages will serve from /omvra/ path
+  base: '/omvra/',
   root: './pages',
   build: {
     outDir: '../dist-pages',

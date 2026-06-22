@@ -30,9 +30,9 @@ const Footer = () => {
           <div>
             <h4 className="mb-4 text-sm font-normal uppercase tracking-[0.14em] text-black/60">Proof</h4>
             <ul className="space-y-3">
-              <li><a href="https://github.com/lorddarq/Omvra" className={linkClassName}>GitHub repository</a></li>
-              <li><a href="https://github.com/lorddarq/Omvra/releases" className={linkClassName}>Releases</a></li>
-              <li><a href="https://github.com/lorddarq/Omvra#readme" className={linkClassName}>Documentation</a></li>
+              <li><a href="https://github.com/lorddarq/omvra" className={linkClassName}>GitHub repository</a></li>
+              <li><a href="https://github.com/lorddarq/omvra/releases" className={linkClassName}>Releases</a></li>
+              <li><a href="https://github.com/lorddarq/omvra#readme" className={linkClassName}>Documentation</a></li>
               <li><a href="#agent-prompts" className={linkClassName}>AI workflows</a></li>
             </ul>
           </div>
@@ -40,9 +40,9 @@ const Footer = () => {
           <div>
             <h4 className="mb-4 text-sm font-normal uppercase tracking-[0.14em] text-black/60">Project</h4>
             <ul className="space-y-3">
-              <li><a href="https://github.com/lorddarq/Omvra/blob/main/LICENSE" className={linkClassName}>License</a></li>
-              <li><a href="https://github.com/lorddarq/Omvra/issues" className={linkClassName}>Issues</a></li>
-              <li><a href="https://github.com/lorddarq/Omvra/actions" className={linkClassName}>Build status</a></li>
+              <li><a href="https://github.com/lorddarq/omvra/blob/main/LICENSE" className={linkClassName}>License</a></li>
+              <li><a href="https://github.com/lorddarq/omvra/issues" className={linkClassName}>Issues</a></li>
+              <li><a href="https://github.com/lorddarq/omvra/actions" className={linkClassName}>Build status</a></li>
             </ul>
           </div>
         </div>

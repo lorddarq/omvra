@@ -292,7 +292,7 @@ Workflow: `.github/workflows/deploy-pages.yml`
 - uploads `dist-pages` as Pages artifact
 - deploys with `actions/deploy-pages`
 
-Vite config for Pages is in `pages/vite.config.ts` and uses base path `/Omvra/`.
+Vite config for Pages is in `pages/vite.config.ts` and uses base path `/omvra/`.
 
 ## Packaging CI and Releases
 

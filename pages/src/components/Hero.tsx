@@ -122,7 +122,7 @@ const Hero = () => {
               Download Omvra
             </a>
             <a
-              href="https://github.com/lorddarq/Omvra"
+              href="https://github.com/lorddarq/omvra"
               className="inline-flex min-h-14 items-center justify-center rounded-xl bg-omvra-lilac-soft px-8 py-4 text-lg font-normal text-omvra-lilac transition-[background-color,transform] duration-150 ease-out hover:bg-[rgba(108,79,224,0.18)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-omvra-lilac/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
             >
               View on GitHub

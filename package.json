@@ -68,7 +68,7 @@
     "publish": {
       "provider": "github",
       "owner": "lorddarq",
-      "repo": "Omvra"
+      "repo": "omvra"
     },
     "files": [
       "dist/**",

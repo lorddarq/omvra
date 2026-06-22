@@ -124,7 +124,7 @@ const Features = () => {
     {
       title: 'Bring AI in with guardrails',
       description:
-        'Use Plumy MCP from Codex, Claude, or any MCP-capable assistant to read task context, make revision-protected updates, and hand work back for human review.',
+        'Use Omvra MCP from Codex, Claude, or any MCP-capable assistant to read task context, make revision-protected updates, and hand work back for human review.',
       icon: (
         <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -151,7 +151,7 @@ const Features = () => {
               className="mb-6 text-4xl font-medium leading-[1.08] tracking-[-0.03em] text-[#101828] md:text-5xl"
               style={{ fontFamily: 'Figtree, sans-serif' }}
             >
-              What you can do in Plumy
+              What you can do in Omvra
             </h2>
             <p className="text-lg leading-8 text-[#4a5565] md:text-xl">
               Every part of the product is aimed at the same outcome: clearer planning, smoother execution, and less
@@ -217,7 +217,7 @@ const Features = () => {
                       A shared workspace for humans and MCP agents
                     </h3>
                     <p className="text-base leading-6 text-[#4a5565]">
-                      Plumy can expose the same planning context to local stdio clients or the local HTTP MCP endpoint.
+                      Omvra can expose the same planning context to local stdio clients or the local HTTP MCP endpoint.
                       Agents can inspect resources and prompts, watch configured boards for incoming work, update tasks
                       safely, attach local file references, log time, and maintain roadmap milestones without replacing
                       human review.

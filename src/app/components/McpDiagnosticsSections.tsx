@@ -9,6 +9,11 @@ interface McpActivityLogSectionProps {
   onRefresh: () => void;
   onCopy: () => void;
   onExport: () => void;
+  listenerStatusLabel: string;
+  connectionStatusLabel: string;
+  tokenExpiryLabel: string;
+  boundUrl?: string | null;
+  restartPending: boolean;
 }
 
 export function McpActivityLogSection({
@@ -17,53 +22,99 @@ export function McpActivityLogSection({
   onRefresh,
   onCopy,
   onExport,
+  listenerStatusLabel,
+  connectionStatusLabel,
+  tokenExpiryLabel,
+  boundUrl,
+  restartPending,
 }: McpActivityLogSectionProps) {
   return (
-    <div className="space-y-2 rounded-lg border bg-gray-50 p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <div className="text-sm font-semibold text-gray-900">MCP activity log</div>
-          <p className="text-xs text-gray-500">
+    <div className="space-y-8">
+      <div className="space-y-4">
+        <div className="space-y-3">
+          <div className="text-sm font-semibold leading-5 text-[#71717a]">Activity Log</div>
+          <p className="text-xs leading-4 text-[#6a7282] text-pretty">
             Recent MCP reads and writes recorded by the local listener. Useful for debugging agent behavior.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button type="button" variant="outline" onClick={onRefresh}>
-            <RefreshCcw className="mr-2 h-4 w-4" />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <ActivityActionButton onClick={onRefresh}>
+            <RefreshCcw className="size-4" />
             Refresh
-          </Button>
-          <Button type="button" variant="outline" onClick={onCopy}>
-            <Copy className="mr-2 h-4 w-4" />
+          </ActivityActionButton>
+          <ActivityActionButton onClick={onCopy}>
+            <Copy className="size-4" />
             {copied ? 'Copied' : 'Copy'}
-          </Button>
-          <Button type="button" variant="outline" onClick={onExport}>
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </Button>
+          </ActivityActionButton>
+          <ActivityActionButton onClick={onExport}>
+            <Download className="size-4" />
+            Export Log
+          </ActivityActionButton>
         </div>
       </div>
+
       {auditLog.length === 0 ? (
-        <p className="rounded-md border border-dashed bg-white px-3 py-4 text-xs text-gray-500">
+        <p className="rounded-xl bg-[#fafafa] px-3 py-4 text-xs leading-4 text-[#6a7282]">
           No MCP activity recorded yet.
         </p>
       ) : (
-        <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border bg-white p-3">
+        <div className="max-h-[422px] overflow-y-auto rounded-xl bg-[#f7f7f8] px-3 py-3">
           {auditLog.map((entry) => (
-            <div key={entry.auditId} className="rounded-md border border-gray-100 bg-gray-50 px-3 py-2">
-              <div className="flex items-center justify-between gap-3 text-xs">
-                <p className="font-medium text-gray-900">{describeAuditEntry(entry)}</p>
-                <p className="shrink-0 text-gray-500">{formatAuditTimestamp(entry.timestamp)}</p>
-              </div>
-              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-500">
-                <span>Audit ID: {entry.auditId}</span>
-                {entry.capabilityProfile && <span>Profile: {entry.capabilityProfile}</span>}
-                {entry.transport && <span>Transport: {entry.transport}</span>}
-                {entry.origin && <span>Origin: {entry.origin}</span>}
-              </div>
-            </div>
+            <ActivityLogEntry key={entry.auditId} entry={entry} />
           ))}
         </div>
       )}
+
+      <div className="space-y-3">
+        <div className="text-sm font-semibold leading-5 text-[#71717a]">Status</div>
+        <div className="rounded-xl bg-[#fafafa] px-3 py-3 text-xs leading-4 text-[#6a7282]">
+          <p>{listenerStatusLabel}</p>
+          <p>{connectionStatusLabel}</p>
+          <p>{tokenExpiryLabel}</p>
+          {boundUrl && <p>Bound URL: {boundUrl}</p>}
+          <p>
+            {restartPending
+              ? 'Restart required after host, port, token, or capability profile changes.'
+              : 'Listener config applied.'}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ActivityActionButton({
+  children,
+  onClick,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex h-8 items-center gap-2 rounded-xl border border-[#e5e7eb] bg-white px-3 text-sm font-medium leading-5 text-[#71717a] outline-none transition-[background-color,color] hover:bg-[#71717a]/5 focus-visible:ring-2 focus-visible:ring-gray-300"
+    >
+      {children}
+    </button>
+  );
+}
+
+function ActivityLogEntry({ entry }: { entry: McpAuditEntry }) {
+  return (
+    <div className="border-b border-[#e5e7eb] py-3 last:border-b-0 last:pb-0 first:pt-0">
+      <div className="space-y-0.5 text-xs leading-4 text-[#6a7282]">
+        <p>{entry.toolName || entry.method || entry.type || 'mcp_event'}</p>
+        {entry.outcome && <p>{entry.outcome}</p>}
+        {entry.taskId && <p>task: {entry.taskId}</p>}
+        <p>{formatAuditTimestamp(entry.timestamp)}</p>
+        <p>Audit ID: {entry.auditId}</p>
+        {entry.transport && <p className="pt-3">Transport: {entry.transport}</p>}
+        {entry.capabilityProfile && <p>Profile: {entry.capabilityProfile}</p>}
+        {entry.origin && <p>Origin: {entry.origin}</p>}
+      </div>
     </div>
   );
 }
@@ -133,16 +184,4 @@ function formatAuditTimestamp(timestamp?: string) {
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) return timestamp;
   return date.toLocaleString();
-}
-
-function describeAuditEntry(entry: McpAuditEntry) {
-  const action = typeof entry.toolName === 'string' && entry.toolName
-    ? entry.toolName
-    : typeof entry.method === 'string' && entry.method
-      ? entry.method
-      : entry.type || 'mcp_event';
-  const outcome = typeof entry.outcome === 'string' && entry.outcome ? entry.outcome : 'recorded';
-  const target = typeof entry.taskId === 'string' && entry.taskId ? `task ${entry.taskId}` : null;
-  const reason = typeof entry.reason === 'string' && entry.reason ? entry.reason : null;
-  return [action, outcome, target, reason].filter(Boolean).join(' · ');
 }

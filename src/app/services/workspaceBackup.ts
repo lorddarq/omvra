@@ -1,12 +1,12 @@
-import { Task, TaskAttachment, TaskStatus, TimelineSwimlane, Person, StatusColumn, ProjectMilestone } from '../types';
+import type { Task, TaskAttachment, TaskStatus, TimelineSwimlane, Person, StatusColumn, ProjectMilestone } from '../types.ts';
 import {
   buildLocalMcpAddress,
   normalizeMcpBindHost,
   normalizeMcpPort,
   normalizeMcpServerAddress,
-} from '../constants/mcp';
-import { getDefaultStatusId, syncLocalMcpServerAddress } from '../utils/mcpPreferences';
-import { flattenPortableStoreEntries, isPortableStorageKey } from '../utils/storage';
+} from '../constants/mcp.ts';
+import { getDefaultStatusId, syncLocalMcpServerAddress } from '../utils/mcpPreferences.ts';
+import { flattenPortableStoreEntries, normalizePortableStorageKey } from '../utils/storage.ts';
 
 export const WORKSPACE_BACKUP_SCHEMA_VERSION = 2;
 
@@ -428,8 +428,9 @@ export function getPortableStorageSnapshotFromEntries(entries: Record<string, st
   const snapshot: Record<string, string> = {};
 
   for (const [key, value] of Object.entries(entries || {})) {
-    if (!isPortableStorageKey(key) || typeof value !== 'string') continue;
-    snapshot[key] = value;
+    const portableKey = normalizePortableStorageKey(key);
+    if (!portableKey || typeof value !== 'string') continue;
+    snapshot[portableKey] = value;
   }
 
   return snapshot;
@@ -440,7 +441,13 @@ export function getPortableElectronStoreSnapshotFromExport(exported: unknown): R
 
   const flattened = flattenPortableStoreEntries(exported);
   return Object.fromEntries(
-    Object.entries(flattened).filter(([key]) => isPortableStorageKey(key))
+    Object.entries(flattened).reduce<Array<[string, unknown]>>((acc, [key, value]) => {
+      const portableKey = normalizePortableStorageKey(key);
+      if (portableKey) {
+        acc.push([portableKey, value]);
+      }
+      return acc;
+    }, [])
   );
 }
 
@@ -625,8 +632,9 @@ export function repairWorkspaceBackupPayload(
   const storageSnapshot: Record<string, string> = isRecord(payload.storage)
     ? Object.fromEntries(
         Object.entries(payload.storage).reduce<Array<[string, string]>>((acc, [key, value]) => {
-          if (isPortableStorageKey(key) && typeof value === 'string') {
-            acc.push([key, value]);
+          const portableKey = normalizePortableStorageKey(key);
+          if (portableKey && typeof value === 'string') {
+            acc.push([portableKey, value]);
           }
           return acc;
         }, [])

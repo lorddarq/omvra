@@ -1,6 +1,6 @@
-# Plumy
+# Omvra
 
-Plumy is an Electron desktop project-management app with synchronized planning surfaces:
+Omvra is an Electron desktop project-management app with synchronized planning surfaces:
 
 - Timeline view: calendar-like scheduling across project swimlanes
 - Kanban view: status-column workflow management
@@ -19,7 +19,7 @@ The app is designed so contributors and agents can reason about the same task da
 
 ## Repository Structure
 
-- `src/`: main renderer app (Plumy desktop UI)
+- `src/`: main renderer app (Omvra desktop UI)
 - `electron/`: Electron main/preload code, IPC handlers, packaging scripts
 - `pages/`: marketing/docs site source for GitHub Pages
 - `.github/workflows/`: CI for packaging and Pages deployment
@@ -126,7 +126,7 @@ Tasks can also carry roadmap and approximate effort metadata:
 - `timeSpentNote` stores the latest effort note
 - `timeEntries` stores append-only effort entries with minutes, note, timestamp, and actor
 
-These fields are preserved by workspace sanitizers, backup/import, app restarts, task reads, and the MCP workspace snapshot. Time logging is intentionally estimate-based; Plumy does not provide a stopwatch or billing workflow.
+These fields are preserved by workspace sanitizers, backup/import, app restarts, task reads, and the MCP workspace snapshot. Time logging is intentionally estimate-based; Omvra does not provide a stopwatch or billing workflow.
 
 Desktop persistence is now canonical-store aware:
 
@@ -148,7 +148,7 @@ Key storage namespaces use versioned keys (`*.v1`) to support future migrations.
 
 ### Backup and portability
 
-Plumy supports full workspace backup/import from the Preferences panel.
+Omvra supports full workspace backup/import from the Preferences panel.
 
 Backups now include:
 
@@ -170,7 +170,7 @@ This is intended to make workspace moves and recovery seamless rather than expor
 
 ## MCP Integration (Desktop)
 
-Plumy includes an MCP endpoint served by Electron main process (`/mcp`, local bind by default).
+Omvra includes an MCP endpoint served by Electron main process (`/mcp`, local bind by default).
 
 Current capabilities include:
 
@@ -184,15 +184,15 @@ Current capabilities include:
     - `agent.find_assigned_work`
     - `agent.execute_task`
     - `agent.complete_and_handoff`
-  - resources under `plumy://...`, including:
-    - `plumy://workspace`
-    - `plumy://agent/guide`
-    - `plumy://schema/task-execution`
+  - resources under `omvra://...`, including:
+    - `omvra://workspace`
+    - `omvra://agent/guide`
+    - `omvra://schema/task-execution`
   - resource templates via `resources/templates/list`, including:
-    - `plumy://tasks/{taskId}`
-    - `plumy://agents/{personId}/assigned`
-    - `plumy://projects/{projectId}/tasks`
-    - `plumy://boards/{statusId}/tasks`
+    - `omvra://tasks/{taskId}`
+    - `omvra://agents/{personId}/assigned`
+    - `omvra://projects/{projectId}/tasks`
+    - `omvra://boards/{statusId}/tasks`
 - gated safe write tools (capability-profile dependent):
   - task lifecycle: `task_write`, `tasks_create`, `tasks_update`, `tasks_update_description`, `tasks_delete`
   - task files: `tasks_attach_file`, `tasks_remove_attachment`
@@ -205,7 +205,7 @@ Client-facing tool names use underscores so they remain compatible with clients 
 
 ### Roadmap, dependencies, and time logging
 
-`workspace_get_snapshot` and `plumy://workspace` include milestones plus each task's roadmap and time fields. `milestones_list` and `milestones_get` provide targeted roadmap reads.
+`workspace_get_snapshot` and `omvra://workspace` include milestones plus each task's roadmap and time fields. `milestones_list` and `milestones_get` provide targeted roadmap reads.
 
 For roadmap writes:
 
@@ -230,11 +230,11 @@ Security controls include:
 
 Recommended workflow:
 
-- agents should start with `plumy://agent/guide` and `plumy://schema/task-execution`
+- agents should start with `omvra://agent/guide` and `omvra://schema/task-execution`
 - use `resources/templates/list` to discover stable lookup URIs before guessing paths
 - use `prompts/list` and `prompts/get` when the MCP client supports prompt-driven workflows
-- use `workspace_get_snapshot` or `plumy://workspace` for the canonical top-level read
-- use `plumy://agents/{personId}/assigned` to find assigned work without guessing filter shapes
+- use `workspace_get_snapshot` or `omvra://workspace` for the canonical top-level read
+- use `omvra://agents/{personId}/assigned` to find assigned work without guessing filter shapes
 - use `tasks_list`, `tasks_get`, `cards_kanban_list`, and `cards_timeline_list` for targeted reads
 - use `milestones_list` and `milestones_get` for targeted roadmap reads
 - use `boards_watch_poll` when an agent needs to monitor a specific status/board without duplicate processing
@@ -292,7 +292,7 @@ Workflow: `.github/workflows/deploy-pages.yml`
 - uploads `dist-pages` as Pages artifact
 - deploys with `actions/deploy-pages`
 
-Vite config for Pages is in `pages/vite.config.ts` and uses base path `/Plumy/`.
+Vite config for Pages is in `pages/vite.config.ts` and uses base path `/Omvra/`.
 
 ## Packaging CI and Releases
 
@@ -321,7 +321,7 @@ These commands cover:
 
 ## Current Agent Workflow Support
 
-Plumy now supports an agent-oriented desktop workflow:
+Omvra now supports an agent-oriented desktop workflow:
 
 - people can be marked as `human` or `agentic`
 - tasks can be assigned to agentic people

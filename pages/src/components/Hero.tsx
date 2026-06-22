@@ -10,7 +10,7 @@ import {
 const trustPills = ['Open source', 'Local-first', 'No account required', 'Cross-platform']
 
 const navLinks = [
-  { href: '#why-plumy', label: 'Why Plumy' },
+  { href: '#why-omvra', label: 'Why Omvra' },
   { href: '#features', label: 'Features' },
   { href: '#how-it-works', label: 'How it works' },
   { href: '#privacy', label: 'Privacy' },
@@ -18,16 +18,16 @@ const navLinks = [
 ]
 
 const swimlanes = [
-  { name: 'Plumy Web', accent: '#0082F6', tint: 'rgba(0,130,246,0.10)' },
+  { name: 'Omvra Web', accent: '#0082F6', tint: 'rgba(0,130,246,0.10)' },
   { name: 'Work project', accent: '#F65200', tint: 'rgba(246,82,0,0.10)' },
-  { name: 'Plumy', accent: '#00CCB7', tint: 'rgba(0,204,183,0.10)' },
+  { name: 'Omvra', accent: '#00CCB7', tint: 'rgba(0,204,183,0.10)' },
 ]
 
 const days = Array.from({ length: 14 }, (_, index) => index + 1)
 
 const laneTasks = [
   {
-    lane: 'Plumy Web',
+    lane: 'Omvra Web',
     start: 7,
     span: 3,
     title: 'Landing page polish',
@@ -43,7 +43,7 @@ const laneTasks = [
     dot: 'rgba(255,43,43,0.90)',
   },
   {
-    lane: 'Plumy',
+    lane: 'Omvra',
     start: 1,
     span: 4,
     title: 'Timeline layout pass',
@@ -77,15 +77,15 @@ const Hero = () => {
 
       <nav className="landing-container relative z-10 py-8">
         <div className="flex items-center justify-between gap-8">
-          <a href="#" className="text-2xl font-bold lowercase tracking-tight text-plumy-ink">
-            plumy
+          <a href="#" className="text-2xl font-bold lowercase tracking-tight text-omvra-ink">
+            omvra
           </a>
           <div className="hidden items-center gap-10 md:flex">
             {navLinks.map((link) => (
               <a
                 key={link.href}
                 href={link.href}
-                className="text-sm font-normal text-plumy-ink transition-colors duration-150 hover:text-plumy-lilac focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-plumy-lilac/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                className="text-sm font-normal text-omvra-ink transition-colors duration-150 hover:text-omvra-lilac focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-omvra-lilac/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
               >
                 {link.label}
               </a>
@@ -96,19 +96,19 @@ const Hero = () => {
 
       <div className="landing-container relative z-10 pb-24 pt-14 sm:pb-28 sm:pt-20">
         <div className="mx-auto flex max-w-4xl flex-col items-center text-center">
-          <div className="landing-eyebrow border-plumy-gold/10 bg-plumy-gold-soft text-plumy-gold-ink">
+          <div className="landing-eyebrow border-omvra-gold/10 bg-omvra-gold-soft text-omvra-gold-ink">
             Free to download. Available for macOS, Windows, and Linux.
           </div>
           <div className="mt-8 flex max-w-4xl flex-col items-center gap-3">
             {logoMark}
-            <h1 className="max-w-4xl text-balance text-[clamp(3.4rem,8vw,4.5rem)] font-normal leading-[0.92] tracking-[-0.045em] text-plumy-ink">
+            <h1 className="max-w-4xl text-balance text-[clamp(3.4rem,8vw,4.5rem)] font-normal leading-[0.92] tracking-[-0.045em] text-omvra-ink">
               Plan work visually.
               <br />
               Keep it local.
             </h1>
           </div>
-          <p className="mt-7 max-w-3xl text-pretty text-lg leading-8 text-plumy-muted sm:text-xl">
-            Plumy is an open-source desktop planner for teams that want clear timelines, fast
+          <p className="mt-7 max-w-3xl text-pretty text-lg leading-8 text-omvra-muted sm:text-xl">
+            Omvra is an open-source desktop planner for teams that want clear timelines, fast
             Kanban execution, and helpful AI workflows without accounts, hidden telemetry, or
             extra process.
           </p>
@@ -116,14 +116,14 @@ const Hero = () => {
           <div className="mt-10 flex flex-col items-stretch justify-center gap-4 sm:flex-row">
             <a
               href="#download"
-              className="inline-flex min-h-14 items-center justify-center gap-3 rounded-xl border border-black/10 bg-plumy-gold px-8 py-4 text-lg font-medium text-plumy-ink shadow-[0_4px_12px_rgba(136,105,0,0.30),0_2px_4px_rgba(121,94,0,0.20)] transition-[transform,background-color,box-shadow] duration-150 ease-out hover:-translate-y-0.5 hover:bg-[#f3c317] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-plumy-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+              className="inline-flex min-h-14 items-center justify-center gap-3 rounded-xl border border-black/10 bg-omvra-gold px-8 py-4 text-lg font-medium text-omvra-ink shadow-[0_4px_12px_rgba(136,105,0,0.30),0_2px_4px_rgba(121,94,0,0.20)] transition-[transform,background-color,box-shadow] duration-150 ease-out hover:-translate-y-0.5 hover:bg-[#f3c317] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-omvra-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
             >
               <Download className="size-5" strokeWidth={2.2} />
-              Download Plumy
+              Download Omvra
             </a>
             <a
-              href="https://github.com/lorddarq/Plumy"
-              className="inline-flex min-h-14 items-center justify-center rounded-xl bg-plumy-lilac-soft px-8 py-4 text-lg font-normal text-plumy-lilac transition-[background-color,transform] duration-150 ease-out hover:bg-[rgba(108,79,224,0.18)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-plumy-lilac/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+              href="https://github.com/lorddarq/Omvra"
+              className="inline-flex min-h-14 items-center justify-center rounded-xl bg-omvra-lilac-soft px-8 py-4 text-lg font-normal text-omvra-lilac transition-[background-color,transform] duration-150 ease-out hover:bg-[rgba(108,79,224,0.18)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-omvra-lilac/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
             >
               View on GitHub
             </a>
@@ -133,7 +133,7 @@ const Hero = () => {
             {trustPills.map((pill) => (
               <span
                 key={pill}
-                className="rounded-full border border-black/20 px-4 py-2 text-sm font-medium text-plumy-ink"
+                className="rounded-full border border-black/20 px-4 py-2 text-sm font-medium text-omvra-ink"
               >
                 {pill}
               </span>
@@ -146,7 +146,7 @@ const Hero = () => {
             <div className="pointer-events-none absolute inset-x-6 top-8 h-48 rounded-full bg-[rgba(232,208,112,0.25)] blur-[120px] sm:inset-x-10 sm:h-64 sm:blur-[160px]" />
             <div className="relative overflow-hidden rounded-xl border border-[#dbdbdb] bg-[#fdfdfd] shadow-[0_10px_13px_rgba(0,0,0,0.05),0_3px_4px_rgba(0,0,0,0.10)]">
               <div className="flex items-center justify-between border-b border-black/10 bg-white px-4 py-3 sm:px-6">
-                <div className="rounded-md bg-plumy-soft-2 p-1">
+                <div className="rounded-md bg-omvra-soft-2 p-1">
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
@@ -174,7 +174,7 @@ const Hero = () => {
                     aria-hidden="true"
                     className="inline-flex size-9 items-center justify-center rounded-md"
                   >
-                    <Settings2 className="size-4 text-plumy-ink" strokeWidth={1.8} />
+                    <Settings2 className="size-4 text-omvra-ink" strokeWidth={1.8} />
                   </button>
                   <button
                     type="button"
@@ -183,19 +183,19 @@ const Hero = () => {
                     aria-hidden="true"
                     className="inline-flex size-9 items-center justify-center rounded-md"
                   >
-                    <Users className="size-4 text-plumy-ink" strokeWidth={1.8} />
+                    <Users className="size-4 text-omvra-ink" strokeWidth={1.8} />
                   </button>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-4 border-b border-black/5 bg-plumy-soft px-4 py-3 sm:px-4">
+              <div className="flex items-center justify-between gap-4 border-b border-black/5 bg-omvra-soft px-4 py-3 sm:px-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="mr-1 text-sm font-medium text-plumy-ink">Timeline</span>
+                  <span className="mr-1 text-sm font-medium text-omvra-ink">Timeline</span>
                   <button
                     type="button"
                     tabIndex={-1}
                     aria-hidden="true"
-                    className="inline-flex size-5 items-center justify-center rounded-md text-base font-medium text-plumy-ink"
+                    className="inline-flex size-5 items-center justify-center rounded-md text-base font-medium text-omvra-ink"
                   >
                     ◀
                   </button>
@@ -203,7 +203,7 @@ const Hero = () => {
                     type="button"
                     tabIndex={-1}
                     aria-hidden="true"
-                    className="inline-flex items-center rounded-md border border-black/10 bg-white px-3 py-0.5 text-sm font-medium text-plumy-ink"
+                    className="inline-flex items-center rounded-md border border-black/10 bg-white px-3 py-0.5 text-sm font-medium text-omvra-ink"
                   >
                     Today
                   </button>
@@ -211,16 +211,16 @@ const Hero = () => {
                     type="button"
                     tabIndex={-1}
                     aria-hidden="true"
-                    className="inline-flex size-5 items-center justify-center rounded-md text-base font-medium text-plumy-ink"
+                    className="inline-flex size-5 items-center justify-center rounded-md text-base font-medium text-omvra-ink"
                   >
                     ▶
                   </button>
-                  <span className="rounded-md bg-plumy-soft-2 px-3 py-0.5 text-sm font-medium text-[#364153]">
+                  <span className="rounded-md bg-omvra-soft-2 px-3 py-0.5 text-sm font-medium text-[#364153]">
                     7 days
                   </span>
                 </div>
 
-                <div className="hidden rounded-md bg-plumy-soft-2 p-1 sm:flex">
+                <div className="hidden rounded-md bg-omvra-soft-2 p-1 sm:flex">
                   <button
                     type="button"
                     tabIndex={-1}
@@ -242,8 +242,8 @@ const Hero = () => {
 
               <div className="flex flex-col lg:flex-row">
                 <div className="w-full border-b border-black/10 lg:w-[16.5rem] lg:border-b-0 lg:border-r">
-                  <div className="relative flex items-start justify-between bg-plumy-soft px-3 pb-10 pt-3">
-                    <span className="text-sm font-medium text-plumy-ink">Swimlanes</span>
+                  <div className="relative flex items-start justify-between bg-omvra-soft px-3 pb-10 pt-3">
+                    <span className="text-sm font-medium text-omvra-ink">Swimlanes</span>
                     <button
                       type="button"
                       aria-label="Add swimlane"
@@ -287,7 +287,7 @@ const Hero = () => {
 
                 <div className="min-w-0 flex-1 overflow-x-auto">
                   <div className="min-w-[52rem]">
-                    <div className="border-b border-[#e7e7e7] bg-white px-3 py-2 text-sm font-medium text-plumy-ink">
+                    <div className="border-b border-[#e7e7e7] bg-white px-3 py-2 text-sm font-medium text-omvra-ink">
                       Mar 2026
                     </div>
                     <div className="flex border-b border-[#e7e7e7] bg-white px-1 py-2">
@@ -297,7 +297,7 @@ const Hero = () => {
                             className={
                               day === 10
                                 ? 'inline-flex size-8 items-center justify-center rounded-full border border-[#3b82f6] text-center text-xs text-[rgba(43,127,255,0.90)]'
-                                : 'text-xs text-plumy-ink'
+                                : 'text-xs text-omvra-ink'
                             }
                           >
                             {day}

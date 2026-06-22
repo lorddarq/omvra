@@ -647,43 +647,43 @@ const PUBLIC_WRITE_TOOL_DEFINITIONS = WRITE_TOOL_DEFINITIONS.map(toPublicToolDef
 
 const RESOURCE_DEFINITIONS = [
   {
-    uri: 'plumy://workspace',
+    uri: 'omvra://workspace',
     name: 'Workspace snapshot',
     description: 'Read-only workspace snapshot',
     mimeType: 'application/json',
   },
   {
-    uri: 'plumy://agent/guide',
+    uri: 'omvra://agent/guide',
     name: 'Agent guide',
-    description: 'Workflow guide for agents using the Plumy MCP server',
+    description: 'Workflow guide for agents using the Omvra MCP server',
     mimeType: 'application/json',
   },
   {
-    uri: 'plumy://schema/task-execution',
+    uri: 'omvra://schema/task-execution',
     name: 'Task execution schema',
     description: 'Task execution lifecycle and handoff schema',
     mimeType: 'application/json',
   },
   {
-    uri: 'plumy://cards/kanban',
+    uri: 'omvra://cards/kanban',
     name: 'Kanban cards',
     description: 'Read-only kanban card projection',
     mimeType: 'application/json',
   },
   {
-    uri: 'plumy://cards/timeline',
+    uri: 'omvra://cards/timeline',
     name: 'Timeline cards',
     description: 'Read-only timeline card projection',
     mimeType: 'application/json',
   },
   {
-    uri: 'plumy://milestones',
+    uri: 'omvra://milestones',
     name: 'Roadmap milestones',
     description: 'Read-only roadmap milestone list',
     mimeType: 'application/json',
   },
   {
-    uriTemplate: 'plumy://tasks/{taskId}',
+    uriTemplate: 'omvra://tasks/{taskId}',
     name: 'Task by id',
     description: 'Read-only task resource',
     mimeType: 'application/json',
@@ -692,31 +692,31 @@ const RESOURCE_DEFINITIONS = [
 
 const RESOURCE_TEMPLATE_DEFINITIONS = [
   {
-    uriTemplate: 'plumy://tasks/{taskId}',
+    uriTemplate: 'omvra://tasks/{taskId}',
     name: 'Task by id',
     description: 'Resolve a task by id',
     mimeType: 'application/json',
   },
   {
-    uriTemplate: 'plumy://milestones/{milestoneId}',
+    uriTemplate: 'omvra://milestones/{milestoneId}',
     name: 'Milestone by id',
     description: 'Resolve a roadmap milestone by id',
     mimeType: 'application/json',
   },
   {
-    uriTemplate: 'plumy://agents/{personId}/assigned',
+    uriTemplate: 'omvra://agents/{personId}/assigned',
     name: 'Assigned tasks by person',
     description: 'Resolve tasks assigned to a person',
     mimeType: 'application/json',
   },
   {
-    uriTemplate: 'plumy://projects/{projectId}/tasks',
+    uriTemplate: 'omvra://projects/{projectId}/tasks',
     name: 'Tasks by project',
     description: 'Resolve tasks in a project',
     mimeType: 'application/json',
   },
   {
-    uriTemplate: 'plumy://boards/{statusId}/tasks',
+    uriTemplate: 'omvra://boards/{statusId}/tasks',
     name: 'Tasks by board',
     description: 'Resolve tasks in a board/status',
     mimeType: 'application/json',
@@ -901,34 +901,34 @@ function isKnownWriteToolName(name) {
 }
 
 function getResourceForUri(store, uri, requestParams) {
-  if (uri === 'plumy://workspace') {
+  if (uri === 'omvra://workspace') {
     return { uri, data: getWorkspaceSnapshot(store) };
   }
 
-  if (uri === 'plumy://agent/guide') {
+  if (uri === 'omvra://agent/guide') {
     return { uri, data: buildMcpAgentGuide() };
   }
 
-  if (uri === 'plumy://schema/task-execution') {
+  if (uri === 'omvra://schema/task-execution') {
     return { uri, data: buildMcpTaskExecutionSchema() };
   }
 
-  if (uri === 'plumy://milestones') {
+  if (uri === 'omvra://milestones') {
     return { uri, data: listMilestones(store) };
   }
 
-  if (uri === 'plumy://tasks/{taskId}'
-    || uri === 'plumy://milestones/{milestoneId}'
-    || uri === 'plumy://agents/{personId}/assigned'
-    || uri === 'plumy://projects/{projectId}/tasks'
-    || uri === 'plumy://boards/{statusId}/tasks') {
+  if (uri === 'omvra://tasks/{taskId}'
+    || uri === 'omvra://milestones/{milestoneId}'
+    || uri === 'omvra://agents/{personId}/assigned'
+    || uri === 'omvra://projects/{projectId}/tasks'
+    || uri === 'omvra://boards/{statusId}/tasks') {
     return {
       error: invalidParams(`Resource URI "${uri}" is a template. Use resources/templates/list and substitute the path parameter before calling resources/read.`, { uri }),
     };
   }
 
-  if (uri.startsWith('plumy://tasks/')) {
-    const taskId = decodeURIComponent(uri.slice('plumy://tasks/'.length));
+  if (uri.startsWith('omvra://tasks/')) {
+    const taskId = decodeURIComponent(uri.slice('omvra://tasks/'.length));
     if (!taskId) {
       return {
         error: invalidParams('Invalid params: task resource URI must include task id.', { uri }),
@@ -937,8 +937,8 @@ function getResourceForUri(store, uri, requestParams) {
     return { uri, data: getTaskById(store, taskId) };
   }
 
-  if (uri.startsWith('plumy://milestones/')) {
-    const milestoneId = decodeURIComponent(uri.slice('plumy://milestones/'.length));
+  if (uri.startsWith('omvra://milestones/')) {
+    const milestoneId = decodeURIComponent(uri.slice('omvra://milestones/'.length));
     if (!milestoneId) {
       return {
         error: invalidParams('Invalid params: milestone resource URI must include milestone id.', { uri }),
@@ -947,8 +947,8 @@ function getResourceForUri(store, uri, requestParams) {
     return { uri, data: getMilestoneById(store, milestoneId) };
   }
 
-  if (uri.startsWith('plumy://agents/') && uri.endsWith('/assigned')) {
-    const personId = decodeURIComponent(uri.slice('plumy://agents/'.length, -'/assigned'.length));
+  if (uri.startsWith('omvra://agents/') && uri.endsWith('/assigned')) {
+    const personId = decodeURIComponent(uri.slice('omvra://agents/'.length, -'/assigned'.length));
     if (!personId) {
       return {
         error: invalidParams('Invalid params: agent resource URI must include person id.', { uri }),
@@ -970,8 +970,8 @@ function getResourceForUri(store, uri, requestParams) {
     };
   }
 
-  if (uri.startsWith('plumy://projects/') && uri.endsWith('/tasks')) {
-    const projectId = decodeURIComponent(uri.slice('plumy://projects/'.length, -'/tasks'.length));
+  if (uri.startsWith('omvra://projects/') && uri.endsWith('/tasks')) {
+    const projectId = decodeURIComponent(uri.slice('omvra://projects/'.length, -'/tasks'.length));
     if (!projectId) {
       return {
         error: invalidParams('Invalid params: project resource URI must include project id.', { uri }),
@@ -989,8 +989,8 @@ function getResourceForUri(store, uri, requestParams) {
     };
   }
 
-  if (uri.startsWith('plumy://boards/') && uri.endsWith('/tasks')) {
-    const statusId = decodeURIComponent(uri.slice('plumy://boards/'.length, -'/tasks'.length));
+  if (uri.startsWith('omvra://boards/') && uri.endsWith('/tasks')) {
+    const statusId = decodeURIComponent(uri.slice('omvra://boards/'.length, -'/tasks'.length));
     if (!statusId) {
       return {
         error: invalidParams('Invalid params: board resource URI must include status id.', { uri }),
@@ -1008,25 +1008,25 @@ function getResourceForUri(store, uri, requestParams) {
     };
   }
 
-  if (uri.startsWith('plumy://cards/kanban')) {
+  if (uri.startsWith('omvra://cards/kanban')) {
     const filters = normalizeObject(requestParams);
     const payload = listKanbanCards(store, {
       status: filters.statusId,
       assigneeId: filters.assigneeId,
       search: filters.search,
     });
-    return { uri: 'plumy://cards/kanban', data: payload };
+    return { uri: 'omvra://cards/kanban', data: payload };
   }
 
-  if (uri.startsWith('plumy://cards/timeline')) {
+  if (uri.startsWith('omvra://cards/timeline')) {
     const filters = normalizeObject(requestParams);
     const payload = listTimelineCards(store, filters);
-    return { uri: 'plumy://cards/timeline', data: payload };
+    return { uri: 'omvra://cards/timeline', data: payload };
   }
 
   return {
     error: invalidParams(`Unsupported resource URI "${uri}".`, {
-      supported: ['plumy://workspace', 'plumy://tasks/{taskId}', 'plumy://milestones', 'plumy://milestones/{milestoneId}', 'plumy://cards/kanban', 'plumy://cards/timeline'],
+      supported: ['omvra://workspace', 'omvra://tasks/{taskId}', 'omvra://milestones', 'omvra://milestones/{milestoneId}', 'omvra://cards/kanban', 'omvra://cards/timeline'],
     }),
   };
 }
@@ -2332,7 +2332,7 @@ function startMcpHttpServer(store, { logger = console, onStatusChange } = {}) {
       const responseCode = responsePayload?.error?.code;
       if (responseCode === JSON_RPC_ERROR.MCP_UNAUTHORIZED) {
         res.statusCode = 401;
-        res.setHeader('WWW-Authenticate', 'Bearer realm="Plumy MCP", error="invalid_token"');
+        res.setHeader('WWW-Authenticate', 'Bearer realm="Omvra MCP", error="invalid_token"');
       } else if (responseCode === JSON_RPC_ERROR.MCP_ACCESS_DISABLED) {
         res.statusCode = 403;
       } else {

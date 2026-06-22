@@ -20,9 +20,9 @@ const CORE_READ_TOOLS = [
 ] as const;
 
 const CORE_RESOURCE_URIS = [
-  'plumy://workspace',
-  'plumy://cards/kanban',
-  'plumy://cards/timeline',
+  'omvra://workspace',
+  'omvra://cards/kanban',
+  'omvra://cards/timeline',
 ] as const;
 
 export interface McpReadService {
@@ -168,7 +168,7 @@ export function createMcpReadService(config: McpClientConfig): McpReadService {
 
   const tryReadWorkspaceResource = async (): Promise<McpWorkspaceSnapshot | null> => {
     try {
-      const contents = await client.readResource('plumy://workspace');
+      const contents = await client.readResource('omvra://workspace');
       const parsed = parseResourceJson<unknown>(contents);
       return normalizeWorkspaceSnapshot(parsed);
     } catch (error) {
@@ -192,7 +192,7 @@ export function createMcpReadService(config: McpClientConfig): McpReadService {
   const tryReadTaskResource = async (taskId: string): Promise<McpTaskSummary | null> => {
     if (!taskId.trim()) return null;
     try {
-      const contents = await client.readResource(`plumy://tasks/${taskId}`);
+      const contents = await client.readResource(`omvra://tasks/${taskId}`);
       const parsed = parseResourceJson<unknown>(contents);
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         const task = parsed as McpTaskSummary;
@@ -342,7 +342,7 @@ export function createMcpReadService(config: McpClientConfig): McpReadService {
 
       const firstTaskId = typeof (tasks[0] as any)?.id === 'string' ? (tasks[0] as any).id : '';
       if (firstTaskId) {
-        const taskUri = `plumy://tasks/${firstTaskId}`;
+        const taskUri = `omvra://tasks/${firstTaskId}`;
         try {
           const taskContents = await client.readResource(taskUri);
           if (taskContents.length > 0) {
@@ -434,7 +434,7 @@ export function createMcpReadService(config: McpClientConfig): McpReadService {
     listKanbanCards: async (filters = {}) => {
       const hasFilters = Object.values(filters).some(value => value !== undefined && value !== null && value !== '');
       if (!hasFilters) {
-        const resourceCards = await tryReadCardResource('plumy://cards/kanban');
+        const resourceCards = await tryReadCardResource('omvra://cards/kanban');
         if (resourceCards) return resourceCards;
       }
       const tasks = await getSnapshotTasks();
@@ -466,7 +466,7 @@ export function createMcpReadService(config: McpClientConfig): McpReadService {
     listTimelineCards: async (filters = {}) => {
       const hasFilters = Object.values(filters).some(value => value !== undefined && value !== null && value !== '');
       if (!hasFilters) {
-        const resourceCards = await tryReadCardResource('plumy://cards/timeline');
+        const resourceCards = await tryReadCardResource('omvra://cards/timeline');
         if (resourceCards) return resourceCards;
       }
       const tasks = await getSnapshotTasks();

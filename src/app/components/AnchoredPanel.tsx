@@ -136,7 +136,7 @@ export function AnchoredPanel({
     <div
       className={cn(
         'flex h-full min-h-0 flex-col overflow-hidden rounded-2xl bg-gradient-to-b from-[#f0f0f0] to-[#f0f0f0]/0 p-[2px] shadow-[0_0_1px_rgba(0,0,0,0.25)]',
-        'plumy-settings-panel',
+        'omvra-settings-panel',
         className
       )}
     >
@@ -152,7 +152,7 @@ export function AnchoredPanel({
           onSelect={scrollToSection}
           onBack={onBack}
         />
-        <div className="plumy-settings-content relative h-full min-h-0 overflow-hidden rounded-[14px] bg-white shadow-[0_0_1px_rgba(0,0,0,0.20)]">
+        <div className="omvra-settings-content relative h-full min-h-0 overflow-hidden rounded-[14px] bg-white shadow-[0_0_1px_rgba(0,0,0,0.20)]">
           <div className="pointer-events-none absolute -left-px -right-px -top-px z-10 flex h-[82px] items-start gap-4 bg-gradient-to-b from-white via-white to-white/0 px-8 pt-[17px]">
             <div className="min-w-0 flex-1 truncate text-sm font-semibold leading-[22px] text-[#71717a]">
               {title}
@@ -166,7 +166,7 @@ export function AnchoredPanel({
               size="icon"
               onClick={onClose}
               aria-label="Close panel"
-              className="plumy-settings-close absolute right-2 top-2 z-10 size-8 rounded-full border-black/10 bg-white text-gray-900 shadow-none hover:bg-white"
+              className="omvra-settings-close absolute right-2 top-2 z-10 size-8 rounded-full border-black/10 bg-white text-gray-900 shadow-none hover:bg-white"
             >
               <XMarkIcon className="size-4" />
             </Button>
@@ -200,7 +200,7 @@ interface AnchoredPanelNavProps {
 
 export function AnchoredPanelNav({ groups, activeAnchor, onSelect, onBack }: AnchoredPanelNavProps) {
   return (
-    <nav className="plumy-settings-nav min-h-0 overflow-hidden px-2 pb-2 pt-7" aria-label="Panel sections">
+    <nav className="omvra-settings-nav min-h-0 overflow-hidden px-2 pb-2 pt-7" aria-label="Panel sections">
       <div className="flex gap-4 sm:block">
         {onBack && (
           <Button type="button" variant="ghost" onClick={onBack} className="justify-start px-3">
@@ -212,7 +212,7 @@ export function AnchoredPanelNav({ groups, activeAnchor, onSelect, onBack }: Anc
             key={group.label}
             className={cn(
               'min-w-36 space-y-3 sm:min-w-0',
-              'plumy-settings-nav-group',
+              'omvra-settings-nav-group',
               groupIndex > 0 && 'mt-3 border-t border-zinc-500/10 pt-3'
             )}
           >
@@ -232,7 +232,7 @@ export function AnchoredPanelNav({ groups, activeAnchor, onSelect, onBack }: Anc
                     onClick={() => onSelect(item.id)}
                     className={cn(
                       'flex h-8 w-full items-center gap-2 rounded-xl px-2 text-left text-xs font-medium outline-none transition-colors',
-                      'plumy-settings-nav-item',
+                      'omvra-settings-nav-item',
                       'focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2',
                       activeAnchor === item.id
                         ? 'active bg-zinc-500/15 text-[#71717a]'
@@ -263,7 +263,7 @@ export const AnchoredPanelScrollView = forwardRef<HTMLDivElement, AnchoredPanelS
       ref={ref}
       className={cn(
         'h-full min-h-0 overflow-y-auto px-8 pb-8 pt-[104px]',
-        'plumy-settings-scroll',
+        'omvra-settings-scroll',
         className
       )}
       {...props}

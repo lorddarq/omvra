@@ -11,6 +11,7 @@ import {
   SettingsPanel,
   TasksSettingsSection,
 } from './SettingsPanel';
+import { AboutSettingsSection, HelpSettingsSection } from './AboutHelpSettingsSections';
 import { McpAccessSettingsSection } from './McpAccessSettingsSection';
 import { McpCommandSettingsSection } from './McpCommandSettingsSection';
 import { McpActivityLogSection } from './McpDiagnosticsSections';
@@ -258,7 +259,7 @@ export function PreferencesPanel({
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `plumy-mcp-audit-${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = `omvra-mcp-audit-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -331,16 +332,13 @@ export function PreferencesPanel({
         <McpCommandSettingsSection
           testCommand={curlCommand}
           writeCommand={writeCommand}
-          stdioCommand={stdioCommand}
           tunnelCommand={tunnelCommand}
           retryGuidance={retryGuidance}
           copiedTestCommand={copiedCommand}
           copiedWriteCommand={copiedWriteCommand}
-          copiedStdioCommand={copiedStdioCommand}
           copiedTunnelCommand={copiedTunnelCommand}
           onCopyTestCommand={copyMcpCommand}
           onCopyWriteCommand={copyWriteCommand}
-          onCopyStdioCommand={copyStdioCommand}
           onCopyTunnelCommand={copyTunnelCommand}
         />
       </McpTestingSettingsSection>
@@ -352,6 +350,11 @@ export function PreferencesPanel({
           onRefresh={onRefreshMcpAuditLog}
           onCopy={copyAuditLog}
           onExport={exportAuditLog}
+          listenerStatusLabel={listenerStatusLabel}
+          connectionStatusLabel={connectionStatusLabel}
+          tokenExpiryLabel={tokenExpiryLabel}
+          boundUrl={mcpListenerStatus?.boundUrl}
+          restartPending={mcpRestartPending}
         />
       </McpActivitySettingsSection>
 
@@ -361,6 +364,9 @@ export function PreferencesPanel({
         onExportTasksAndProjects={onExportTasksAndProjects}
         onImportTasksAndProjects={onImportTasksAndProjects}
       />
+
+      <AboutSettingsSection />
+      <HelpSettingsSection />
     </SettingsPanel>
   );
 }

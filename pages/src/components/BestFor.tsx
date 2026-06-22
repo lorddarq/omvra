@@ -26,7 +26,7 @@ const BestFor = () => {
               Built for teams that want less overhead
             </h2>
             <p className="text-lg font-normal leading-8 text-[#6B6B6B] md:text-xl">
-              Plumy is especially strong for teams that need better planning clarity but do not want another bloated
+              Omvra is especially strong for teams that need better planning clarity but do not want another bloated
               system to administer.
             </p>
           </div>

@@ -9,10 +9,10 @@ const EXPECTED_TOOLS = [
   'cards.timeline.list',
 ];
 const EXPECTED_RESOURCES = [
-  'plumy://workspace',
-  'plumy://cards/kanban',
-  'plumy://cards/timeline',
-  'plumy://tasks/{taskId}',
+  'omvra://workspace',
+  'omvra://cards/kanban',
+  'omvra://cards/timeline',
+  'omvra://tasks/{taskId}',
 ];
 
 function parseArgs(argv) {

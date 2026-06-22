@@ -167,8 +167,21 @@ export function safeReadLocalStorageJSON<T>(key: string, fallback: T): T {
   }
 }
 
+export function getLegacyPortableStorageKey(key: string): string | null {
+  if (key.startsWith('omvra.')) return `plumy.${key.slice('omvra.'.length)}`;
+  if (key.startsWith('omvra_viewstate_')) return `plumy_viewstate_${key.slice('omvra_viewstate_'.length)}`;
+  return null;
+}
+
+export function normalizePortableStorageKey(key: string): string | null {
+  if (key.startsWith('omvra.') || key.startsWith('omvra_viewstate_')) return key;
+  if (key.startsWith('plumy.')) return `omvra.${key.slice('plumy.'.length)}`;
+  if (key.startsWith('plumy_viewstate_')) return `omvra_viewstate_${key.slice('plumy_viewstate_'.length)}`;
+  return null;
+}
+
 export function isPortableStorageKey(key: string): boolean {
-  return key.startsWith('plumy.') || key.startsWith('plumy_viewstate_');
+  return normalizePortableStorageKey(key) !== null;
 }
 
 export function getPortableStorageSnapshot(): Record<string, string> {
@@ -178,10 +191,12 @@ export function getPortableStorageSnapshot(): Record<string, string> {
   try {
     for (let index = 0; index < window.localStorage.length; index += 1) {
       const key = window.localStorage.key(index);
-      if (!key || !isPortableStorageKey(key)) continue;
+      if (!key) continue;
+      const portableKey = normalizePortableStorageKey(key);
+      if (!portableKey) continue;
       const value = window.localStorage.getItem(key);
       if (typeof value === 'string') {
-        snapshot[key] = value;
+        snapshot[portableKey] = value;
       }
     }
   } catch (err) {
@@ -219,19 +234,31 @@ export function getPortableStoreValue<T = unknown>(
   exported: Record<string, unknown>,
   key: string
 ): T | undefined {
-  if (Object.prototype.hasOwnProperty.call(exported, key)) {
-    return exported[key] as T;
+  const candidateKeys = [key, getLegacyPortableStorageKey(key)].filter((candidate): candidate is string => Boolean(candidate));
+
+  for (const candidateKey of candidateKeys) {
+    if (Object.prototype.hasOwnProperty.call(exported, candidateKey)) {
+      return exported[candidateKey] as T;
+    }
   }
 
-  const segments = key.split('.');
-  let current: unknown = exported;
-  for (const segment of segments) {
-    if (!current || typeof current !== 'object' || Array.isArray(current) || !(segment in (current as Record<string, unknown>))) {
-      return undefined;
+  for (const candidateKey of candidateKeys) {
+    const segments = candidateKey.split('.');
+    let current: unknown = exported;
+    for (const segment of segments) {
+      if (!current || typeof current !== 'object' || Array.isArray(current) || !(segment in (current as Record<string, unknown>))) {
+        current = undefined;
+        break;
+      }
+      current = (current as Record<string, unknown>)[segment];
     }
-    current = (current as Record<string, unknown>)[segment];
+
+    if (current !== undefined) {
+      return current as T;
+    }
   }
-  return current as T;
+
+  return undefined;
 }
 
 export async function getPortableElectronStoreSnapshot(): Promise<Record<string, unknown>> {
@@ -243,7 +270,13 @@ export async function getPortableElectronStoreSnapshot(): Promise<Record<string,
 
     const flattened = flattenPortableStoreEntries(exported);
     return Object.fromEntries(
-      Object.entries(flattened).filter(([key]) => isPortableStorageKey(key))
+      Object.entries(flattened).reduce<Array<[string, unknown]>>((acc, [key, value]) => {
+        const portableKey = normalizePortableStorageKey(key);
+        if (portableKey) {
+          acc.push([portableKey, value]);
+        }
+        return acc;
+      }, [])
     );
   } catch (err) {
     return {};
@@ -310,8 +343,9 @@ export async function restorePortableStorageSnapshot(
 
   if (storageSnapshot && typeof storageSnapshot === 'object') {
     Object.entries(storageSnapshot).forEach(([key, value]) => {
-      if (!isPortableStorageKey(key) || typeof value !== 'string') return;
-      safeWriteRaw(key, value);
+      const portableKey = normalizePortableStorageKey(key);
+      if (!portableKey || typeof value !== 'string') return;
+      safeWriteRaw(portableKey, value);
     });
   }
 
@@ -320,7 +354,11 @@ export async function restorePortableStorageSnapshot(
     if (typeof storeSet === 'function') {
       await Promise.all(
         Object.entries(electronStoreSnapshot)
-          .filter(([key]) => isPortableStorageKey(key))
+          .map(([key, value]) => {
+            const portableKey = normalizePortableStorageKey(key);
+            return portableKey ? [portableKey, value] as const : null;
+          })
+          .filter((entry): entry is readonly [string, unknown] => Boolean(entry))
           .map(([key, value]) => storeSet(key, value).catch(() => undefined))
       );
     }

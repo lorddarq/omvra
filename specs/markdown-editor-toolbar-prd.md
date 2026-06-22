@@ -2,7 +2,7 @@
 
 ## Summary
 
-Plumy currently edits task notes with a plain textarea and renders them later as markdown. This feature adds a dedicated markdown editor component for task notes in edit mode, with toolbar-driven formatting, preview controls, and markdown-string persistence.
+Omvra currently edits task notes with a plain textarea and renders them later as markdown. This feature adds a dedicated markdown editor component for task notes in edit mode, with toolbar-driven formatting, preview controls, and markdown-string persistence.
 
 The read surface in task details should continue to render from `task.notes` using the existing markdown renderer.
 
@@ -23,19 +23,19 @@ The read surface in task details should continue to render from `task.notes` usi
 
 ## Current State
 
-- Task editing uses a plain textarea in [`src/app/components/TaskDialog.tsx`](/Users/sorin.jurcut/Documents/GitHub/Plumy/src/app/components/TaskDialog.tsx).
-- Task details render markdown through [`src/app/components/MarkdownContent.tsx`](/Users/sorin.jurcut/Documents/GitHub/Plumy/src/app/components/MarkdownContent.tsx).
-- `task.notes` is stored and updated as a plain string via [`src/app/hooks/useTaskActions.ts`](/Users/sorin.jurcut/Documents/GitHub/Plumy/src/app/hooks/useTaskActions.ts).
+- Task editing uses a plain textarea in [`src/app/components/TaskDialog.tsx`](/Users/sorin.jurcut/Documents/GitHub/Omvra/src/app/components/TaskDialog.tsx).
+- Task details render markdown through [`src/app/components/MarkdownContent.tsx`](/Users/sorin.jurcut/Documents/GitHub/Omvra/src/app/components/MarkdownContent.tsx).
+- `task.notes` is stored and updated as a plain string via [`src/app/hooks/useTaskActions.ts`](/Users/sorin.jurcut/Documents/GitHub/Omvra/src/app/hooks/useTaskActions.ts).
 
 ## Package Research
 
 ### Option 1: `@uiw/react-md-editor`
 
-- Fit: best match for a low-risk markdown-native editing upgrade in Plumy.
+- Fit: best match for a low-risk markdown-native editing upgrade in Omvra.
 - Pros:
   - Simple React + TypeScript API with markdown string state.
   - Toolbar and preview are built in.
-  - Supports selection-based formatting without Plumy owning custom transform logic for V1.
+  - Supports selection-based formatting without Omvra owning custom transform logic for V1.
   - Lower dependency surface than richer editor frameworks.
 - Cons:
   - More textarea-oriented than a richer document editor.
@@ -44,7 +44,7 @@ The read surface in task details should continue to render from `task.notes` usi
 
 ### Option 2: `@mdxeditor/editor`
 
-- Fit: strongest match if Plumy later wants a more advanced markdown document editor.
+- Fit: strongest match if Omvra later wants a more advanced markdown document editor.
 - Pros:
   - React-first editor built around markdown as the primary format.
   - Supports customizable toolbar, tables, code blocks, source mode, markdown shortcuts, and richer block workflows.
@@ -57,7 +57,7 @@ The read surface in task details should continue to render from `task.notes` usi
 
 ### Option 3: Tiptap with `@tiptap/markdown`
 
-- Fit: strong long-term foundation if Plumy expects deep editor customization later.
+- Fit: strong long-term foundation if Omvra expects deep editor customization later.
 - Pros:
   - Mature extension model and large ecosystem.
   - Markdown parse/serialize support exists with `getMarkdown()` and markdown-aware commands.
@@ -65,12 +65,12 @@ The read surface in task details should continue to render from `task.notes` usi
 - Cons:
   - Higher integration cost for a task editor.
   - Toolbar and markdown feature parity require more assembly work.
-  - More infrastructure than Plumy currently needs for notes editing.
+  - More infrastructure than Omvra currently needs for notes editing.
 - Integration complexity: high.
 
 ### Option 4: Toast UI Editor
 
-- Fit: acceptable if Plumy wanted an all-in-one markdown/WYSIWYG package quickly.
+- Fit: acceptable if Omvra wanted an all-in-one markdown/WYSIWYG package quickly.
 - Pros:
   - Mature markdown + WYSIWYG editor with toolbar concepts.
   - Broad feature coverage.
@@ -82,14 +82,14 @@ The read surface in task details should continue to render from `task.notes` usi
 
 ## Recommended Direction
 
-Use `@uiw/react-md-editor` wrapped in a Plumy-owned `MarkdownEditor` component.
+Use `@uiw/react-md-editor` wrapped in a Omvra-owned `MarkdownEditor` component.
 
 Reasoning:
 
 - It preserves `task.notes` as a plain markdown string with minimal adapter code.
 - It delivers the requested toolbar and selection-driven markdown formatting without introducing a heavyweight editor stack.
-- A Plumy wrapper component still gives us a separate styling and integration boundary for the toolbar/editor surface.
-- `@mdxeditor/editor` remains a valid future upgrade if Plumy later needs more advanced document-authoring behavior.
+- A Omvra wrapper component still gives us a separate styling and integration boundary for the toolbar/editor surface.
+- `@mdxeditor/editor` remains a valid future upgrade if Omvra later needs more advanced document-authoring behavior.
 
 ## Proposed UX
 

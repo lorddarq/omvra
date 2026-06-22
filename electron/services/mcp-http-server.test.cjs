@@ -36,7 +36,7 @@ test('initialize returns MCP server identity and capabilities', () => {
   assert.ok(response.result);
   assert.equal(response.result.protocolVersion, '2024-11-05');
   assert.deepEqual(response.result.serverInfo, {
-    name: 'Plumy',
+    name: 'Omvra',
     version: '0.0.1',
   });
   assert.ok(response.result.capabilities);
@@ -121,13 +121,13 @@ test('resources/list exposes the guide, schema, and lookup templates', () => {
   assert.equal(response.id, '2.1');
   assert.ok(Array.isArray(response.result.resources));
   assert.ok(Array.isArray(response.result.resourceTemplates));
-  assert.ok(response.result.resources.some(resource => resource.uri === 'plumy://agent/guide'));
-  assert.ok(response.result.resources.some(resource => resource.uri === 'plumy://schema/task-execution'));
-  assert.ok(response.result.resources.some(resource => resource.uri === 'plumy://milestones'));
-  assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'plumy://milestones/{milestoneId}'));
-  assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'plumy://agents/{personId}/assigned'));
-  assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'plumy://projects/{projectId}/tasks'));
-  assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'plumy://boards/{statusId}/tasks'));
+  assert.ok(response.result.resources.some(resource => resource.uri === 'omvra://agent/guide'));
+  assert.ok(response.result.resources.some(resource => resource.uri === 'omvra://schema/task-execution'));
+  assert.ok(response.result.resources.some(resource => resource.uri === 'omvra://milestones'));
+  assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'omvra://milestones/{milestoneId}'));
+  assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'omvra://agents/{personId}/assigned'));
+  assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'omvra://projects/{projectId}/tasks'));
+  assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'omvra://boards/{statusId}/tasks'));
 });
 
 test('task_write creates a new task through the MCP write surface with metadata', () => {
@@ -658,10 +658,10 @@ test('resources/templates/list returns the same lookup templates for clients tha
   assert.equal(response.jsonrpc, '2.0');
   assert.equal(response.id, '2.2');
   assert.ok(Array.isArray(response.result.resourceTemplates));
-  assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'plumy://tasks/{taskId}'));
-  assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'plumy://agents/{personId}/assigned'));
-  assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'plumy://projects/{projectId}/tasks'));
-  assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'plumy://boards/{statusId}/tasks'));
+  assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'omvra://tasks/{taskId}'));
+  assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'omvra://agents/{personId}/assigned'));
+  assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'omvra://projects/{projectId}/tasks'));
+  assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'omvra://boards/{statusId}/tasks'));
 });
 
 test('prompts/list and prompts/get expose guided agent workflows', () => {
@@ -704,11 +704,11 @@ test('guide and execution schema resources explain the task workflow', () => {
     id: '2.3',
     method: 'resources/read',
     params: {
-      uri: 'plumy://agent/guide',
+      uri: 'omvra://agent/guide',
     },
   }, req);
 
-  assert.match(guideResponse.result.contents[0].text, /plumy:\/\/agent\/guide/);
+  assert.match(guideResponse.result.contents[0].text, /omvra:\/\/agent\/guide/);
   assert.match(guideResponse.result.contents[0].text, /resources\/templates\/list/);
   assert.match(guideResponse.result.contents[0].text, /tasks\.move_to_ready_for_human_review/);
   assert.match(guideResponse.result.contents[0].text, /canonicalWritePaths/);
@@ -719,7 +719,7 @@ test('guide and execution schema resources explain the task workflow', () => {
     id: '2.4',
     method: 'resources/read',
     params: {
-      uri: 'plumy://schema/task-execution',
+      uri: 'omvra://schema/task-execution',
     },
   }, req);
 
@@ -739,7 +739,7 @@ test('template resources resolve assigned work, project work, and board work', (
     id: '2.5',
     method: 'resources/read',
     params: {
-      uri: 'plumy://agents/agent-1/assigned',
+      uri: 'omvra://agents/agent-1/assigned',
     },
   }, req);
 
@@ -764,7 +764,7 @@ test('template resources resolve assigned work, project work, and board work', (
     id: '2.6',
     method: 'resources/read',
     params: {
-      uri: 'plumy://projects/lane-1/tasks',
+      uri: 'omvra://projects/lane-1/tasks',
     },
   }, req);
 
@@ -776,7 +776,7 @@ test('template resources resolve assigned work, project work, and board work', (
     id: '2.7',
     method: 'resources/read',
     params: {
-      uri: 'plumy://boards/in-progress/tasks',
+      uri: 'omvra://boards/in-progress/tasks',
     },
   }, req);
 
@@ -791,7 +791,7 @@ test('reading a literal template URI returns a guided validation error', () => {
     id: '2.7.1',
     method: 'resources/read',
     params: {
-      uri: 'plumy://agents/{personId}/assigned',
+      uri: 'omvra://agents/{personId}/assigned',
     },
   }, makeReq());
 
@@ -923,7 +923,7 @@ test('remote http transport can read resources and expose write tools with valid
     id: '6',
     method: 'resources/read',
     params: {
-      uri: 'plumy://workspace',
+      uri: 'omvra://workspace',
     },
   }, req);
 
@@ -1243,7 +1243,7 @@ test('read_only fixture only exposes read tools and preserves custom resources',
     id: '10',
     method: 'resources/read',
     params: {
-      uri: 'plumy://workspace',
+      uri: 'omvra://workspace',
     },
   }, req);
 

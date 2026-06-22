@@ -1,4 +1,4 @@
-# Plumy Landing Page Audit
+# Omvra Landing Page Audit
 
 Date: 2026-03-27
 
@@ -11,7 +11,7 @@ Scope:
 
 ## Executive Summary
 
-The landing page feels clean and credible, but it currently reads more like a product capability inventory than a persuasive reason to install Plumy. The biggest gap is message clarity: the page does not quickly explain who Plumy is for, why it is better than lighter or heavier alternatives, and why a visitor should trust it enough to download now.
+The landing page feels clean and credible, but it currently reads more like a product capability inventory than a persuasive reason to install Omvra. The biggest gap is message clarity: the page does not quickly explain who Omvra is for, why it is better than lighter or heavier alternatives, and why a visitor should trust it enough to download now.
 
 The strongest raw differentiators already exist in the product and codebase:
 - local-first
@@ -35,7 +35,7 @@ Those strengths are currently underused or introduced too late. The page leads w
 ## Core Problems
 
 1. The hero is too generic.
-The current headline, `Project management, simplified`, is pleasant but non-distinctive. It does not communicate the specific value of Plumy or why someone should switch.
+The current headline, `Project management, simplified`, is pleasant but non-distinctive. It does not communicate the specific value of Omvra or why someone should switch.
 
 2. The subhead is overloaded and feature-led.
 The hero paragraph reads like a spec list. It explains what the app contains, but not the outcome users get from it.
@@ -73,7 +73,7 @@ The main debate points and final decisions:
 - Comparison section:
   - Marketing suggested comparison positioning
   - Copy did not center it
-  - Conclusion: avoid a brittle competitor table; instead add a softer section like `Why teams switch` or `When Plumy is the better fit`
+  - Conclusion: avoid a brittle competitor table; instead add a softer section like `Why teams switch` or `When Omvra is the better fit`
 
 ## Full Todo List
 
@@ -97,7 +97,7 @@ The main debate points and final decisions:
   Recommendation:
   Replace labels like `Dual-View System` with user-facing language like `Plan on a timeline, execute in Kanban`.
 
-- Add a benefits-first `Why Plumy` section.
+- Add a benefits-first `Why Omvra` section.
   Why:
   The page jumps from hero to feature grid without first framing why the product matters.
   Recommendation:
@@ -175,11 +175,11 @@ The main debate points and final decisions:
 
 ## Suggested Top 5 For Task Description
 
-1. Rewrite the hero to clearly communicate Plumy's main outcome and differentiators instead of using generic project-management language.
+1. Rewrite the hero to clearly communicate Omvra's main outcome and differentiators instead of using generic project-management language.
 2. Move `open source`, `local-first`, and `no account required` above the fold so the page earns trust earlier.
 3. Replace feature-led section copy with benefit-first messaging that explains why Timeline plus Kanban is useful in practice.
 4. Reframe the privacy section into a positive trust section and repeat those trust guarantees near the download CTA.
-5. Add one or two missing conversion sections, preferably `Why Plumy` plus `How it works` or FAQ, to reduce friction before download.
+5. Add one or two missing conversion sections, preferably `Why Omvra` plus `How it works` or FAQ, to reduce friction before download.
 
 ## Optional Rewrite Direction
 
@@ -188,7 +188,7 @@ Illustrative direction only, not final copy:
 - Hero headline:
   `Plan work visually. Keep it local.`
 - Hero subhead:
-  `Plumy is an open-source, local-first desktop planner for teams that want clear timelines, fast Kanban execution, and helpful AI workflows without accounts or telemetry.`
+  `Omvra is an open-source, local-first desktop planner for teams that want clear timelines, fast Kanban execution, and helpful AI workflows without accounts or telemetry.`
 - Privacy section title:
   `Local by design`
 - Best-for section title:

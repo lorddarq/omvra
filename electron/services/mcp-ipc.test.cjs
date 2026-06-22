@@ -35,7 +35,7 @@ test('MCP IPC exposes listener status from the main runtime state', async () => 
 
 test('MCP IPC exposes recent audit log entries', async () => {
   const store = makeStoreFromFixture('workspace-basic');
-  store.set('plumy.mcp.audit.v1', [
+  store.set('omvra.mcp.audit.v1', [
     {
       auditId: 'audit-1',
       timestamp: '2026-03-26T10:00:00.000Z',

@@ -6,11 +6,11 @@ const { makeStoreFromFixture, loadFixture } = require('./test-fixtures.cjs');
 
 test('workspace-basic fixture remains structurally portable for MCP tests', () => {
   const fixture = loadFixture('workspace-basic');
-  assert.ok(Array.isArray(fixture['plumy.tasks.v1']));
-  assert.ok(Array.isArray(fixture['plumy.people.v1']));
-  assert.ok(Array.isArray(fixture['plumy.swimlanes.v1']));
-  assert.ok(Array.isArray(fixture['plumy.statusColumns.v1']));
-  assert.equal(fixture['plumy.preferences.v1'].mcpCapabilityProfile, 'task_write');
+  assert.ok(Array.isArray(fixture['omvra.tasks.v1']));
+  assert.ok(Array.isArray(fixture['omvra.people.v1']));
+  assert.ok(Array.isArray(fixture['omvra.swimlanes.v1']));
+  assert.ok(Array.isArray(fixture['omvra.statusColumns.v1']));
+  assert.equal(fixture['omvra.preferences.v1'].mcpCapabilityProfile, 'task_write');
 });
 
 test('workspace-custom-status fixture keeps custom statuses visible in snapshots', () => {
@@ -25,10 +25,10 @@ test('workspace-custom-status fixture keeps custom statuses visible in snapshots
 
 test('workspace-mcp-security fixture keeps listener and auth settings portable', () => {
   const fixture = loadFixture('workspace-mcp-security');
-  assert.equal(fixture['plumy.preferences.v1'].mcpAgentAccessEnabled, true);
-  assert.equal(fixture['plumy.preferences.v1'].mcpCapabilityProfile, 'task_write');
-  assert.equal(fixture['plumy.preferences.v1'].mcpPort, 3456);
-  assert.equal(fixture['plumy.preferences.v1'].mcpAccessToken, 'fixture-token');
+  assert.equal(fixture['omvra.preferences.v1'].mcpAgentAccessEnabled, true);
+  assert.equal(fixture['omvra.preferences.v1'].mcpCapabilityProfile, 'task_write');
+  assert.equal(fixture['omvra.preferences.v1'].mcpPort, 3456);
+  assert.equal(fixture['omvra.preferences.v1'].mcpAccessToken, 'fixture-token');
 });
 
 test('canonical store fixture ignores legacy localStorage-only clutter', () => {

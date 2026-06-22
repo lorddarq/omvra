@@ -4,8 +4,8 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
-  // GitHub Pages will serve from /Plumy/ path
-  base: '/Plumy/',
+  // GitHub Pages will serve from /Omvra/ path
+  base: '/Omvra/',
   root: './pages',
   build: {
     outDir: '../dist-pages',

@@ -4,7 +4,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 ## Project Overview
 
-Plumy is an Electron-based project management tool featuring a dual-view interface:
+Omvra is an Electron-based project management tool featuring a dual-view interface:
 - **Timeline View**: A Gantt-chart-like calendar timeline for visualizing task schedules
 - **Swimlanes View**: A kanban board for task status management
 
@@ -45,9 +45,9 @@ npm start               # Run packaged Electron app
 **Data Flow**:
 - All state is stored in `src/app/App.tsx` as the source of truth
 - Data persists to browser localStorage via `safeReadJSON`/`safeWriteJSON` helpers
-- Status columns (swimlanes for kanban) stored in `plumy.statusColumns.v1`
-- Tasks stored in `plumy.tasks.v1`
-- Timeline swimlanes stored in `plumy.swimlanes.v1`
+- Status columns (swimlanes for kanban) stored in `omvra.statusColumns.v1`
+- Tasks stored in `omvra.tasks.v1`
+- Timeline swimlanes stored in `omvra.swimlanes.v1`
 
 ### View Architecture
 
@@ -129,11 +129,11 @@ npm start               # Run packaged Electron app
 - **Tailwind CSS Vite Plugin**: Automatically applies Tailwind transformations
 - **Electron Builder**: Packages the app for macOS (dmg, pkg), Windows (nsis), and Linux (AppImage)
 - **Icons**: Generated from source via `npm run generate:icons` before dist build
-- App ID: `com.plumy.app`, Product Name: `Plumy`
+- App ID: `com.omvra.app`, Product Name: `Omvra`
 
 ## Important Implementation Notes
 
-1. **Local Storage Keys**: Use version suffix (e.g., `plumy.tasks.v1`) for easy schema migrations
+1. **Local Storage Keys**: Use version suffix (e.g., `omvra.tasks.v1`) for easy schema migrations
 2. **Task IDs**: Generated using `Date.now().toString()` for uniqueness
 3. **Swimlane Assignment**: Tasks can optionally belong to a timeline swimlane via `swimlaneId`
 4. **Task Visibility**: The `swimlaneOnly` flag controls whether a task appears only in swimlanes or in both views

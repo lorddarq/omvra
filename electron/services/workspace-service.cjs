@@ -1,23 +1,23 @@
 const { randomUUID } = require('crypto');
 
-const PREFERENCES_KEY = 'plumy.preferences.v1';
-const TASKS_KEY = 'plumy.tasks.v1';
-const MILESTONES_KEY = 'plumy.milestones.v1';
-const PEOPLE_KEY = 'plumy.people.v1';
-const SWIMLANES_KEY = 'plumy.swimlanes.v1';
-const STATUS_COLUMNS_KEY = 'plumy.statusColumns.v1';
-const MCP_BOARD_WATCHERS_KEY = 'plumy.mcp.boardWatchers.v1';
+const PREFERENCES_KEY = 'omvra.preferences.v1';
+const TASKS_KEY = 'omvra.tasks.v1';
+const MILESTONES_KEY = 'omvra.milestones.v1';
+const PEOPLE_KEY = 'omvra.people.v1';
+const SWIMLANES_KEY = 'omvra.swimlanes.v1';
+const STATUS_COLUMNS_KEY = 'omvra.statusColumns.v1';
+const MCP_BOARD_WATCHERS_KEY = 'omvra.mcp.boardWatchers.v1';
 const REQUIRES_HUMAN_REVIEW_STATUS_ID = 'requires-human-review';
 const REQUIRES_HUMAN_REVIEW_STATUS_TITLE = 'Requires human review';
 const REQUIRES_HUMAN_REVIEW_STATUS_COLOR = '#f97316';
 const MCP_PROTOCOL_VERSION = '2024-11-05';
-const MCP_SERVER_NAME = 'Plumy';
+const MCP_SERVER_NAME = 'Omvra';
 const DEFAULT_MCP_HOST = '127.0.0.1';
 const DEFAULT_MCP_PORT = 3456;
 const DEFAULT_MCP_PATH = '/mcp';
 const DEFAULT_MCP_CAPABILITY_PROFILE = 'read_only';
 const MCP_CAPABILITY_PROFILES = ['read_only', 'task_write', 'admin'];
-const MCP_AUDIT_LOG_KEY = 'plumy.mcp.audit.v1';
+const MCP_AUDIT_LOG_KEY = 'omvra.mcp.audit.v1';
 const MCP_AUDIT_LOG_MAX_ENTRIES = 200;
 const MCP_TASK_REV_FIELD = '__mcpRevision';
 const TASK_ACTIVITY_LOG_MAX_ENTRIES = 50;
@@ -846,28 +846,28 @@ function listTimelineCards(store, filters = {}) {
 function buildMcpAgentGuide() {
   return {
     schemaVersion: '1',
-    resource: 'plumy://agent/guide',
-    title: 'Plumy MCP agent guide',
-    summary: 'Discovery-first workflow for agents using the Plumy MCP server.',
+    resource: 'omvra://agent/guide',
+    title: 'Omvra MCP agent guide',
+    summary: 'Discovery-first workflow for agents using the Omvra MCP server.',
     recommendedDiscoveryOrder: [
       'initialize',
       'resources/list',
       'resources/templates/list',
-      'resources/read plumy://agent/guide',
-      'resources/read plumy://schema/task-execution',
-      'resources/read plumy://workspace',
-      'resources/read plumy://agents/{personId}/assigned',
+      'resources/read omvra://agent/guide',
+      'resources/read omvra://schema/task-execution',
+      'resources/read omvra://workspace',
+      'resources/read omvra://agents/{personId}/assigned',
     ],
     commonResources: [
-      'plumy://workspace',
-      'plumy://schema/task-execution',
-      'plumy://agent/guide',
+      'omvra://workspace',
+      'omvra://schema/task-execution',
+      'omvra://agent/guide',
     ],
     commonResourceTemplates: [
-      'plumy://tasks/{taskId}',
-      'plumy://agents/{personId}/assigned',
-      'plumy://projects/{projectId}/tasks',
-      'plumy://boards/{statusId}/tasks',
+      'omvra://tasks/{taskId}',
+      'omvra://agents/{personId}/assigned',
+      'omvra://projects/{projectId}/tasks',
+      'omvra://boards/{statusId}/tasks',
     ],
     commonTools: [
       'tasks.list',
@@ -902,7 +902,7 @@ function buildMcpAgentGuide() {
     workflow: [
       'Read the guide and task-execution schema before taking action.',
       'Use resources/templates/list to discover stable lookup URIs.',
-      'Inspect plumy://workspace for the overall state, then read the assigned task resource.',
+      'Inspect omvra://workspace for the overall state, then read the assigned task resource.',
       'Resolve durable persona instructions from task.assigneeId -> workspace.people/person -> agentInstructions when present.',
       'Read current task data before writing, and pass expectedRevision on every write.',
       'For roadmap membership and intertask dependencies, use milestones.link_tasks as the single canonical write path.',
@@ -920,8 +920,8 @@ function buildMcpAgentGuide() {
 function buildMcpTaskExecutionSchema() {
   return {
     schemaVersion: '1',
-    resource: 'plumy://schema/task-execution',
-    title: 'Plumy task execution schema',
+    resource: 'omvra://schema/task-execution',
+    title: 'Omvra task execution schema',
     summary: 'Expected agent task lifecycle and write sequence.',
     lifecycle: [
       'discover',
@@ -983,7 +983,7 @@ function buildMcpTaskExecutionSchema() {
     ],
     lookupHints: [
       'Use tasks.list with assigneeId to find assigned work.',
-      'Use plumy://agents/{personId}/assigned to read the agentic persona metadata, including agentInstructions when present.',
+      'Use omvra://agents/{personId}/assigned to read the agentic persona metadata, including agentInstructions when present.',
       'Use task_write to log new bug-hunting or follow-up tasks with metadata.',
       'Use boards.watch.poll to watch a board for changes.',
       'Use cards.kanban.list for board-friendly projections.',
@@ -1072,7 +1072,7 @@ function getMcpPrompt(promptName, args = {}) {
       messages: buildPromptMessages(
         `Prepare to execute task "${taskId || '{taskId}'}".`,
         [
-          'Read plumy://schema/task-execution before making changes.',
+          'Read omvra://schema/task-execution before making changes.',
           'Read the task by id and inspect any assigned project, person, and description context.',
           'Use read tools/resources first; only use write tools after you understand the task and have the current revision.',
         ]

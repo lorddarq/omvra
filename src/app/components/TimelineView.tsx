@@ -43,8 +43,8 @@ const DEFAULT_DAY_WIDTH = 60;
 const DEFAULT_LEFT_COL_WIDTH = 282;
 const MIN_LEFT_COL_WIDTH = 260;
 const MAX_LEFT_COL_WIDTH = 420;
-const MONTH_WIDTHS_KEY = 'plumy.monthWidths.v1';
-const LEFT_COL_WIDTH_KEY = 'plumy.leftColWidth.v1';
+const MONTH_WIDTHS_KEY = 'omvra.monthWidths.v1';
+const LEFT_COL_WIDTH_KEY = 'omvra.leftColWidth.v1';
 const HORIZONTAL_RENDER_BUFFER_PX = 1200;
 const MIN_TOTAL_MONTHS = 12;
 
@@ -240,8 +240,8 @@ export function TimelineView({
 
     const hydrateTimelineLayout = async () => {
       const [storedLeftColWidth, storedMonthWidths] = await Promise.all([
-        getJSON<number>('plumy.leftColWidth.v1', null),
-        getJSON<Record<string, number>>('plumy.monthWidths.v1', null),
+        getJSON<number>('omvra.leftColWidth.v1', null),
+        getJSON<Record<string, number>>('omvra.monthWidths.v1', null),
       ]);
 
       if (cancelled) return;

@@ -2,7 +2,7 @@
 
 ## Summary
 
-Add an `electron-updater` based update flow for macOS, Windows, and Linux. Plumy will show a custom React modal for update availability, download progress, and install readiness. Stable users receive stable releases only; users can opt into RC updates from preferences. Before installing RC updates, the modal requires a successful workspace backup export. Stable updates will still offer backup export, but installation will not be blocked.
+Add an `electron-updater` based update flow for macOS, Windows, and Linux. Omvra will show a custom React modal for update availability, download progress, and install readiness. Stable users receive stable releases only; users can opt into RC updates from preferences. Before installing RC updates, the modal requires a successful workspace backup export. Stable updates will still offer backup export, but installation will not be blocked.
 
 ## Key Changes
 

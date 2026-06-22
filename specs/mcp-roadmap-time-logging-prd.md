@@ -2,7 +2,7 @@
 
 ## Problem
 
-Plumy's MCP surface cannot yet represent the full planning model that exists in the product. Agents can read and update tasks, but they cannot reliably create roadmap structures, link tasks to roadmap milestones, persist task dependencies, or log approximate time spent. This blocks agent-led planning, follow-up task decomposition, and reliable roadmap maintenance.
+Omvra's MCP surface cannot yet represent the full planning model that exists in the product. Agents can read and update tasks, but they cannot reliably create roadmap structures, link tasks to roadmap milestones, persist task dependencies, or log approximate time spent. This blocks agent-led planning, follow-up task decomposition, and reliable roadmap maintenance.
 
 ## Goals
 
@@ -46,7 +46,7 @@ Read:
 
 - `workspace.get_snapshot` includes `milestones` and task roadmap/time fields.
 - Add milestone listing and lookup support.
-- Keep `plumy://workspace` aligned with tool reads.
+- Keep `omvra://workspace` aligned with tool reads.
 
 Write:
 

@@ -1,4 +1,5 @@
 import { normalizeMcpServerAddress } from '../../constants/mcp.ts';
+import { APP_VERSION } from '../../version.ts';
 import type {
   McpClientConfig,
   McpInitializeResult,
@@ -9,7 +10,7 @@ import type {
 
 const DEFAULT_TIMEOUT_MS = 4000;
 const MCP_PROTOCOL_VERSION = '2024-11-05';
-const MCP_CLIENT_NAME = 'Plumy';
+const MCP_CLIENT_NAME = 'Omvra';
 
 interface JsonRpcSuccess<T> {
   jsonrpc?: '2.0';
@@ -189,7 +190,7 @@ export class McpClient {
       protocolVersion: MCP_PROTOCOL_VERSION,
       clientInfo: {
         name: MCP_CLIENT_NAME,
-        version: '0.0.1',
+        version: APP_VERSION,
       },
       capabilities: {},
     }).catch(error => {

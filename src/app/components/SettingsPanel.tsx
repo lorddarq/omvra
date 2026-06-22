@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Activity, Bot, Download, Terminal, Upload, Users } from 'lucide-react';
+import { Activity, Bot, Download, HelpCircle, Info, Terminal, Upload, Users } from 'lucide-react';
 import { Person, StorageMeter, StatusColumn, TaskStatus } from '../types';
 import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
@@ -59,6 +59,21 @@ const SETTINGS_PANEL_NAV_GROUPS = [
       },
     ],
   },
+  {
+    label: 'Help',
+    items: [
+      {
+        id: 'about',
+        label: 'About',
+        icon: Info,
+      },
+      {
+        id: 'help',
+        label: 'Help',
+        icon: HelpCircle,
+      },
+    ],
+  },
 ];
 
 interface SettingsPanelProps {
@@ -72,8 +87,8 @@ export function SettingsPanel({ isOpen, onClose, initialAnchor = 'task-load', ch
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent
-        className="plumy-settings-sheet !bottom-2 !left-auto !right-2 !top-2 !h-auto !w-[min(800px,calc(100vw-16px))] !translate-x-0 !translate-y-0 gap-0 overflow-hidden rounded-[24px] border-0 bg-white p-2 shadow-[0_2px_8px_rgba(0,0,0,0.10),0_-6px_12px_rgba(0,0,0,0.10),0_14px_28px_rgba(0,0,0,0.10)] sm:max-w-none"
-        overlayClassName="plumy-settings-overlay"
+        className="omvra-settings-sheet !bottom-2 !left-auto !right-2 !top-2 !h-auto !w-[min(800px,calc(100vw-16px))] !translate-x-0 !translate-y-0 gap-0 overflow-hidden rounded-[24px] border-0 bg-white p-2 shadow-[0_2px_8px_rgba(0,0,0,0.10),0_-6px_12px_rgba(0,0,0,0.10),0_14px_28px_rgba(0,0,0,0.10)] sm:max-w-none"
+        overlayClassName="omvra-settings-overlay"
         showClose={false}
       >
         <SheetTitle className="sr-only">Preferences</SheetTitle>
@@ -107,7 +122,11 @@ export function McpSettingsSection({ children }: McpSettingsSectionProps) {
 
 export function McpTestingSettingsSection({ children }: McpSettingsSectionProps) {
   return (
-    <AnchoredPanelSection id="mcp-testing" title="MCP Testing">
+    <AnchoredPanelSection
+      id="mcp-testing"
+      title="MCP Testing"
+      description="Check MCP activity and debug issues"
+    >
       {children}
     </AnchoredPanelSection>
   );
@@ -115,7 +134,11 @@ export function McpTestingSettingsSection({ children }: McpSettingsSectionProps)
 
 export function McpActivitySettingsSection({ children }: McpSettingsSectionProps) {
   return (
-    <AnchoredPanelSection id="mcp-activity" title="MCP Activity">
+    <AnchoredPanelSection
+      id="mcp-activity"
+      title="MCP Activity Log"
+      description="MCP Activity log used for debugging agent behavior"
+    >
       {children}
     </AnchoredPanelSection>
   );

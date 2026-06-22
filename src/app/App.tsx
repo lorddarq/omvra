@@ -75,17 +75,17 @@ import {
 } from './utils/workspaceSanitizers';
 
 // LocalStorage keys
-const TASKS_KEY = 'plumy.tasks.v1';
-const SWIMLANES_KEY = 'plumy.swimlanes.v1';
-const PEOPLE_KEY = 'plumy.people.v1';
-const MILESTONES_KEY = 'plumy.milestones.v1';
-const STATUS_COLUMNS_KEY = 'plumy.statusColumns.v1';
-const PREFERENCES_KEY = 'plumy.preferences.v1';
-const TIMELINE_VIEW_STATE_KEY = 'plumy_viewstate_timeline';
-const KANBAN_VIEW_STATE_KEY = 'plumy_viewstate_kanban';
-const MONTH_WIDTHS_KEY = 'plumy.monthWidths.v1';
-const LEFT_COL_WIDTH_KEY = 'plumy.leftColWidth.v1';
-const MCP_AGENT_WATCH_CONFIGS_KEY = 'plumy.mcp.agentWatchConfigs.v1';
+const TASKS_KEY = 'omvra.tasks.v1';
+const SWIMLANES_KEY = 'omvra.swimlanes.v1';
+const PEOPLE_KEY = 'omvra.people.v1';
+const MILESTONES_KEY = 'omvra.milestones.v1';
+const STATUS_COLUMNS_KEY = 'omvra.statusColumns.v1';
+const PREFERENCES_KEY = 'omvra.preferences.v1';
+const TIMELINE_VIEW_STATE_KEY = 'omvra_viewstate_timeline';
+const KANBAN_VIEW_STATE_KEY = 'omvra_viewstate_kanban';
+const MONTH_WIDTHS_KEY = 'omvra.monthWidths.v1';
+const LEFT_COL_WIDTH_KEY = 'omvra.leftColWidth.v1';
+const MCP_AGENT_WATCH_CONFIGS_KEY = 'omvra.mcp.agentWatchConfigs.v1';
 
 const ENABLE_SAMPLE_WORKSPACE = Boolean(import.meta.env.DEV);
 const DEFAULT_TASKS_SEED = ENABLE_SAMPLE_WORKSPACE ? initialTasks : [];
@@ -900,7 +900,7 @@ function App() {
         viewState: {
           timeline: currentTimelineViewState,
           kanban: currentKanbanViewState,
-          roadmap: safeReadLocalStorageJSON<Record<string, unknown>>('plumy_viewstate_roadmap', viewState.getViewState('roadmap')),
+          roadmap: safeReadLocalStorageJSON<Record<string, unknown>>('omvra_viewstate_roadmap', viewState.getViewState('roadmap')),
         },
         timeline: {
           leftColWidth: Number(safeReadRaw(LEFT_COL_WIDTH_KEY) || 200),
@@ -917,7 +917,7 @@ function App() {
     const link = document.createElement('a');
     const dateStamp = new Date().toISOString().slice(0, 10);
     link.href = url;
-    link.download = `plumy-backup-${dateStamp}.json`;
+    link.download = `omvra-backup-${dateStamp}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

@@ -8,14 +8,14 @@ test('formatTaskDetailsForClipboard includes core collaboration details', () => 
       taskId: 'task-123',
       title: 'Copy task details from modal',
       assigneeLabel: 'Codex',
-      projectLabels: ['Plumy'],
+      projectLabels: ['Omvra'],
       statusLabel: 'Open Tasks',
     }),
     [
       'Task: Copy task details from modal',
       'ID: task-123',
       'Allocated to: Codex',
-      'Project: Plumy',
+      'Project: Omvra',
       'Status: Open Tasks',
     ].join('\n')
   );
@@ -44,9 +44,9 @@ test('formatTaskDetailsForClipboard formats multiple projects readably', () => {
       taskId: 'task-789',
       title: 'Shared task',
       assigneeLabel: 'Sorin Jurcut',
-      projectLabels: ['Plumy', 'Plumy Web'],
+      projectLabels: ['Omvra', 'Omvra Web'],
       statusLabel: 'Ready for human review',
     }),
-    /Project: Plumy, Plumy Web/
+    /Project: Omvra, Omvra Web/
   );
 });

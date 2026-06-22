@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes for Plumy release candidates should be documented in this file.
+All notable changes for Omvra release candidates should be documented in this file.
 
 This entry reflects the current supported feature set in the repository and is intended as the baseline for the next stable release candidate.
 
@@ -88,13 +88,13 @@ Current supported write capabilities include:
 
 Current supported MCP resource and prompt surfaces include:
 
-- `plumy://workspace`
-- `plumy://agent/guide`
-- `plumy://schema/task-execution`
-- `plumy://tasks/{taskId}`
-- `plumy://agents/{personId}/assigned`
-- `plumy://projects/{projectId}/tasks`
-- `plumy://boards/{statusId}/tasks`
+- `omvra://workspace`
+- `omvra://agent/guide`
+- `omvra://schema/task-execution`
+- `omvra://tasks/{taskId}`
+- `omvra://agents/{personId}/assigned`
+- `omvra://projects/{projectId}/tasks`
+- `omvra://boards/{statusId}/tasks`
 - `agent.find_assigned_work`
 - `agent.execute_task`
 - `agent.complete_and_handoff`

@@ -86,9 +86,9 @@ export function useViewState(initialView: ViewType = 'timeline') {
 
     const hydrateStoredViewStates = async () => {
       const [timelineState, kanbanState, roadmapState] = await Promise.all([
-        getJSON<Record<string, any>>('plumy_viewstate_timeline', null),
-        getJSON<Record<string, any>>('plumy_viewstate_kanban', null),
-        getJSON<Record<string, any>>('plumy_viewstate_roadmap', null),
+        getJSON<Record<string, any>>('omvra_viewstate_timeline', null),
+        getJSON<Record<string, any>>('omvra_viewstate_kanban', null),
+        getJSON<Record<string, any>>('omvra_viewstate_roadmap', null),
       ]);
 
       if (cancelled) return;
@@ -162,7 +162,7 @@ export function useViewState(initialView: ViewType = 'timeline') {
         ...state,
       };
 
-      void persistJSONWithElectronMirror(`plumy_viewstate_${view}`, viewStatesRef.current[view]);
+      void persistJSONWithElectronMirror(`omvra_viewstate_${view}`, viewStatesRef.current[view]);
     },
     []
   );
@@ -176,7 +176,7 @@ export function useViewState(initialView: ViewType = 'timeline') {
   const restoreViewState = useCallback(
     (view: ViewType): Record<string, any> => {
       try {
-        const stored = localStorage.getItem(`plumy_viewstate_${view}`);
+        const stored = localStorage.getItem(`omvra_viewstate_${view}`);
         if (stored) {
           const parsed = JSON.parse(stored);
           viewStatesRef.current[view] = {
@@ -215,7 +215,7 @@ export function useViewState(initialView: ViewType = 'timeline') {
    * @param view - View to clear storage for
    */
   const clearStoredViewState = useCallback((view: ViewType) => {
-    void deleteStoredValue(`plumy_viewstate_${view}`);
+    void deleteStoredValue(`omvra_viewstate_${view}`);
   }, []);
 
   return {

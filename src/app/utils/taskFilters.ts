@@ -4,8 +4,8 @@ import {
   readInitialWorkspaceJSON,
 } from './storage.ts';
 
-export const KANBAN_TASK_FILTERS_STORAGE_KEY = 'plumy.filters.v1';
-export const UNASSIGNED_ASSIGNEE_FILTER_VALUE = '__plumy_unassigned__';
+export const KANBAN_TASK_FILTERS_STORAGE_KEY = 'omvra.filters.v1';
+export const UNASSIGNED_ASSIGNEE_FILTER_VALUE = '__omvra_unassigned__';
 
 export type TaskAssigneeFilterValue =
   | string

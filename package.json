@@ -60,15 +60,15 @@
   },
   "build": {
     "icon": "electron/assets/icon",
-    "appId": "com.plumy.app",
-    "productName": "Plumy",
+    "appId": "com.omvra.app",
+    "productName": "Omvra",
     "directories": {
       "output": "release"
     },
     "publish": {
       "provider": "github",
       "owner": "lorddarq",
-      "repo": "Plumy"
+      "repo": "Omvra"
     },
     "files": [
       "dist/**",

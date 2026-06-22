@@ -8,7 +8,7 @@ const PrivacyProof = () => {
     {
       title: 'No account required',
       description:
-        'You can download Plumy and start using it without sign-up flows, user profiles, or another shared admin surface to manage.',
+        'You can download Omvra and start using it without sign-up flows, user profiles, or another shared admin surface to manage.',
     },
     {
       title: 'No hidden telemetry',
@@ -37,7 +37,7 @@ const PrivacyProof = () => {
             Local by design
           </h2>
           <p className="mx-auto mb-14 max-w-3xl text-center text-lg font-normal leading-8 text-[#6B6B6B] md:mb-16 md:text-xl">
-            Plumy is designed for teams that want more control, fewer surprises, and a planning tool that does not treat their work like a source of telemetry.
+            Omvra is designed for teams that want more control, fewer surprises, and a planning tool that does not treat their work like a source of telemetry.
           </p>
 
           <div className="grid gap-6 md:grid-cols-12">

@@ -138,7 +138,7 @@ export function PeopleManagementSections({
       .filter(({ count }) => count > 0);
     const editInstructionsId = `person-agent-instructions-${person.id}`;
     const displayActions = (
-      <div className="flex items-center gap-2 text-xs font-semibold leading-5 text-[#1a60cb]">
+      <div className="flex items-center gap-2 text-[#1a60cb]">
         <EditPersonPopover
           open={isEditing}
           person={person}
@@ -164,7 +164,7 @@ export function PeopleManagementSections({
         <button
           type="button"
           onClick={() => onDeletePerson(person.id)}
-          className="rounded-sm hover:text-[#164ea4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
+          className="h-auto rounded-sm px-0 py-0 text-xs font-semibold leading-4 text-[#1a60cb] hover:text-[#164ea4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
         >
           Delete
         </button>
@@ -431,7 +431,7 @@ function EditPersonPopover({
         <button
           type="button"
           onClick={() => onOpenChange(!open)}
-          className="rounded-sm hover:text-[#164ea4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
+          className="h-auto rounded-sm px-0 py-0 text-xs font-semibold leading-4 text-[#1a60cb] hover:text-[#164ea4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
           aria-expanded={open}
         >
           Edit

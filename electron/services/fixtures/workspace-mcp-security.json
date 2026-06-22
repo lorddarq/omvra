@@ -1,9 +1,9 @@
 {
-  "plumy.tasks.v1": [],
-  "plumy.people.v1": [],
-  "plumy.swimlanes.v1": [],
-  "plumy.statusColumns.v1": [],
-  "plumy.preferences.v1": {
+  "omvra.tasks.v1": [],
+  "omvra.people.v1": [],
+  "omvra.swimlanes.v1": [],
+  "omvra.statusColumns.v1": [],
+  "omvra.preferences.v1": {
     "mcpAgentAccessEnabled": true,
     "mcpCapabilityProfile": "task_write",
     "mcpBindHost": "127.0.0.1",

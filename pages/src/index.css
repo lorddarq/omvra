@@ -3,21 +3,21 @@
 
 @theme inline {
   --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
-  --color-plumy-page: #ffffff;
-  --color-plumy-ink: #0a0a0a;
-  --color-plumy-body: #2c2c2c;
-  --color-plumy-muted: #6b6b6b;
-  --color-plumy-line: #e7e7e7;
-  --color-plumy-line-strong: rgba(0, 0, 0, 0.12);
-  --color-plumy-soft: #fafafa;
-  --color-plumy-soft-2: #f3f4f6;
-  --color-plumy-lilac: #6c4fe0;
-  --color-plumy-lilac-soft: rgba(108, 79, 224, 0.13);
-  --color-plumy-lilac-pill: rgba(108, 79, 224, 0.1);
-  --color-plumy-lilac-ink: #34217f;
-  --color-plumy-gold: #ffca15;
-  --color-plumy-gold-soft: rgba(255, 202, 21, 0.09);
-  --color-plumy-gold-ink: #785e16;
+  --color-omvra-page: #ffffff;
+  --color-omvra-ink: #0a0a0a;
+  --color-omvra-body: #2c2c2c;
+  --color-omvra-muted: #6b6b6b;
+  --color-omvra-line: #e7e7e7;
+  --color-omvra-line-strong: rgba(0, 0, 0, 0.12);
+  --color-omvra-soft: #fafafa;
+  --color-omvra-soft-2: #f3f4f6;
+  --color-omvra-lilac: #6c4fe0;
+  --color-omvra-lilac-soft: rgba(108, 79, 224, 0.13);
+  --color-omvra-lilac-pill: rgba(108, 79, 224, 0.1);
+  --color-omvra-lilac-ink: #34217f;
+  --color-omvra-gold: #ffca15;
+  --color-omvra-gold-soft: rgba(255, 202, 21, 0.09);
+  --color-omvra-gold-ink: #785e16;
 }
 
 @layer base {
@@ -30,7 +30,7 @@
   }
 
   body {
-    @apply m-0 bg-plumy-page font-sans text-plumy-ink antialiased;
+    @apply m-0 bg-omvra-page font-sans text-omvra-ink antialiased;
   }
 
   a {
@@ -49,7 +49,7 @@
 
 @layer components {
   .landing-shell {
-    @apply min-h-dvh bg-plumy-page text-plumy-ink;
+    @apply min-h-dvh bg-omvra-page text-omvra-ink;
   }
 
   .landing-container {

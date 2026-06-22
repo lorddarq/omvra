@@ -1,4 +1,4 @@
-# Plumy UI 2.0 Implementation PRD
+# Omvra UI 2.0 Implementation PRD
 
 Status: Draft  
 Date: 2026-06-19  
@@ -6,19 +6,19 @@ Owner: Product + Engineering
 
 ## 1. Summary
 
-Plumy UI 2.0 is a phased visual and layout architecture overhaul that introduces a reusable anchored panel pattern for long configuration and object-detail surfaces, then progressively applies the new design language across Settings, task details/editing, Kanban, Timeline, and related workflows.
+Omvra UI 2.0 is a phased visual and layout architecture overhaul that introduces a reusable anchored panel pattern for long configuration and object-detail surfaces, then progressively applies the new design language across Settings, task details/editing, Kanban, Timeline, and related workflows.
 
 The goal is to improve clarity, consistency, and maintainability without mixing large behavior changes with broad restyling. The first implementation slices should focus on component inventory, layout primitives, and safe componentization before applying final visual styling.
 
 ## 2. Design Reference
 
-- [Plumy UI 2.0 Figma](https://www.figma.com/design/xK22WyMtqAJLx21eZr3QqS/Plumy?node-id=26-175)
+- [Omvra UI 2.0 Figma](https://www.figma.com/design/xK22WyMtqAJLx21eZr3QqS/Omvra?node-id=26-175)
 
 The Figma reference is directional for layout, information architecture, spacing, interaction grammar, and visual mood. Implementation must still verify behavior against the current codebase and real workspace data.
 
 ## 3. Problem
 
-Current Plumy UI surfaces have grown organically:
+Current Omvra UI surfaces have grown organically:
 
 - Settings are concentrated in a large preferences component.
 - People management lives in a separate panel even though it is an occasional configuration task.

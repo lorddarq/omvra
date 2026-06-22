@@ -1,4 +1,4 @@
-# Plumy MCP Integration PRD
+# Omvra MCP Integration PRD
 
 Status: Draft  
 Date: 2026-03-17  
@@ -6,7 +6,7 @@ Owner: Product + Engineering
 
 ## 1. Summary
 
-Plumy needs an MCP integration so external coding agents can read project-management context from both Kanban and Timeline views, then act on tasks with clear guardrails.  
+Omvra needs an MCP integration so external coding agents can read project-management context from both Kanban and Timeline views, then act on tasks with clear guardrails.  
 This PRD defines a phased rollout that starts read-only and evolves to controlled write support.
 
 ## 2. Problem
@@ -28,7 +28,7 @@ This blocks agent-assisted workflows and future deployment models (self-hosted/w
 ## 4. Non-Goals
 
 - Full multi-tenant cloud backend in v1.
-- Autonomous code execution/orchestration engine inside Plumy in v1.
+- Autonomous code execution/orchestration engine inside Omvra in v1.
 - Broad arbitrary write access from MCP clients.
 
 ## 5. Users and Primary Use Cases
@@ -41,7 +41,7 @@ Use cases:
 - Agent lists assigned tasks and pulls enough context to start work.
 - Agent reads “Kanban card view” grouped by status.
 - Agent reads “Timeline card view” grouped by lane/date window.
-- Human reviews agent updates in Plumy after task transitions to under-review.
+- Human reviews agent updates in Omvra after task transitions to under-review.
 
 ## 6. Product Requirements
 
@@ -101,10 +101,10 @@ Why this model:
 
 ### 8.2 Core Resources
 
-- `plumy://workspace`
-- `plumy://tasks/{taskId}`
-- `plumy://cards/kanban`
-- `plumy://cards/timeline`
+- `omvra://workspace`
+- `omvra://tasks/{taskId}`
+- `omvra://cards/kanban`
+- `omvra://cards/timeline`
 
 ### 8.3 Canonical Data Rule
 

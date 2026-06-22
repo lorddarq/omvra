@@ -762,8 +762,8 @@ test('task normalization extracts project context from description notes', () =>
   const task = listTasks(store, { status: 'under-review' })[0];
   assert.ok(task.descriptionProjectContext);
   assert.deepEqual(task.descriptionProjectContext.projectMentions, ['Mission Control']);
-  assert.ok(task.descriptionProjectContext.repoHints.some(value => value.includes('github.com/acme/plumy')));
-  assert.ok(task.descriptionProjectContext.urls.some(value => value.includes('github.com/acme/plumy/issues/10')));
+  assert.ok(task.descriptionProjectContext.repoHints.some(value => value.includes('github.com/acme/omvra')));
+  assert.ok(task.descriptionProjectContext.urls.some(value => value.includes('github.com/acme/omvra/issues/10')));
 });
 
 test('creates Requires human review board and moves qualifying tasks', () => {

@@ -4,7 +4,7 @@ Date: 2026-03-06
 
 ## Summary
 
-Plumy is not yet structured for true plugin-style extensibility.
+Omvra is not yet structured for true plugin-style extensibility.
 
 It is still a desktop-first React application where domain state, persistence, migrations, and UI orchestration are tightly coupled in the renderer, mainly inside `src/app/App.tsx` and parts of `src/app/components/TimelineView.tsx`.
 
@@ -238,7 +238,7 @@ Right now there is:
 - an Electron shell
 - no dedicated server process
 
-To run Plumy in Docker properly, one of these needs to exist:
+To run Omvra in Docker properly, one of these needs to exist:
 
 1. A web-only frontend served by a small HTTP server, plus a backend storage service
 2. A frontend talking to a private backend such as Convex or Postgres over the network
@@ -247,7 +247,7 @@ Electron itself is not the right abstraction for Docker-hosted private deploymen
 
 ## Umbrel Feasibility
 
-Umbrel is feasible only after Plumy has a browser-hosted mode.
+Umbrel is feasible only after Omvra has a browser-hosted mode.
 
 Umbrel apps run in Docker containers and are exposed as web apps.
 

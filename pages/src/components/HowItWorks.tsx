@@ -53,7 +53,7 @@ const HowItWorks = () => {
               A simple flow from planning to delivery
             </h2>
             <p className="text-lg leading-8 text-[#4a5565] md:text-xl">
-              Plumy is designed to be easy to understand on day one. You plan visually, execute in the same
+              Omvra is designed to be easy to understand on day one. You plan visually, execute in the same
               workspace, and keep handoffs clean without adding another cloud service to manage.
             </p>
           </div>

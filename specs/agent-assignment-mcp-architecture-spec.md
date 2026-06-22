@@ -6,7 +6,7 @@ Scope: Task model, project/repo routing, agent workflow, MCP surface, and backen
 
 ## 1. Purpose
 
-This spec defines how Plumy should evolve from a local desktop planning tool into a system that can:
+This spec defines how Omvra should evolve from a local desktop planning tool into a system that can:
 
 - track human-reported issues cleanly
 - assign tasks to agents in a structured way
@@ -25,7 +25,7 @@ The design should avoid tightly coupling the product to any single backend such 
 
 ## 2. Problem Statement
 
-Plumy currently manages tasks primarily as UI state with local persistence. That is sufficient for a local-first desktop planner, but it does not support a robust workflow where:
+Omvra currently manages tasks primarily as UI state with local persistence. That is sufficient for a local-first desktop planner, but it does not support a robust workflow where:
 
 - a human reports a bug
 - an agent is assigned to it
@@ -328,9 +328,9 @@ If the agent cannot proceed:
 
 ### 8.1 Design principle
 
-Plumy should expose an MCP server so external agents such as Codex or Claude can consume task/project context while still doing actual code work in the correct repository.
+Omvra should expose an MCP server so external agents such as Codex or Claude can consume task/project context while still doing actual code work in the correct repository.
 
-Plumy should not depend on those agents being embedded inside the app.
+Omvra should not depend on those agents being embedded inside the app.
 
 ### 8.2 MCP responsibilities
 
@@ -576,7 +576,7 @@ The recommended path is:
 4. move to repository and host abstractions
 5. expose MCP over that stable service layer
 
-This gives Plumy a clean path toward:
+This gives Omvra a clean path toward:
 
 - agent-driven bug execution
 - private local workflows

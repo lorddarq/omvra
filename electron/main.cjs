@@ -11,7 +11,7 @@ const {
 
 // Consider the app to be in dev mode when it's not packaged. This avoids trying to load a dev server in packaged builds.
 const isDev = !app.isPackaged;
-const storeName = isDev ? 'plumy-store-dev' : 'plumy-store';
+const storeName = isDev ? 'omvra-store-dev' : 'omvra-store';
 const store = new Store({ name: storeName });
 const STORE_DID_CHANGE_CHANNEL = 'store/did-change';
 let mcpHttpServer = null;
@@ -36,8 +36,8 @@ function setMcpRuntimeState(nextState) {
 
 function shouldStartMcpServer() {
   // Explicit runtime overrides for troubleshooting enterprise endpoint controls.
-  if (process.env.PLUMY_DISABLE_MCP_SERVER === '1') return false;
-  if (process.env.PLUMY_ENABLE_MCP_SERVER === '1') return true;
+  if (process.env.OMVRA_DISABLE_MCP_SERVER === '1') return false;
+  if (process.env.OMVRA_ENABLE_MCP_SERVER === '1') return true;
   return isMcpAgentAccessEnabled(store);
 }
 
@@ -257,9 +257,9 @@ function createWindow() {
     loadProd();
   }
 
-  // Optionally open devtools in packaged app for debugging when PLUMY_DEBUG_RENDERER=1
+  // Optionally open devtools in packaged app for debugging when OMVRA_DEBUG_RENDERER=1
   try {
-    if (!isDev && process.env.PLUMY_DEBUG_RENDERER === '1') {
+    if (!isDev && process.env.OMVRA_DEBUG_RENDERER === '1') {
       win.webContents.openDevTools({ mode: 'detach' });
     }
   } catch (e) {}
@@ -304,7 +304,7 @@ ipcMain.handle('mcp/restart-server', () => {
     if (!mcpHttpServer) {
       return {
         success: false,
-        error: 'MCP server is disabled. Enable mcpAgentAccessEnabled or set PLUMY_ENABLE_MCP_SERVER=1.',
+        error: 'MCP server is disabled. Enable mcpAgentAccessEnabled or set OMVRA_ENABLE_MCP_SERVER=1.',
       };
     }
     return {

@@ -1,19 +1,19 @@
 {
-  "plumy.preferences.v1": {
+  "omvra.preferences.v1": {
     "mcpAgentAccessEnabled": true,
     "mcpCapabilityProfile": "task_write"
   },
-  "plumy.swimlanes.v1": [
+  "omvra.swimlanes.v1": [
     { "id": "lane-1", "name": "Project A", "color": "#3b82f6" },
     { "id": "lane-2", "name": "Project B", "color": "#10b981" }
   ],
-  "plumy.statusColumns.v1": [
+  "omvra.statusColumns.v1": [
     { "id": "open", "title": "Open", "color": "#06b6d4" },
     { "id": "in-progress", "title": "In Progress", "color": "#3b82f6" },
     { "id": "under-review", "title": "In Review", "color": "#ec4899" },
     { "id": "done", "title": "Done", "color": "#a855f7" }
   ],
-  "plumy.people.v1": [
+  "omvra.people.v1": [
     { "id": "person-1", "name": "Alex", "kind": "human", "role": "Designer", "color": "#ec4899" },
     {
       "id": "agent-1",
@@ -24,7 +24,7 @@
       "agentInstructions": "Use the durable Codex persona instructions when working assigned tasks."
     }
   ],
-  "plumy.tasks.v1": [
+  "omvra.tasks.v1": [
     {
       "id": "task-1",
       "title": "Build timeline",
@@ -52,7 +52,7 @@
     {
       "id": "task-3",
       "title": "Write docs",
-      "notes": "Project: Mission Control\nRepo: github.com/acme/plumy\nSee https://github.com/acme/plumy/issues/10",
+      "notes": "Project: Mission Control\nRepo: github.com/acme/omvra\nSee https://github.com/acme/omvra/issues/10",
       "status": "under-review",
       "assigneeId": "agent-1",
       "swimlaneId": "lane-1",

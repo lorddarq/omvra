@@ -8,17 +8,17 @@ const Download = () => {
           <div className="grid gap-10 text-center md:grid-cols-[minmax(0,1.1fr)_auto] md:items-end md:gap-12 md:text-left">
             <div className="max-w-3xl">
               <h2 className="mb-6 text-4xl font-normal tracking-[-0.03em] text-black md:text-5xl">
-                Download Plumy
+                Download Omvra
               </h2>
               <p className="text-lg font-normal leading-8 text-[#6B6B6B] md:text-xl">
-                Get a calmer way to plan and ship work. Plumy is free to download, open source,
+                Get a calmer way to plan and ship work. Omvra is free to download, open source,
                 local-first, and ready to use without creating an account.
               </p>
             </div>
 
             <div className="flex flex-col items-center gap-5 md:items-end">
               <a
-                href="https://github.com/lorddarq/Plumy/releases/latest"
+                href="https://github.com/lorddarq/Omvra/releases/latest"
                 className="inline-flex items-center gap-3 rounded-xl border border-black/10 bg-[#FFCA15] px-8 py-4 text-lg font-medium text-black shadow-[0_4px_12px_rgba(136,105,0,0.3),0_2px_4px_rgba(121,94,0,0.2)] transition-[transform,background-color,box-shadow] duration-150 ease-out hover:-translate-y-0.5 hover:bg-[#FFD84A] hover:shadow-[0_10px_24px_rgba(136,105,0,0.28)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B0C81A] focus-visible:ring-offset-2"
               >
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -33,7 +33,7 @@ const Download = () => {
               </a>
 
               <a
-                href="https://github.com/lorddarq/Plumy"
+                href="https://github.com/lorddarq/Omvra"
                 className="text-base font-normal text-[#6C4FE0] underline decoration-[#D5CEF1] underline-offset-4 transition-colors hover:text-[#34217F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D5CEF1] focus-visible:ring-offset-2"
               >
                 View source, releases, and project updates on GitHub

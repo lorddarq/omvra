@@ -1,5 +1,5 @@
 {
-  "plumy.tasks.v1": [
+  "omvra.tasks.v1": [
     {
       "id": "task-canonical-1",
       "title": "Canonical store task",
@@ -17,7 +17,7 @@
       "priority": "normal"
     }
   ],
-  "plumy.people.v1": [
+  "omvra.people.v1": [
     {
       "id": "person-canonical",
       "name": "Alpha Bot",
@@ -26,14 +26,14 @@
       "color": "#3b82f6"
     }
   ],
-  "plumy.swimlanes.v1": [
+  "omvra.swimlanes.v1": [
     {
       "id": "lane-canonical",
       "name": "Canonical Project",
       "color": "#3b82f6"
     }
   ],
-  "plumy.statusColumns.v1": [
+  "omvra.statusColumns.v1": [
     {
       "id": "open",
       "title": "Open",
@@ -55,7 +55,7 @@
       "color": "#a855f7"
     }
   ],
-  "plumy.preferences.v1": {
+  "omvra.preferences.v1": {
     "executionLoadStatusId": "in-progress",
     "pipelineLoadStatusId": "open",
     "mcpAgentAccessEnabled": true,

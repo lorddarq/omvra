@@ -367,14 +367,15 @@ function HealthResultCard({
     : connectionStatusLabel.replace(/^Connection status:\s*/i, '');
   const authLabel = result?.authMode ?? tokenExpiryLabel.replace(/^Auth mode:\s*/i, '');
   const resultLines = buildHealthResultLines(result, listenerStatusLabel, connectionStatusLabel, tokenExpiryLabel, restartPending);
+  const defaultTone = result ? (result.ok ? 'ok' : 'issue') : 'neutral';
 
   return (
     <div className="space-y-4">
       <div className="rounded-xl bg-[#fafafa] px-3 py-3">
-        <HealthMetric label="Status:" value={statusLabel} tone={result?.ok ? 'ok' : 'issue'} />
-        <HealthMetric label="Latency:" value={latencyLabel} tone={result?.ok ? 'ok' : 'issue'} />
-        <HealthMetric label="Connection" value={connectionLabel} tone={result?.ok ? 'ok' : 'issue'} />
-        <HealthMetric label="Authentication:" value={authLabel} tone={result?.authMode === 'token' ? 'ok' : 'issue'} />
+        <HealthMetric label="Status:" value={statusLabel} tone={defaultTone} />
+        <HealthMetric label="Latency:" value={latencyLabel} tone={defaultTone} />
+        <HealthMetric label="Connection:" value={connectionLabel} tone={defaultTone} />
+        <HealthMetric label="Authentication:" value={authLabel} tone={result?.authMode === 'token' ? 'ok' : defaultTone} />
       </div>
 
       <div className="space-y-1 text-sm leading-5 text-[#7f8796]">
@@ -386,12 +387,14 @@ function HealthResultCard({
   );
 }
 
-function HealthMetric({ label, value, tone }: { label: string; value: string; tone: 'ok' | 'issue' }) {
+function HealthMetric({ label, value, tone }: { label: string; value: string; tone: 'ok' | 'issue' | 'neutral' }) {
+  const dotClass = tone === 'ok' ? 'bg-[#15c349]' : tone === 'issue' ? 'bg-[#e00000]' : 'bg-[#d4d4d8]';
+
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_90px] items-center gap-3 py-1">
+    <div className="grid grid-cols-[128px_minmax(0,1fr)] items-center gap-3 py-1">
       <span className="text-sm leading-5 text-[#7f8796]">{label}</span>
-      <span className="inline-flex h-7 items-center justify-center gap-2 rounded-full border border-[#e5e7eb] bg-white px-3 text-xs font-semibold text-[#71717a] tabular-nums">
-        <span className={`size-2 rounded-full ${tone === 'ok' ? 'bg-[#20c760]' : 'bg-[#e00000]'}`} />
+      <span className="inline-flex min-w-0 items-center gap-2 text-sm font-medium leading-5 text-[#71717a] tabular-nums">
+        <span className={`size-1.5 shrink-0 rounded-full ${dotClass}`} />
         {value}
       </span>
     </div>

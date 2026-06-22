@@ -10,7 +10,7 @@ Build renderer and package electron:
 
 Notes:
 - In dev, Electron will load http://localhost:5173. Make sure `npm run dev` is running before starting Electron.
-- Attachments are referenced by absolute local paths by default. The task model stores metadata only; Plumy does not copy attached files unless the optional embed IPC is used by future UI.
+- Attachments are referenced by absolute local paths by default. The task model stores metadata only; Omvra does not copy attached files unless the optional embed IPC is used by future UI.
 - Exposed preload APIs are available under `window.electron` (storeGet/storeSet, attachments.*, openExternal).
 - `attachments.pick` opens the native file picker with multi-selection.
 - `attachments.verify` checks whether a referenced file still exists and returns file metadata such as size and mtime.

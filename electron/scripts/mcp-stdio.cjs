@@ -3,7 +3,7 @@
 const Store = require('electron-store');
 const { createRequestDispatcher } = require('../services/mcp-http-server.cjs');
 
-const storeName = process.env.PLUMY_STORE_NAME || (process.env.NODE_ENV === 'development' ? 'plumy-store-dev' : 'plumy-store');
+const storeName = process.env.OMVRA_STORE_NAME || (process.env.NODE_ENV === 'development' ? 'omvra-store-dev' : 'omvra-store');
 const store = new Store({ name: storeName });
 const dispatch = createRequestDispatcher(store);
 

@@ -1,7 +1,7 @@
 # UI 2.0 Component Inventory and Implementation Map
 
 Source PRD: `UI-2.0-IMPLEMENTATION-PRD.md`
-Design reference: [Plumy UI 2.0 Figma](https://www.figma.com/design/xK22WyMtqAJLx21eZr3QqS/Plumy?node-id=26-175)
+Design reference: [Omvra UI 2.0 Figma](https://www.figma.com/design/xK22WyMtqAJLx21eZr3QqS/Omvra?node-id=26-175)
 Task: `task-e2c057ab-d2f7-4cb9-bcaa-e98603d64c19`
 
 ## Purpose

@@ -1,33 +1,33 @@
 const promptExamples = [
   {
     title: 'Let Codex pick up assigned work',
-    why: 'Best when you already assigned tasks to an agentic person in Plumy and want the assistant to start with the right context.',
+    why: 'Best when you already assigned tasks to an agentic person in Omvra and want the assistant to start with the right context.',
     prompt:
-      'Connect to Plumy MCP over stdio if available, inspect the guide and assigned-work resources for Codex, then summarize which tasks are actionable right now and start with the highest-priority one.',
+      'Connect to Omvra MCP over stdio if available, inspect the guide and assigned-work resources for Codex, then summarize which tasks are actionable right now and start with the highest-priority one.',
   },
   {
     title: 'Work a single task without guessing',
     why: 'Best when you want the agent to inspect one task carefully before making any write calls.',
     prompt:
-      'Using Plumy MCP, read the task execution guide and inspect task <TASK_ID>. Review the description, comments, project context, and current revision first. Then explain the execution plan before making any updates.',
+      'Using Omvra MCP, read the task execution guide and inspect task <TASK_ID>. Review the description, comments, project context, and current revision first. Then explain the execution plan before making any updates.',
   },
   {
     title: 'Hand off completed work cleanly',
     why: 'Best when you want the agent to leave a concise summary and move the card into human review in one safe flow.',
     prompt:
-      'Use Plumy MCP to complete task <TASK_ID>. Keep the completion note brief, call the high-level review handoff workflow, and move it to Ready for human review when done.',
+      'Use Omvra MCP to complete task <TASK_ID>. Keep the completion note brief, call the high-level review handoff workflow, and move it to Ready for human review when done.',
   },
   {
     title: 'Watch a board for incoming work',
     why: 'Best for ongoing execution lanes where an assistant should only react to new or changed cards.',
     prompt:
-      'Watch the In Progress board through Plumy MCP for newly assigned tasks for Codex. Use board polling so duplicates are suppressed, report only new actionable work, and tell me which card should be handled next.',
+      'Watch the In Progress board through Omvra MCP for newly assigned tasks for Codex. Use board polling so duplicates are suppressed, report only new actionable work, and tell me which card should be handled next.',
   },
   {
     title: 'Connect work context across MCP servers',
-    why: 'Best when the task lives in Plumy but the background lives in tools your team already uses.',
+    why: 'Best when the task lives in Omvra but the background lives in tools your team already uses.',
     prompt:
-      'Use Plumy MCP as the planning source of truth, then consult connected MCP servers for Glean, Atlassian Rovo, Microsoft 365, and Figma as needed. Bring back only the relevant links, design context, decisions, and handoff notes to the Plumy task.',
+      'Use Omvra MCP as the planning source of truth, then consult connected MCP servers for Glean, Atlassian Rovo, Microsoft 365, and Figma as needed. Bring back only the relevant links, design context, decisions, and handoff notes to the Omvra task.',
   },
 ]
 
@@ -50,7 +50,7 @@ const AgentPrompts = () => {
             Human-to-agent workflows, when you want them
           </h2>
           <p className="mx-auto mb-14 max-w-4xl text-center text-lg font-normal leading-8 text-[#6B6B6B] md:mb-16 md:text-xl">
-            Plumy gives MCP-capable assistants a structured planning surface, while other MCP servers can provide the company knowledge, tickets, documents, and designs around the work. Codex, Claude, and similar clients can help without turning the board into an unreviewed automation stream.
+            Omvra gives MCP-capable assistants a structured planning surface, while other MCP servers can provide the company knowledge, tickets, documents, and designs around the work. Codex, Claude, and similar clients can help without turning the board into an unreviewed automation stream.
           </p>
 
           <div className="grid gap-10 lg:grid-cols-[minmax(18rem,0.92fr)_minmax(0,1.08fr)] lg:items-start">
@@ -121,8 +121,8 @@ const AgentPrompts = () => {
                       <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-[#838383]">Sample prompt</p>
                       <p className="font-mono text-[0.93rem] leading-5 text-[#2C2C2C]">
                         {index === 0
-                          ? 'Connect to Plumy MCP over stdio if available, inspect the guide and assigned-work resources for Codex, summarize what is actionable now, then start with the highest-priority task.'
-                          : 'Use Plumy as the task source of truth, consult Glean, Rovo, Microsoft 365, and Figma MCP where relevant, then bring concise links and decisions back to the task.'}
+                          ? 'Connect to Omvra MCP over stdio if available, inspect the guide and assigned-work resources for Codex, summarize what is actionable now, then start with the highest-priority task.'
+                          : 'Use Omvra as the task source of truth, consult Glean, Rovo, Microsoft 365, and Figma MCP where relevant, then bring concise links and decisions back to the task.'}
                       </p>
                     </div>
                   </div>

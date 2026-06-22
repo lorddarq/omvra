@@ -12,7 +12,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { UNASSIGNED_ASSIGNEE_FILTER_VALUE, type KanbanTaskFilterKey } from '../utils/taskFilters';
 
-const ALL_FILTER_VALUE = '__plumy_all__';
+const ALL_FILTER_VALUE = '__omvra_all__';
 
 const PRIORITY_FILTERS: { value: TaskPriority; label: string }[] = [
   { value: 'urgent', label: 'Urgent' },

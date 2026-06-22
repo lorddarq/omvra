@@ -12,27 +12,27 @@ const reasons = [
   {
     title: 'Stay in control of your data',
     description:
-      'Plumy is local-first and open source, with no account required, no hidden telemetry, and full-workspace backups when you want extra peace of mind.',
+      'Omvra is local-first and open source, with no account required, no hidden telemetry, and full-workspace backups when you want extra peace of mind.',
   },
 ]
 
-const WhyPlumy = () => {
+const WhyOmvra = () => {
   return (
-    <section id="why-plumy" className="bg-white py-24 md:py-28">
+    <section id="why-omvra" className="bg-white py-24 md:py-28">
       <div className="container mx-auto px-6">
         <div className="mx-auto max-w-6xl">
           <div className="mx-auto mb-14 max-w-3xl text-center md:mb-20">
             <div className="mb-5 inline-flex items-center justify-center rounded-full border border-[#6c4fe0]/25 bg-[#6c4fe0]/6 px-4 py-1.5 text-sm font-medium text-[#6c4fe0]">
-              Why Plumy?
+              Why Omvra?
             </div>
             <h2
               className="mb-6 text-4xl font-medium leading-[1.08] tracking-[-0.03em] text-[#101828] md:text-5xl"
               style={{ fontFamily: 'Figtree, sans-serif' }}
             >
-              Why teams switch to Plumy
+              Why teams switch to Omvra
             </h2>
             <p className="text-lg leading-8 text-[#4a5565] md:text-xl">
-              Plumy is for teams that want clear planning, fast execution, and less overhead. It gives you the
+              Omvra is for teams that want clear planning, fast execution, and less overhead. It gives you the
               visibility of a timeline, the momentum of Kanban, and the control of a local-first desktop app.
             </p>
           </div>
@@ -62,4 +62,4 @@ const WhyPlumy = () => {
   )
 }
 
-export default WhyPlumy
+export default WhyOmvra

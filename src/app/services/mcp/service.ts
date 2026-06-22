@@ -25,6 +25,14 @@ const CORE_RESOURCE_URIS = [
   'omvra://cards/timeline',
 ] as const;
 
+const TOOL_NAME_ALIASES: Record<string, string> = {
+  workspace_get_snapshot: 'workspace.get_snapshot',
+  tasks_list: 'tasks.list',
+  tasks_get: 'tasks.get',
+  cards_kanban_list: 'cards.kanban.list',
+  cards_timeline_list: 'cards.timeline.list',
+};
+
 export interface McpReadService {
   diagnostics: () => Promise<McpDiagnosticsResult>;
   validateHealth: (expectation?: McpSnapshotExpectation) => Promise<McpHealthCheckResult>;
@@ -61,6 +69,10 @@ function normalizeWorkspaceSnapshot(payload: unknown): McpWorkspaceSnapshot | nu
       statusColumns: Array.isArray(directWorkspace.statusColumns) ? directWorkspace.statusColumns : [],
     },
   };
+}
+
+function normalizeToolName(name: string): string {
+  return TOOL_NAME_ALIASES[name] || name;
 }
 
 function parseResourceJson<T>(contents: McpResourceResponse[]): T | null {
@@ -263,6 +275,7 @@ export function createMcpReadService(config: McpClientConfig): McpReadService {
       const startedAt = performance.now();
       const errors: string[] = [];
       let toolsAvailable: string[] = [];
+      let canonicalToolsAvailable: string[] = [];
       let missingTools: string[] = [];
       let resourceReadSupported = false;
       let resourcesAvailable: string[] = [];
@@ -289,10 +302,11 @@ export function createMcpReadService(config: McpClientConfig): McpReadService {
         await client.initialize();
         const tools = await client.listTools();
         toolsAvailable = tools.map(tool => tool.name).filter(Boolean);
+        canonicalToolsAvailable = Array.from(new Set(toolsAvailable.map(normalizeToolName)));
       } catch (error) {
         errors.push(`initialize/tools/list failed: ${error instanceof Error ? error.message : String(error)}`);
       }
-      missingTools = CORE_READ_TOOLS.filter(name => !toolsAvailable.includes(name));
+      missingTools = CORE_READ_TOOLS.filter(name => !canonicalToolsAvailable.includes(name));
 
       for (const uri of CORE_RESOURCE_URIS) {
         try {
@@ -358,11 +372,11 @@ export function createMcpReadService(config: McpClientConfig): McpReadService {
         }
       }
       const logicalCallSamples = [1];
-      if (toolsAvailable.includes('tasks.list')) logicalCallSamples.push(1);
-      if (toolsAvailable.includes('tasks.list') && toolsAvailable.includes('tasks.get') && firstTaskId) {
+      if (canonicalToolsAvailable.includes('tasks.list')) logicalCallSamples.push(1);
+      if (canonicalToolsAvailable.includes('tasks.list') && canonicalToolsAvailable.includes('tasks.get') && firstTaskId) {
         logicalCallSamples.push(2);
       }
-      if (toolsAvailable.includes('cards.kanban.list') && toolsAvailable.includes('tasks.get') && firstTaskId) {
+      if (canonicalToolsAvailable.includes('cards.kanban.list') && canonicalToolsAvailable.includes('tasks.get') && firstTaskId) {
         logicalCallSamples.push(2);
       }
       const medianLogicalCalls = median(logicalCallSamples);

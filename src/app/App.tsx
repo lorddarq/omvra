@@ -565,6 +565,7 @@ function App() {
   const {
     saveTask: handleSaveTask,
     addTaskComment: handleAddTaskComment,
+    updateTaskAttachments: handleUpdateTaskAttachments,
     deleteTask: handleDeleteTask,
     moveTask: handleMoveTask,
     moveAgentTaskToReview: handleMoveAgentTaskToReview,
@@ -1133,6 +1134,7 @@ function App() {
         onEditTaskFromDetails={handleEditTaskFromDetails}
         onMoveAgentTaskToReview={handleMoveAgentTaskToReview}
         onAddTaskComment={handleAddTaskComment}
+        onUpdateTaskAttachments={handleUpdateTaskAttachments}
         onCloseMilestoneDialog={handleCloseMilestoneDialog}
         onSaveMilestone={handleSaveMilestone}
         onDeleteMilestone={handleDeleteMilestone}

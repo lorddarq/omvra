@@ -63,6 +63,7 @@ interface AppPanelsProps {
   onEditTaskFromDetails: (task: Task) => void;
   onMoveAgentTaskToReview: (taskId: string) => void;
   onAddTaskComment: (taskId: string, content: string) => void;
+  onUpdateTaskAttachments: (taskId: string, attachments: Task['attachments']) => void;
   onCloseMilestoneDialog: () => void;
   onSaveMilestone: (milestone: ProjectMilestone) => void;
   onDeleteMilestone: (milestoneId: string) => void;
@@ -149,6 +150,7 @@ export function AppPanels({
   onEditTaskFromDetails,
   onMoveAgentTaskToReview,
   onAddTaskComment,
+  onUpdateTaskAttachments,
   onCloseMilestoneDialog,
   onSaveMilestone,
   onDeleteMilestone,
@@ -232,6 +234,7 @@ export function AppPanels({
             onEdit={onEditTaskFromDetails}
             onMoveAgentTaskToReview={onMoveAgentTaskToReview}
             onAddComment={onAddTaskComment}
+            onUpdateAttachments={onUpdateTaskAttachments}
             task={detailsTask}
             swimlanes={timelineSwimlanes}
             people={people}

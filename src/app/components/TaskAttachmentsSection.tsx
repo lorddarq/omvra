@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, FolderSearch, Paperclip } from 'lucide-react';
+import { AlertTriangle, Folder, Paperclip } from 'lucide-react';
 import type { TaskAttachment } from '../types';
-import { Button } from '@/app/components/ui/button';
 
 interface TaskAttachmentsSectionProps {
   attachments?: TaskAttachment[];
@@ -41,17 +40,7 @@ export function TaskAttachmentsSection({
   }, [attachments]);
 
   return (
-    <div className="min-w-0 space-y-3 rounded-xl border border-[#71717a]/10 bg-white p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm font-semibold leading-5 text-[#71717a]">
-          <Paperclip className="size-4" />
-          Attachments
-        </div>
-        <div className="rounded-full border border-black/10 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-[#71717a]">
-          {attachments.length}
-        </div>
-      </div>
-
+    <div className="min-w-0">
       {attachments.length > 0 ? (
         <div className="max-h-72 space-y-1 overflow-y-auto pr-1">
           {attachments.map(attachment => {
@@ -60,41 +49,40 @@ export function TaskAttachmentsSection({
             return (
               <div
                 key={attachment.id}
-                className={`flex min-w-0 items-center justify-between gap-3 rounded-lg border px-3 py-3 ${
-                  isMissing ? 'border-red-100 bg-red-50' : 'border-gray-100 bg-gray-50'
+                className={`flex min-h-10 min-w-0 items-center justify-between gap-3 rounded-xl border px-3 py-2 ${
+                  isMissing ? 'border-red-100 bg-red-50' : 'border-black/[0.06] bg-white'
                 }`}
               >
-                <div className="min-w-0">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <div className="truncate text-xs font-medium text-[#6a7282]">{attachment.name}</div>
+                <div className="flex min-w-0 items-center gap-2">
+                  <Paperclip className="size-4 shrink-0 text-[#71717a]" />
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold leading-5 text-[#71717a]">{attachment.name}</div>
+                    {sizeLabel && !isMissing && (
+                      <div className="truncate text-[11px] leading-4 text-[#8a8a92]">{sizeLabel}</div>
+                    )}
                     {isMissing && (
-                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                      <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-full bg-red-100 px-1.5 py-0.5 text-[11px] font-medium leading-none text-red-700">
                         <AlertTriangle className="size-3" />
                         Missing
                       </span>
                     )}
                   </div>
-                  <div className={`truncate text-[11px] ${isMissing ? 'text-red-600' : 'text-[#8a8a92]'}`}>
-                    {attachment.path}
-                    {!isMissing && sizeLabel ? ` - ${sizeLabel}` : ''}
-                  </div>
                 </div>
-                <Button
+                <button
                   type="button"
-                  variant="outline"
-                  className="h-7 shrink-0 gap-1.5 rounded-full px-2 text-xs"
+                  className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full px-2 text-sm font-semibold leading-5 text-[#1a60cb] hover:bg-[#1a60cb]/10 hover:text-[#004ec5] disabled:cursor-not-allowed disabled:text-[#a5a5ac] disabled:hover:bg-transparent"
                   onClick={() => onRevealAttachment(attachment.path)}
                   disabled={!canReveal || isMissing}
                 >
-                  <FolderSearch className="size-4" />
+                  <Folder className="size-4" />
                   Show
-                </Button>
+                </button>
               </div>
             );
           })}
         </div>
       ) : (
-        <div className="rounded-xl border border-dashed border-[#71717a]/10 bg-[#71717a]/5 px-4 py-3 text-sm text-[#71717a]">
+        <div className="rounded-xl border border-dashed border-[#71717a]/10 bg-[#71717a]/5 px-3 py-2 text-sm text-[#71717a]">
           No files attached.
         </div>
       )}

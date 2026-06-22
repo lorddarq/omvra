@@ -278,6 +278,7 @@ interface AnchoredPanelSectionProps extends ComponentPropsWithoutRef<'section'> 
   id: string;
   title: string;
   description?: string;
+  headerAction?: ReactNode;
   children: ReactNode;
 }
 
@@ -285,6 +286,7 @@ export function AnchoredPanelSection({
   id,
   title,
   description,
+  headerAction,
   children,
   className,
   ...props
@@ -299,11 +301,14 @@ export function AnchoredPanelSection({
       className={cn('scroll-mt-8 space-y-4', className)}
       {...props}
     >
-      <div className="space-y-1">
-        <h3 id={titleId} className="text-sm font-semibold leading-5 text-[#71717a]">
-          {title}
-        </h3>
-        {description && <p className="text-xs leading-5 text-[#8a8a92]">{description}</p>}
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 space-y-1">
+          <h3 id={titleId} className="text-sm font-semibold leading-5 text-[#71717a]">
+            {title}
+          </h3>
+          {description && <p className="text-xs leading-5 text-[#8a8a92]">{description}</p>}
+        </div>
+        {headerAction && <div className="shrink-0">{headerAction}</div>}
       </div>
       {children}
     </section>

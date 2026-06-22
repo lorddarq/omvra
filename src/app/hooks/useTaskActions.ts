@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { Person, Task, TaskComment, TaskStatus } from '../types.ts';
+import type { Person, Task, TaskAttachment, TaskComment, TaskStatus } from '../types.ts';
 
 interface UseTaskActionsOptions {
   people: Person[];
@@ -66,6 +66,12 @@ export function useTaskActions({
     )));
   }, [setTasks]);
 
+  const updateTaskAttachments = useCallback((taskId: string, attachments: TaskAttachment[]) => {
+    setTasks(prevTasks => prevTasks.map(task => (
+      task.id === taskId ? { ...task, attachments } : task
+    )));
+  }, [setTasks]);
+
   const deleteTask = useCallback((taskId: string) => {
     setTasks(prevTasks =>
       prevTasks
@@ -101,6 +107,7 @@ export function useTaskActions({
   return {
     saveTask,
     addTaskComment,
+    updateTaskAttachments,
     deleteTask,
     moveTask,
     moveAgentTaskToReview,

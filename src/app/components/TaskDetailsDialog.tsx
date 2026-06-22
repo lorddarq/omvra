@@ -1,4 +1,4 @@
-import { Task, TimelineSwimlane, Person, TaskStatus, StatusColumn, ProjectMilestone } from '../types';
+import { Task, TimelineSwimlane, Person, TaskStatus, StatusColumn, ProjectMilestone, TaskAttachment } from '../types';
 import { useMemo, useState } from 'react';
 import { Activity, FileText, FolderKanban, GitBranch, Info, MessageSquare, Paperclip } from 'lucide-react';
 import {
@@ -27,6 +27,7 @@ interface TaskDetailsDialogProps {
   onEdit?: (task: Task) => void;
   onMoveAgentTaskToReview?: (taskId: string) => void;
   onAddComment?: (taskId: string, content: string) => void;
+  onUpdateAttachments?: (taskId: string, attachments: TaskAttachment[]) => void;
   task?: Task | null;
   swimlanes: TimelineSwimlane[];
   people: Person[];
@@ -49,6 +50,7 @@ export function TaskDetailsDialog({
   onEdit,
   onMoveAgentTaskToReview,
   onAddComment,
+  onUpdateAttachments,
   task,
   swimlanes,
   people,
@@ -176,6 +178,38 @@ export function TaskDetailsDialog({
     await window.electron?.attachments?.reveal?.(filePath);
   };
 
+  const handleAddAttachments = async () => {
+    if (!task || !onUpdateAttachments) return;
+
+    const pickedPaths = await window.electron?.attachments?.pick?.();
+    if (!Array.isArray(pickedPaths) || pickedPaths.length === 0) return;
+
+    const existingAttachments = task.attachments || [];
+    const existingPaths = new Set(existingAttachments.map(attachment => attachment.path));
+    const nextAttachments = await Promise.all(
+      pickedPaths
+        .filter(filePath => typeof filePath === 'string' && filePath.trim() && !existingPaths.has(filePath))
+        .map(async (filePath): Promise<TaskAttachment> => {
+          const verified = await window.electron?.attachments?.verify?.(filePath).catch(() => null);
+          const normalized = filePath.replace(/\\/g, '/');
+          const name = normalized.split('/').filter(Boolean).pop() || filePath;
+          const prefixed = normalized.match(/^[A-Za-z]:\//) ? `/${normalized}` : normalized;
+          return {
+            id: `attachment-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+            name,
+            path: filePath,
+            uri: `file://${encodeURI(prefixed)}`,
+            size: verified?.exists && Number.isFinite(Number(verified.size)) ? Number(verified.size) : undefined,
+            addedAt: new Date().toISOString(),
+          };
+        })
+    );
+
+    if (nextAttachments.length > 0) {
+      onUpdateAttachments(task.id, [...existingAttachments, ...nextAttachments]);
+    }
+  };
+
   const handleEditTask = () => {
     if (!task || !onEdit) return;
     onEdit(task);
@@ -281,6 +315,16 @@ export function TaskDetailsDialog({
           <AnchoredPanelSection
             id="task-attachments"
             title="Attachments"
+            headerAction={(
+              <button
+                type="button"
+                onClick={handleAddAttachments}
+                disabled={!task || !onUpdateAttachments || !window.electron?.attachments?.pick}
+                className="text-sm font-semibold leading-5 text-[#1a60cb] hover:text-[#004ec5] disabled:cursor-not-allowed disabled:text-[#a5a5ac]"
+              >
+                Add
+              </button>
+            )}
           >
             <TaskAttachmentsSection
               attachments={task?.attachments}

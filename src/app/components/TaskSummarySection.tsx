@@ -1,5 +1,8 @@
-import { GitBranch } from 'lucide-react';
+import { Ban, GitBranch, Sparkles, User } from 'lucide-react';
+import { ReactNode } from 'react';
+import { TaskPriority, Person } from '../types';
 import { PERSON_CAPACITY_POINTS } from '../utils/taskLoad';
+import { TASK_PRIORITY_ICONS } from './taskPriorityIcons';
 
 interface TaskSummarySectionProps {
   statusLabel: string;
@@ -9,7 +12,10 @@ interface TaskSummarySectionProps {
   taskSizeLabel: string;
   complexityLabel: string;
   priorityLabel: string;
+  priority: TaskPriority;
   blockedLabel: string;
+  blocked: boolean;
+  assigneeKind?: Person['kind'];
   milestoneLabel: string;
 }
 
@@ -26,18 +32,32 @@ export function TaskSummarySection({
   taskSizeLabel,
   complexityLabel,
   priorityLabel,
+  priority,
   blockedLabel,
+  blocked,
+  assigneeKind,
   milestoneLabel,
 }: TaskSummarySectionProps) {
+  const priorityIcon = TASK_PRIORITY_ICONS[priority];
+  const AssigneeIcon = assigneeKind === 'agentic' ? Sparkles : User;
+
   return (
     <div className="min-w-0 space-y-4">
       <div className="grid min-w-0 grid-cols-1 gap-x-8 gap-y-3 rounded-xl bg-[#71717a]/5 p-3 sm:grid-cols-2">
         <SummaryRow label="Status" value={statusLabel} />
-        <SummaryRow label="Assignee" value={assigneeLabel} />
+        <SummaryRow label="Assignee" value={assigneeLabel} icon={<AssigneeIcon className="size-3.5 text-[#71717a]" />} />
         <SummaryRow label="Task Size" value={taskSizeLabel} />
         <SummaryRow label="Complexity" value={complexityLabel} capitalize />
-        <SummaryRow label="Priority" value={priorityLabel} />
-        <SummaryRow label="Blocked" value={blockedLabel.toUpperCase()} />
+        <SummaryRow
+          label="Priority"
+          value={priorityLabel}
+          icon={<img src={priorityIcon.src} alt="" aria-hidden="true" className="size-3.5" />}
+        />
+        <SummaryRow
+          label="Blocked"
+          value={blockedLabel.toUpperCase()}
+          icon={blocked ? <Ban className="size-3.5 text-[#71717a]" /> : <Ban className="size-3.5 text-[#71717a]/70" />}
+        />
       </div>
 
       <div className="grid min-w-0 grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-3">
@@ -54,15 +74,12 @@ export function TaskLoadDetailsSection({
   taskLoadContribution,
 }: TaskLoadDetailsSectionProps) {
   return (
-    <div className="grid min-w-0 grid-cols-1 gap-x-8 gap-y-3 rounded-xl bg-[#71717a]/5 p-3 sm:grid-cols-2">
-      <SummaryField label="Load Points" value={`${taskLoadPoints.toFixed(1)} / ${PERSON_CAPACITY_POINTS}`} />
-      {taskLoadContribution !== null && (
-        <SummaryField
-          label="Person Load Contribution"
-          value={`${taskLoadContribution}%`}
-          className="sm:col-span-2"
-        />
-      )}
+    <div className="grid min-w-0 grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
+      <LoadMetricRow label="Load Points" value={`${taskLoadPoints.toFixed(1)} / ${PERSON_CAPACITY_POINTS}`} />
+      <LoadMetricRow
+        label="Load Contribution"
+        value={taskLoadContribution !== null ? `${taskLoadContribution}%` : 'N/A'}
+      />
     </div>
   );
 }
@@ -185,11 +202,16 @@ function SummaryField({ label, value, compact = false, capitalize = false, class
   );
 }
 
-function SummaryRow({ label, value, capitalize = false }: Pick<SummaryFieldProps, 'label' | 'value' | 'capitalize'>) {
+function SummaryRow({
+  label,
+  value,
+  capitalize = false,
+  icon,
+}: Pick<SummaryFieldProps, 'label' | 'value' | 'capitalize'> & { icon?: ReactNode }) {
   return (
     <div className="flex min-w-0 items-center justify-between gap-3">
       <div className="shrink-0 text-xs font-medium leading-5 text-[#71717a]">{label}</div>
-      <SummaryPill value={value} capitalize={capitalize} />
+      <SummaryPill value={value} capitalize={capitalize} icon={icon} />
     </div>
   );
 }
@@ -203,15 +225,28 @@ function SummaryStack({ label, value }: Pick<SummaryFieldProps, 'label' | 'value
   );
 }
 
+function LoadMetricRow({ label, value }: Pick<SummaryFieldProps, 'label' | 'value'>) {
+  return (
+    <div className="flex min-w-0 items-center justify-between gap-3">
+      <div className="shrink-0 text-xs font-medium leading-5 text-[#71717a]">{label}</div>
+      <div className="inline-flex min-h-5 shrink-0 items-center rounded-full border border-[#ffb6b6] bg-[#ffd9d9] px-2 py-0.5 text-[11px] font-bold leading-none text-[#b80000]">
+        {value}
+      </div>
+    </div>
+  );
+}
+
 function SummaryPill({
   value,
   capitalize = false,
   className = '',
-}: Pick<SummaryFieldProps, 'value' | 'capitalize' | 'className'>) {
+  icon,
+}: Pick<SummaryFieldProps, 'value' | 'capitalize' | 'className'> & { icon?: ReactNode }) {
   return (
     <div
-      className={`inline-flex min-h-5 max-w-full items-center rounded-full border border-black/10 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-[#71717a] ${capitalize ? 'capitalize' : ''} ${className}`}
+      className={`inline-flex min-h-5 max-w-full items-center gap-1 rounded-full border border-black/10 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-[#71717a] ${capitalize ? 'capitalize' : ''} ${className}`}
     >
+      {icon}
       <span className="min-w-0 truncate">{value}</span>
     </div>
   );

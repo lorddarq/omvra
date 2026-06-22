@@ -231,7 +231,10 @@ export function TaskDetailsDialog({
                 taskSizeLabel={(task.size || 'm').toUpperCase()}
                 complexityLabel={task.complexity || 'medium'}
                 priorityLabel={priorityLabel}
+                priority={task.priority || 'normal'}
                 blockedLabel={task.blocked ? 'Yes' : 'No'}
+                blocked={Boolean(task.blocked)}
+                assigneeKind={assignee?.kind}
                 milestoneLabel={milestoneLabel}
               />
             )}

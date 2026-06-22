@@ -84,6 +84,17 @@ function normalizeTaskAttachments(value: unknown): TaskAttachment[] {
     .filter((attachment): attachment is TaskAttachment => Boolean(attachment));
 }
 
+const SAMPLE_TITLE_EXPANSIONS: Record<string, string> = {
+  'Look at the Mon...': 'Look at the Moon Through a Telescope',
+  'Do Moon Research...': 'Do Moon Research',
+  'Watch YouTube V...': 'Watch YouTube Video On Rocket Building',
+  'Design The Spac...': 'Design The Spacesuits',
+};
+
+function normalizeTaskTitle(title: string): string {
+  return SAMPLE_TITLE_EXPANSIONS[title] || title;
+}
+
 export function normalizeTask(task: Task, swimlanes: TimelineSwimlane[]): Task {
   const projectIds = task.projectIds?.length
     ? task.projectIds
@@ -95,6 +106,7 @@ export function normalizeTask(task: Task, swimlanes: TimelineSwimlane[]): Task {
 
   return {
     ...task,
+    title: normalizeTaskTitle(task.title),
     projectIds,
     project: projectName || task.project,
     size: task.size || 'm',

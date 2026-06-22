@@ -120,7 +120,7 @@ export function AnchoredPanel({
           onBack={onBack}
         />
         <div className="plumy-settings-content relative h-full min-h-0 overflow-hidden rounded-[14px] bg-white shadow-[0_0_1px_rgba(0,0,0,0.20)]">
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex h-20 items-start gap-4 bg-gradient-to-b from-white via-white to-white/0 px-8 pt-4">
+          <div className="pointer-events-none absolute -left-px -right-px -top-px z-10 flex h-[82px] items-start gap-4 bg-gradient-to-b from-white via-white to-white/0 px-8 pt-[17px]">
             <div className="min-w-0 flex-1 truncate text-sm font-semibold leading-[22px] text-[#71717a]">
               {title}
             </div>
@@ -146,7 +146,7 @@ export function AnchoredPanel({
             {children}
           </AnchoredPanelScrollView>
           {footer && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex h-20 items-end bg-gradient-to-t from-white via-white to-white/0 px-8 pb-4">
+            <div className="pointer-events-none absolute -bottom-px -left-px -right-px z-10 flex h-[82px] items-end bg-gradient-to-t from-white via-white to-white/0 px-8 pb-[17px]">
               <div className="pointer-events-auto w-full">
                 {footer}
               </div>

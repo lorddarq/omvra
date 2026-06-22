@@ -945,7 +945,7 @@
   background-color: #1a60cb;
   pointer-events: none;
   transform: translateX(-50%);
-  z-index: 9;
+  z-index: 2;
 }
 
 /* Swimlane Row */
@@ -1788,24 +1788,53 @@
 }
 
 .kanban-task-edit-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
   flex-shrink: 0;
   border: 0;
-  border-radius: 0.375rem;
-  padding: 0;
+  border-radius: 999px;
+  background: transparent;
+  padding: 0.3125rem;
   color: #1a60cb;
-  font-size: 0.75rem;
-  font-weight: 400;
-  line-height: 1rem;
-  transition-property: background-color, color, border-color;
+  opacity: 0;
+  transform: translateY(-1px);
+  transition-property: background-color, color, opacity, transform;
   transition-duration: 140ms;
   transition-timing-function: ease;
 }
 
+.kanban-task-edit-button svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  flex: 0 0 0.875rem;
+}
+
 @media (hover: hover) and (pointer: fine) {
+  .kanban-task-card-ui:hover .kanban-task-edit-button,
+  .kanban-task-card-ui:focus-within .kanban-task-edit-button {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
   .kanban-task-edit-button:hover {
-    background-color: rgba(26, 96, 203, 0.08);
+    background-color: rgba(26, 96, 203, 0.2);
     color: #004ec5;
   }
+}
+
+.kanban-task-edit-button:active {
+  background-color: rgba(26, 96, 203, 0.3);
+  transform: translateY(0) scale(0.96);
+}
+
+.kanban-task-edit-button:focus-visible {
+  opacity: 1;
+  transform: translateY(0);
+  outline: 2px solid rgba(26, 96, 203, 0.28);
+  outline-offset: 2px;
 }
 
 .kanban-task-description-ui {

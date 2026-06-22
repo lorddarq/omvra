@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Search } from 'lucide-react';
 import type { Task } from '../types';
+import { taskEditCheckboxClassName, taskEditIconFieldClassName, taskEditLabelClassName } from './taskFormStyles';
 
 interface TaskDependenciesSectionProps {
   milestoneSelected: boolean;
@@ -38,9 +39,9 @@ export function TaskDependenciesSection({
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_335px]">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(220px,356px)_minmax(180px,200px)]">
         <div className="space-y-1">
-          <div className="text-xs font-medium leading-5 text-[#71717a]">Search task:</div>
+          <div className={taskEditLabelClassName}>Search task:</div>
           <div className="relative">
             <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-[#71717a]" />
             <input
@@ -49,7 +50,7 @@ export function TaskDependenciesSection({
               onChange={event => setSearchQuery(event.target.value)}
               placeholder="Task name"
               disabled={!milestoneSelected || dependencyCandidates.length === 0}
-              className="h-8 w-full rounded-xl border border-black/10 bg-white/10 pl-8 pr-2 text-sm text-[#1f2937] outline-none placeholder:text-[#b5b5ba] focus:border-[#71717a]/30 disabled:cursor-not-allowed disabled:opacity-60"
+              className={`${taskEditIconFieldClassName} w-full outline-none disabled:cursor-not-allowed disabled:opacity-60`}
             />
           </div>
         </div>
@@ -85,7 +86,7 @@ export function TaskDependenciesSection({
                   disabled={createsCycle}
                   onChange={() => onToggleDependency(candidate.id)}
                   aria-label={`${taskTitle || 'Task'} depends on ${candidate.title}`}
-                  className="h-4 w-4 rounded border-[#71717a]/20"
+                  className={taskEditCheckboxClassName}
                 />
                 <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
                   <span className="min-w-0 truncate text-xs font-medium leading-5 text-[#4a4a4f]">

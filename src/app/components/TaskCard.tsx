@@ -1,17 +1,7 @@
 import React, { memo } from 'react';
 import { TaskPriority } from '../types';
 import { extractTaskCardContent } from '../utils/taskNotes';
-import urgentIcon from '../images/icons/icon-urgent.svg';
-import highIcon from '../images/icons/icon-high.svg';
-import normalIcon from '../images/icons/icon-normal.svg';
-import lowIcon from '../images/icons/icon-low.svg';
-
-const PRIORITY_ICONS: Record<TaskPriority, { label: string; src: string }> = {
-  urgent: { label: 'Urgent priority', src: urgentIcon },
-  moderate: { label: 'High priority', src: highIcon },
-  normal: { label: 'Normal priority', src: normalIcon },
-  low: { label: 'Low priority', src: lowIcon },
-};
+import { TASK_PRIORITY_ICONS } from './taskPriorityIcons';
 
 const VISIBLE_PROJECT_COUNT = 2;
 
@@ -29,7 +19,7 @@ function TaskCardComponent({ title, notes, color, project, priority = 'normal', 
   const projectLabels = project
     ? project.split(',').map(label => label.trim()).filter(Boolean)
     : [];
-  const priorityIcon = PRIORITY_ICONS[priority];
+  const priorityIcon = TASK_PRIORITY_ICONS[priority];
   const { bodyPreview, checklistItems } = extractTaskCardContent(notes);
   const checklistPreview = checklistItems.slice(0, 3);
   const remainingChecklistCount = Math.max(0, checklistItems.length - checklistPreview.length);
@@ -62,7 +52,19 @@ function TaskCardComponent({ title, notes, color, project, priority = 'normal', 
               className="kanban-task-edit-button"
               aria-label="Edit task"
             >
-              Edit
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.862 4.487Zm0 0L19.5 7.125"
+                />
+              </svg>
             </button>
           )}
         </div>

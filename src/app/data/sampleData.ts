@@ -19,7 +19,7 @@ export const initialTasks: Task[] = [
   },
   {
     id: '2',
-    title: 'Look at the Mon...',
+    title: 'Look at the Moon Through a Telescope',
     status: 'in-progress',
     notes: 'Research moon observation techniques',
     startDate: '2026-02-24',
@@ -29,7 +29,7 @@ export const initialTasks: Task[] = [
   },
   {
     id: '3',
-    title: 'Do Moon Research...',
+    title: 'Do Moon Research',
     status: 'done',
     notes: 'Complete comprehensive moon research',
     startDate: '2026-02-25',
@@ -39,7 +39,7 @@ export const initialTasks: Task[] = [
   },
   {
     id: '4',
-    title: 'Watch YouTube V...',
+    title: 'Watch YouTube Video On Rocket Building',
     status: 'under-review',
     notes: 'Review educational videos about rocket building',
     startDate: '2026-03-01',
@@ -59,7 +59,7 @@ export const initialTasks: Task[] = [
   },
   {
     id: '6',
-    title: 'Design The Spac...',
+    title: 'Design The Spacesuits',
     status: 'under-review',
     notes: 'Design spacesuits for the crew',
     startDate: '2026-03-05',

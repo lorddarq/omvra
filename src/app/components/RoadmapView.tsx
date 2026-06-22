@@ -37,6 +37,7 @@ interface RoadmapRow {
   projects: TimelineSwimlane[];
   summary: ReturnType<typeof summarizeMilestone>;
   top: number;
+  height: number;
 }
 
 const DAY_WIDTH = 52;
@@ -44,7 +45,7 @@ const LEFT_WIDTH = 280;
 const HEADER_HEIGHT = 82;
 const MILESTONE_ROW_HEIGHT = 52;
 const TASK_ROW_HEIGHT = 48;
-const MILESTONE_ROW_GAP = 14;
+const MILESTONE_ROW_GAP = 0;
 const CHART_PADDING_BOTTOM = 24;
 
 const STATUS_SEGMENT_CLASSES: Record<TaskStatus, string> = {
@@ -240,6 +241,7 @@ export function RoadmapView({
   onTaskClick,
 }: RoadmapViewProps) {
   const chartScrollRef = useRef<HTMLDivElement>(null);
+  const chartViewportRef = useRef<HTMLDivElement>(null);
   const isHeaderScrubbingRef = useRef(false);
   const scrubStartXRef = useRef(0);
   const scrubStartScrollLeftRef = useRef(0);
@@ -250,6 +252,8 @@ export function RoadmapView({
   const [dateWindow, setDateWindow] = useState<RoadmapDateWindow>('all');
   const [isHeaderScrubbing, setIsHeaderScrubbing] = useState(false);
   const [chartScrollLeft, setChartScrollLeft] = useState(0);
+  const [chartScrollTop, setChartScrollTop] = useState(0);
+  const [chartViewportHeight, setChartViewportHeight] = useState(0);
   const enrichedMilestoneById = readModel?.milestonesById;
 
   const filteredMilestones = useMemo(() => {
@@ -308,26 +312,48 @@ export function RoadmapView({
     });
     return groups;
   }, [allDates]);
-  const rows = useMemo<RoadmapRow[]>(() => {
-    let top = HEADER_HEIGHT;
+  const rowSummaries = useMemo(() => {
     return filteredMilestones.map(milestone => {
       const enrichedMilestone = enrichedMilestoneById?.get(milestone.id);
       const summary = enrichedMilestone?.summary ?? summarizeMilestone(milestone, tasks);
-      const row = {
+      return {
         milestone,
         projects: enrichedMilestone?.projects
           ?? projects.filter(project => getMilestoneProjectIds(milestone).includes(project.id)),
         summary,
-        top,
       };
-      top += getRoadmapRowHeight(summary.linkedTasks.length);
-      return row;
     });
   }, [enrichedMilestoneById, filteredMilestones, projects, tasks]);
+  const rows = useMemo<RoadmapRow[]>(() => {
+    const availableRowsHeight = Math.max(0, chartViewportHeight - HEADER_HEIGHT);
+    const baseHeights = rowSummaries.map(row => getRoadmapRowHeight(row.summary.linkedTasks.length));
+    const totalBaseHeight = baseHeights.reduce((total, height) => total + height, 0);
+    const extraHeightPerRow = rowSummaries.length > 0 && totalBaseHeight < availableRowsHeight
+      ? (availableRowsHeight - totalBaseHeight) / rowSummaries.length
+      : 0;
+    let top = HEADER_HEIGHT;
+
+    return rowSummaries.map((row, index) => {
+      const height = baseHeights[index] + extraHeightPerRow;
+      const positionedRow = {
+        ...row,
+        top,
+        height,
+      };
+      top += height;
+      return positionedRow;
+    });
+  }, [chartViewportHeight, rowSummaries]);
   const timelineWidth = allDates.length * DAY_WIDTH;
+  const chartContentHeight = rows.length === 0
+    ? 360
+    : rows[rows.length - 1].top + rows[rows.length - 1].height;
   const chartHeight = rows.length === 0
     ? 360
-    : rows[rows.length - 1].top + getRoadmapRowHeight(rows[rows.length - 1].summary.linkedTasks.length) + CHART_PADDING_BOTTOM;
+    : Math.max(
+        chartViewportHeight,
+        chartContentHeight + (chartContentHeight > chartViewportHeight ? CHART_PADDING_BOTTOM : 0)
+      );
   const todayIndex = daysBetween(range.start, startOfDay(new Date()));
   const todayLeft = todayIndex >= 0 && todayIndex < allDates.length ? todayIndex * DAY_WIDTH + DAY_WIDTH / 2 : null;
 
@@ -361,6 +387,23 @@ export function RoadmapView({
     };
   }, []);
 
+  useLayoutEffect(() => {
+    const viewportNode = chartViewportRef.current;
+    if (!viewportNode) return;
+
+    const updateViewportHeight = () => {
+      setChartViewportHeight(viewportNode.clientHeight);
+    };
+    updateViewportHeight();
+
+    const observer = new ResizeObserver(updateViewportHeight);
+    observer.observe(viewportNode);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
   const handleHeaderScrubStart = (event: React.MouseEvent<HTMLElement>) => {
     if (event.button !== 0 || !chartScrollRef.current) return;
     const target = event.target as HTMLElement;
@@ -376,8 +419,12 @@ export function RoadmapView({
 
   const handleChartScroll = () => {
     const nextScrollLeft = chartScrollRef.current?.scrollLeft || 0;
+    const nextScrollTop = chartScrollRef.current?.scrollTop || 0;
     setChartScrollLeft(currentScrollLeft => (
       currentScrollLeft === nextScrollLeft ? currentScrollLeft : nextScrollLeft
+    ));
+    setChartScrollTop(currentScrollTop => (
+      currentScrollTop === nextScrollTop ? currentScrollTop : nextScrollTop
     ));
   };
 
@@ -388,7 +435,7 @@ export function RoadmapView({
 
     const viewportWidth = chartScrollRef.current.clientWidth;
     const dayCenter = dayIndex * DAY_WIDTH + DAY_WIDTH / 2;
-    const targetLeft = dayCenter - (viewportWidth + LEFT_WIDTH) / 2;
+    const targetLeft = dayCenter - viewportWidth / 2;
     chartScrollRef.current.scrollTo({
       left: Math.max(0, targetLeft),
       behavior,
@@ -538,7 +585,7 @@ export function RoadmapView({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-hidden p-4">
+      <div className="min-h-0 flex-1 overflow-hidden">
 
         {milestones.length === 0 ? (
           <section className="rounded-2xl border border-dashed border-gray-300 bg-white p-8 text-center">
@@ -561,7 +608,7 @@ export function RoadmapView({
             </Button>
           </section>
         ) : (
-          <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <section className="flex h-full min-h-0 flex-col overflow-hidden border-t border-gray-200 bg-white">
             <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
               <div className="text-sm text-gray-600">
                 Showing {filteredMilestones.length} of {milestones.length} milestone{milestones.length === 1 ? '' : 's'}
@@ -579,7 +626,7 @@ export function RoadmapView({
               </div>
             </div>
 
-            <div className="relative min-h-0 flex-1 overflow-hidden">
+            <div ref={chartViewportRef} className="relative min-h-0 flex-1 overflow-hidden">
               <div
                 className={`absolute inset-x-0 top-0 z-50 h-[82px] select-none border-b border-gray-200 bg-white ${
                   isHeaderScrubbing ? 'cursor-grabbing' : 'cursor-grab'
@@ -593,8 +640,9 @@ export function RoadmapView({
                   <div className="px-4 py-4 text-sm font-semibold text-gray-900">Milestones</div>
                 </div>
                 <div
-                  className="absolute left-0 top-0"
+                  className="absolute top-0"
                   style={{
+                    left: LEFT_WIDTH,
                     width: timelineWidth,
                     height: HEADER_HEIGHT,
                     transform: `translate3d(${-chartScrollLeft}px, 0, 0)`,
@@ -629,7 +677,50 @@ export function RoadmapView({
                 </div>
               </div>
 
-              <div ref={chartScrollRef} className="absolute inset-0 overflow-auto" onScroll={handleChartScroll}>
+              <div className="absolute bottom-0 left-0 top-[82px] z-40 overflow-hidden border-r border-gray-200 bg-white" style={{ width: LEFT_WIDTH }}>
+                <div
+                  className="relative"
+                  style={{
+                    height: Math.max(0, chartHeight - HEADER_HEIGHT),
+                    transform: `translate3d(0, ${-chartScrollTop}px, 0)`,
+                  }}
+                >
+                  {rows.map(row => (
+                    <button
+                      key={row.milestone.id}
+                      type="button"
+                      onClick={() => onMilestoneClick(row.milestone)}
+                      className="absolute left-0 flex w-full flex-col gap-2 border-t border-gray-200 bg-white px-4 py-4 text-left hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20"
+                      style={{ top: row.top - HEADER_HEIGHT, height: row.height }}
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span
+                          className="size-3 shrink-0 rounded-full"
+                          style={{ backgroundColor: row.milestone.color || row.projects[0]?.color || '#6b7280' }}
+                          aria-hidden="true"
+                        />
+                        <span className="min-w-0 truncate text-sm font-semibold text-gray-950">{row.milestone.title}</span>
+                      </div>
+                      <div className="flex min-w-0 flex-wrap gap-1.5">
+                        <Badge variant="outline" className="max-w-full truncate text-gray-600">
+                          {row.projects.length > 0
+                            ? row.projects.map(project => project.name).join(', ')
+                            : 'Unknown project'}
+                        </Badge>
+                        <Badge className={HEALTH_CLASSES[row.summary.health]} variant="outline">
+                          {HEALTH_LABELS[row.summary.health]}
+                        </Badge>
+                      </div>
+                      <MilestoneRollupBar counts={row.summary.counts} totalTasks={row.summary.totalTasks} />
+                      <div className="text-xs text-gray-500">
+                        {row.summary.completedTasks} of {row.summary.totalTasks} tasks done
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div ref={chartScrollRef} className="absolute bottom-0 right-0 top-0 overflow-auto" style={{ left: LEFT_WIDTH }} onScroll={handleChartScroll}>
                 <div
                   className="relative"
                   style={{
@@ -703,52 +794,12 @@ export function RoadmapView({
                   const milestoneLeft = daysBetween(range.start, parseISODateLocal(row.milestone.endDate) || range.start) * DAY_WIDTH + DAY_WIDTH / 2;
                   const lateTaskIds = new Set(row.summary.lateTasks.map(task => task.id));
                   const sortedTasks = sortRoadmapTasks(row.summary.linkedTasks);
-                  const rowHeight = getRoadmapRowHeight(sortedTasks.length);
 
                   return (
                     <div key={row.milestone.id}>
                       <div
-                        className="absolute left-0 z-40"
-                        style={{ top: row.top, width: LEFT_WIDTH, height: rowHeight }}
-                      >
-                        <div
-                          className="sticky left-0 h-full border-r border-t border-gray-200 bg-white"
-                          style={{ width: LEFT_WIDTH }}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => onMilestoneClick(row.milestone)}
-                            className="flex h-full w-full flex-col gap-2 px-4 py-3 text-left hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20"
-                          >
-                            <div className="flex items-center gap-2">
-                              <span
-                                className="size-3 rounded-full"
-                                style={{ backgroundColor: row.milestone.color || row.projects[0]?.color || '#6b7280' }}
-                                aria-hidden="true"
-                              />
-                              <span className="truncate text-sm font-semibold text-gray-950">{row.milestone.title}</span>
-                            </div>
-                            <div className="flex flex-wrap gap-1.5">
-                              <Badge variant="outline" className="max-w-full truncate text-gray-600">
-                                {row.projects.length > 0
-                                  ? row.projects.map(project => project.name).join(', ')
-                                  : 'Unknown project'}
-                              </Badge>
-                              <Badge className={HEALTH_CLASSES[row.summary.health]} variant="outline">
-                                {HEALTH_LABELS[row.summary.health]}
-                              </Badge>
-                            </div>
-                            <MilestoneRollupBar counts={row.summary.counts} totalTasks={row.summary.totalTasks} />
-                            <div className="text-xs text-gray-500">
-                              {row.summary.completedTasks} of {row.summary.totalTasks} tasks done
-                            </div>
-                          </button>
-                        </div>
-                      </div>
-
-                      <div
                         className="absolute border-t border-gray-200"
-                        style={{ left: 0, top: row.top, width: timelineWidth, height: rowHeight }}
+                        style={{ left: 0, top: row.top, width: timelineWidth, height: row.height }}
                       >
                         <button
                           type="button"

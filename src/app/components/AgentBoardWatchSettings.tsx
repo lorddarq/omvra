@@ -4,6 +4,7 @@ import type { AgentWatchConfig, AgentWatchAction } from '../utils/workspaceSanit
 import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Switch } from './ui/switch';
 
 interface AgentBoardWatchSettingsProps {
   agent: Person;
@@ -148,28 +149,17 @@ export function AgentBoardWatchSettings({
       <div className="space-y-1">
         <div className="flex items-center justify-between gap-3">
           <div className="text-sm font-semibold leading-5 text-[#71717a]">Watching</div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={watchConfig.enabled}
+          <Switch
+            checked={watchConfig.enabled}
             aria-label={`Toggle watcher for ${agent.name}`}
-            onClick={() =>
+            onCheckedChange={(enabled) =>
               onSave({
                 ...watchConfig,
                 personId: agent.id,
-                enabled: !watchConfig.enabled,
+                enabled,
               })
             }
-            className={`relative inline-flex h-4 w-8 shrink-0 items-center rounded-2xl p-0.5 transition-colors ${
-              watchConfig.enabled ? 'bg-[#15c349]' : 'bg-[#d4d4d8]'
-            }`}
-          >
-            <span
-              className={`block size-3 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.18)] transition-transform ${
-                watchConfig.enabled ? 'translate-x-4' : 'translate-x-0'
-              }`}
-            />
-          </button>
+          />
         </div>
         <p className="text-xs leading-4 text-[#6a7282]">Enables global kanban board monitoring by agents</p>
       </div>

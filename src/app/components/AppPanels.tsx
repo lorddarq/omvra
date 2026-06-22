@@ -37,8 +37,8 @@ interface AppPanelsProps {
   milestones: ProjectMilestone[];
   readModel: WorkspaceReadModel;
   isMilestoneDialogOpen: boolean;
-  executionLoadStatusId: TaskStatus;
-  pipelineLoadStatusId: TaskStatus;
+  executionLoadStatusIds: TaskStatus[];
+  pipelineLoadStatusIds: TaskStatus[];
   agentWatchConfigs: AgentWatchConfig[];
   agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
   storageMeter: StorageMeter;
@@ -54,7 +54,6 @@ interface AppPanelsProps {
   mcpAuditLog: McpAuditEntry[];
   mcpHealthResult: McpHealthCheckResult | null;
   mcpHealthCheckRunning: boolean;
-  showMcpHealthDiagnostics: boolean;
   mcpRestartPending: boolean;
   onCloseTaskDialog: () => void;
   onSaveTask: (taskData: Partial<Task>) => void;
@@ -124,8 +123,8 @@ export function AppPanels({
   milestones,
   readModel,
   isMilestoneDialogOpen,
-  executionLoadStatusId,
-  pipelineLoadStatusId,
+  executionLoadStatusIds,
+  pipelineLoadStatusIds,
   agentWatchConfigs,
   agentWatchRuntime,
   storageMeter,
@@ -141,7 +140,6 @@ export function AppPanels({
   mcpAuditLog,
   mcpHealthResult,
   mcpHealthCheckRunning,
-  showMcpHealthDiagnostics,
   mcpRestartPending,
   onCloseTaskDialog,
   onSaveTask,
@@ -284,8 +282,8 @@ export function AppPanels({
         people={people}
         tasks={tasks}
         statusColumns={statusColumns}
-        executionLoadStatusId={executionLoadStatusId}
-        pipelineLoadStatusId={pipelineLoadStatusId}
+        executionLoadStatusIds={executionLoadStatusIds}
+        pipelineLoadStatusIds={pipelineLoadStatusIds}
         onAddPerson={onAddPerson}
         onUpdatePerson={onUpdatePerson}
         onDeletePerson={onDeletePerson}
@@ -296,8 +294,8 @@ export function AppPanels({
         onClose={onClosePreferences}
         initialAnchor={preferencesInitialAnchor}
         statusColumns={statusColumns}
-        executionLoadStatusId={executionLoadStatusId}
-        pipelineLoadStatusId={pipelineLoadStatusId}
+        executionLoadStatusIds={executionLoadStatusIds}
+        pipelineLoadStatusIds={pipelineLoadStatusIds}
         people={people}
         tasks={tasks}
         agentWatchConfigs={agentWatchConfigs}
@@ -333,7 +331,6 @@ export function AppPanels({
         onMcpAccessTokenTtlMinutesChange={onMcpAccessTokenTtlMinutesChange}
         onMcpCapabilityProfileChange={onMcpCapabilityProfileChange}
         onRestartMcpServer={onRestartMcpServer}
-        showMcpHealthDiagnostics={showMcpHealthDiagnostics}
         mcpHealthResult={mcpHealthResult}
         mcpHealthCheckRunning={mcpHealthCheckRunning}
         onRunMcpHealthCheck={onRunMcpHealthCheck}

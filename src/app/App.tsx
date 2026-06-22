@@ -94,8 +94,8 @@ const DEFAULT_PEOPLE_SEED = ENABLE_SAMPLE_WORKSPACE ? initialPeople : [];
 const DEFAULT_MILESTONES_SEED = ENABLE_SAMPLE_WORKSPACE ? initialMilestones : [];
 
 interface AppPreferences {
-  executionLoadStatusId: TaskStatus;
-  pipelineLoadStatusId: TaskStatus;
+  executionLoadStatusIds: TaskStatus[];
+  pipelineLoadStatusIds: TaskStatus[];
   mcpAgentAccessEnabled: boolean;
   mcpCapabilityProfile: 'read_only' | 'task_write' | 'admin';
   mcpBindHost: string;
@@ -104,6 +104,20 @@ interface AppPreferences {
   mcpAccessToken: string;
   mcpAccessTokenIssuedAt?: string;
   mcpAccessTokenTtlMinutes: number;
+}
+
+function normalizeLoadStatusIds(
+  value: unknown,
+  fallback: TaskStatus[],
+  statusColumns: Array<{ id: string }>
+): TaskStatus[] {
+  const validIds = new Set(statusColumns.map(column => column.id));
+  const candidates = Array.isArray(value) ? value : typeof value === 'string' ? [value] : fallback;
+  const normalized = candidates.filter((statusId): statusId is TaskStatus => (
+    typeof statusId === 'string' && validIds.has(statusId)
+  ));
+
+  return Array.from(new Set(normalized));
 }
 
 interface AgentWatchRuntimeState {
@@ -190,15 +204,26 @@ function App() {
     readInitialWorkspaceJSON<AgentWatchConfig[]>(MCP_AGENT_WATCH_CONFIGS_KEY, [])
   );
   const [preferences, setPreferences] = useState<AppPreferences>(() => {
-    const stored = readInitialWorkspaceJSON<Partial<AppPreferences>>(PREFERENCES_KEY, {});
+    const stored = readInitialWorkspaceJSON<Partial<AppPreferences> & {
+      executionLoadStatusId?: TaskStatus;
+      pipelineLoadStatusId?: TaskStatus;
+    }>(PREFERENCES_KEY, {});
     const executionDefault = getDefaultStatusId(defaultSwimlanes, 'in-progress');
     const pipelineDefault = getDefaultStatusId(defaultSwimlanes, 'open');
     const bindHost = normalizeMcpBindHost(stored.mcpBindHost);
     const port = normalizeMcpPort(stored.mcpPort);
 
     return {
-      executionLoadStatusId: stored.executionLoadStatusId || executionDefault,
-      pipelineLoadStatusId: stored.pipelineLoadStatusId || pipelineDefault,
+      executionLoadStatusIds: normalizeLoadStatusIds(
+        stored.executionLoadStatusIds ?? stored.executionLoadStatusId,
+        [executionDefault],
+        defaultSwimlanes
+      ),
+      pipelineLoadStatusIds: normalizeLoadStatusIds(
+        stored.pipelineLoadStatusIds ?? stored.pipelineLoadStatusId,
+        [pipelineDefault],
+        defaultSwimlanes
+      ),
       mcpAgentAccessEnabled: Boolean(stored.mcpAgentAccessEnabled),
       mcpCapabilityProfile:
         stored.mcpCapabilityProfile === 'task_write' || stored.mcpCapabilityProfile === 'admin'
@@ -818,8 +843,8 @@ function App() {
     setMilestones([]);
     setStatusColumns(defaultSwimlanes);
     setPreferences({
-      executionLoadStatusId: getDefaultStatusId(defaultSwimlanes, 'in-progress'),
-      pipelineLoadStatusId: getDefaultStatusId(defaultSwimlanes, 'open'),
+      executionLoadStatusIds: [getDefaultStatusId(defaultSwimlanes, 'in-progress')],
+      pipelineLoadStatusIds: [getDefaultStatusId(defaultSwimlanes, 'open')],
       mcpAgentAccessEnabled: false,
       mcpCapabilityProfile: 'read_only',
       mcpBindHost: DEFAULT_MCP_BIND_HOST,
@@ -969,21 +994,20 @@ function App() {
 
   useEffect(() => {
     setPreferences(prev => {
-      const nextExecution = statusColumns.some(col => col.id === prev.executionLoadStatusId)
-        ? prev.executionLoadStatusId
-        : getDefaultStatusId(statusColumns, 'in-progress');
-      const nextPipeline = statusColumns.some(col => col.id === prev.pipelineLoadStatusId)
-        ? prev.pipelineLoadStatusId
-        : getDefaultStatusId(statusColumns, 'open');
+      const nextExecution = normalizeLoadStatusIds(prev.executionLoadStatusIds, [], statusColumns);
+      const nextPipeline = normalizeLoadStatusIds(prev.pipelineLoadStatusIds, [], statusColumns);
 
-      if (nextExecution === prev.executionLoadStatusId && nextPipeline === prev.pipelineLoadStatusId) {
+      if (
+        areSerializedValuesEqual(nextExecution, prev.executionLoadStatusIds) &&
+        areSerializedValuesEqual(nextPipeline, prev.pipelineLoadStatusIds)
+      ) {
         return prev;
       }
 
       return {
         ...prev,
-        executionLoadStatusId: nextExecution,
-        pipelineLoadStatusId: nextPipeline,
+        executionLoadStatusIds: nextExecution,
+        pipelineLoadStatusIds: nextPipeline,
       };
     });
   }, [statusColumns]);
@@ -1108,8 +1132,8 @@ function App() {
         milestones={milestones}
         readModel={workspaceReadModel}
         isMilestoneDialogOpen={isMilestoneDialogOpen}
-        executionLoadStatusId={preferences.executionLoadStatusId}
-        pipelineLoadStatusId={preferences.pipelineLoadStatusId}
+        executionLoadStatusIds={preferences.executionLoadStatusIds}
+        pipelineLoadStatusIds={preferences.pipelineLoadStatusIds}
         agentWatchConfigs={agentWatchConfigs}
         agentWatchRuntime={agentWatchRuntime}
         storageMeter={storageMeter}
@@ -1125,7 +1149,6 @@ function App() {
         mcpAuditLog={mcpAuditLog}
         mcpHealthResult={mcpHealth.result}
         mcpHealthCheckRunning={mcpHealth.isRunning}
-        showMcpHealthDiagnostics={mcpHealth.isDevEnvironment}
         mcpRestartPending={isMcpRestartPending}
         onCloseTaskDialog={handleCloseTaskDialog}
         onSaveTask={handleSaveTask}
@@ -1157,10 +1180,20 @@ function App() {
         onExportTasksAndProjects={handleExportTasksAndProjects}
         onImportTasksAndProjects={handleImportTasksAndProjects}
         onExecutionLoadStatusChange={(statusId) =>
-          setPreferences(prev => ({ ...prev, executionLoadStatusId: statusId }))
+          setPreferences(prev => ({
+            ...prev,
+            executionLoadStatusIds: prev.executionLoadStatusIds.includes(statusId)
+              ? prev.executionLoadStatusIds.filter(id => id !== statusId)
+              : [...prev.executionLoadStatusIds, statusId],
+          }))
         }
         onPipelineLoadStatusChange={(statusId) =>
-          setPreferences(prev => ({ ...prev, pipelineLoadStatusId: statusId }))
+          setPreferences(prev => ({
+            ...prev,
+            pipelineLoadStatusIds: prev.pipelineLoadStatusIds.includes(statusId)
+              ? prev.pipelineLoadStatusIds.filter(id => id !== statusId)
+              : [...prev.pipelineLoadStatusIds, statusId],
+          }))
         }
         onMcpAgentAccessToggle={(enabled) =>
           setPreferences(prev => ({ ...prev, mcpAgentAccessEnabled: enabled }))

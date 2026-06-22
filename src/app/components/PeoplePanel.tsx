@@ -8,8 +8,8 @@ interface PeoplePanelProps {
   people: Person[];
   tasks: Task[];
   statusColumns: StatusColumn[];
-  executionLoadStatusId: TaskStatus;
-  pipelineLoadStatusId: TaskStatus;
+  executionLoadStatusIds: TaskStatus[];
+  pipelineLoadStatusIds: TaskStatus[];
   onAddPerson: (person: Omit<Person, 'id'>) => void;
   onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions'>) => void;
   onDeletePerson: (personId: string) => void;
@@ -21,8 +21,8 @@ export function PeoplePanel({
   people,
   tasks,
   statusColumns,
-  executionLoadStatusId,
-  pipelineLoadStatusId,
+  executionLoadStatusIds,
+  pipelineLoadStatusIds,
   onAddPerson,
   onUpdatePerson,
   onDeletePerson,
@@ -42,8 +42,8 @@ export function PeoplePanel({
             people={people}
             tasks={tasks}
             statusColumns={statusColumns}
-            executionLoadStatusId={executionLoadStatusId}
-            pipelineLoadStatusId={pipelineLoadStatusId}
+            executionLoadStatusIds={executionLoadStatusIds}
+            pipelineLoadStatusIds={pipelineLoadStatusIds}
             onAddPerson={onAddPerson}
             onUpdatePerson={onUpdatePerson}
             onDeletePerson={onDeletePerson}

@@ -13,7 +13,7 @@ import {
 } from './SettingsPanel';
 import { McpAccessSettingsSection } from './McpAccessSettingsSection';
 import { McpCommandSettingsSection } from './McpCommandSettingsSection';
-import { McpActivityLogSection, McpHealthDiagnosticsSection } from './McpDiagnosticsSections';
+import { McpActivityLogSection } from './McpDiagnosticsSections';
 import { PeopleManagementSections } from './PeopleSettingsSections';
 
 interface PreferencesPanelProps {
@@ -21,8 +21,8 @@ interface PreferencesPanelProps {
   onClose: () => void;
   initialAnchor?: string;
   statusColumns: StatusColumn[];
-  executionLoadStatusId: TaskStatus;
-  pipelineLoadStatusId: TaskStatus;
+  executionLoadStatusIds: TaskStatus[];
+  pipelineLoadStatusIds: TaskStatus[];
   people: Person[];
   tasks: Task[];
   agentWatchConfigs: AgentWatchConfig[];
@@ -57,7 +57,6 @@ interface PreferencesPanelProps {
   onMcpAccessTokenTtlMinutesChange: (ttlMinutes: number) => void;
   onMcpCapabilityProfileChange: (profile: 'read_only' | 'task_write' | 'admin') => void;
   onRestartMcpServer: () => void;
-  showMcpHealthDiagnostics: boolean;
   mcpHealthResult: McpHealthCheckResult | null;
   mcpHealthCheckRunning: boolean;
   onRunMcpHealthCheck: () => void;
@@ -71,8 +70,8 @@ export function PreferencesPanel({
   onClose,
   initialAnchor,
   statusColumns,
-  executionLoadStatusId,
-  pipelineLoadStatusId,
+  executionLoadStatusIds,
+  pipelineLoadStatusIds,
   people,
   tasks,
   agentWatchConfigs,
@@ -107,7 +106,6 @@ export function PreferencesPanel({
   onMcpAccessTokenTtlMinutesChange,
   onMcpCapabilityProfileChange,
   onRestartMcpServer,
-  showMcpHealthDiagnostics,
   mcpHealthResult,
   mcpHealthCheckRunning,
   onRunMcpHealthCheck,
@@ -271,8 +269,8 @@ export function PreferencesPanel({
     <SettingsPanel isOpen={isOpen} onClose={onClose} initialAnchor={initialAnchor}>
       <TasksSettingsSection
         statusColumns={statusColumns}
-        executionLoadStatusId={executionLoadStatusId}
-        pipelineLoadStatusId={pipelineLoadStatusId}
+        executionLoadStatusIds={executionLoadStatusIds}
+        pipelineLoadStatusIds={pipelineLoadStatusIds}
         people={people}
         agentWatchConfigs={agentWatchConfigs}
         agentWatchRuntime={agentWatchRuntime}
@@ -287,50 +285,46 @@ export function PreferencesPanel({
         people={people}
         tasks={tasks}
         statusColumns={statusColumns}
-        executionLoadStatusId={executionLoadStatusId}
-        pipelineLoadStatusId={pipelineLoadStatusId}
+        executionLoadStatusIds={executionLoadStatusIds}
+        pipelineLoadStatusIds={pipelineLoadStatusIds}
         onAddPerson={onAddPerson}
         onUpdatePerson={onUpdatePerson}
         onDeletePerson={onDeletePerson}
       />
 
       <McpSettingsSection>
-        <div className="space-y-3 rounded-lg border p-4">
-          <McpAccessSettingsSection
-            agentAccessEnabled={mcpAgentAccessEnabled}
-            address={mcpAddress}
-            bindHost={mcpBindHost}
-            port={mcpPort}
-            accessToken={mcpAccessToken}
-            accessTokenTtlMinutes={mcpAccessTokenTtlMinutes}
-            capabilityProfile={mcpCapabilityProfile}
-            copiedAddress={copied}
-            listenerStatus={mcpListenerStatus}
-            listenerStatusLabel={listenerStatusLabel}
-            connectionStatusLabel={connectionStatusLabel}
-            tokenExpiryLabel={tokenExpiryLabel}
-            restartPending={mcpRestartPending}
-            remoteTokenWarning={remoteTokenWarning}
-            onAgentAccessToggle={onMcpAgentAccessToggle}
-            onAddressChange={onMcpAddressChange}
-            onBindHostChange={onMcpBindHostChange}
-            onPortChange={onMcpPortChange}
-            onAccessTokenChange={onMcpAccessTokenChange}
-            onAccessTokenRotate={onMcpAccessTokenRotate}
-            onAccessTokenTtlMinutesChange={onMcpAccessTokenTtlMinutesChange}
-            onCapabilityProfileChange={onMcpCapabilityProfileChange}
-            onRestartServer={onRestartMcpServer}
-            onCopyAddress={copyMcpAddress}
-          />
-
-          {showMcpHealthDiagnostics && (
-            <McpHealthDiagnosticsSection
-              result={mcpHealthResult}
-              running={mcpHealthCheckRunning}
-              onRun={onRunMcpHealthCheck}
-            />
-          )}
-        </div>
+        <McpAccessSettingsSection
+          agentAccessEnabled={mcpAgentAccessEnabled}
+          address={mcpAddress}
+          bindHost={mcpBindHost}
+          port={mcpPort}
+          accessToken={mcpAccessToken}
+          accessTokenTtlMinutes={mcpAccessTokenTtlMinutes}
+          capabilityProfile={mcpCapabilityProfile}
+          copiedAddress={copied}
+          copiedStdioCommand={copiedStdioCommand}
+          listenerStatus={mcpListenerStatus}
+          listenerStatusLabel={listenerStatusLabel}
+          connectionStatusLabel={connectionStatusLabel}
+          tokenExpiryLabel={tokenExpiryLabel}
+          restartPending={mcpRestartPending}
+          remoteTokenWarning={remoteTokenWarning}
+          stdioCommand={stdioCommand}
+          healthResult={mcpHealthResult}
+          healthRunning={mcpHealthCheckRunning}
+          onAgentAccessToggle={onMcpAgentAccessToggle}
+          onAddressChange={onMcpAddressChange}
+          onBindHostChange={onMcpBindHostChange}
+          onPortChange={onMcpPortChange}
+          onAccessTokenChange={onMcpAccessTokenChange}
+          onAccessTokenRotate={onMcpAccessTokenRotate}
+          onAccessTokenTtlMinutesChange={onMcpAccessTokenTtlMinutesChange}
+          onCapabilityProfileChange={onMcpCapabilityProfileChange}
+          onRestartServer={onRestartMcpServer}
+          onCopyAddress={copyMcpAddress}
+          onCopyStdioCommand={copyStdioCommand}
+          onRunHealthCheck={onRunMcpHealthCheck}
+        />
       </McpSettingsSection>
 
       <McpTestingSettingsSection>

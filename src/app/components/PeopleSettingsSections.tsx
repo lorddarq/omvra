@@ -15,8 +15,8 @@ interface PeopleManagementSectionsProps {
   people: Person[];
   tasks: Task[];
   statusColumns: StatusColumn[];
-  executionLoadStatusId: TaskStatus;
-  pipelineLoadStatusId: TaskStatus;
+  executionLoadStatusIds: TaskStatus[];
+  pipelineLoadStatusIds: TaskStatus[];
   onAddPerson: (person: Omit<Person, 'id'>) => void;
   onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions'>) => void;
   onDeletePerson: (personId: string) => void;
@@ -31,8 +31,8 @@ export function PeopleManagementSections({
   people,
   tasks,
   statusColumns,
-  executionLoadStatusId,
-  pipelineLoadStatusId,
+  executionLoadStatusIds,
+  pipelineLoadStatusIds,
   onAddPerson,
   onUpdatePerson,
   onDeletePerson,
@@ -56,8 +56,9 @@ export function PeopleManagementSections({
     }).length;
   }
 
-  function getLoadPercentageForPerson(personId: string, statusId: string): number {
-    const personTasks = tasks.filter(task => task.assigneeId === personId && task.status === statusId);
+  function getLoadPercentageForPerson(personId: string, statusIds: string[]): number {
+    const selectedStatuses = new Set(statusIds);
+    const personTasks = tasks.filter(task => task.assigneeId === personId && selectedStatuses.has(task.status));
     return getLoadPercentageForTasks(personTasks);
   }
 
@@ -130,8 +131,8 @@ export function PeopleManagementSections({
   function renderPersonItem(person: Person) {
     const totalTasks = getTaskCountForPerson(person.id);
     const isEditing = editingPersonId === person.id;
-    const executionLoadPercentage = getLoadPercentageForPerson(person.id, executionLoadStatusId);
-    const pipelineLoadPercentage = getLoadPercentageForPerson(person.id, pipelineLoadStatusId);
+    const executionLoadPercentage = getLoadPercentageForPerson(person.id, executionLoadStatusIds);
+    const pipelineLoadPercentage = getLoadPercentageForPerson(person.id, pipelineLoadStatusIds);
     const statusCounts = statusColumns
       .map(column => ({ column, count: getTaskCountForPerson(person.id, column.id) }))
       .filter(({ count }) => count > 0);

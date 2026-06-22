@@ -13,8 +13,10 @@ export const WORKSPACE_BACKUP_SCHEMA_VERSION = 2;
 export type WorkspaceViewType = 'timeline' | 'kanban' | 'roadmap';
 
 export interface WorkspacePreferences {
-  executionLoadStatusId: TaskStatus;
-  pipelineLoadStatusId: TaskStatus;
+  executionLoadStatusIds: TaskStatus[];
+  pipelineLoadStatusIds: TaskStatus[];
+  executionLoadStatusId?: TaskStatus;
+  pipelineLoadStatusId?: TaskStatus;
   mcpAgentAccessEnabled: boolean;
   mcpCapabilityProfile: 'read_only' | 'task_write' | 'admin';
   mcpBindHost: string;
@@ -23,6 +25,20 @@ export interface WorkspacePreferences {
   mcpAccessToken: string;
   mcpAccessTokenIssuedAt?: string;
   mcpAccessTokenTtlMinutes: number;
+}
+
+function normalizeLoadStatusIds(
+  value: unknown,
+  fallback: TaskStatus[],
+  statusColumns: StatusColumn[]
+): TaskStatus[] {
+  const validIds = new Set(statusColumns.map(column => column.id));
+  const candidates = Array.isArray(value) ? value : typeof value === 'string' ? [value] : fallback;
+  const normalized = candidates.filter((statusId): statusId is TaskStatus => (
+    typeof statusId === 'string' && validIds.has(statusId)
+  ));
+
+  return Array.from(new Set(normalized));
 }
 
 export type WorkspaceStatusColumn = StatusColumn;
@@ -360,29 +376,35 @@ export function sanitizePreferences(
   if (!preferences) {
     return {
       ...fallback,
-      executionLoadStatusId: statusColumns.some(column => column.id === fallback.executionLoadStatusId)
-        ? fallback.executionLoadStatusId
-        : getDefaultStatusId(statusColumns, 'in-progress'),
-      pipelineLoadStatusId: statusColumns.some(column => column.id === fallback.pipelineLoadStatusId)
-        ? fallback.pipelineLoadStatusId
-        : getDefaultStatusId(statusColumns, 'open'),
+      executionLoadStatusIds: normalizeLoadStatusIds(
+        fallback.executionLoadStatusIds,
+        [getDefaultStatusId(statusColumns, 'in-progress')],
+        statusColumns
+      ),
+      pipelineLoadStatusIds: normalizeLoadStatusIds(
+        fallback.pipelineLoadStatusIds,
+        [getDefaultStatusId(statusColumns, 'open')],
+        statusColumns
+      ),
     };
   }
 
   const bindHost = normalizeMcpBindHost(preferences.mcpBindHost || fallback.mcpBindHost);
   const port = normalizeMcpPort(preferences.mcpPort || fallback.mcpPort);
-  const executionLoadStatusId =
-    preferences.executionLoadStatusId && statusColumns.some(column => column.id === preferences.executionLoadStatusId)
-      ? preferences.executionLoadStatusId
-      : getDefaultStatusId(statusColumns, 'in-progress');
-  const pipelineLoadStatusId =
-    preferences.pipelineLoadStatusId && statusColumns.some(column => column.id === preferences.pipelineLoadStatusId)
-      ? preferences.pipelineLoadStatusId
-      : getDefaultStatusId(statusColumns, 'open');
+  const executionLoadStatusIds = normalizeLoadStatusIds(
+    preferences.executionLoadStatusIds ?? preferences.executionLoadStatusId,
+    [getDefaultStatusId(statusColumns, 'in-progress')],
+    statusColumns
+  );
+  const pipelineLoadStatusIds = normalizeLoadStatusIds(
+    preferences.pipelineLoadStatusIds ?? preferences.pipelineLoadStatusId,
+    [getDefaultStatusId(statusColumns, 'open')],
+    statusColumns
+  );
 
   return {
-    executionLoadStatusId,
-    pipelineLoadStatusId,
+    executionLoadStatusIds,
+    pipelineLoadStatusIds,
     mcpAgentAccessEnabled: Boolean(preferences.mcpAgentAccessEnabled),
     mcpCapabilityProfile:
       preferences.mcpCapabilityProfile === 'task_write' || preferences.mcpCapabilityProfile === 'admin'
@@ -641,15 +663,23 @@ export function createDefaultWorkspacePreferences(
 ): WorkspacePreferences {
   const bindHost = normalizeMcpBindHost(overrides.mcpBindHost);
   const port = normalizeMcpPort(overrides.mcpPort);
-  const executionLoadStatusId = overrides.executionLoadStatusId || getDefaultStatusId(statusColumns, 'in-progress');
-  const pipelineLoadStatusId = overrides.pipelineLoadStatusId || getDefaultStatusId(statusColumns, 'open');
+  const executionLoadStatusIds = normalizeLoadStatusIds(
+    overrides.executionLoadStatusIds ?? overrides.executionLoadStatusId,
+    [getDefaultStatusId(statusColumns, 'in-progress')],
+    statusColumns
+  );
+  const pipelineLoadStatusIds = normalizeLoadStatusIds(
+    overrides.pipelineLoadStatusIds ?? overrides.pipelineLoadStatusId,
+    [getDefaultStatusId(statusColumns, 'open')],
+    statusColumns
+  );
   const serverAddress = normalizeMcpServerAddress(
     overrides.mcpServerAddress || buildLocalMcpAddress(bindHost, port)
   );
 
   return {
-    executionLoadStatusId,
-    pipelineLoadStatusId,
+    executionLoadStatusIds,
+    pipelineLoadStatusIds,
     mcpAgentAccessEnabled: Boolean(overrides.mcpAgentAccessEnabled),
     mcpCapabilityProfile:
       overrides.mcpCapabilityProfile === 'task_write' || overrides.mcpCapabilityProfile === 'admin'

@@ -4,8 +4,10 @@ import { buildLocalMcpAddress, normalizeMcpBindHost, normalizeMcpPort, normalize
 export type StatusColumnState = StatusColumn;
 
 export interface AppPreferencesLike {
-  executionLoadStatusId: TaskStatus;
-  pipelineLoadStatusId: TaskStatus;
+  executionLoadStatusIds: TaskStatus[];
+  pipelineLoadStatusIds: TaskStatus[];
+  executionLoadStatusId?: TaskStatus;
+  pipelineLoadStatusId?: TaskStatus;
   mcpAgentAccessEnabled: boolean;
   mcpCapabilityProfile: 'read_only' | 'task_write' | 'admin';
   mcpBindHost: string;
@@ -42,6 +44,20 @@ function getDefaultStatusId(
   const preferredColumn = columns.find(column => column.id === preferred);
   if (preferredColumn) return preferredColumn.id as TaskStatus;
   return (columns[0]?.id as TaskStatus) || preferred;
+}
+
+function normalizeLoadStatusIds(
+  value: unknown,
+  fallback: TaskStatus[],
+  statusColumns: Array<{ id: string }>
+): TaskStatus[] {
+  const validIds = new Set(statusColumns.map(column => column.id));
+  const candidates = Array.isArray(value) ? value : typeof value === 'string' ? [value] : fallback;
+  const normalized = candidates.filter((statusId): statusId is TaskStatus => (
+    typeof statusId === 'string' && validIds.has(statusId)
+  ));
+
+  return Array.from(new Set(normalized));
 }
 
 function getFileNameFromPath(filePath: string): string {
@@ -301,29 +317,35 @@ export function sanitizePreferences(
   if (!preferences) {
     return {
       ...fallback,
-      executionLoadStatusId: statusColumns.some(col => col.id === fallback.executionLoadStatusId)
-        ? fallback.executionLoadStatusId
-        : getDefaultStatusId(statusColumns, 'in-progress'),
-      pipelineLoadStatusId: statusColumns.some(col => col.id === fallback.pipelineLoadStatusId)
-        ? fallback.pipelineLoadStatusId
-        : getDefaultStatusId(statusColumns, 'open'),
+      executionLoadStatusIds: normalizeLoadStatusIds(
+        fallback.executionLoadStatusIds,
+        [getDefaultStatusId(statusColumns, 'in-progress')],
+        statusColumns
+      ),
+      pipelineLoadStatusIds: normalizeLoadStatusIds(
+        fallback.pipelineLoadStatusIds,
+        [getDefaultStatusId(statusColumns, 'open')],
+        statusColumns
+      ),
     };
   }
 
   const bindHost = normalizeMcpBindHost(preferences.mcpBindHost || fallback.mcpBindHost);
   const port = normalizeMcpPort(preferences.mcpPort || fallback.mcpPort);
-  const executionLoadStatusId =
-    preferences.executionLoadStatusId && statusColumns.some(col => col.id === preferences.executionLoadStatusId)
-      ? preferences.executionLoadStatusId
-      : getDefaultStatusId(statusColumns, 'in-progress');
-  const pipelineLoadStatusId =
-    preferences.pipelineLoadStatusId && statusColumns.some(col => col.id === preferences.pipelineLoadStatusId)
-      ? preferences.pipelineLoadStatusId
-      : getDefaultStatusId(statusColumns, 'open');
+  const executionLoadStatusIds = normalizeLoadStatusIds(
+    preferences.executionLoadStatusIds ?? preferences.executionLoadStatusId,
+    [getDefaultStatusId(statusColumns, 'in-progress')],
+    statusColumns
+  );
+  const pipelineLoadStatusIds = normalizeLoadStatusIds(
+    preferences.pipelineLoadStatusIds ?? preferences.pipelineLoadStatusId,
+    [getDefaultStatusId(statusColumns, 'open')],
+    statusColumns
+  );
 
   return {
-    executionLoadStatusId,
-    pipelineLoadStatusId,
+    executionLoadStatusIds,
+    pipelineLoadStatusIds,
     mcpAgentAccessEnabled: Boolean(preferences.mcpAgentAccessEnabled),
     mcpCapabilityProfile:
       preferences.mcpCapabilityProfile === 'task_write' || preferences.mcpCapabilityProfile === 'admin'

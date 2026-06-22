@@ -123,8 +123,8 @@ export function McpActivitySettingsSection({ children }: McpSettingsSectionProps
 
 interface TasksSettingsSectionProps {
   statusColumns: StatusColumn[];
-  executionLoadStatusId: TaskStatus;
-  pipelineLoadStatusId: TaskStatus;
+  executionLoadStatusIds: TaskStatus[];
+  pipelineLoadStatusIds: TaskStatus[];
   people: Person[];
   agentWatchConfigs: AgentWatchConfig[];
   agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
@@ -137,8 +137,8 @@ interface TasksSettingsSectionProps {
 
 export function TasksSettingsSection({
   statusColumns,
-  executionLoadStatusId,
-  pipelineLoadStatusId,
+  executionLoadStatusIds,
+  pipelineLoadStatusIds,
   people,
   agentWatchConfigs,
   agentWatchRuntime,
@@ -181,17 +181,17 @@ export function TasksSettingsSection({
     >
       <TaskStatusChoiceGroup
         title="Execution Load"
-        description="Only tasks in this column count toward execution load."
+        description="Tasks in these columns count toward execution load."
         statusColumns={statusColumns}
-        value={executionLoadStatusId}
+        value={executionLoadStatusIds}
         onChange={onExecutionLoadStatusChange}
       />
 
       <TaskStatusChoiceGroup
         title="Pipeline Load"
-        description="Tasks in this column count toward pipeline pressure."
+        description="Tasks in these columns count toward pipeline pressure."
         statusColumns={statusColumns}
-        value={pipelineLoadStatusId}
+        value={pipelineLoadStatusIds}
         onChange={onPipelineLoadStatusChange}
       />
 
@@ -230,7 +230,7 @@ interface TaskStatusChoiceGroupProps {
   title: string;
   description: string;
   statusColumns: StatusColumn[];
-  value: TaskStatus;
+  value: TaskStatus[];
   onChange: (statusId: TaskStatus) => void;
 }
 
@@ -247,14 +247,14 @@ function TaskStatusChoiceGroup({
         <div className="text-sm font-semibold leading-5 text-[#71717a]">{title}</div>
         <p className="break-words text-xs leading-4 text-[#6a7282] [overflow-wrap:anywhere]">{description}</p>
       </div>
-      <div className="space-y-1" role="radiogroup" aria-label={title}>
+      <div className="space-y-1" role="group" aria-label={title}>
         {statusColumns.map(col => {
-          const isSelected = col.id === value;
+          const isSelected = value.includes(col.id as TaskStatus);
           return (
             <button
               key={col.id}
               type="button"
-              role="radio"
+              role="checkbox"
               aria-checked={isSelected}
               onClick={() => onChange(col.id as TaskStatus)}
               className="flex min-h-6 w-full items-center gap-3 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-gray-300"

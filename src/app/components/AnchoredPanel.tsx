@@ -41,12 +41,27 @@ export function AnchoredPanel({
   className,
 }: AnchoredPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const programmaticAnchorRef = useRef<string | null>(null);
+  const programmaticScrollTimeoutRef = useRef<number | null>(null);
   const enabledItems = useMemo(
     () => navGroups.flatMap(group => group.items).filter(item => !item.disabled),
     [navGroups]
   );
   const firstAnchor = enabledItems[0]?.id;
   const [activeAnchor, setActiveAnchor] = useState(initialAnchor ?? firstAnchor ?? '');
+
+  const clearProgrammaticScrollLock = () => {
+    if (programmaticScrollTimeoutRef.current !== null) {
+      window.clearTimeout(programmaticScrollTimeoutRef.current);
+      programmaticScrollTimeoutRef.current = null;
+    }
+
+    programmaticScrollTimeoutRef.current = window.setTimeout(() => {
+      programmaticAnchorRef.current = null;
+      programmaticScrollTimeoutRef.current = null;
+      syncActiveSection();
+    }, 180);
+  };
 
   const scrollToSection = (anchorId: string) => {
     const scrollNode = scrollRef.current;
@@ -56,11 +71,13 @@ export function AnchoredPanel({
     if (!section) return;
 
     const sectionTop = section.getBoundingClientRect().top - scrollNode.getBoundingClientRect().top + scrollNode.scrollTop;
+    programmaticAnchorRef.current = anchorId;
+    setActiveAnchor(anchorId);
+    clearProgrammaticScrollLock();
     scrollNode.scrollTo({
       top: Math.max(0, sectionTop - 82),
       behavior: 'auto',
     });
-    setActiveAnchor(anchorId);
   };
 
   useEffect(() => {
@@ -77,6 +94,12 @@ export function AnchoredPanel({
   const syncActiveSection = () => {
     const scrollNode = scrollRef.current;
     if (!scrollNode) return;
+
+    if (programmaticAnchorRef.current) {
+      setActiveAnchor(programmaticAnchorRef.current);
+      clearProgrammaticScrollLock();
+      return;
+    }
 
     const sections = Array.from(
       scrollNode.querySelectorAll<HTMLElement>('[data-anchored-panel-section]')
@@ -98,6 +121,14 @@ export function AnchoredPanel({
       setActiveAnchor(nextSection.id);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (programmaticScrollTimeoutRef.current !== null) {
+        window.clearTimeout(programmaticScrollTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div

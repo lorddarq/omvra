@@ -47,23 +47,20 @@ export function ViewToggle({
               </svg>
     },
   ];
+  const activeIndex = Math.max(0, views.findIndex(view => view.value === currentView));
 
   return (
-    <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-full max-h-10">
+    <div
+      className="view-toggle"
+      data-active-index={activeIndex}
+    >
+      <span className="view-toggle-indicator" aria-hidden="true" />
       {views.map(view => (
         <button
           key={view.value}
           onClick={() => onViewChange(view.value)}
           disabled={disabled}
-          className={`
-            px-4 py-2 rounded-full font-medium text-sm transition-all max-h-8 justify-center flex items-center gap-1
-            ${
-              currentView === view.value
-                ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-            }
-            ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-          `}
+          className={`view-toggle-button ${currentView === view.value ? 'active' : ''}`}
           aria-pressed={currentView === view.value}
           aria-label={`Switch to ${view.label} view`}
         >

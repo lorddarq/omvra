@@ -3,6 +3,8 @@ import { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from './ui/button';
 import { cn } from './ui/utils';
 
+const ANCHORED_PANEL_HEADER_OFFSET = 104;
+
 export interface AnchoredPanelNavItem {
   id: string;
   label: string;
@@ -75,7 +77,7 @@ export function AnchoredPanel({
     setActiveAnchor(anchorId);
     clearProgrammaticScrollLock();
     scrollNode.scrollTo({
-      top: Math.max(0, sectionTop - 82),
+      top: Math.max(0, sectionTop - ANCHORED_PANEL_HEADER_OFFSET),
       behavior: 'auto',
     });
   };
@@ -113,7 +115,7 @@ export function AnchoredPanel({
     const nextSection = sections
       .map(section => ({
         id: section.dataset.anchoredPanelSection ?? '',
-        distance: Math.abs(section.getBoundingClientRect().top - scrollNode.getBoundingClientRect().top - 82),
+        distance: Math.abs(section.getBoundingClientRect().top - scrollNode.getBoundingClientRect().top - ANCHORED_PANEL_HEADER_OFFSET),
       }))
       .sort((a, b) => a.distance - b.distance)[0];
 
@@ -260,7 +262,7 @@ export const AnchoredPanelScrollView = forwardRef<HTMLDivElement, AnchoredPanelS
     <div
       ref={ref}
       className={cn(
-        'h-full min-h-0 overflow-y-auto px-8 pb-8 pt-[82px]',
+        'h-full min-h-0 overflow-y-auto px-8 pb-8 pt-[104px]',
         'plumy-settings-scroll',
         className
       )}

@@ -12,9 +12,8 @@ export function TaskDescriptionSection({ notes }: TaskDescriptionSectionProps) {
 
   return (
     <div className="min-w-0 space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-sm font-semibold leading-5 text-[#71717a]">Description</div>
-        {isLongDescription && (
+      {isLongDescription && (
+        <div className="flex justify-end">
           <button
             type="button"
             className="rounded-full border border-black/10 px-3 py-1 text-xs font-medium text-[#71717a] hover:bg-[#71717a]/5"
@@ -22,8 +21,8 @@ export function TaskDescriptionSection({ notes }: TaskDescriptionSectionProps) {
           >
             {isExpanded ? 'Collapse' : 'Expand'}
           </button>
-        )}
-      </div>
+        </div>
+      )}
       <div
         className={`relative min-w-0 max-w-full overflow-hidden rounded-xl border border-[#71717a]/10 bg-white p-4 text-xs leading-4 text-[#6a7282] ${
           isLongDescription && !isExpanded ? 'max-h-[300px]' : ''
@@ -36,9 +35,7 @@ export function TaskDescriptionSection({ notes }: TaskDescriptionSectionProps) {
         )}
       </div>
       {isLongDescription && !isExpanded && (
-        <div className="-mt-8 h-8 rounded-b-xl bg-gradient-to-b from-white/0 to-white px-4 py-2 text-center text-xs text-[#71717a]">
-          Long description collapsed.
-        </div>
+        <div className="-mt-8 h-8 rounded-b-xl bg-gradient-to-b from-white/0 to-white" aria-hidden="true" />
       )}
     </div>
   );

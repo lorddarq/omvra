@@ -66,7 +66,7 @@ export function TaskDetailsActionMenu({
         title="Task actions"
         onClick={() => setIsOpen(open => !open)}
       >
-        <Ellipsis className="size-5" />
+        <Ellipsis className="size-4" />
       </Button>
 
       {isOpen && (

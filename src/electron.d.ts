@@ -150,6 +150,12 @@ declare global {
         reveal: (path: string) => Promise<{ success: boolean; error?: string }>;
       };
       openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
+      tasks: {
+        exportPdf: (payload: {
+          html: string;
+          defaultFileName?: string;
+        }) => Promise<{ success: boolean; canceled?: boolean; filePath?: string; error?: string }>;
+      };
       mcp: {
         getCapabilities: () => Promise<McpBridgeResult<McpCapabilities>>;
         getListenerStatus: () => Promise<McpBridgeResult<McpListenerStatus>>;

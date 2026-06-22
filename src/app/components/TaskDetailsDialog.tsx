@@ -1,6 +1,6 @@
 import { Task, TimelineSwimlane, Person, TaskStatus, StatusColumn, ProjectMilestone, TaskAttachment } from '../types';
 import { useMemo, useState } from 'react';
-import { Activity, FileText, FolderKanban, GitBranch, Info, MessageSquare, Paperclip } from 'lucide-react';
+import { Activity, FileText, GitBranch, Info, MessageSquare, Paperclip } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -8,15 +8,15 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/app/components/ui/dialog';
-import { getTaskLoadContributionPercent, getTaskLoadPoints } from '../utils/taskLoad';
+import { getTaskLoadContributionPercent, getTaskLoadPoints, PERSON_CAPACITY_POINTS } from '../utils/taskLoad';
 import { getMilestoneForTask } from '../utils/roadmap';
 import { formatTaskDetailsForClipboard } from '../utils/taskClipboard';
+import { buildTaskPdfExportHtml, createTaskPdfFileName } from '../utils/taskPdfExport';
 import { TaskAttachmentsSection } from './TaskAttachmentsSection';
 import { TaskCommentsSection } from './TaskCommentsSection';
 import { TaskDescriptionSection } from './TaskDescriptionSection';
 import { TaskDetailsActionMenu } from './TaskDetailsActionMenu';
 import { TaskFooterActions } from './TaskFooterActions';
-import { TaskProjectsSection } from './TaskProjectsSection';
 import { TaskDependencyDetailsSection, TaskLoadDetailsSection, TaskSummarySection } from './TaskSummarySection';
 import { AnchoredPanel, AnchoredPanelSection } from './AnchoredPanel';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
@@ -61,6 +61,7 @@ export function TaskDetailsDialog({
 }: TaskDetailsDialogProps) {
   const [newComment, setNewComment] = useState('');
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const enrichedTask = task ? readModel?.tasksById.get(task.id) : undefined;
   const primaryTimelineProject = enrichedTask?.primaryTimelineProject?.name
     ?? (task?.swimlaneId
@@ -121,7 +122,6 @@ export function TaskDetailsDialog({
         label: 'Task Details',
         items: [
           { id: 'task-basic', label: 'Basic Info', icon: Info },
-          { id: 'task-projects', label: 'Projects', icon: FolderKanban },
           { id: 'task-description', label: 'Description', icon: FileText },
           { id: 'task-load', label: 'Load', icon: Activity },
           { id: 'task-dependencies', label: 'Dependencies', icon: GitBranch },
@@ -171,6 +171,69 @@ export function TaskDetailsDialog({
     } catch {
       setCopyState('failed');
       window.setTimeout(() => setCopyState('idle'), 1800);
+    }
+  };
+
+  const handleExportPdf = async () => {
+    if (!task || !window.electron?.tasks?.exportPdf || isExportingPdf) return;
+
+    setIsExportingPdf(true);
+
+    const html = buildTaskPdfExportHtml({
+      taskId: task.id,
+      title: task.title,
+      exportedAt: new Date().toISOString(),
+      summaryFields: [
+        { label: 'Status', value: statusLabel },
+        { label: 'Assignee', value: assigneeLabel },
+        { label: 'Task Size', value: (task.size || 'm').toUpperCase() },
+        { label: 'Complexity', value: task.complexity || 'medium' },
+        { label: 'Priority', value: priorityLabel },
+        { label: 'Blocked', value: task.blocked ? 'Yes' : 'No' },
+        { label: 'Primary Project', value: primaryTimelineProject },
+        { label: 'Milestone', value: milestoneLabel },
+        { label: 'Timeline', value: timelineLabel },
+      ],
+      projectLabels,
+      description: task.notes,
+      loadFields: [
+        { label: 'Load Points', value: `${taskLoadPoints.toFixed(1)} / ${PERSON_CAPACITY_POINTS}` },
+        { label: 'Load Contribution', value: taskLoadContribution !== null ? `${taskLoadContribution}%` : 'N/A' },
+      ],
+      dependencies: dependencyTasks.map(dependencyTask => ({
+        title: dependencyTask.title,
+        detail: statusColumns.find(column => column.id === dependencyTask.status)?.title ?? dependencyTask.status,
+      })),
+      attachments: (task.attachments || []).map(attachment => ({
+        title: attachment.name,
+        detail: attachment.path,
+      })),
+      comments: sortedComments.map(comment => ({
+        author: comment.author,
+        content: comment.content,
+        createdAt: formatDate(comment.createdAt),
+      })),
+    });
+
+    try {
+      const result = await window.electron.tasks.exportPdf({
+        html,
+        defaultFileName: createTaskPdfFileName(task.title),
+      });
+
+      if (!result.success && !result.canceled) {
+        window.alert(result.error || 'Could not export this task as a PDF.');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      const missingHandler = message.includes("No handler registered for 'tasks/export-pdf'");
+      window.alert(
+        missingHandler
+          ? 'PDF export is available, but Plumy needs to restart once to load the new Electron export handler.'
+          : message || 'Could not export this task as a PDF.'
+      );
+    } finally {
+      setIsExportingPdf(false);
     }
   };
 
@@ -240,8 +303,10 @@ export function TaskDetailsDialog({
             <TaskDetailsActionMenu
               copyState={copyState}
               canEdit={Boolean(onEdit)}
+              canExportPdf={Boolean(window.electron?.tasks?.exportPdf && !isExportingPdf)}
               onEdit={handleEditTask}
               onCopy={handleCopyTaskDetails}
+              onExportPdf={handleExportPdf}
             />
           )}
           footer={(
@@ -272,13 +337,6 @@ export function TaskDetailsDialog({
                 milestoneLabel={milestoneLabel}
               />
             )}
-          </AnchoredPanelSection>
-
-          <AnchoredPanelSection
-            id="task-projects"
-            title="Projects"
-          >
-            <TaskProjectsSection projectLabels={projectLabels} />
           </AnchoredPanelSection>
 
           <AnchoredPanelSection

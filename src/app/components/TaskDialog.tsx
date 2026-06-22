@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { AlertTriangle, Ban, Briefcase, CalendarDays, ChevronsUpDown, FileText, Info, Link2, Paperclip, RefreshCw, Search, Sparkles, Trash2 } from 'lucide-react';
+import { AlertTriangle, Briefcase, CalendarDays, ChevronsUpDown, FileText, Info, Link2, Paperclip, RefreshCw, Search, Sparkles, Trash2 } from 'lucide-react';
 import { Task, TaskStatus, TimelineSwimlane, Person, TaskSize, TaskComplexity, TaskPriority, StatusColumn, ProjectMilestone, TaskAttachment } from '../types';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import { toLocalISODate } from '../utils/date';
@@ -26,7 +26,6 @@ import { normalizeTaskNotesForSave } from '../utils/taskNotes';
 import { TaskDependenciesSection } from './TaskDependenciesSection';
 import { AnchoredPanel, AnchoredPanelSection } from './AnchoredPanel';
 import {
-  taskEditCheckboxClassName,
   taskEditFieldClassName,
   taskEditIconFieldClassName,
   taskEditIconSelectClassName,
@@ -35,6 +34,7 @@ import {
   taskEditTextAreaClassName,
 } from './taskFormStyles';
 import { TASK_PRIORITY_ICONS } from './taskPriorityIcons';
+import { TaskCheckboxControl } from './TaskCheckboxControl';
 
 function getFileNameFromPath(filePath: string): string {
   const normalized = filePath.replace(/\\/g, '/');
@@ -531,7 +531,7 @@ export function TaskDialog({
                         aria-hidden="true"
                         className="absolute left-2 top-1/2 size-4 -translate-y-1/2"
                       />
-                      <SelectValue />
+                      <span className="min-w-0 flex-1 truncate">{selectedPriorityIcon.display}</span>
                     </SelectTrigger>
                     <SelectContent>
                       {(Object.keys(TASK_PRIORITY_ICONS) as TaskPriority[]).map(priorityValue => (
@@ -583,8 +583,7 @@ export function TaskDialog({
                 <div className="space-y-1">
                   <Label htmlFor="task-blocked" className={taskEditLabelClassName}>Blocked</Label>
                   <Select value={blocked ? 'yes' : 'no'} onValueChange={(value) => setBlocked(value === 'yes')}>
-                    <SelectTrigger id="task-blocked" className={taskEditIconSelectClassName}>
-                      <Ban className="absolute left-2 top-1/2 size-4 -translate-y-1/2 text-[#71717a]" />
+                    <SelectTrigger id="task-blocked" className={taskEditSelectClassName}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -646,11 +645,9 @@ export function TaskDialog({
                         key={swimlane.id}
                         className="flex h-10 cursor-pointer items-center gap-2 border-b border-black/[0.06] px-2 last:border-b-0 hover:bg-[#71717a]/5"
                       >
-                        <input
-                          type="checkbox"
+                        <TaskCheckboxControl
                           checked={isChecked}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
+                          onCheckedChange={(checked) => {
                             setProjectIds(prev => {
                               const next = checked
                                 ? [...new Set([...prev, swimlane.id])]
@@ -666,7 +663,6 @@ export function TaskDialog({
                               return next;
                             });
                           }}
-                          className={taskEditCheckboxClassName}
                         />
                         <Briefcase className="size-4 shrink-0 text-[#f59e0b]" />
                         <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#3f3f46]">{swimlane.name}</span>

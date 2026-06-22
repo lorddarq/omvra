@@ -1,13 +1,15 @@
+import type { ReactNode } from 'react';
 import type { Person, StatusColumn } from '../types';
 import type { AgentWatchConfig, AgentWatchAction } from '../utils/workspaceSanitizers';
 import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
-import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 interface AgentBoardWatchSettingsProps {
   agent: Person;
+  agents: Person[];
+  selectedAgentId: string;
+  onAgentChange: (personId: string) => void;
   statusColumns: StatusColumn[];
   watchConfig: AgentWatchConfig;
   watchRuntime?: AgentWatchRuntimeState;
@@ -18,6 +20,9 @@ interface AgentBoardWatchSettingsProps {
 
 export function AgentBoardWatchSettings({
   agent,
+  agents,
+  selectedAgentId,
+  onAgentChange,
   statusColumns,
   watchConfig,
   watchRuntime,
@@ -26,17 +31,24 @@ export function AgentBoardWatchSettings({
   onPoll,
 }: AgentBoardWatchSettingsProps) {
   return (
-    <div className="rounded-lg border bg-gray-50 p-3 space-y-3">
-      <div>
-        <div className="text-sm font-semibold text-gray-900">{agent.name}</div>
-        <p className="text-xs text-gray-500">
-          Configure which board this agent monitors for newly assigned tasks.
-        </p>
-      </div>
+    <div className="space-y-3">
+      <FieldBlock label="Agent">
+        <Select value={selectedAgentId} onValueChange={onAgentChange}>
+          <SelectTrigger className={watchSelectClassName}>
+            <SelectValue placeholder="Select agent" />
+          </SelectTrigger>
+          <SelectContent>
+            {agents.map(item => (
+              <SelectItem key={item.id} value={item.id}>
+                {item.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </FieldBlock>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-2">
-          <Label>Watched board</Label>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <FieldBlock label="Watched Board">
           <Select
             value={watchConfig.statusId}
             onValueChange={(value) =>
@@ -47,7 +59,7 @@ export function AgentBoardWatchSettings({
               })
             }
           >
-            <SelectTrigger className="h-9">
+            <SelectTrigger className={watchSelectClassName}>
               <SelectValue placeholder="Select board" />
             </SelectTrigger>
             <SelectContent>
@@ -58,9 +70,8 @@ export function AgentBoardWatchSettings({
               ))}
             </SelectContent>
           </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Action</Label>
+        </FieldBlock>
+        <FieldBlock label="Action">
           <Select
             value={watchConfig.action}
             onValueChange={(value) =>
@@ -71,7 +82,7 @@ export function AgentBoardWatchSettings({
               })
             }
           >
-            <SelectTrigger className="h-9">
+            <SelectTrigger className={watchSelectClassName}>
               <SelectValue placeholder="Select action" />
             </SelectTrigger>
             <SelectContent>
@@ -80,9 +91,11 @@ export function AgentBoardWatchSettings({
               <SelectItem value="move_to_ready_for_human_review">Ready for human review</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Project filter</Label>
+        </FieldBlock>
+      </div>
+
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <FieldBlock label="Project filter">
           <Input
             value={watchConfig.projectId || ''}
             onChange={(e) =>
@@ -92,31 +105,32 @@ export function AgentBoardWatchSettings({
                 projectId: e.target.value.trim() || undefined,
               })
             }
-            placeholder="Optional project id"
-            className="h-9"
+            placeholder="Project Name"
+            className={watchInputClassName}
           />
-        </div>
-        <div className="space-y-2">
-          <Label>Poll interval (sec)</Label>
-          <Input
-            type="number"
-            min={15}
-            max={3600}
-            value={watchConfig.intervalSeconds}
-            onChange={(e) =>
-              onSave({
-                ...watchConfig,
-                personId: agent.id,
-                intervalSeconds: Math.max(15, Math.min(3600, Number(e.target.value) || 60)),
-              })
-            }
-            className="h-9"
-          />
-        </div>
+        </FieldBlock>
+        <FieldBlock label="Poll interval">
+          <div className="flex items-center gap-1">
+            <Input
+              type="number"
+              min={15}
+              max={3600}
+              value={watchConfig.intervalSeconds}
+              onChange={(e) =>
+                onSave({
+                  ...watchConfig,
+                  personId: agent.id,
+                  intervalSeconds: Math.max(15, Math.min(3600, Number(e.target.value) || 60)),
+                })
+              }
+              className={`${watchInputClassName} w-20 flex-none`}
+            />
+            <span className="text-xs font-medium leading-5 text-[#71717a]">Sec</span>
+          </div>
+        </FieldBlock>
       </div>
 
-      <div className="space-y-2">
-        <Label>Search filter</Label>
+      <FieldBlock label="Search filter">
         <Input
           value={watchConfig.search || ''}
           onChange={(e) =>
@@ -126,50 +140,41 @@ export function AgentBoardWatchSettings({
               search: e.target.value.trim() || undefined,
             })
           }
-          placeholder="Optional title/description filter"
-          className="h-9"
+          placeholder="Keyword"
+          className={watchInputClassName}
         />
-      </div>
+      </FieldBlock>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-white px-3 py-2">
-        <div>
-          <div className="text-sm font-medium text-gray-900">Watcher enabled</div>
-          <div className="text-xs text-gray-500">{describeAgentAction(watchConfig.action)}</div>
-        </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={watchConfig.enabled}
-          aria-label={`Toggle watcher for ${agent.name}`}
-          onClick={() =>
-            onSave({
-              ...watchConfig,
-              personId: agent.id,
-              enabled: !watchConfig.enabled,
-            })
-          }
-          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors ${
-            watchConfig.enabled ? 'bg-[#020329] border-[#020329]' : 'bg-gray-300 border-gray-300'
-          }`}
-        >
-          <span
-            className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-              watchConfig.enabled ? 'translate-x-5' : 'translate-x-0'
+      <div className="space-y-1">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-sm font-semibold leading-5 text-[#71717a]">Watching</div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={watchConfig.enabled}
+            aria-label={`Toggle watcher for ${agent.name}`}
+            onClick={() =>
+              onSave({
+                ...watchConfig,
+                personId: agent.id,
+                enabled: !watchConfig.enabled,
+              })
+            }
+            className={`relative inline-flex h-4 w-8 shrink-0 items-center rounded-2xl p-0.5 transition-colors ${
+              watchConfig.enabled ? 'bg-[#15c349]' : 'bg-[#d4d4d8]'
             }`}
-          />
-        </button>
+          >
+            <span
+              className={`block size-3 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.18)] transition-transform ${
+                watchConfig.enabled ? 'translate-x-4' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+        <p className="text-xs leading-4 text-[#6a7282]">Enables global kanban board monitoring by agents</p>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" onClick={() => onPoll(agent.id)}>
-          Poll now
-        </Button>
-        <Button variant="ghost" size="sm" onClick={() => onRemove(agent.id)}>
-          Reset watcher
-        </Button>
-      </div>
-
-      <div className="rounded-md border bg-white px-3 py-2 text-xs text-gray-600 space-y-1">
+      <div className="rounded-xl bg-[#f4f4f5] px-3 py-2 text-xs leading-4 text-[#6a7282]">
         <p>Last checked: {formatWatchTime(watchRuntime?.lastCheckedAt)}</p>
         <p>
           Changes: {watchRuntime?.newTaskCount || 0} new, {watchRuntime?.updatedTaskCount || 0} updated,
@@ -184,6 +189,41 @@ export function AgentBoardWatchSettings({
           <p className="text-amber-700">Watcher error: {watchRuntime.error}</p>
         )}
       </div>
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => onPoll(agent.id)}
+          className="inline-flex h-8 items-center rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-[#67676f] outline-none hover:bg-[#71717a]/5 focus-visible:ring-2 focus-visible:ring-gray-300"
+        >
+          Poll now
+        </button>
+        <button
+          type="button"
+          onClick={() => onRemove(agent.id)}
+          className="inline-flex h-8 items-center rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-[#67676f] outline-none hover:bg-[#71717a]/5 focus-visible:ring-2 focus-visible:ring-gray-300"
+        >
+          Reset watcher
+        </button>
+      </div>
+
+      <div className="sr-only">
+        <div>
+          <div>{describeAgentAction(watchConfig.action)}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const watchSelectClassName = 'h-8 rounded-xl border-0 bg-white px-2 text-sm font-medium text-[#67676f] shadow-[0_0_1px_rgba(0,0,0,0.06),0_1px_1px_rgba(0,0,0,0.06),0_2px_2px_rgba(0,0,0,0.04)] focus-visible:ring-gray-300';
+const watchInputClassName = 'h-8 rounded-xl border-black/10 bg-white/10 px-2 text-sm font-medium text-[#67676f] shadow-none placeholder:text-[#b0b0b5] focus-visible:ring-gray-300';
+
+function FieldBlock({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="min-w-0 space-y-1">
+      <div className="text-xs font-medium leading-5 text-[#71717a]">{label}</div>
+      {children}
     </div>
   );
 }

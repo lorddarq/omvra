@@ -1,7 +1,8 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Search } from 'lucide-react';
 import type { Task } from '../types';
-import { taskEditCheckboxClassName, taskEditIconFieldClassName, taskEditLabelClassName } from './taskFormStyles';
+import { taskEditIconFieldClassName, taskEditLabelClassName } from './taskFormStyles';
+import { TaskCheckboxControl } from './TaskCheckboxControl';
 
 interface TaskDependenciesSectionProps {
   milestoneSelected: boolean;
@@ -80,13 +81,11 @@ export function TaskDependenciesSection({
                   createsCycle ? 'cursor-not-allowed opacity-60' : 'hover:bg-[#71717a]/5'
                 }`}
               >
-                <input
-                  type="checkbox"
+                <TaskCheckboxControl
                   checked={dependencyIds.includes(candidate.id)}
                   disabled={createsCycle}
-                  onChange={() => onToggleDependency(candidate.id)}
-                  aria-label={`${taskTitle || 'Task'} depends on ${candidate.title}`}
-                  className={taskEditCheckboxClassName}
+                  onCheckedChange={() => onToggleDependency(candidate.id)}
+                  ariaLabel={`${taskTitle || 'Task'} depends on ${candidate.title}`}
                 />
                 <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
                   <span className="min-w-0 truncate text-xs font-medium leading-5 text-[#4a4a4f]">

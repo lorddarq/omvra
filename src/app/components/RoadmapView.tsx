@@ -614,15 +614,15 @@ export function RoadmapView({
                 Showing {filteredMilestones.length} of {milestones.length} milestone{milestones.length === 1 ? '' : 's'}
               </div>
               <div className="flex items-center gap-2">
+                <Badge variant="outline" className="gap-1.5 text-gray-600">
+                  <CalendarDays className="size-3.5" />
+                  {toLocalISODate(range.start)} to {toLocalISODate(range.end)}
+                </Badge>
                 {todayLeft !== null && (
                   <Button type="button" variant="outline" size="sm" onClick={scrollToToday}>
                     Today
                   </Button>
                 )}
-                <Badge variant="outline" className="gap-1.5 text-gray-600">
-                  <CalendarDays className="size-3.5" />
-                  {toLocalISODate(range.start)} to {toLocalISODate(range.end)}
-                </Badge>
               </div>
             </div>
 

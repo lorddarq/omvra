@@ -11,5 +11,3 @@ export const taskEditIconFieldClassName = 'h-8 rounded-xl border border-black/10
 export const taskEditIconSelectClassName = `relative flex h-8 items-center rounded-xl border-0 bg-white pl-8 pr-8 text-sm font-medium text-[#67676f] ${taskEditSelectShadow} transition-[box-shadow,background-color] focus-visible:ring-2 focus-visible:ring-[#71717a]/15`;
 
 export const taskEditTextAreaClassName = 'min-h-[125px] w-full resize-y rounded-xl border border-black/10 bg-white/10 p-3 text-sm font-medium leading-relaxed text-[#67676f] shadow-none outline-none transition-[border-color,box-shadow,background-color] placeholder:text-[#b5b5ba] focus:border-black/20 focus:bg-white/20 focus:ring-2 focus:ring-[#71717a]/15';
-
-export const taskEditCheckboxClassName = 'size-4 rounded-[4px] border border-[#71717a]/35 bg-white accent-[#020329] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#71717a]/20';

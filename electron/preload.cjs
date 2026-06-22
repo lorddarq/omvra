@@ -33,6 +33,11 @@ contextBridge.exposeInMainWorld('electron', {
   // Open external (validated in main)
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
 
+  // Task actions
+  tasks: {
+    exportPdf: (payload) => ipcRenderer.invoke('tasks/export-pdf', payload),
+  },
+
   // MCP bridge (read-only, gated by mcpAgentAccessEnabled preference)
   mcp: {
     getCapabilities: () => ipcRenderer.invoke('mcp/get-capabilities'),

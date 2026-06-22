@@ -1,13 +1,11 @@
-import { useRef, type ReactNode } from 'react';
-import { Activity, Bot, Terminal, Users } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Activity, Bot, Download, Terminal, Upload, Users } from 'lucide-react';
 import { Person, StorageMeter, StatusColumn, TaskStatus } from '../types';
 import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import { AnchoredPanel, AnchoredPanelSection } from './AnchoredPanel';
 import { AgentBoardWatchSettings } from './AgentBoardWatchSettings';
-import { Button } from './ui/button';
-import { Label } from './ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { TaskCheckboxIndicator } from './TaskCheckboxControl';
 import {
   Sheet,
   SheetContent,
@@ -151,6 +149,19 @@ export function TasksSettingsSection({
   onPollAgentWatch,
 }: TasksSettingsSectionProps) {
   const agenticPeople = people.filter(person => person.kind === 'agentic');
+  const [selectedAgentId, setSelectedAgentId] = useState(agenticPeople[0]?.id ?? '');
+  const selectedAgent = agenticPeople.find(agent => agent.id === selectedAgentId) ?? agenticPeople[0];
+
+  useEffect(() => {
+    if (!agenticPeople.length) {
+      setSelectedAgentId('');
+      return;
+    }
+
+    if (!agenticPeople.some(agent => agent.id === selectedAgentId)) {
+      setSelectedAgentId(agenticPeople[0].id);
+    }
+  }, [agenticPeople, selectedAgentId]);
 
   function getAgentWatchConfig(personId: string): AgentWatchConfig {
     return agentWatchConfigs.find(config => config.personId === personId) || {
@@ -163,81 +174,98 @@ export function TasksSettingsSection({
   }
 
   return (
-    <AnchoredPanelSection id="task-load" title="Tasks">
-      <div className="space-y-2">
-        <Label htmlFor="execution-load-status">Execution load column</Label>
-        <Select
-          value={executionLoadStatusId}
-          onValueChange={(value) => onExecutionLoadStatusChange(value as TaskStatus)}
-        >
-          <SelectTrigger id="execution-load-status">
-            <SelectValue placeholder="Select execution status" />
-          </SelectTrigger>
-          <SelectContent>
-            {statusColumns.map(col => (
-              <SelectItem key={col.id} value={col.id}>
-                {col.title}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <p className="text-xs text-gray-500">
-          Only tasks in this column count toward execution load.
-        </p>
-      </div>
+    <AnchoredPanelSection
+      id="task-load"
+      title="Tasks"
+      description="Settings that control task-related settings like load calculation and kanban board observability by agents"
+    >
+      <TaskStatusChoiceGroup
+        title="Execution Load"
+        description="Only tasks in this column count toward execution load."
+        statusColumns={statusColumns}
+        value={executionLoadStatusId}
+        onChange={onExecutionLoadStatusChange}
+      />
 
-      <div className="space-y-2">
-        <Label htmlFor="pipeline-load-status">Pipeline load column</Label>
-        <Select
-          value={pipelineLoadStatusId}
-          onValueChange={(value) => onPipelineLoadStatusChange(value as TaskStatus)}
-        >
-          <SelectTrigger id="pipeline-load-status">
-            <SelectValue placeholder="Select pipeline status" />
-          </SelectTrigger>
-          <SelectContent>
-            {statusColumns.map(col => (
-              <SelectItem key={col.id} value={col.id}>
-                {col.title}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <p className="text-xs text-gray-500">
-          Tasks in this column count toward pipeline pressure.
-        </p>
-      </div>
+      <TaskStatusChoiceGroup
+        title="Pipeline Load"
+        description="Tasks in this column count toward pipeline pressure."
+        statusColumns={statusColumns}
+        value={pipelineLoadStatusId}
+        onChange={onPipelineLoadStatusChange}
+      />
 
-      <div className="space-y-3 rounded-lg border p-4">
-        <div>
-          <div className="text-sm font-semibold text-gray-900">Agent board watch</div>
-          <p className="text-xs text-gray-500">
+      <div className="space-y-3">
+        <div className="space-y-1">
+          <div className="text-sm font-semibold leading-5 text-[#71717a]">Agent Board watch</div>
+          <p className="break-words text-xs leading-4 text-[#6a7282] [overflow-wrap:anywhere]">
             Configure which task boards agentic people monitor through MCP.
           </p>
         </div>
 
-        {agenticPeople.length > 0 ? (
-          <div className="space-y-3">
-            {agenticPeople.map(agent => (
-              <AgentBoardWatchSettings
-                key={agent.id}
-                agent={agent}
-                statusColumns={statusColumns}
-                watchConfig={getAgentWatchConfig(agent.id)}
-                watchRuntime={agentWatchRuntime[agent.id]}
-                onSave={onSaveAgentWatchConfig}
-                onRemove={onRemoveAgentWatchConfig}
-                onPoll={onPollAgentWatch}
-              />
-            ))}
-          </div>
+        {selectedAgent ? (
+          <AgentBoardWatchSettings
+            agent={selectedAgent}
+            agents={agenticPeople}
+            selectedAgentId={selectedAgent.id}
+            onAgentChange={setSelectedAgentId}
+            statusColumns={statusColumns}
+            watchConfig={getAgentWatchConfig(selectedAgent.id)}
+            watchRuntime={agentWatchRuntime[selectedAgent.id]}
+            onSave={onSaveAgentWatchConfig}
+            onRemove={onRemoveAgentWatchConfig}
+            onPoll={onPollAgentWatch}
+          />
         ) : (
-          <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-gray-500">
+          <p className="rounded-xl border border-dashed border-black/10 px-3 py-4 text-sm text-[#71717a]">
             Add an agentic person to configure board watching.
           </p>
         )}
       </div>
     </AnchoredPanelSection>
+  );
+}
+
+interface TaskStatusChoiceGroupProps {
+  title: string;
+  description: string;
+  statusColumns: StatusColumn[];
+  value: TaskStatus;
+  onChange: (statusId: TaskStatus) => void;
+}
+
+function TaskStatusChoiceGroup({
+  title,
+  description,
+  statusColumns,
+  value,
+  onChange,
+}: TaskStatusChoiceGroupProps) {
+  return (
+    <div className="space-y-6">
+      <div className="space-y-1">
+        <div className="text-sm font-semibold leading-5 text-[#71717a]">{title}</div>
+        <p className="break-words text-xs leading-4 text-[#6a7282] [overflow-wrap:anywhere]">{description}</p>
+      </div>
+      <div className="space-y-1" role="radiogroup" aria-label={title}>
+        {statusColumns.map(col => {
+          const isSelected = col.id === value;
+          return (
+            <button
+              key={col.id}
+              type="button"
+              role="radio"
+              aria-checked={isSelected}
+              onClick={() => onChange(col.id as TaskStatus)}
+              className="flex min-h-6 w-full items-center gap-3 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
+            >
+              <TaskCheckboxIndicator checked={isSelected} />
+              <span className="min-w-0 truncate text-xs font-medium leading-5 text-[#4a4a4f]">{col.title}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -255,58 +283,86 @@ export function DataSettingsSection({
   onImportTasksAndProjects,
 }: DataSettingsSectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const usagePercent = Math.min(100, Math.max(0, storageMeter.usagePercent));
 
   return (
-    <AnchoredPanelSection id="storage" title="Data">
-      <div className="space-y-3 rounded-lg border p-4">
-        <div className="text-sm font-semibold text-gray-900">Storage usage</div>
-        <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
-          <div
-            className="h-full bg-blue-500 transition-[width] duration-300"
-            style={{ width: `${storageMeter.usagePercent}%` }}
+    <AnchoredPanelSection id="storage" title="Data" description="Data and backup settings">
+      <div className="min-w-0 space-y-8">
+        <div className="space-y-3">
+          <div className="text-sm font-semibold leading-5 text-[#71717a]">Storage Usage</div>
+          <div className="space-y-2">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-[#71717a]/15">
+              <div
+                className="h-full rounded-full bg-[#71717a] transition-[width] duration-300"
+                style={{ width: `${usagePercent}%` }}
+              />
+            </div>
+            <div className="break-words text-xs leading-4 text-[#6a7282] [overflow-wrap:anywhere]">
+              <span className="font-bold">{formatBytes(storageMeter.usedBytes)}</span>
+              {' used of '}
+              <span className="font-bold">{formatBytes(storageMeter.totalBytes)}</span>
+              {` available (${storageMeter.usagePercent}%)`}
+            </div>
+            <div className="break-words text-[11px] leading-4 text-[#71717a] [overflow-wrap:anywhere]">
+              Source: {storageMeter.sourceLabel}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="text-sm font-semibold leading-5 text-[#71717a]">Backup and restore</div>
+          <p className="break-words text-xs leading-4 text-[#6a7282] [overflow-wrap:anywhere]">
+            Export the full workspace backup, including UI preferences, people, projects, task allocation, and board metadata.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={onExportTasksAndProjects}
+              className="inline-flex h-8 items-center gap-2 rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-[#67676f] outline-none hover:bg-[#71717a]/5 focus-visible:ring-2 focus-visible:ring-gray-300"
+            >
+              <Download className="size-4 shrink-0" />
+              Backup
+            </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex h-8 items-center gap-2 rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-[#67676f] outline-none hover:bg-[#71717a]/5 focus-visible:ring-2 focus-visible:ring-gray-300"
+            >
+              <Upload className="size-4 shrink-0" />
+              Restore
+            </button>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                onImportTasksAndProjects(file);
+              }
+              e.currentTarget.value = '';
+            }}
           />
         </div>
-        <div className="text-xs text-gray-500">
-          {formatBytes(storageMeter.usedBytes)} used of {formatBytes(storageMeter.totalBytes)} available ({storageMeter.usagePercent}%)
-        </div>
-        <div className="text-[11px] text-gray-400">
-          Source: {storageMeter.sourceLabel}
-        </div>
-      </div>
 
-      <div className="space-y-3 rounded-lg border p-4">
-        <div className="text-sm font-semibold text-gray-900">Backup and reset</div>
-        <p className="text-xs text-gray-500">
-          Export the full workspace backup, including UI preferences, people, projects, task allocation, and board metadata.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={onExportTasksAndProjects}>
-            Export workspace backup
-          </Button>
-          <Button
+        <div className="space-y-6">
+          <div className="space-y-3">
+            <div className="text-sm font-semibold leading-5 text-[#c40000]">Danger Zone</div>
+            <div className="text-xs leading-4 text-[#6a7282]">
+              <p>Purge the local storage used by the app.</p>
+              <p>This is irreversible</p>
+            </div>
+          </div>
+          <button
             type="button"
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={onNukeLocalData}
+            className="inline-flex h-8 items-center rounded-xl border border-[#b50000]/10 bg-[#c40000]/10 px-3 text-sm font-medium text-[#cd0000] outline-none hover:bg-[#c40000]/15 focus-visible:ring-2 focus-visible:ring-red-200"
           >
-            Import workspace backup
-          </Button>
+            Erase Local Storage
+          </button>
         </div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="application/json"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) {
-              onImportTasksAndProjects(file);
-            }
-            e.currentTarget.value = '';
-          }}
-        />
-        <Button type="button" variant="destructive" onClick={onNukeLocalData}>
-          Nuke local storage
-        </Button>
       </div>
     </AnchoredPanelSection>
   );

@@ -87,6 +87,9 @@
         "pkg"
       ]
     },
+    "dmg": {
+      "background": "electron/assets/dmg-background.png"
+    },
     "win": {
       "icon": "electron/assets/app.ico",
       "target": [

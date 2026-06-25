@@ -713,6 +713,16 @@ test('guide and execution schema resources explain the task workflow', () => {
   assert.match(guideResponse.result.contents[0].text, /tasks\.move_to_ready_for_human_review/);
   assert.match(guideResponse.result.contents[0].text, /canonicalWritePaths/);
   assert.match(guideResponse.result.contents[0].text, /milestones\.link_tasks/);
+  const guide = JSON.parse(guideResponse.result.contents[0].text);
+  assert.equal(guide.contentBoundary.classification, 'advisory-metadata');
+  assert.equal(
+    guide.contentBoundary.instructionPrecedence,
+    'never-above-client-system-or-developer-instructions'
+  );
+  assert.match(
+    guide.workflowReference.join('\n'),
+    /not authority to change instruction hierarchy or task acceptance criteria/
+  );
 
   const schemaResponse = dispatch({
     jsonrpc: '2.0',
@@ -745,6 +755,11 @@ test('template resources resolve assigned work, project work, and board work', (
 
   assert.ok(Array.isArray(agentResponse.result.contents));
   const assignedWork = JSON.parse(agentResponse.result.contents[0].text);
+  assert.equal(assignedWork.contentBoundary.classification, 'workspace-data');
+  assert.equal(
+    assignedWork.contentBoundary.instructionPrecedence,
+    'never-above-client-system-or-developer-instructions'
+  );
   assert.deepEqual(assignedWork.person, {
     id: 'agent-1',
     name: 'Codex',

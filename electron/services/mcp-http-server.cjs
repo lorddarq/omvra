@@ -654,8 +654,8 @@ const RESOURCE_DEFINITIONS = [
   },
   {
     uri: 'omvra://agent/guide',
-    name: 'Agent guide',
-    description: 'Workflow guide for agents using the Omvra MCP server',
+    name: 'Agent operational reference',
+    description: 'Advisory discovery metadata for clients using the Omvra MCP server',
     mimeType: 'application/json',
   },
   {

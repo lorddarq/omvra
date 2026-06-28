@@ -32,7 +32,6 @@ import { allocateTasksToTracks, calculateSwimlaneHeight } from '../utils/trackAl
 import { getReadableTextClassFor } from '../utils/contrast';
 import { parseISODateLocal, toLocalISODate } from '../utils/date';
 import { getJSON, persistRawWithElectronMirror } from '../utils/storage';
-import { shouldBootstrapFromLocalStorage } from '../utils/canonicalHydration.js';
 import { applyTimelineTaskDrop } from '../utils/timelineTaskDrop';
 import { resolveReorderDropIndex } from '../utils/swimlaneReorder';
 
@@ -47,6 +46,35 @@ const MONTH_WIDTHS_KEY = 'omvra.monthWidths.v1';
 const LEFT_COL_WIDTH_KEY = 'omvra.leftColWidth.v1';
 const HORIZONTAL_RENDER_BUFFER_PX = 1200;
 const MIN_TOTAL_MONTHS = 12;
+
+function readStoredLeftColumnWidth(): number | null {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const raw = window.localStorage.getItem(LEFT_COL_WIDTH_KEY);
+    const parsed = raw ? Number(raw) : NaN;
+    return Number.isFinite(parsed)
+      ? Math.max(MIN_LEFT_COL_WIDTH, Math.min(MAX_LEFT_COL_WIDTH, parsed))
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function readStoredMonthWidths(): Record<string, number> | null {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const raw = window.localStorage.getItem(MONTH_WIDTHS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, number>
+      : null;
+  } catch {
+    return null;
+  }
+}
 
 function TimelineSwimlaneInsertionMarker({
   height,
@@ -176,12 +204,7 @@ export function TimelineView({
 }: TimelineViewProps) {
   // Left column width state
   const [leftColWidth, setLeftColWidth] = useState<number>(() => {
-    if (!shouldBootstrapFromLocalStorage()) return DEFAULT_LEFT_COL_WIDTH;
-    const raw = window.localStorage.getItem(LEFT_COL_WIDTH_KEY);
-    const parsed = raw ? Number(raw) : NaN;
-    return Number.isFinite(parsed)
-      ? Math.max(MIN_LEFT_COL_WIDTH, Math.min(MAX_LEFT_COL_WIDTH, parsed))
-      : DEFAULT_LEFT_COL_WIDTH;
+    return readStoredLeftColumnWidth() ?? DEFAULT_LEFT_COL_WIDTH;
   });
   const [isResizingLeft, setIsResizingLeft] = useState<boolean>(false);
   const leftResizeRef = useRef<{ startX: number; startWidth: number; pendingWidth?: number } | null>(null);
@@ -222,7 +245,6 @@ export function TimelineView({
   const leftListRef = useRef<HTMLDivElement>(null);
   const fixedBtnRef = useRef<HTMLDivElement>(null);
   const hasInitializedScrollRef = useRef<boolean>(false);
-  const isScrollingRef = useRef<boolean>(false); // Flag to prevent feedback loops
   const scrollNotifyRafRef = useRef<number | null>(null);
   const resizeUpdateRafRef = useRef<number | null>(null);
   const pendingResizePreviewRef = useRef<{ taskId: string; left: number; width: number } | null>(null);
@@ -232,6 +254,7 @@ export function TimelineView({
   const scrubStartScrollLeftRef = useRef<number>(0);
   const startupScrollTimersRef = useRef<number[]>([]);
   const startupScrollRafRef = useRef<number | null>(null);
+  const hasHydratedTimelineLayoutRef = useRef(false);
   const [isHeaderScrubbing, setIsHeaderScrubbing] = useState(false);
   const [needsStartupTodayScroll, setNeedsStartupTodayScroll] = useState(false);
 
@@ -253,6 +276,8 @@ export function TimelineView({
       if (storedMonthWidths && typeof storedMonthWidths === 'object') {
         setMonthWidths(prev => ({ ...prev, ...storedMonthWidths }));
       }
+
+      hasHydratedTimelineLayoutRef.current = true;
     };
 
     void hydrateTimelineLayout();
@@ -376,15 +401,8 @@ export function TimelineView({
     Object.entries(allDatesByMonth).forEach(([k, monthDates]) => {
       defaults[k] = monthDates.length * DEFAULT_DAY_WIDTH;
     });
-    if (!shouldBootstrapFromLocalStorage()) return defaults;
-    try {
-      const raw = window.localStorage.getItem(MONTH_WIDTHS_KEY);
-      if (!raw) return defaults;
-      const stored = JSON.parse(raw) as Record<string, number>;
-      return { ...defaults, ...stored };
-    } catch {
-      return defaults;
-    }
+    const stored = readStoredMonthWidths();
+    return stored ? { ...defaults, ...stored } : defaults;
   });
 
   // Derive day widths
@@ -414,11 +432,13 @@ export function TimelineView({
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (!hasHydratedTimelineLayoutRef.current && !readStoredLeftColumnWidth()) return;
     persistRawWithElectronMirror(LEFT_COL_WIDTH_KEY, String(leftColWidth));
   }, [leftColWidth]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (!hasHydratedTimelineLayoutRef.current && !readStoredMonthWidths()) return;
     persistRawWithElectronMirror(MONTH_WIDTHS_KEY, JSON.stringify(monthWidths));
   }, [monthWidths]);
 
@@ -525,6 +545,10 @@ export function TimelineView({
     });
     return heights;
   }, [tasks, displaySwimlanes, mode]);
+
+  const draggedSwimlaneHeight = draggingSwimlaneId
+    ? swimlaneHeights[draggingSwimlaneId] || DEFAULT_ROW_HEIGHT
+    : DEFAULT_ROW_HEIGHT;
 
   // Sync left column header height with timeline header actual height
   const [syncedHeaderHeight, setSyncedHeaderHeight] = useState<number | null>(null);
@@ -994,19 +1018,19 @@ export function TimelineView({
     setSwimlaneDropIndicator(null);
   }, [displaySwimlanes, handleMoveSwimlane]);
 
-  // Sync vertical scroll between left column and rows container
-  const handleLeftScroll = useCallback(() => {
-    if (!leftListRef.current || !rowsContainerRef.current || isScrollingRef.current) return;
-    isScrollingRef.current = true;
-    rowsContainerRef.current.scrollTop = leftListRef.current.scrollTop;
-    setTimeout(() => {
-      isScrollingRef.current = false;
-    }, 0);
+  // Keep the timeline grid as the single vertical scroller. Wheel events over
+  // the fixed Projects column proxy into it so the two panes cannot fight.
+  const handleLeftWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
+    if (!rowsContainerRef.current) return;
+    rowsContainerRef.current.scrollTop += event.deltaY;
+    if (event.deltaX) {
+      rowsContainerRef.current.scrollLeft += event.deltaX;
+    }
+    event.preventDefault();
   }, []);
 
   const handleRowsVerticalScroll = useCallback(() => {
-    if (!leftListRef.current || !rowsContainerRef.current || isScrollingRef.current) return;
-    isScrollingRef.current = true;
+    if (!leftListRef.current || !rowsContainerRef.current) return;
     leftListRef.current.scrollTop = rowsContainerRef.current.scrollTop;
     if (scrollNotifyRafRef.current == null) {
       scrollNotifyRafRef.current = requestAnimationFrame(() => {
@@ -1024,28 +1048,22 @@ export function TimelineView({
         scrollNotifyRafRef.current = null;
       });
     }
-    setTimeout(() => {
-      isScrollingRef.current = false;
-    }, 0);
   }, [onTimelineScroll]);
 
-  // Attach vertical scroll listeners
+  // Attach vertical scroll listener
   useEffect(() => {
-    const leftEl = leftListRef.current;
     const rowsEl = rowsContainerRef.current;
-    if (!leftEl || !rowsEl) return;
+    if (!rowsEl) return;
 
-    leftEl.addEventListener('scroll', handleLeftScroll);
     rowsEl.addEventListener('scroll', handleRowsVerticalScroll);
     return () => {
       if (scrollNotifyRafRef.current != null) {
         cancelAnimationFrame(scrollNotifyRafRef.current);
         scrollNotifyRafRef.current = null;
       }
-      leftEl.removeEventListener('scroll', handleLeftScroll);
       rowsEl.removeEventListener('scroll', handleRowsVerticalScroll);
     };
-  }, [handleLeftScroll, handleRowsVerticalScroll]);
+  }, [handleRowsVerticalScroll]);
 
   useEffect(() => {
     if (!rowsContainerRef.current) return;
@@ -1147,9 +1165,12 @@ export function TimelineView({
               />
             </div>
 
-            <div className="timeline-left-list" ref={leftListRef}>
+            <div className="timeline-left-list" ref={leftListRef} onWheel={handleLeftWheel}>
               {displaySwimlanes.map((swimlane, index) => {
                 const height = swimlaneHeights[swimlane.id] || DEFAULT_ROW_HEIGHT;
+                const isDraggedRowCollapsed = Boolean(
+                  visibleSwimlaneDropIndicator && draggingSwimlaneId === swimlane.id
+                );
                 const taskCount = mode === 'people'
                   ? tasks.filter(t => t.assigneeId === swimlane.id).length
                   : tasks.filter(t => t.swimlaneId === swimlane.id).length;
@@ -1158,7 +1179,7 @@ export function TimelineView({
                   <React.Fragment key={swimlane.id}>
                     {visibleSwimlaneDropIndicator?.targetId === swimlane.id && visibleSwimlaneDropIndicator.position === 'before' && (
                       <TimelineSwimlaneInsertionMarker
-                        height={height}
+                        height={draggedSwimlaneHeight}
                         width={`${leftColWidth}px`}
                         indicator={visibleSwimlaneDropIndicator}
                         onSwimlaneDrop={handleSwimlaneDrop}
@@ -1168,8 +1189,9 @@ export function TimelineView({
                     <div
                       className="timeline-swimlane-label-container"
                       style={{
-                        height: `${height}px`,
-                        minHeight: `${height}px`,
+                        height: isDraggedRowCollapsed ? '0px' : `${height}px`,
+                        minHeight: isDraggedRowCollapsed ? '0px' : `${height}px`,
+                        overflow: isDraggedRowCollapsed ? 'hidden' : undefined,
                       }}
                     >
                       <DraggableSwimlaneLabel
@@ -1189,7 +1211,7 @@ export function TimelineView({
                     </div>
                     {visibleSwimlaneDropIndicator?.targetId === swimlane.id && visibleSwimlaneDropIndicator.position === 'after' && (
                       <TimelineSwimlaneInsertionMarker
-                        height={height}
+                        height={draggedSwimlaneHeight}
                         width={`${leftColWidth}px`}
                         indicator={visibleSwimlaneDropIndicator}
                         onSwimlaneDrop={handleSwimlaneDrop}
@@ -1278,12 +1300,15 @@ export function TimelineView({
                   ? tasks.filter(t => t.assigneeId === swimlane.id)
                   : tasks.filter(t => t.swimlaneId === swimlane.id);
                 const height = swimlaneHeights[swimlane.id] || DEFAULT_ROW_HEIGHT;
+                const isDraggedRowCollapsed = Boolean(
+                  visibleSwimlaneDropIndicator && draggingSwimlaneId === swimlane.id
+                );
 
                 return (
                   <React.Fragment key={swimlane.id}>
                     {visibleSwimlaneDropIndicator?.targetId === swimlane.id && visibleSwimlaneDropIndicator.position === 'before' && (
                       <TimelineSwimlaneInsertionMarker
-                        height={height}
+                        height={draggedSwimlaneHeight}
                         width={`${totalTimelineWidth + endPadding}px`}
                         indicator={visibleSwimlaneDropIndicator}
                         onSwimlaneDrop={handleSwimlaneDrop}
@@ -1293,8 +1318,9 @@ export function TimelineView({
                     <div
                       className="swimlane-row relative"
                       style={{
-                        height: `${height}px`,
-                        minHeight: `${height}px`,
+                        height: isDraggedRowCollapsed ? '0px' : `${height}px`,
+                        minHeight: isDraggedRowCollapsed ? '0px' : `${height}px`,
+                        overflow: isDraggedRowCollapsed ? 'hidden' : undefined,
                         opacity: draggingSwimlaneId === swimlane.id ? 0.4 : undefined,
                       }}
                     >
@@ -1355,7 +1381,7 @@ export function TimelineView({
                     </div>
                     {visibleSwimlaneDropIndicator?.targetId === swimlane.id && visibleSwimlaneDropIndicator.position === 'after' && (
                       <TimelineSwimlaneInsertionMarker
-                        height={height}
+                        height={draggedSwimlaneHeight}
                         width={`${totalTimelineWidth + endPadding}px`}
                         indicator={visibleSwimlaneDropIndicator}
                         onSwimlaneDrop={handleSwimlaneDrop}

@@ -28,6 +28,8 @@ export interface AppMainViewsProps {
   milestones: ProjectMilestone[];
   readModel: WorkspaceReadModel;
   timelineInitialScrollLeft: number;
+  kanbanInitialScrollLeft: number;
+  kanbanInitialScrollTop: number;
   onTimelineTaskClick: (task: Task) => void;
   onTimelineAddTask: (date: Date, swimlaneId: string, endDate?: Date, mode?: 'projects' | 'people') => void;
   onTimelineUpdateTaskDates: (taskId: string, startDate: string, endDate: string) => void;
@@ -70,6 +72,8 @@ export function AppMainViews({
   milestones,
   readModel,
   timelineInitialScrollLeft,
+  kanbanInitialScrollLeft,
+  kanbanInitialScrollTop,
   onTimelineTaskClick,
   onTimelineAddTask,
   onTimelineUpdateTaskDates,
@@ -122,13 +126,16 @@ export function AppMainViews({
       )}
 
       {currentView === 'kanban' && (
-        <div key={`kanban-${viewRefreshKey}`} ref={kanbanContainerRef} className="flex h-full min-h-0 w-full">
+        <div key={`kanban-${viewRefreshKey}`} className="flex h-full min-h-0 w-full">
           <DndProvider backend={HTML5Backend}>
             <KanbanView
               tasks={tasks}
               swimlanes={statusColumns}
               projects={timelineSwimlanes}
               people={people}
+              scrollContainerRef={kanbanContainerRef}
+              initialScrollLeft={kanbanInitialScrollLeft}
+              initialScrollTop={kanbanInitialScrollTop}
               onTaskClick={onKanbanTaskClick}
               onEditTask={onKanbanEditTask}
               onAddTask={onKanbanAddTask}

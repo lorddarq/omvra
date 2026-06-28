@@ -412,11 +412,12 @@
 
 .timeline-left-list {
   flex: 1;
-  overflow: auto;
+  overflow: hidden;
   border-right: 1px solid rgba(0, 0, 0, 0.1);
   background-color: #f9fafb;
   display: flex;
   flex-direction: column;
+  overscroll-behavior: contain;
 }
 
 .timeline-swimlane-label-container {
@@ -1575,9 +1576,8 @@
 }
 
 .kanban-column-frame.is-dragging {
-  width: 0;
-  overflow: hidden;
-  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .kanban-column-drag-handle {

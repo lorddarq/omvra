@@ -167,6 +167,10 @@ function App() {
     scrollLeft: 0,
     scrollTop: 0,
   });
+  const kanbanScrollStateRef = useRef<{ scrollLeft: number; scrollTop: number }>({
+    scrollLeft: 0,
+    scrollTop: 0,
+  });
 
   const [tasks, setTasks] = useState<Task[]>(() => {
     const stored = readInitialWorkspaceJSON<Task[]>(TASKS_KEY, DEFAULT_TASKS_SEED);
@@ -725,6 +729,25 @@ function App() {
     timelineScrollStateRef.current = state;
   }, []);
 
+  useEffect(() => {
+    const handleKanbanScroll = (event: Event) => {
+      const { scrollLeft = 0, scrollTop = 0 } = (event as CustomEvent<{
+        scrollLeft?: number;
+        scrollTop?: number;
+      }>).detail ?? {};
+
+      kanbanScrollStateRef.current = { scrollLeft, scrollTop };
+      viewState.viewStatesRef.current.kanban = {
+        ...viewState.viewStatesRef.current.kanban,
+        scrollLeft,
+        scrollTop,
+      };
+    };
+
+    document.addEventListener('kanbanScroll', handleKanbanScroll);
+    return () => document.removeEventListener('kanbanScroll', handleKanbanScroll);
+  }, [viewState.viewStatesRef]);
+
   const handlePollAgentWatchFromPanel = useCallback((personId: string) => {
     const config = agentWatchConfigs.find(item => item.personId === personId) || {
       personId,
@@ -867,8 +890,8 @@ function App() {
     } else {
       viewState.saveViewState('kanban', {
         ...viewState.getViewState('kanban'),
-        scrollLeft: kanbanContainerRef.current?.scrollLeft || 0,
-        scrollTop: kanbanContainerRef.current?.scrollTop || 0,
+        scrollLeft: kanbanScrollStateRef.current.scrollLeft,
+        scrollTop: kanbanScrollStateRef.current.scrollTop,
       });
     }
 
@@ -884,8 +907,8 @@ function App() {
       viewState.currentView === 'kanban'
         ? {
             ...viewState.getViewState('kanban'),
-            scrollLeft: kanbanContainerRef.current?.scrollLeft || 0,
-            scrollTop: kanbanContainerRef.current?.scrollTop || 0,
+            scrollLeft: kanbanScrollStateRef.current.scrollLeft,
+            scrollTop: kanbanScrollStateRef.current.scrollTop,
           }
         : safeReadLocalStorageJSON<Record<string, unknown>>(KANBAN_VIEW_STATE_KEY, viewState.getViewState('kanban'));
     const payload = buildWorkspaceBackupPayload({
@@ -1044,8 +1067,8 @@ function App() {
             });
           } else if (viewState.currentView === 'kanban') {
             viewState.saveViewState('kanban', {
-              scrollLeft: kanbanContainerRef.current?.scrollLeft || 0,
-              scrollTop: kanbanContainerRef.current?.scrollTop || 0,
+              scrollLeft: kanbanScrollStateRef.current.scrollLeft,
+              scrollTop: kanbanScrollStateRef.current.scrollTop,
             });
           } else if (viewState.currentView === 'roadmap') {
             viewState.saveViewState('roadmap', viewState.getViewState('roadmap'));
@@ -1084,6 +1107,8 @@ function App() {
         milestones={milestones}
         readModel={workspaceReadModel}
         timelineInitialScrollLeft={viewState.getViewState('timeline').scrollLeft || 0}
+        kanbanInitialScrollLeft={viewState.getViewState('kanban').scrollLeft || 0}
+        kanbanInitialScrollTop={viewState.getViewState('kanban').scrollTop || 0}
         onTimelineTaskClick={handleTaskClick}
         onTimelineAddTask={handleAddTaskFromTimeline}
         onTimelineUpdateTaskDates={handleUpdateTaskDates}

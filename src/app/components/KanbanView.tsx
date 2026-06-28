@@ -8,7 +8,7 @@
  * Columns grow to fill available width or overflow-scroll if total width exceeds viewport.
  */
 
-import { useRef, useEffect, useLayoutEffect, useCallback, useMemo, useState } from 'react';
+import { useRef, useEffect, useLayoutEffect, useCallback, useMemo, useState, type RefObject } from 'react';
 import { Task, TaskStatus, StatusColumn, TimelineSwimlane, Person } from '../types';
 import { SwimlanesView } from './SwimlanesView';
 import { ALL_FILTER_VALUE, KanbanToolbar } from './KanbanToolbar';
@@ -32,6 +32,9 @@ interface KanbanViewProps {
   swimlanes: StatusColumn[];
   projects: TimelineSwimlane[];
   people: Person[];
+  scrollContainerRef?: RefObject<HTMLDivElement | null>;
+  initialScrollLeft?: number;
+  initialScrollTop?: number;
   onTaskClick: (task: Task) => void;
   onEditTask?: (task: Task) => void;
   onAddTask: (status: TaskStatus) => void;
@@ -49,6 +52,9 @@ export function KanbanView({
   swimlanes,
   projects,
   people,
+  scrollContainerRef,
+  initialScrollLeft = 0,
+  initialScrollTop = 0,
   onTaskClick,
   onEditTask,
   onAddTask,
@@ -60,9 +66,11 @@ export function KanbanView({
   onAddColumn,
   onDeleteColumn,
 }: KanbanViewProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const fallbackContainerRef = useRef<HTMLDivElement>(null);
+  const containerRef = scrollContainerRef ?? fallbackContainerRef;
   const scrollbarTrackRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<{ startClientX: number; startScrollLeft: number } | null>(null);
+  const didRestoreInitialScrollRef = useRef(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<KanbanTaskFilters>(() =>
     readInitialKanbanTaskFilters(projects, people)
@@ -166,6 +174,17 @@ export function KanbanView({
     },
     [emitScrollState, syncScrollMetrics]
   );
+
+  useLayoutEffect(() => {
+    const node = containerRef.current;
+    if (!node || didRestoreInitialScrollRef.current) return;
+
+    node.scrollLeft = initialScrollLeft;
+    node.scrollTop = initialScrollTop;
+    didRestoreInitialScrollRef.current = true;
+    syncScrollMetrics(node);
+    emitScrollState(node);
+  }, [containerRef, emitScrollState, initialScrollLeft, initialScrollTop, syncScrollMetrics]);
 
   useLayoutEffect(() => {
     syncScrollMetrics();

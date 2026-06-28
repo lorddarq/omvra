@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays, Filter, Plus, Search, TriangleAlert, X } from 'lucide-react';
+import type { CSSProperties } from 'react';
+import { Filter, Plus, Search, TriangleAlert, X } from 'lucide-react';
 import { ProjectMilestone, Task, TaskStatus, TimelineSwimlane } from '../types';
 import {
   getMilestoneProjectIds,
@@ -48,13 +49,6 @@ const TASK_ROW_HEIGHT = 48;
 const MILESTONE_ROW_GAP = 0;
 const CHART_PADDING_BOTTOM = 24;
 
-const STATUS_SEGMENT_CLASSES: Record<TaskStatus, string> = {
-  open: 'bg-gray-300',
-  'in-progress': 'bg-blue-500',
-  'under-review': 'bg-amber-500',
-  done: 'bg-emerald-500',
-};
-
 const HEALTH_LABELS: Record<MilestoneHealth, string> = {
   complete: 'Complete',
   'at-risk': 'At risk',
@@ -73,6 +67,23 @@ const HEALTH_CLASSES: Record<MilestoneHealth, string> = {
 
 function getStatusTitle(statusColumns: RoadmapViewProps['statusColumns'], status: TaskStatus): string {
   return statusColumns.find(column => column.id === status)?.title || status;
+}
+
+function getStatusColorProps(
+  statusColumns: RoadmapViewProps['statusColumns'],
+  status: TaskStatus
+): { className?: string; style?: CSSProperties } {
+  const color = statusColumns.find(column => column.id === status)?.color;
+
+  if (color?.startsWith('#')) {
+    return { style: { backgroundColor: color } };
+  }
+
+  if (color) {
+    return { className: color };
+  }
+
+  return { style: { backgroundColor: '#d1d5db' } };
 }
 
 function getTaskProgress(status: TaskStatus): number {
@@ -204,9 +215,11 @@ function getRoadmapRowHeight(taskCount: number): number {
 function MilestoneRollupBar({
   counts,
   totalTasks,
+  statusColumns,
 }: {
   counts: Record<TaskStatus, number>;
   totalTasks: number;
+  statusColumns: RoadmapViewProps['statusColumns'];
 }) {
   if (totalTasks === 0) {
     return <div className="h-2 rounded-full bg-gray-100" aria-label="No linked tasks" />;
@@ -214,15 +227,20 @@ function MilestoneRollupBar({
 
   return (
     <div className="flex h-2 overflow-hidden rounded-full bg-gray-100" aria-label="Milestone task status composition">
-      {(Object.keys(STATUS_SEGMENT_CLASSES) as TaskStatus[]).map(status => {
+      {statusColumns.map(column => {
+        const status = column.id;
         const count = counts[status] || 0;
         if (count === 0) return null;
+        const colorProps = getStatusColorProps(statusColumns, status);
         return (
           <div
             key={status}
-            className={STATUS_SEGMENT_CLASSES[status]}
-            style={{ width: `${(count / totalTasks) * 100}%` }}
-            title={`${count} ${status} task${count === 1 ? '' : 's'}`}
+            className={colorProps.className}
+            style={{
+              ...colorProps.style,
+              width: `${(count / totalTasks) * 100}%`,
+            }}
+            title={`${count} ${getStatusTitle(statusColumns, status)} task${count === 1 ? '' : 's'}`}
           />
         );
       })}
@@ -443,7 +461,7 @@ export function RoadmapView({
   };
 
   const scrollToToday = () => {
-    scrollToDay(new Date());
+    scrollToDay(new Date(), 'auto');
   };
 
   useLayoutEffect(() => {
@@ -472,6 +490,20 @@ export function RoadmapView({
             placeholder="Search milestones, projects, or linked tasks..."
             className="kanban-toolbar-search-input"
           />
+        </div>
+        <div className="roadmap-toolbar-center" aria-label="Roadmap date navigation">
+          <span className="roadmap-toolbar-date-range">
+            {toLocalISODate(range.start)} to {toLocalISODate(range.end)}
+          </span>
+          {todayLeft !== null && (
+            <button
+              type="button"
+              onClick={scrollToToday}
+              className="timeline-toolbar-button-primary"
+            >
+              Today
+            </button>
+          )}
         </div>
         <div className="kanban-toolbar-actions">
           <div className="kanban-filter-control">
@@ -609,23 +641,6 @@ export function RoadmapView({
           </section>
         ) : (
           <section className="flex h-full min-h-0 flex-col overflow-hidden border-t border-gray-200 bg-white">
-            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-              <div className="text-sm text-gray-600">
-                Showing {filteredMilestones.length} of {milestones.length} milestone{milestones.length === 1 ? '' : 's'}
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="gap-1.5 text-gray-600">
-                  <CalendarDays className="size-3.5" />
-                  {toLocalISODate(range.start)} to {toLocalISODate(range.end)}
-                </Badge>
-                {todayLeft !== null && (
-                  <Button type="button" variant="outline" size="sm" onClick={scrollToToday}>
-                    Today
-                  </Button>
-                )}
-              </div>
-            </div>
-
             <div ref={chartViewportRef} className="relative min-h-0 flex-1 overflow-hidden">
               <div
                 className={`absolute inset-x-0 top-0 z-50 h-[82px] select-none border-b border-gray-200 bg-white ${
@@ -711,7 +726,11 @@ export function RoadmapView({
                           {HEALTH_LABELS[row.summary.health]}
                         </Badge>
                       </div>
-                      <MilestoneRollupBar counts={row.summary.counts} totalTasks={row.summary.totalTasks} />
+                      <MilestoneRollupBar
+                        counts={row.summary.counts}
+                        totalTasks={row.summary.totalTasks}
+                        statusColumns={statusColumns}
+                      />
                       <div className="text-xs text-gray-500">
                         {row.summary.completedTasks} of {row.summary.totalTasks} tasks done
                       </div>
@@ -821,6 +840,7 @@ export function RoadmapView({
                           const width = getTaskWidth(task);
                           const progress = getTaskProgress(task.status);
                           const isLate = lateTaskIds.has(task.id);
+                          const statusColorProps = getStatusColorProps(statusColumns, task.status);
                           return (
                             <button
                               key={task.id}
@@ -837,8 +857,11 @@ export function RoadmapView({
                               title={`${task.title} - ${getStatusTitle(statusColumns, task.status)}`}
                             >
                               <span
-                                className={`absolute inset-y-0 left-0 ${STATUS_SEGMENT_CLASSES[task.status]} opacity-45`}
-                                style={{ width: `${progress}%` }}
+                                className={`absolute inset-y-0 left-0 opacity-45 ${statusColorProps.className || ''}`}
+                                style={{
+                                  ...statusColorProps.style,
+                                  width: `${progress}%`,
+                                }}
                                 aria-hidden="true"
                               />
                               <span className="relative z-10 truncate px-3 text-gray-900">{task.title}</span>

@@ -1409,6 +1409,7 @@
 }
 
 .kanban-toolbar {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -1458,6 +1459,30 @@
   align-items: center;
   justify-content: flex-end;
   gap: 0.5rem;
+}
+
+.roadmap-toolbar-center {
+  pointer-events: none;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+}
+
+.roadmap-toolbar-center > * {
+  pointer-events: auto;
+}
+
+.roadmap-toolbar-date-range {
+  color: #6f6f77;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .kanban-filter-control {

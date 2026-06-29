@@ -49,6 +49,7 @@ const HEADER_HEIGHT = 82;
 const MILESTONE_ROW_HEIGHT = 52;
 const TASK_ROW_HEIGHT = 48;
 const MILESTONE_ROW_GAP = 0;
+const MIN_ROADMAP_ROW_HEIGHT = 132;
 const CHART_PADDING_BOTTOM = 24;
 
 const HEALTH_LABELS: Record<MilestoneHealth, string> = {
@@ -211,7 +212,10 @@ function sortRoadmapTasks(tasks: Task[]): Task[] {
 }
 
 function getRoadmapRowHeight(taskCount: number): number {
-  return MILESTONE_ROW_HEIGHT + Math.max(1, taskCount) * TASK_ROW_HEIGHT + MILESTONE_ROW_GAP;
+  return Math.max(
+    MIN_ROADMAP_ROW_HEIGHT,
+    MILESTONE_ROW_HEIGHT + Math.max(1, taskCount) * TASK_ROW_HEIGHT + MILESTONE_ROW_GAP
+  );
 }
 
 function MilestoneRollupBar({

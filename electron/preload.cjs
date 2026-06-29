@@ -22,6 +22,10 @@ contextBridge.exposeInMainWorld('electron', {
     };
   },
 
+  app: {
+    getRuntimeInfo: () => ipcRenderer.invoke('app/get-runtime-info'),
+  },
+
   // Attachments
   attachments: {
     pick: () => ipcRenderer.invoke('attachments/pick'),

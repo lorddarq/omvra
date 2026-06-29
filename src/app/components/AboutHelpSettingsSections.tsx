@@ -6,10 +6,9 @@ import {
   Play,
   RotateCcw,
 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import omvraLogo from '../images/logo-large.svg';
 import profilePicture from '../images/profile.png';
-import { APP_VERSION } from '../version';
 import { AnchoredPanelSection } from './AnchoredPanel';
 
 const CONTACT_EMAIL_URL = 'mailto:sorin.jurcut@gmail.com';
@@ -26,6 +25,12 @@ const faqs = [
   'How do agents access Omvra?',
   'Can I back up or restore my workspace?',
 ];
+
+interface AboutVersionInfo {
+  appVersion: string;
+  mcpVersion: string;
+  build: string;
+}
 
 export function HelpSettingsSection() {
   return (
@@ -70,6 +75,35 @@ export function HelpSettingsSection() {
 }
 
 export function AboutSettingsSection() {
+  const [versionInfo, setVersionInfo] = useState<AboutVersionInfo>({
+    appVersion: 'Loading...',
+    mcpVersion: 'Loading...',
+    build: 'Loading...',
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadVersionInfo = async () => {
+      const runtimeInfo = await loadRuntimeInfo();
+      const mcpVersion = await loadMcpVersion();
+
+      if (cancelled) return;
+
+      setVersionInfo({
+        appVersion: runtimeInfo.appVersion,
+        mcpVersion,
+        build: runtimeInfo.build,
+      });
+    };
+
+    void loadVersionInfo();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <AnchoredPanelSection id="about" title="About">
       <div className="min-w-0 space-y-8">
@@ -82,9 +116,9 @@ export function AboutSettingsSection() {
             Version
           </h4>
           <div className="rounded-xl bg-[#fafafa] px-4 py-3">
-            <InfoRow label="App version" value={APP_VERSION} />
-            <InfoRow label="MCP version" value={APP_VERSION} />
-            <InfoRow label="Build" value="Local build" />
+            <InfoRow label="App version" value={versionInfo.appVersion} />
+            <InfoRow label="MCP version" value={versionInfo.mcpVersion} />
+            <InfoRow label="Build" value={versionInfo.build} />
             <InfoRow label="Copyright" value="Sorin Jurcut" />
           </div>
         </section>
@@ -168,6 +202,41 @@ function InfoRow({ label, value }: { label: string; value: string }) {
       <span className="max-w-[260px] truncate text-right text-xs font-semibold leading-4 text-[#71717a]">{value}</span>
     </div>
   );
+}
+
+async function loadRuntimeInfo(): Promise<{ appVersion: string; build: string }> {
+  if (!window.electron?.app?.getRuntimeInfo) {
+    return {
+      appVersion: 'Unavailable',
+      build: 'Browser preview',
+    };
+  }
+
+  try {
+    const runtimeInfo = await window.electron.app.getRuntimeInfo();
+    return {
+      appVersion: runtimeInfo.version || 'Unavailable',
+      build: `${runtimeInfo.isPackaged ? 'Packaged' : 'Development'} / Electron ${runtimeInfo.electronVersion || 'unknown'}`,
+    };
+  } catch {
+    return {
+      appVersion: 'Unavailable',
+      build: 'Unavailable',
+    };
+  }
+}
+
+async function loadMcpVersion(): Promise<string> {
+  if (!window.electron?.mcp?.getCapabilities) {
+    return 'Unavailable';
+  }
+
+  try {
+    const result = await window.electron.mcp.getCapabilities();
+    return result.data?.serverInfo?.version || 'Unavailable';
+  } catch {
+    return 'Unavailable';
+  }
 }
 
 function ResourceList({ title, children }: { title: string; children: ReactNode }) {

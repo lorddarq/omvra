@@ -143,6 +143,16 @@ declare global {
       storeDelete: (key: string) => Promise<void>;
       storeExport: () => Promise<Record<string, any>>;
       onStoreChanged: (listener: (payload: { updatedAt: string }) => void) => () => void;
+      app: {
+        getRuntimeInfo: () => Promise<{
+          name: string;
+          version: string;
+          isPackaged: boolean;
+          electronVersion: string;
+          chromeVersion: string;
+          nodeVersion: string;
+        }>;
+      };
       attachments: {
         pick: () => Promise<string[]>;
         verify: (path: string) => Promise<any>;

@@ -9,9 +9,6 @@ import {
 } from '../utils/roadmap';
 import {
   Dialog,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
 } from './ui/dialog';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -276,14 +273,10 @@ export function MilestoneDetailsDialog({
 
       <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <DialogSurface className="max-w-[430px]">
-          <DialogHeader className="border-b border-black/6 px-6 py-5 text-left">
-            <DialogTitle className="text-[1.05rem] font-semibold tracking-[-0.02em] text-[#111827]">
-              Delete milestone?
-            </DialogTitle>
-            <DialogDescription className="text-sm leading-6 text-[#6b7280]">
-              This removes the milestone and clears milestone-linked dependency wiring from the affected tasks.
-            </DialogDescription>
-          </DialogHeader>
+          <DialogSurfaceHeader
+            title="Delete milestone?"
+            description="This removes the milestone and clears milestone-linked dependency wiring from the affected tasks."
+          />
           <DialogSurfaceFooter>
             <Button
               type="button"

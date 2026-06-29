@@ -297,6 +297,14 @@ ipcMain.handle('store/get', (_, key) => store.get(key));
 ipcMain.handle('store/set', (_, key, value) => store.set(key, value));
 ipcMain.handle('store/delete', (_, key) => store.delete(key));
 ipcMain.handle('store/export', () => store.store);
+ipcMain.handle('app/get-runtime-info', () => ({
+  name: app.getName(),
+  version: app.getVersion(),
+  isPackaged: app.isPackaged,
+  electronVersion: process.versions.electron || 'unknown',
+  chromeVersion: process.versions.chrome || 'unknown',
+  nodeVersion: process.versions.node || 'unknown',
+}));
 ipcMain.handle('tasks/export-pdf', exportHtmlToPdf);
 ipcMain.handle('mcp/restart-server', () => {
   try {
@@ -371,7 +379,7 @@ ipcMain.handle('attachments/reveal', async (_, filePath) => {
 ipcMain.handle('open-external', async (_, urlStr) => {
   try {
     const url = new URL(urlStr);
-    if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Invalid protocol');
+    if (!['http:', 'https:', 'mailto:'].includes(url.protocol)) throw new Error('Invalid protocol');
     await shell.openExternal(urlStr);
     return { success: true };
   } catch (err) {

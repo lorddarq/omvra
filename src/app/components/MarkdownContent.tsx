@@ -15,6 +15,17 @@ type CodeComponentProps = ComponentPropsWithoutRef<'code'> & {
   };
 };
 
+function openExternalLink(url: string) {
+  if (typeof window === 'undefined') return;
+
+  if (window.electron?.openExternal) {
+    void window.electron.openExternal(url);
+    return;
+  }
+
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
 export const markdownComponents: Components = {
   h1: ({ children }) => <h1 className="break-words text-xl font-semibold text-gray-900 [overflow-wrap:anywhere]">{children}</h1>,
   h2: ({ children }) => <h2 className="break-words text-lg font-semibold text-gray-900 [overflow-wrap:anywhere]">{children}</h2>,
@@ -83,7 +94,16 @@ export const markdownComponents: Components = {
       safeHref.startsWith('mailto:');
     if (!isSafe) return <span>{children}</span>;
     return (
-      <a href={safeHref} target="_blank" rel="noreferrer" className="break-words text-blue-600 underline [overflow-wrap:anywhere]">
+      <a
+        href={safeHref}
+        target="_blank"
+        rel="noreferrer"
+        onClick={(event) => {
+          event.preventDefault();
+          openExternalLink(safeHref);
+        }}
+        className="break-words text-blue-600 underline [overflow-wrap:anywhere]"
+      >
         {children}
       </a>
     );

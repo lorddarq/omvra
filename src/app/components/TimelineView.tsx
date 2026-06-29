@@ -15,12 +15,13 @@ import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffe
 import { Task, TimelineSwimlane, TaskStatus, Person, StatusColumn } from '../types';
 import { DndProvider, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { Plus } from 'lucide-react';
+import { CalendarDays, Plus, Users } from 'lucide-react';
 import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import { TimelineHeader } from './TimelineHeader';
 import { TimelineToolbar } from './TimelineToolbar';
 import { AppStatusBar } from './AppStatusBar';
+import { EmptyStateCard } from './EmptyStateCard';
 import {
   DraggableSwimlaneLabel,
   SWIMLANE_ROW_ITEM_TYPE,
@@ -236,6 +237,14 @@ export function TimelineView({
     }
     return swimlanes;
   }, [mode, people, swimlanes]);
+  const visibleTaskCount = useMemo(() => {
+    const visibleSwimlaneIds = new Set(displaySwimlanes.map(swimlane => swimlane.id));
+    return tasks.filter(task => (
+      mode === 'people'
+        ? Boolean(task.assigneeId && visibleSwimlaneIds.has(task.assigneeId))
+        : Boolean(task.swimlaneId && visibleSwimlaneIds.has(task.swimlaneId))
+    )).length;
+  }, [displaySwimlanes, mode, tasks]);
   const lastDisplaySwimlaneId = displaySwimlanes[displaySwimlanes.length - 1]?.id;
 
   // Refs
@@ -1144,6 +1153,25 @@ export function TimelineView({
         />
 
         {/* Main content */}
+        {displaySwimlanes.length === 0 ? (
+          <div className="flex flex-1 items-center justify-center px-6 py-10">
+            <div className="w-full max-w-3xl">
+              <EmptyStateCard
+                icon={mode === 'people' ? <Users className="size-5" /> : <CalendarDays className="size-5" />}
+                title={mode === 'people' ? 'No people on the timeline yet' : 'No timeline projects yet'}
+                description={mode === 'people'
+                  ? 'Add people in Settings to plan work by assignee, then switch back here to schedule and review capacity.'
+                  : 'Create a project lane to start planning work on the timeline. Tasks placed into a project will show up here automatically.'}
+                action={mode === 'projects' ? (
+                  <button type="button" onClick={onAddSwimlane} className="timeline-left-header-button h-auto px-4 py-2">
+                    <Plus className="size-4" />
+                    <span>Add first project</span>
+                  </button>
+                ) : undefined}
+              />
+            </div>
+          </div>
+        ) : (
         <div className="timeline-main-content">
           {/* Left column: swimlane labels */}
           <div className="timeline-left-column" style={{ width: `${leftColWidth}px` }}>
@@ -1294,6 +1322,19 @@ export function TimelineView({
             )}
 
             {/* Swimlane rows: tasks */}
+            {visibleTaskCount === 0 ? (
+              <div className="timeline-rows-container flex items-center justify-center p-6">
+                <div className="w-full max-w-2xl">
+                  <EmptyStateCard
+                    icon={<CalendarDays className="size-5" />}
+                    title="No scheduled timeline work yet"
+                    description={mode === 'people'
+                      ? 'Assign or date work for these people to start seeing it on the timeline.'
+                      : 'Add dated tasks to these projects and they will appear here with duration and overlap context.'}
+                  />
+                </div>
+              </div>
+            ) : (
             <div className="timeline-rows-container">
               {displaySwimlanes.map((swimlane, idx) => {
                 const swimlaneTasks = mode === 'people'
@@ -1399,9 +1440,11 @@ export function TimelineView({
                 onSwimlaneDropIndicatorClear={() => setSwimlaneDropIndicator(null)}
               />
             </div>
+            )}
             </div>
           </div>
         </div>
+        )}
 
         <AppStatusBar
           people={people}

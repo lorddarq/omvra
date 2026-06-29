@@ -503,8 +503,6 @@ function App() {
     isTaskDetailsOpen,
     setIsTaskDetailsOpen,
     isSwimlaneDialogOpen,
-    isPeoplePanelOpen,
-    setIsPeoplePanelOpen,
     isPreferencesOpen,
     setIsPreferencesOpen,
     selectedTask,
@@ -716,10 +714,6 @@ function App() {
   const handleOpenAgentsPanel = useCallback(() => {
     setPreferencesInitialAnchor('agents');
     setIsPreferencesOpen(true);
-  }, []);
-
-  const handleClosePeoplePanel = useCallback(() => {
-    setIsPeoplePanelOpen(false);
   }, []);
 
   const handleCloseTaskDetails = useCallback(() => {
@@ -1160,7 +1154,6 @@ function App() {
         isTaskDialogOpen={isTaskDialogOpen}
         isTaskDetailsOpen={isTaskDetailsOpen}
         isSwimlaneDialogOpen={isSwimlaneDialogOpen}
-        isPeoplePanelOpen={isPeoplePanelOpen}
         isPreferencesOpen={isPreferencesOpen}
         preferencesInitialAnchor={preferencesInitialAnchor}
         selectedTask={selectedTask}
@@ -1217,7 +1210,6 @@ function App() {
         onCloseSwimlaneDialog={handleCloseSwimlaneDialog}
         onSaveSwimlane={handleSaveSwimlane}
         onDeleteSwimlane={handleDeleteSwimlane}
-        onClosePeoplePanel={handleClosePeoplePanel}
         onAddPerson={handleAddPerson}
         onUpdatePerson={handleUpdatePerson}
         onDeletePerson={handleDeletePerson}

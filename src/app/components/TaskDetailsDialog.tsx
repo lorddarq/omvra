@@ -3,10 +3,6 @@ import { useMemo, useState } from 'react';
 import { Activity, FileText, GitBranch, Info, MessageSquare, Paperclip } from 'lucide-react';
 import {
   Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
 } from '@/app/components/ui/dialog';
 import { getTaskLoadContributionPercent, getTaskLoadPoints, PERSON_CAPACITY_POINTS } from '../utils/taskLoad';
 import { getMilestoneForTask } from '../utils/roadmap';
@@ -20,6 +16,7 @@ import { TaskFooterActions } from './TaskFooterActions';
 import { TaskDependencyDetailsSection, TaskLoadDetailsSection, TaskSummarySection } from './TaskSummarySection';
 import { AnchoredPanel, AnchoredPanelSection } from './AnchoredPanel';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
+import { DialogSurface } from './DialogSurface';
 
 interface TaskDetailsDialogProps {
   isOpen: boolean;
@@ -60,6 +57,7 @@ export function TaskDetailsDialog({
   readModel,
 }: TaskDetailsDialogProps) {
   const [newComment, setNewComment] = useState('');
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const enrichedTask = task ? readModel?.tasksById.get(task.id) : undefined;
@@ -116,6 +114,8 @@ export function TaskDetailsDialog({
     () => [...(task?.comments || [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     [task?.comments]
   );
+  const normalizedNotes = task?.notes?.trim() || '';
+  const isLongDescription = normalizedNotes.length > 900 || normalizedNotes.split('\n').length > 14;
   const detailsNavGroups = useMemo(
     () => [
       {
@@ -285,16 +285,11 @@ export function TaskDetailsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent
+      <DialogSurface
         showClose={false}
         overlayClassName="omvra-settings-overlay"
         className="h-[min(920px,calc(100vh-2rem))] w-[min(837px,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] gap-0 overflow-hidden rounded-[24px] border-0 bg-white p-2 shadow-[0_2px_8px_rgba(0,0,0,0.10),0_-6px_12px_rgba(0,0,0,0.10),0_14px_28px_rgba(0,0,0,0.10)] sm:max-w-none"
       >
-        <DialogHeader className="sr-only">
-          <DialogTitle>{task?.title || 'Task details'}</DialogTitle>
-          <DialogDescription>Review task details and markdown description.</DialogDescription>
-        </DialogHeader>
-
         <AnchoredPanel
           title={task?.title || 'Task details'}
           description="Review task details and markdown description."
@@ -342,8 +337,17 @@ export function TaskDetailsDialog({
           <AnchoredPanelSection
             id="task-description"
             title="Description"
+            headerAction={isLongDescription ? (
+              <button
+                type="button"
+                className="rounded-full border border-black/10 px-3 py-1 text-xs font-medium text-[#71717a] hover:bg-[#71717a]/5"
+                onClick={() => setIsDescriptionExpanded(value => !value)}
+              >
+                {isDescriptionExpanded ? 'Collapse' : 'Expand'}
+              </button>
+            ) : undefined}
           >
-            <TaskDescriptionSection notes={task?.notes} />
+            <TaskDescriptionSection notes={task?.notes} isExpanded={isDescriptionExpanded} />
           </AnchoredPanelSection>
 
           <AnchoredPanelSection
@@ -405,7 +409,7 @@ export function TaskDetailsDialog({
             />
           </AnchoredPanelSection>
         </AnchoredPanel>
-      </DialogContent>
+      </DialogSurface>
     </Dialog>
   );
 }

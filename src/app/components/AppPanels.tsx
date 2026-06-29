@@ -6,7 +6,6 @@ import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import { MilestoneDialog } from './MilestoneDialog';
 import { MilestoneDetailsDialog } from './MilestoneDetailsDialog';
 import { SwimlaneDialog } from './SwimlaneDialog';
-import { PeoplePanel } from './PeoplePanel';
 import { PreferencesPanel } from './PreferencesPanel';
 import { McpHealthCheckResult } from '../services/mcp/types';
 
@@ -17,7 +16,6 @@ interface AppPanelsProps {
   isTaskDialogOpen: boolean;
   isTaskDetailsOpen: boolean;
   isSwimlaneDialogOpen: boolean;
-  isPeoplePanelOpen: boolean;
   isPreferencesOpen: boolean;
   preferencesInitialAnchor?: string;
   selectedTask: Task | null;
@@ -77,7 +75,6 @@ interface AppPanelsProps {
   onCloseSwimlaneDialog: () => void;
   onSaveSwimlane: (swimlaneData: Partial<TimelineSwimlane>) => void;
   onDeleteSwimlane: (swimlaneId: string) => void;
-  onClosePeoplePanel: () => void;
   onAddPerson: (personData: Omit<Person, 'id'>) => void;
   onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions'>) => void;
   onDeletePerson: (personId: string) => void;
@@ -107,7 +104,6 @@ export function AppPanels({
   isTaskDialogOpen,
   isTaskDetailsOpen,
   isSwimlaneDialogOpen,
-  isPeoplePanelOpen,
   isPreferencesOpen,
   preferencesInitialAnchor,
   selectedTask,
@@ -164,7 +160,6 @@ export function AppPanels({
   onCloseSwimlaneDialog,
   onSaveSwimlane,
   onDeleteSwimlane,
-  onClosePeoplePanel,
   onAddPerson,
   onUpdatePerson,
   onDeletePerson,
@@ -280,19 +275,6 @@ export function AppPanels({
         onSave={onSaveSwimlane}
         onDelete={onDeleteSwimlane}
         swimlane={selectedSwimlane}
-      />
-
-      <PeoplePanel
-        isOpen={isPeoplePanelOpen}
-        onClose={onClosePeoplePanel}
-        people={people}
-        tasks={tasks}
-        statusColumns={statusColumns}
-        executionLoadStatusIds={executionLoadStatusIds}
-        pipelineLoadStatusIds={pipelineLoadStatusIds}
-        onAddPerson={onAddPerson}
-        onUpdatePerson={onUpdatePerson}
-        onDeletePerson={onDeletePerson}
       />
 
       <PreferencesPanel

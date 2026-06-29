@@ -6,10 +6,6 @@ import { toLocalISODate } from '../utils/date';
 import { getMilestoneForTask, getMilestoneProjectIds } from '../utils/roadmap';
 import {
   Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
 } from '@/app/components/ui/dialog';
 import { Button } from '@/app/components/ui/button';
 import { Badge } from '@/app/components/ui/badge';
@@ -25,6 +21,7 @@ import {
 import { normalizeTaskNotesForSave } from '../utils/taskNotes';
 import { TaskDependenciesSection } from './TaskDependenciesSection';
 import { AnchoredPanel, AnchoredPanelSection } from './AnchoredPanel';
+import { DialogSurface } from './DialogSurface';
 import { EmptyStateCard } from './EmptyStateCard';
 import {
   taskEditFieldClassName,
@@ -371,18 +368,11 @@ export function TaskDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent
+      <DialogSurface
         showClose={false}
         overlayClassName="omvra-settings-overlay"
         className="h-[min(920px,calc(100vh-2rem))] w-[min(837px,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] gap-0 overflow-hidden rounded-[24px] border-0 bg-white p-2 shadow-[0_2px_8px_rgba(0,0,0,0.10),0_-6px_12px_rgba(0,0,0,0.10),0_14px_28px_rgba(0,0,0,0.10)] sm:max-w-none"
       >
-        <DialogHeader className="sr-only">
-          <DialogTitle>{task ? 'Edit Task' : 'Create Task'}</DialogTitle>
-          <DialogDescription className="sr-only">
-            {task ? 'Edit the task details below.' : 'Enter the task details below.'}
-          </DialogDescription>
-        </DialogHeader>
-
         <AnchoredPanel
           title={task ? 'Edit Task' : 'Create Task'}
           description={task ? 'Edit the task details below.' : 'Enter the task details below.'}
@@ -837,7 +827,7 @@ export function TaskDialog({
             </div>
           </AnchoredPanelSection>
         </AnchoredPanel>
-      </DialogContent>
+      </DialogSurface>
     </Dialog>
   );
 }

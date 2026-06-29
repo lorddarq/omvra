@@ -5,7 +5,6 @@ export function useWorkspaceDialogs(tasks: Task[]) {
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isTaskDetailsOpen, setIsTaskDetailsOpen] = useState(false);
   const [isSwimlaneDialogOpen, setIsSwimlaneDialogOpen] = useState(false);
-  const [isPeoplePanelOpen, setIsPeoplePanelOpen] = useState(false);
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [detailsTaskId, setDetailsTaskId] = useState<string | null>(null);
@@ -102,8 +101,6 @@ export function useWorkspaceDialogs(tasks: Task[]) {
     setIsTaskDetailsOpen,
     isSwimlaneDialogOpen,
     setIsSwimlaneDialogOpen,
-    isPeoplePanelOpen,
-    setIsPeoplePanelOpen,
     isPreferencesOpen,
     setIsPreferencesOpen,
     selectedTask,

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { EmptyStateCard } from './EmptyStateCard';
 import { MarkdownContent } from './MarkdownContent';
 
 interface TaskDescriptionSectionProps {
@@ -31,7 +32,11 @@ export function TaskDescriptionSection({ notes }: TaskDescriptionSectionProps) {
         {normalizedNotes ? (
           <MarkdownContent content={normalizedNotes} />
         ) : (
-          <div className="text-sm text-[#71717a]">No description provided.</div>
+          <EmptyStateCard
+            compact
+            title="No description provided"
+            description="Add notes, scope, or acceptance details to make this task easier to review and hand off."
+          />
         )}
       </div>
       {isLongDescription && !isExpanded && (

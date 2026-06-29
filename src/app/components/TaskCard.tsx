@@ -69,9 +69,11 @@ function TaskCardComponent({ title, notes, color, project, priority = 'normal', 
           )}
         </div>
 
-        <p className="kanban-task-description-ui">
-          {bodyPreview || 'No description provided.'}
-        </p>
+        {bodyPreview ? (
+          <p className="kanban-task-description-ui">{bodyPreview}</p>
+        ) : (
+          <div className="kanban-task-inline-empty">No description yet</div>
+        )}
 
         {checklistPreview.length > 0 && (
           <div className="kanban-task-checklist-preview">
@@ -114,7 +116,7 @@ function TaskCardComponent({ title, notes, color, project, priority = 'normal', 
               )}
             </div>
           ) : (
-            <div className="kanban-task-no-project">No projects</div>
+            <div className="kanban-task-inline-empty">No projects yet</div>
           )}
         </div>
       </div>

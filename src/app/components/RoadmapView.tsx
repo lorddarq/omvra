@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { Filter, Flag, Plus, Search, TriangleAlert, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Filter, Flag, Plus, Search, TriangleAlert, X } from 'lucide-react';
 import { ProjectMilestone, Task, TaskStatus, TimelineSwimlane } from '../types';
 import {
   getMilestoneProjectIds,
@@ -12,6 +12,7 @@ import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { EmptyStateCard } from './EmptyStateCard';
+import { RoadmapMilestoneSidebar } from './RoadmapMilestoneSidebar';
 import { Input } from './ui/input';
 import {
   Select,
@@ -465,6 +466,14 @@ export function RoadmapView({
     scrollToDay(new Date(), 'auto');
   };
 
+  const scrollTimelineLeft = () => {
+    chartScrollRef.current?.scrollBy({ left: -200, behavior: 'smooth' });
+  };
+
+  const scrollTimelineRight = () => {
+    chartScrollRef.current?.scrollBy({ left: 200, behavior: 'smooth' });
+  };
+
   useLayoutEffect(() => {
     if (todayLeft === null) return;
     const rangeKey = `${toLocalISODate(range.start)}:${toLocalISODate(range.end)}:${timelineWidth}`;
@@ -497,13 +506,33 @@ export function RoadmapView({
             {toLocalISODate(range.start)} to {toLocalISODate(range.end)}
           </span>
           {todayLeft !== null && (
-            <button
-              type="button"
-              onClick={scrollToToday}
-              className="timeline-toolbar-button-primary"
-            >
-              Today
-            </button>
+            <div className="timeline-toolbar-controls" aria-label="Roadmap navigation">
+              <button
+                type="button"
+                onClick={scrollTimelineLeft}
+                className="timeline-icon-button timeline-icon-button-left"
+                aria-label="Scroll roadmap left"
+                title="Scroll roadmap left"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={scrollToToday}
+                className="timeline-toolbar-button-primary"
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={scrollTimelineRight}
+                className="timeline-icon-button timeline-icon-button-right"
+                aria-label="Scroll roadmap right"
+                title="Scroll roadmap right"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           )}
         </div>
         <div className="kanban-toolbar-actions">
@@ -637,18 +666,30 @@ export function RoadmapView({
         ) : (
           <section className="flex h-full min-h-0 flex-col overflow-hidden border-t border-gray-200 bg-white">
             <div ref={chartViewportRef} className="relative min-h-0 flex-1 overflow-hidden">
+              <RoadmapMilestoneSidebar
+                rows={rows}
+                leftWidth={LEFT_WIDTH}
+                headerHeight={HEADER_HEIGHT}
+                chartHeight={chartHeight}
+                chartScrollTop={chartScrollTop}
+                healthLabels={HEALTH_LABELS}
+                healthClasses={HEALTH_CLASSES}
+                onAddMilestone={onAddMilestone}
+                onMilestoneClick={onMilestoneClick}
+                renderRollupBar={summary => (
+                  <MilestoneRollupBar
+                    counts={summary.counts}
+                    totalTasks={summary.totalTasks}
+                    statusColumns={statusColumns}
+                  />
+                )}
+              />
               <div
                 className={`absolute inset-x-0 top-0 z-50 h-[82px] select-none border-b border-gray-200 bg-white ${
                   isHeaderScrubbing ? 'cursor-grabbing' : 'cursor-grab'
                 }`}
                 onMouseDown={handleHeaderScrubStart}
               >
-                <div
-                  className="absolute left-0 top-0 z-10 border-r border-gray-200 bg-white"
-                  style={{ width: LEFT_WIDTH, height: HEADER_HEIGHT }}
-                >
-                  <div className="px-4 py-4 text-sm font-semibold text-gray-900">Milestones</div>
-                </div>
                 <div
                   className="absolute top-0"
                   style={{
@@ -684,53 +725,6 @@ export function RoadmapView({
                       </div>
                     );
                   })}
-                </div>
-              </div>
-
-              <div className="absolute bottom-0 left-0 top-[82px] z-40 overflow-hidden border-r border-gray-200 bg-white" style={{ width: LEFT_WIDTH }}>
-                <div
-                  className="relative"
-                  style={{
-                    height: Math.max(0, chartHeight - HEADER_HEIGHT),
-                    transform: `translate3d(0, ${-chartScrollTop}px, 0)`,
-                  }}
-                >
-                  {rows.map(row => (
-                    <button
-                      key={row.milestone.id}
-                      type="button"
-                      onClick={() => onMilestoneClick(row.milestone)}
-                      className="absolute left-0 flex w-full flex-col gap-2 border-t border-gray-200 bg-white px-4 py-4 text-left hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20"
-                      style={{ top: row.top - HEADER_HEIGHT, height: row.height }}
-                    >
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span
-                          className="size-3 shrink-0 rounded-full"
-                          style={{ backgroundColor: row.milestone.color || row.projects[0]?.color || '#6b7280' }}
-                          aria-hidden="true"
-                        />
-                        <span className="min-w-0 truncate text-sm font-semibold text-gray-950">{row.milestone.title}</span>
-                      </div>
-                      <div className="flex min-w-0 flex-wrap gap-1.5">
-                        <Badge variant="outline" className="max-w-full truncate text-gray-600">
-                          {row.projects.length > 0
-                            ? row.projects.map(project => project.name).join(', ')
-                            : 'Unknown project'}
-                        </Badge>
-                        <Badge className={HEALTH_CLASSES[row.summary.health]} variant="outline">
-                          {HEALTH_LABELS[row.summary.health]}
-                        </Badge>
-                      </div>
-                      <MilestoneRollupBar
-                        counts={row.summary.counts}
-                        totalTasks={row.summary.totalTasks}
-                        statusColumns={statusColumns}
-                      />
-                      <div className="text-xs text-gray-500">
-                        {row.summary.completedTasks} of {row.summary.totalTasks} tasks done
-                      </div>
-                    </button>
-                  ))}
                 </div>
               </div>
 

@@ -1,4 +1,5 @@
 import { CalendarDays, Edit3, TriangleAlert } from 'lucide-react';
+import { useState } from 'react';
 import type { ProjectMilestone, Task, TaskStatus, TimelineSwimlane } from '../types';
 import {
   getMilestoneDateRangeLabel,
@@ -8,6 +9,9 @@ import {
 } from '../utils/roadmap';
 import {
   Dialog,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
 } from './ui/dialog';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -24,6 +28,7 @@ interface MilestoneDetailsDialogProps {
   readModel?: WorkspaceReadModel;
   onClose: () => void;
   onEdit: (milestone: ProjectMilestone) => void;
+  onDelete?: (milestoneId: string) => void;
   onTaskClick: (task: Task) => void;
 }
 
@@ -98,8 +103,10 @@ export function MilestoneDetailsDialog({
   readModel,
   onClose,
   onEdit,
+  onDelete,
   onTaskClick,
 }: MilestoneDetailsDialogProps) {
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const enrichedMilestone = milestone ? readModel?.milestonesById.get(milestone.id) : undefined;
   const milestoneProjects = enrichedMilestone?.projects ?? (milestone
     ? projects.filter(item => getMilestoneProjectIds(milestone).includes(item.id))
@@ -109,10 +116,18 @@ export function MilestoneDetailsDialog({
   const sortedTasks = summary
     ? [...summary.linkedTasks].sort((a, b) => (a.endDate || '').localeCompare(b.endDate || ''))
     : [];
+  const canDelete = Boolean(milestone && onDelete);
+
+  const handleDelete = () => {
+    if (!milestone || !onDelete) return;
+    onDelete(milestone.id);
+    setDeleteConfirmOpen(false);
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogSurface className="sm:max-w-[760px]">
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogSurface className="sm:max-w-[760px]">
         <DialogSurfaceHeader
           title={milestone?.title || 'Roadmap milestone'}
           description="Review milestone health, linked task progress, and date risk."
@@ -236,6 +251,16 @@ export function MilestoneDetailsDialog({
         )}
 
         <DialogSurfaceFooter>
+          {canDelete ? (
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => setDeleteConfirmOpen(true)}
+              className="mr-auto h-10 rounded-2xl"
+            >
+              Delete milestone
+            </Button>
+          ) : null}
           <Button type="button" variant="outline" onClick={onClose} className="h-10 rounded-2xl">
             Close
           </Button>
@@ -246,7 +271,39 @@ export function MilestoneDetailsDialog({
             </Button>
           )}
         </DialogSurfaceFooter>
-      </DialogSurface>
-    </Dialog>
+        </DialogSurface>
+      </Dialog>
+
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogSurface className="max-w-[430px]">
+          <DialogHeader className="border-b border-black/6 px-6 py-5 text-left">
+            <DialogTitle className="text-[1.05rem] font-semibold tracking-[-0.02em] text-[#111827]">
+              Delete milestone?
+            </DialogTitle>
+            <DialogDescription className="text-sm leading-6 text-[#6b7280]">
+              This removes the milestone and clears milestone-linked dependency wiring from the affected tasks.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogSurfaceFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteConfirmOpen(false)}
+              className="h-10 rounded-2xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDelete}
+              className="h-10 rounded-2xl"
+            >
+              Delete milestone
+            </Button>
+          </DialogSurfaceFooter>
+        </DialogSurface>
+      </Dialog>
+    </>
   );
 }

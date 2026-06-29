@@ -253,6 +253,7 @@ export function AppPanels({
         isOpen={Boolean(detailsMilestone)}
         onClose={onCloseMilestoneDetails}
         onEdit={onEditMilestoneFromDetails}
+        onDelete={onDeleteMilestone}
         onTaskClick={onMilestoneTaskClick}
         milestone={detailsMilestone}
         projects={timelineSwimlanes}

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { Person, StatusColumn } from '../types';
 import type { AgentWatchConfig, AgentWatchAction } from '../utils/workspaceSanitizers';
 import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
+import { EmptyStateCard } from './EmptyStateCard';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Switch } from './ui/switch';
@@ -31,6 +32,9 @@ export function AgentBoardWatchSettings({
   onRemove,
   onPoll,
 }: AgentBoardWatchSettingsProps) {
+  const hasRecentMatches = Boolean(watchRuntime?.latestTaskTitles?.length);
+  const hasWatcherError = Boolean(watchRuntime?.error);
+
   return (
     <div className="space-y-3">
       <FieldBlock label="Agent">
@@ -170,14 +174,22 @@ export function AgentBoardWatchSettings({
           Changes: {watchRuntime?.newTaskCount || 0} new, {watchRuntime?.updatedTaskCount || 0} updated,
           {` ${watchRuntime?.removedTaskCount || 0} removed`}
         </p>
-        {watchRuntime?.latestTaskTitles?.length ? (
+        {hasRecentMatches ? (
           <p>Latest tasks: {watchRuntime.latestTaskTitles.join(', ')}</p>
-        ) : (
-          <p>No recent watcher matches.</p>
-        )}
-        {watchRuntime?.error && (
+        ) : null}
+        {hasWatcherError ? (
           <p className="text-amber-700">Watcher error: {watchRuntime.error}</p>
-        )}
+        ) : null}
+        {!hasRecentMatches && !hasWatcherError ? (
+          <div className="mt-2">
+            <EmptyStateCard
+              compact
+              title="No recent watcher matches"
+              description="Poll again after new board activity and recent task hits will appear here."
+              className="border-white/80 bg-white/70"
+            />
+          </div>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap gap-2">

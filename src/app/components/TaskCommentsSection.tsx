@@ -1,4 +1,5 @@
 import type { TaskComment } from '../types';
+import { EmptyStateCard } from './EmptyStateCard';
 import { Textarea } from '@/app/components/ui/textarea';
 
 interface TaskCommentsSectionProps {
@@ -70,9 +71,11 @@ export function TaskCommentsSection({
           ))}
         </div>
       ) : (
-        <div className="rounded-xl border border-dashed border-[#71717a]/10 bg-[#71717a]/5 px-3 py-2 text-sm text-[#71717a]">
-          No comments yet.
-        </div>
+        <EmptyStateCard
+          compact
+          title="No comments yet"
+          description="Add context, review notes, or handoff details here to keep the task conversation attached to the work."
+        />
       )}
     </div>
   );

@@ -827,9 +827,12 @@ export function TaskDialog({
                   })}
                 </div>
               ) : (
-                <div className="rounded-xl border border-dashed border-[#71717a]/10 bg-[#71717a]/5 px-4 py-3 text-sm text-[#71717a]">
-                  No files attached.
-                </div>
+                <EmptyStateCard
+                  compact
+                  icon={<Paperclip className="size-4" />}
+                  title="No files attached"
+                  description="Add files here to keep source material, exports, and supporting artifacts attached while editing."
+                />
               )}
             </div>
           </AnchoredPanelSection>

@@ -2,6 +2,7 @@ import { Ban, GitBranch, Sparkles, User } from 'lucide-react';
 import { ReactNode } from 'react';
 import { TaskPriority, Person } from '../types';
 import { PERSON_CAPACITY_POINTS } from '../utils/taskLoad';
+import { EmptyStateCard } from './EmptyStateCard';
 import { TASK_PRIORITY_ICONS } from './taskPriorityIcons';
 
 interface TaskSummarySectionProps {
@@ -96,9 +97,11 @@ interface TaskDependencyDetailsSectionProps {
 export function TaskDependencyDetailsSection({ dependencies }: TaskDependencyDetailsSectionProps) {
   if (dependencies.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-[#71717a]/10 bg-[#71717a]/5 p-4 text-sm text-[#71717a]">
-        No roadmap dependencies.
-      </div>
+      <EmptyStateCard
+        compact
+        title="No roadmap dependencies"
+        description="Add predecessor work from the same milestone when this task should wait on other delivery steps."
+      />
     );
   }
 

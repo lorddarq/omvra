@@ -1,59 +1,92 @@
 const reasons = [
   {
-    title: 'See the whole plan without adding more process',
+    title: 'See the\nbig picture',
     description:
-      'Plan work on a timeline, move it through Kanban, and keep the same tasks in both places so your team spends less time translating status between tools.',
+      'Plan work on a timeline, move it through Kanban. Spend less time translating status between tools.',
+    illustration: 'Illustration01.svg',
+    glow: 'bg-[radial-gradient(circle_at_50%_34%,rgba(239,229,123,0.55),transparent_56%)]',
   },
   {
-    title: 'Keep ownership, notes, and review handoffs in one place',
+    title: 'Keep things\nin one place',
     description:
-      'Task details, markdown notes, comments, and review-ready handoffs stay attached to the work instead of getting scattered across docs, chats, and spreadsheets.',
+      'Task details, markdown notes, comments, and review-ready handoffs stay attached to the work.',
+    illustration: 'Illustration02.svg',
+    glow: 'bg-[radial-gradient(circle_at_50%_34%,rgba(223,227,243,0.7),transparent_58%)]',
   },
   {
-    title: 'Stay in control of your data',
+    title: 'Stay in control\nof your data',
     description:
-      'Omvra is local-first and open source, with no account required, no hidden telemetry, and full-workspace backups when you want extra peace of mind.',
+      'Local-first and open source, with no account required, no hidden telemetry, and full-workspace backups.',
+    illustration: 'Illustration03.svg',
+    glow: 'bg-[radial-gradient(circle_at_50%_34%,rgba(255,208,107,0.5),transparent_56%)]',
   },
-]
+] as const
+
+const trustPills = ['Open source', 'Local-first', 'No account required', 'Cross-platform']
+
+const illustrationBase = `${import.meta.env.BASE_URL}illustrations`
 
 const WhyOmvra = () => {
   return (
-    <section id="why-omvra" className="bg-white py-24 md:py-28">
-      <div className="container mx-auto px-6">
-        <div className="mx-auto max-w-6xl">
-          <div className="mx-auto mb-14 max-w-3xl text-center md:mb-20">
-            <div className="mb-5 inline-flex items-center justify-center rounded-full border border-[#6c4fe0]/25 bg-[#6c4fe0]/6 px-4 py-1.5 text-sm font-medium text-[#6c4fe0]">
-              Why Omvra?
-            </div>
-            <h2
-              className="mb-6 text-4xl font-medium leading-[1.08] tracking-[-0.03em] text-[#101828] md:text-5xl"
-              style={{ fontFamily: 'Figtree, sans-serif' }}
-            >
-              Why teams switch to Omvra
+    <section id="why-omvra" className="bg-[#fbfaf8] py-24 md:py-28">
+      <div className="landing-container">
+        <div className="mx-auto max-w-[72rem]">
+          <div className="mx-auto max-w-3xl text-center">
+            <h2 className="text-balance text-[clamp(2.7rem,5vw,4rem)] font-medium leading-[1.04] tracking-[-0.05em] text-[#5b5966]">
+              Why should I use it?
             </h2>
-            <p className="text-lg leading-8 text-[#4a5565] md:text-xl">
-              Omvra is for teams that want clear planning, fast execution, and less overhead. It gives you the
-              visibility of a timeline, the momentum of Kanban, and the control of a local-first desktop app.
-            </p>
+            <div className="mx-auto mt-7 max-w-[48rem] space-y-7 text-pretty text-lg leading-9 text-[#6d6a73] sm:text-[1.35rem]">
+              <p>
+                Omvra is for people that want clear planning, fast execution, and less overhead.
+                It gives them the visibility of a timeline, the momentum of Kanban, and the
+                control of a local-first desktop app.
+              </p>
+              <p>
+                Most tools are built to record what happened.
+                <br />
+                Omvra is built to tell you and your agents, what&apos;s next.
+              </p>
+            </div>
           </div>
 
-          <div className="grid gap-10 md:grid-cols-3 md:gap-8 xl:gap-12">
-            {reasons.map((reason, index) => (
-              <article key={reason.title} className="relative pt-6">
-                <div className="mb-6 flex items-end justify-between gap-4">
-                  <span className="text-sm font-semibold tracking-[0.24em] text-[#6c4fe0]">0{index + 1}</span>
-                  <span className="text-xs uppercase tracking-[0.24em] text-black/35">
-                    {index === 0 ? 'Visibility' : index === 1 ? 'Execution' : 'Control'}
-                  </span>
+          <div className="mt-16 grid gap-6 md:grid-cols-3 md:gap-8">
+            {reasons.map((reason) => (
+              <article
+                key={reason.title}
+                className="relative overflow-hidden rounded-[2rem] border border-black/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.88)_0%,rgba(247,245,242,0.96)_100%)] px-8 pb-8 pt-8 shadow-[0_2px_6px_rgba(17,24,39,0.04),0_18px_40px_rgba(17,24,39,0.04)]"
+              >
+                <div aria-hidden="true" className={`pointer-events-none absolute inset-x-0 top-0 h-40 ${reason.glow}`} />
+                <div className="relative">
+                  <div className="flex justify-end">
+                    <div className="flex size-32 items-center justify-center">
+                      <img
+                        src={`${illustrationBase}/${reason.illustration}`}
+                        alt=""
+                        className="h-32 w-32 object-contain"
+                        loading="lazy"
+                      />
+                    </div>
+                  </div>
+
+                  <h3 className="mt-2 whitespace-pre-line text-[2.05rem] font-semibold leading-[1.15] tracking-[-0.05em] text-[#5a5866]">
+                    {reason.title}
+                  </h3>
+                  <p className="mt-5 max-w-[18rem] text-base leading-8 text-[#77737c]">
+                    {reason.description}
+                  </p>
                 </div>
-                <h3
-                  className="mb-4 max-w-[14ch] text-2xl font-semibold leading-tight tracking-[-0.02em] text-[#101828] md:text-[2rem]"
-                  style={{ fontFamily: 'Figtree, sans-serif' }}
-                >
-                  {reason.title}
-                </h3>
-                <p className="max-w-[34ch] leading-6 text-[#4a5565]">{reason.description}</p>
               </article>
+            ))}
+          </div>
+
+          <div className="mt-14 flex flex-wrap items-center justify-center gap-3">
+            {trustPills.map((pill) => (
+              <span
+                key={pill}
+                className="inline-flex items-center rounded-full border border-black/10 bg-white/75 px-4 py-1.5 text-sm font-medium text-[#7a7680] shadow-[0_1px_2px_rgba(17,24,39,0.03)]"
+              >
+                {pill}
+              </span>
             ))}
           </div>
         </div>

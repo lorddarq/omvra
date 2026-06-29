@@ -71,7 +71,7 @@ const WhyOmvra = () => {
                   <h3 className="mt-2 whitespace-pre-line text-[2.05rem] font-semibold leading-[1.15] tracking-[-0.05em] text-[#5a5866]">
                     {reason.title}
                   </h3>
-                  <p className="mt-5 max-w-[18rem] text-base leading-8 text-[#77737c]">
+                  <p className="mt-5 max-w-[18rem] text-base text-[#77737c]">
                     {reason.description}
                   </p>
                 </div>

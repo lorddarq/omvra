@@ -4,13 +4,11 @@ import { getMilestoneProjectIds } from '../utils/roadmap';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import {
   Dialog,
-  DialogContent,
-  DialogDescription,
   DialogFooter,
-  DialogHeader,
-  DialogTitle,
 } from './ui/dialog';
 import { Button } from './ui/button';
+import { DialogSurface, DialogSurfaceHeader, DialogSurfaceSection } from './DialogSurface';
+import { EmptyStateCard } from './EmptyStateCard';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
@@ -20,7 +18,6 @@ import {
   taskEditTextAreaClassName,
 } from './taskFormStyles';
 
-const milestoneDialogPanelClassName = 'rounded-[24px] border border-black/6 bg-white/70 p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_10px_24px_rgba(15,23,42,0.05)]';
 const milestoneDialogCheckboxCardClassName = 'flex cursor-pointer items-center gap-3 rounded-2xl border border-black/6 bg-white px-3 py-3 text-sm transition-colors hover:bg-[#f7f7f8]';
 const milestoneDialogSearchInputClassName = `${taskEditFieldClassName} h-10 rounded-2xl bg-white`;
 
@@ -191,16 +188,12 @@ export function MilestoneDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-[28px] border-white/70 bg-[#f3f4f6] p-0 shadow-[0_24px_80px_rgba(15,23,42,0.18)] sm:max-w-[760px]">
+      <DialogSurface className="sm:max-w-[760px]">
         <form onSubmit={handleSubmit}>
-          <DialogHeader className="border-b border-black/6 px-6 py-5 text-left">
-            <DialogTitle className="text-[1.1rem] font-semibold tracking-[-0.02em] text-[#111827]">
-              {milestone ? 'Edit roadmap milestone' : 'Create roadmap milestone'}
-            </DialogTitle>
-            <DialogDescription className="max-w-[44rem] text-sm leading-6 text-[#6b7280]">
-              Milestones can be scoped to one product or span multiple projects under a shared release frame.
-            </DialogDescription>
-          </DialogHeader>
+          <DialogSurfaceHeader
+            title={milestone ? 'Edit roadmap milestone' : 'Create roadmap milestone'}
+            description="Milestones can be scoped to one product or span multiple projects under a shared release frame."
+          />
 
           <div className="grid gap-5 px-6 py-5">
             <div className="grid gap-2">
@@ -217,7 +210,7 @@ export function MilestoneDialog({
 
             <div className="grid gap-2">
               <Label className={taskEditLabelClassName}>Projects</Label>
-              <div className={`${milestoneDialogPanelClassName} grid gap-2 sm:grid-cols-2`}>
+              <DialogSurfaceSection className="grid gap-2 sm:grid-cols-2">
                 {projects.map(project => {
                   const isChecked = projectIds.includes(project.id);
                   return (
@@ -240,7 +233,7 @@ export function MilestoneDialog({
                     </label>
                   );
                 })}
-              </div>
+              </DialogSurfaceSection>
               <p className="text-xs leading-5 text-[#7b8190]">
                 Select one project for product-specific milestones, or multiple projects for release-frame milestones.
               </p>
@@ -293,7 +286,7 @@ export function MilestoneDialog({
               />
             </div>
 
-            <section className={milestoneDialogPanelClassName}>
+            <DialogSurfaceSection>
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-semibold text-[#111827]">Linked tasks</h3>
@@ -314,13 +307,17 @@ export function MilestoneDialog({
                 />
               </div>
               {projectTasks.length === 0 ? (
-                <p className="rounded-2xl border border-dashed border-black/8 bg-white px-4 py-4 text-sm text-[#6b7280]">
-                  No tasks are currently assigned to the selected project scope.
-                </p>
+                <EmptyStateCard
+                  compact
+                  title="No tasks in this project scope"
+                  description="Add tasks to the selected roadmap projects first, then link the milestone work from this list."
+                />
               ) : filteredProjectTasks.length === 0 ? (
-                <p className="rounded-2xl border border-dashed border-black/8 bg-white px-4 py-4 text-sm text-[#6b7280]">
-                  No tasks match this search.
-                </p>
+                <EmptyStateCard
+                  compact
+                  title="No tasks match this search"
+                  description="Try a different task title, status, note, or project keyword to find the right milestone work."
+                />
               ) : (
                 <div className="grid gap-2">
                   {filteredProjectTasks.map(task => {
@@ -375,7 +372,7 @@ export function MilestoneDialog({
                   })}
                 </div>
               )}
-            </section>
+            </DialogSurfaceSection>
           </div>
 
           <DialogFooter className="gap-2 border-t border-black/6 px-6 py-5">
@@ -397,7 +394,7 @@ export function MilestoneDialog({
             </Button>
           </DialogFooter>
         </form>
-      </DialogContent>
+      </DialogSurface>
     </Dialog>
   );
 }

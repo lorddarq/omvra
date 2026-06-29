@@ -39,6 +39,10 @@ interface PreferencesPanelProps {
   onNukeLocalData: () => void;
   onExportTasksAndProjects: () => void;
   onImportTasksAndProjects: (file: File) => void;
+  importFeedback?: {
+    type: 'success' | 'error';
+    message: string;
+  } | null;
   mcpAgentAccessEnabled: boolean;
   mcpAddress: string;
   mcpBindHost: string;
@@ -88,6 +92,7 @@ export function PreferencesPanel({
   onNukeLocalData,
   onExportTasksAndProjects,
   onImportTasksAndProjects,
+  importFeedback,
   mcpAgentAccessEnabled,
   mcpAddress,
   mcpBindHost,
@@ -363,6 +368,7 @@ export function PreferencesPanel({
         onNukeLocalData={onNukeLocalData}
         onExportTasksAndProjects={onExportTasksAndProjects}
         onImportTasksAndProjects={onImportTasksAndProjects}
+        importFeedback={importFeedback}
       />
 
       <AboutSettingsSection />

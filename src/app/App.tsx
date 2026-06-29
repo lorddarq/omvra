@@ -131,6 +131,11 @@ interface AgentWatchRuntimeState {
   error?: string;
 }
 
+interface ImportFeedbackState {
+  type: 'success' | 'error';
+  message: string;
+}
+
 function areSerializedValuesEqual(left: unknown, right: unknown): boolean {
   try {
     return JSON.stringify(left) === JSON.stringify(right);
@@ -171,6 +176,7 @@ function App() {
     scrollLeft: 0,
     scrollTop: 0,
   });
+  const [importFeedback, setImportFeedback] = useState<ImportFeedbackState | null>(null);
 
   const [tasks, setTasks] = useState<Task[]>(() => {
     const stored = readInitialWorkspaceJSON<Task[]>(TASKS_KEY, DEFAULT_TASKS_SEED);
@@ -949,17 +955,24 @@ function App() {
 
   const handleImportTasksAndProjects = async (file: File) => {
     try {
+      setImportFeedback(null);
       const text = await file.text();
       const parsed = parseWorkspaceBackupJson(text);
       if (!parsed.ok || !parsed.payload) {
-        window.alert(parsed.error || 'Could not import backup. Please select a valid JSON export file.');
+        setImportFeedback({
+          type: 'error',
+          message: parsed.error || 'Could not import backup. Please select a valid JSON export file.',
+        });
         return;
       }
 
       const parsedPayload = parsed.payload as Record<string, unknown>;
 
       if (!Array.isArray(parsedPayload.tasks) || !Array.isArray(parsedPayload.projects)) {
-        window.alert('Invalid backup format. Expected "tasks" and "projects" arrays.');
+        setImportFeedback({
+          type: 'error',
+          message: 'Invalid backup format. Expected "tasks" and "projects" arrays.',
+        });
         return;
       }
 
@@ -974,7 +987,10 @@ function App() {
       });
 
       if (!repaired.ok) {
-        window.alert(repaired.error || 'Could not import backup. Please select a valid JSON export file.');
+        setImportFeedback({
+          type: 'error',
+          message: repaired.error || 'Could not import backup. Please select a valid JSON export file.',
+        });
         return;
       }
 
@@ -1009,9 +1025,16 @@ function App() {
       ) {
         viewState.switchView(repaired.ui.currentView as ViewType);
       }
+      setImportFeedback({
+        type: 'success',
+        message: `Restored ${repaired.tasks.length} tasks, ${repaired.projects.length} projects, ${repaired.people.length} people, and ${repaired.milestones.length} milestones from backup.`,
+      });
       setViewRefreshKey(prev => prev + 1);
     } catch (err) {
-      window.alert('Could not import backup. Please select a valid JSON export file.');
+      setImportFeedback({
+        type: 'error',
+        message: 'Could not import backup. Please select a valid JSON export file.',
+      });
     }
   };
 
@@ -1162,6 +1185,7 @@ function App() {
         agentWatchConfigs={agentWatchConfigs}
         agentWatchRuntime={agentWatchRuntime}
         storageMeter={storageMeter}
+        importFeedback={importFeedback}
         mcpAgentAccessEnabled={preferences.mcpAgentAccessEnabled}
         mcpAddress={preferences.mcpServerAddress}
         mcpBindHost={preferences.mcpBindHost}

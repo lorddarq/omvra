@@ -1,6 +1,7 @@
 import { Fragment, useRef, useState } from 'react';
 import { useDrag, useDragLayer, useDrop } from 'react-dnd';
 import { Task, TaskStatus, StatusColumn } from '../types';
+import { EmptyStateCard } from './EmptyStateCard';
 import { DroppableColumn } from './DroppableColumn';
 
 const SWIMLANE_COLUMN = 'SWIMLANE_COLUMN';
@@ -277,8 +278,12 @@ export function SwimlanesView({
   return (
       <div className="kanban-board-surface">
         {isFilterActive && tasks.length === 0 && (
-          <div className="kanban-filter-empty-state">
-            No tasks match the current filters.
+          <div className="p-6">
+            <EmptyStateCard
+              compact
+              title="No tasks match the current filters"
+              description="Clear or adjust the active filters to bring matching Kanban work back into view."
+            />
           </div>
         )}
         <div className="kanban-columns-track">

@@ -4,6 +4,7 @@ import { Bot, Users } from 'lucide-react';
 import type { Person, PersonKind, StatusColumn, Task, TaskStatus } from '../types';
 import { getLoadPercentageForTasks } from '../utils/taskLoad';
 import { AnchoredPanelSection } from './AnchoredPanel';
+import { EmptyStateCard } from './EmptyStateCard';
 import { AgentCard, PersonCard } from './PersonCards';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -635,22 +636,6 @@ interface PeopleSettingsSectionProps {
   popupOpen?: boolean;
 }
 
-interface SettingsEmptyStateProps {
-  icon: ReactNode;
-  label: string;
-}
-
-function SettingsEmptyState({ icon, label }: SettingsEmptyStateProps) {
-  return (
-    <div className="flex h-20 items-center justify-center gap-1.5 overflow-hidden rounded-xl border border-dashed border-black/20 bg-zinc-500/5 p-3 text-xs text-[#6a7282]">
-      <span className="flex size-4 shrink-0 items-center justify-center" aria-hidden="true">
-        {icon}
-      </span>
-      <span className="leading-4">{label}</span>
-    </div>
-  );
-}
-
 export function PeopleSettingsSection({ children, empty = false, action, popupOpen = false }: PeopleSettingsSectionProps) {
   return (
     <AnchoredPanelSection
@@ -668,7 +653,12 @@ export function PeopleSettingsSection({ children, empty = false, action, popupOp
           <p className="text-xs leading-4 text-[#6a7282]">Manage humans for task assignment.</p>
         </div>
         {empty ? (
-          <SettingsEmptyState icon={<Users className="size-4" />} label="No people available" />
+          <EmptyStateCard
+            compact
+            icon={<Users className="size-4" />}
+            title="No people available"
+            description="Add a teammate to make human assignment and load tracking available here."
+          />
         ) : children}
       </div>
     </AnchoredPanelSection>
@@ -692,7 +682,12 @@ export function AgentsSettingsSection({ children, empty = false, action, popupOp
           <p className="text-xs leading-4 text-[#6a7282]">Manage agentic sub-agents for task assignment.</p>
         </div>
         {empty ? (
-          <SettingsEmptyState icon={<Bot className="size-4" />} label="No agents available" />
+          <EmptyStateCard
+            compact
+            icon={<Bot className="size-4" />}
+            title="No agents available"
+            description="Add an agentic teammate to configure assignment, load, and watcher behavior."
+          />
         ) : children}
       </div>
     </AnchoredPanelSection>

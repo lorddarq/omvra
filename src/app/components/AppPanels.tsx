@@ -42,6 +42,10 @@ interface AppPanelsProps {
   agentWatchConfigs: AgentWatchConfig[];
   agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
   storageMeter: StorageMeter;
+  importFeedback?: {
+    type: 'success' | 'error';
+    message: string;
+  } | null;
   mcpAgentAccessEnabled: boolean;
   mcpAddress: string;
   mcpBindHost: string;
@@ -128,6 +132,7 @@ export function AppPanels({
   agentWatchConfigs,
   agentWatchRuntime,
   storageMeter,
+  importFeedback,
   mcpAgentAccessEnabled,
   mcpAddress,
   mcpBindHost,
@@ -301,6 +306,7 @@ export function AppPanels({
         agentWatchConfigs={agentWatchConfigs}
         agentWatchRuntime={agentWatchRuntime}
         storageMeter={storageMeter}
+        importFeedback={importFeedback}
         onNukeLocalData={onNukeLocalData}
         onExportTasksAndProjects={onExportTasksAndProjects}
         onImportTasksAndProjects={onImportTasksAndProjects}

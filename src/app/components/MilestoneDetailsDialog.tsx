@@ -8,17 +8,12 @@ import {
 } from '../utils/roadmap';
 import {
   Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
 } from './ui/dialog';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
-
-const milestoneDetailsPanelClassName = 'rounded-[24px] border border-black/6 bg-white/70 p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_10px_24px_rgba(15,23,42,0.05)]';
+import { DialogSurface, DialogSurfaceBody, DialogSurfaceFooter, DialogSurfaceHeader, DialogSurfaceSection } from './DialogSurface';
+import { EmptyStateCard } from './EmptyStateCard';
 
 interface MilestoneDetailsDialogProps {
   isOpen: boolean;
@@ -117,19 +112,15 @@ export function MilestoneDetailsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] overflow-x-hidden overflow-y-auto rounded-[28px] border-white/70 bg-[#f3f4f6] p-0 shadow-[0_24px_80px_rgba(15,23,42,0.18)] sm:max-w-[760px]">
-        <DialogHeader className="border-b border-black/6 px-6 py-5 text-left">
-          <DialogTitle className="break-words text-[1.1rem] font-semibold tracking-[-0.02em] text-[#111827] [overflow-wrap:anywhere]">
-            {milestone?.title || 'Roadmap milestone'}
-          </DialogTitle>
-          <DialogDescription className="text-sm leading-6 text-[#6b7280]">
-            Review milestone health, linked task progress, and date risk.
-          </DialogDescription>
-        </DialogHeader>
+      <DialogSurface className="sm:max-w-[760px]">
+        <DialogSurfaceHeader
+          title={milestone?.title || 'Roadmap milestone'}
+          description="Review milestone health, linked task progress, and date risk."
+        />
 
         {milestone && summary && (
-          <div className="min-w-0 space-y-4 px-6 py-5">
-            <section className={`${milestoneDetailsPanelClassName} grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]`}>
+          <DialogSurfaceBody>
+            <DialogSurfaceSection className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
               <div className="min-w-0">
                 <div className="text-xs uppercase tracking-wide text-[#7b8190]">Projects</div>
                 <div className="break-words text-sm font-medium text-[#111827] [overflow-wrap:anywhere]">
@@ -165,10 +156,10 @@ export function MilestoneDetailsDialog({
                   statusColumns={statusColumns}
                 />
               </div>
-            </section>
+            </DialogSurfaceSection>
 
             {summary.lateTasks.length > 0 && (
-              <section className="rounded-md border border-red-200 bg-red-50 p-4">
+              <section className="rounded-[24px] border border-red-200 bg-red-50/90 p-4 shadow-[0_1px_2px_rgba(239,68,68,0.08)]">
                 <div className="flex items-start gap-2">
                   <TriangleAlert className="mt-0.5 size-4 shrink-0 text-red-700" />
                   <div>
@@ -181,12 +172,16 @@ export function MilestoneDetailsDialog({
               </section>
             )}
 
-            <section className={milestoneDetailsPanelClassName}>
+            <DialogSurfaceSection>
               <h3 className="text-sm font-semibold text-[#111827]">Linked tasks</h3>
               {sortedTasks.length === 0 ? (
-                <p className="mt-3 rounded-2xl border border-dashed border-black/8 bg-white px-4 py-4 text-sm text-[#6b7280]">
-                  No tasks are linked to this milestone yet.
-                </p>
+                <div className="mt-3">
+                  <EmptyStateCard
+                    compact
+                    title="No linked tasks yet"
+                    description="Link task work to this milestone to populate rollout progress, dependency context, and date health."
+                  />
+                </div>
               ) : (
                 <div className="mt-3 grid gap-2">
                   {sortedTasks.map(task => {
@@ -227,20 +222,20 @@ export function MilestoneDetailsDialog({
                   })}
                 </div>
               )}
-            </section>
+            </DialogSurfaceSection>
 
             {milestone.notes?.trim() && (
-              <section className={milestoneDetailsPanelClassName}>
+              <DialogSurfaceSection>
                 <h3 className="text-sm font-semibold text-[#111827]">Notes</h3>
                 <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-[#4b5563] [overflow-wrap:anywhere]">
                   {milestone.notes}
                 </p>
-              </section>
+              </DialogSurfaceSection>
             )}
-          </div>
+          </DialogSurfaceBody>
         )}
 
-        <DialogFooter className="gap-2 border-t border-black/6 px-6 py-5">
+        <DialogSurfaceFooter>
           <Button type="button" variant="outline" onClick={onClose} className="h-10 rounded-2xl">
             Close
           </Button>
@@ -250,8 +245,8 @@ export function MilestoneDetailsDialog({
               Edit milestone
             </Button>
           )}
-        </DialogFooter>
-      </DialogContent>
+        </DialogSurfaceFooter>
+      </DialogSurface>
     </Dialog>
   );
 }

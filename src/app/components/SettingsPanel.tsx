@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Activity, Bot, Download, HelpCircle, Info, Terminal, Upload, Users } from 'lucide-react';
+import { Activity, AlertTriangle, Bot, CheckCircle2, Download, HelpCircle, Info, Terminal, Upload, Users } from 'lucide-react';
 import { Person, StorageMeter, StatusColumn, TaskStatus } from '../types';
 import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import { AnchoredPanel, AnchoredPanelSection } from './AnchoredPanel';
 import { AgentBoardWatchSettings } from './AgentBoardWatchSettings';
+import { EmptyStateCard } from './EmptyStateCard';
 import { TaskCheckboxIndicator } from './TaskCheckboxControl';
 import {
   Sheet,
@@ -297,6 +298,10 @@ interface DataSettingsSectionProps {
   onNukeLocalData: () => void;
   onExportTasksAndProjects: () => void;
   onImportTasksAndProjects: (file: File) => void;
+  importFeedback?: {
+    type: 'success' | 'error';
+    message: string;
+  } | null;
 }
 
 export function DataSettingsSection({
@@ -304,6 +309,7 @@ export function DataSettingsSection({
   onNukeLocalData,
   onExportTasksAndProjects,
   onImportTasksAndProjects,
+  importFeedback,
 }: DataSettingsSectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const usagePercent = Math.min(100, Math.max(0, storageMeter.usagePercent));
@@ -355,6 +361,15 @@ export function DataSettingsSection({
               Restore
             </button>
           </div>
+          {importFeedback ? (
+            <EmptyStateCard
+              compact
+              icon={importFeedback.type === 'error' ? <AlertTriangle className="size-4" /> : <CheckCircle2 className="size-4" />}
+              title={importFeedback.type === 'error' ? 'Backup restore failed' : 'Backup restored'}
+              description={importFeedback.message}
+              className={importFeedback.type === 'error' ? 'border-red-200 bg-red-50/70' : 'border-emerald-200 bg-emerald-50/70'}
+            />
+          ) : null}
           <input
             ref={fileInputRef}
             type="file"

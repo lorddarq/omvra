@@ -2,15 +2,13 @@ import { useState, useEffect } from 'react';
 import { TimelineSwimlane } from '../types';
 import {
   Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogFooter,
-  DialogDescription,
 } from '../components/ui/dialog';
 import { Button } from '../components/ui/button';
+import { DialogSurface, DialogSurfaceHeader, DialogSurfaceSection } from './DialogSurface';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { taskEditFieldClassName, taskEditLabelClassName } from './taskFormStyles';
 
 interface SwimlaneDialogProps {
   isOpen: boolean;
@@ -62,51 +60,50 @@ export function SwimlaneDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[400px]">
-        <DialogHeader>
-          <DialogTitle>{swimlane ? 'Edit Swimlane' : 'Create Swimlane'}</DialogTitle>
-          <DialogDescription>
-            {swimlane ? 'Edit the swimlane details' : 'Create a new swimlane'}
-          </DialogDescription>
-        </DialogHeader>
+      <DialogSurface className="sm:max-w-[400px]">
+        <DialogSurfaceHeader
+          title={swimlane ? 'Edit Swimlane' : 'Create Swimlane'}
+          description={swimlane ? 'Edit the swimlane details.' : 'Create a new swimlane.'}
+        />
 
         <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Swimlane Name</Label>
+          <div className="space-y-2 px-6">
+            <Label htmlFor="name" className={taskEditLabelClassName}>Swimlane Name</Label>
             <Input
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Frontend Team, Project Alpha, John Doe"
               autoFocus
+              className={`${taskEditFieldClassName} h-10`}
             />
-            <p className="text-xs text-gray-500">
-              Name this swimlane by project, team, or person
+            <p className="text-xs leading-5 text-[#7b8190]">
+              Name this swimlane by project, team, or person.
             </p>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="color">Swimlane Color</Label>
+          <DialogSurfaceSection className="mx-6 space-y-2">
+            <Label htmlFor="color" className={taskEditLabelClassName}>Swimlane Color</Label>
             <div className="flex items-center gap-3">
               <Input
                 id="color"
                 type="color"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
-                className="h-10 w-20 cursor-pointer"
+                className="h-11 w-20 cursor-pointer rounded-2xl border border-black/8 bg-white p-1"
               />
               <Input
                 type="text"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
                 placeholder="#3b82f6"
-                className="flex-1 font-mono text-sm"
+                className={`${taskEditFieldClassName} h-10 flex-1 font-mono text-sm`}
               />
             </div>
-            <p className="text-xs text-gray-500">
-              Color for swimlane label and timeline row background
+            <p className="text-xs leading-5 text-[#7b8190]">
+              Color for swimlane label and timeline row background.
             </p>
-          </div>
+          </DialogSurfaceSection>
         </div>
 
         <DialogFooter className="gap-2">
@@ -122,7 +119,7 @@ export function SwimlaneDialog({
             {swimlane ? 'Update' : 'Create'}
           </Button>
         </DialogFooter>
-      </DialogContent>
+      </DialogSurface>
     </Dialog>
   );
 }

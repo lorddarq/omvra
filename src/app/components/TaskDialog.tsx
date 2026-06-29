@@ -25,6 +25,7 @@ import {
 import { normalizeTaskNotesForSave } from '../utils/taskNotes';
 import { TaskDependenciesSection } from './TaskDependenciesSection';
 import { AnchoredPanel, AnchoredPanelSection } from './AnchoredPanel';
+import { EmptyStateCard } from './EmptyStateCard';
 import {
   taskEditFieldClassName,
   taskEditIconFieldClassName,
@@ -670,9 +671,12 @@ export function TaskDialog({
                     );
                   })
                 ) : (
-                  <div className="rounded-xl border border-dashed border-[#71717a]/10 bg-[#71717a]/5 px-3 py-3 text-sm text-[#71717a]">
-                    No projects match "{projectSearchQuery}".
-                  </div>
+                  <EmptyStateCard
+                    compact
+                    icon={<Briefcase className="size-4" />}
+                    title={`No projects match "${projectSearchQuery}"`}
+                    description="Try a different project name or clear the search to see all available timeline projects."
+                  />
                 )}
               </div>
 

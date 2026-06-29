@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Search } from 'lucide-react';
 import type { Task } from '../types';
+import { EmptyStateCard } from './EmptyStateCard';
 import { taskEditIconFieldClassName, taskEditLabelClassName } from './taskFormStyles';
 import { TaskCheckboxControl } from './TaskCheckboxControl';
 
@@ -59,17 +60,23 @@ export function TaskDependenciesSection({
       </div>
 
       {!milestoneSelected ? (
-        <p className="rounded-[18px] bg-white p-4 text-sm text-[#71717a] shadow-[0_0_1px_1px_rgba(0,0,0,0.05),0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06)]">
-          Select a milestone to choose dependencies.
-        </p>
+        <EmptyStateCard
+          compact
+          title="Select a milestone first"
+          description="Dependencies are milestone-scoped, so pick a roadmap milestone before choosing predecessor tasks."
+        />
       ) : dependencyCandidates.length === 0 ? (
-        <p className="rounded-[18px] bg-white p-4 text-sm text-[#71717a] shadow-[0_0_1px_1px_rgba(0,0,0,0.05),0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06)]">
-          No other tasks are linked to this milestone yet.
-        </p>
+        <EmptyStateCard
+          compact
+          title="No dependency candidates yet"
+          description="Link more tasks to this milestone and they will become available as dependency options here."
+        />
       ) : filteredDependencyCandidates.length === 0 ? (
-        <p className="rounded-[18px] bg-white p-4 text-sm text-[#71717a] shadow-[0_0_1px_1px_rgba(0,0,0,0.05),0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06)]">
-          No dependencies match "{searchQuery}".
-        </p>
+        <EmptyStateCard
+          compact
+          title={`No dependencies match "${searchQuery}"`}
+          description="Try a different task title or status to find the milestone dependency you want."
+        />
       ) : (
         <div className="max-h-[368px] overflow-y-auto rounded-[18px] bg-white p-3 shadow-[0_0_1px_1px_rgba(0,0,0,0.05),0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06)]">
           {filteredDependencyCandidates.map(candidate => {

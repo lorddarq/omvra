@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { Filter, Plus, Search, TriangleAlert, X } from 'lucide-react';
+import { Filter, Flag, Plus, Search, TriangleAlert, X } from 'lucide-react';
 import { ProjectMilestone, Task, TaskStatus, TimelineSwimlane } from '../types';
 import {
   getMilestoneProjectIds,
@@ -11,6 +11,7 @@ import { parseISODateLocal, toLocalISODate } from '../utils/date';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
+import { EmptyStateCard } from './EmptyStateCard';
 import { Input } from './ui/input';
 import {
   Select,
@@ -620,25 +621,19 @@ export function RoadmapView({
       <div className="min-h-0 flex-1 overflow-hidden">
 
         {milestones.length === 0 ? (
-          <section className="rounded-2xl border border-dashed border-gray-300 bg-white p-8 text-center">
-            <h3 className="text-lg font-semibold text-gray-950">No roadmap milestones yet</h3>
-            <p className="mx-auto mt-2 max-w-xl text-sm text-gray-600">
-              Create a milestone to group task work around a project delivery point, then track composition and date risk here.
-            </p>
-            <Button onClick={onAddMilestone} className="mt-5">
-              Create first milestone
-            </Button>
-          </section>
+          <EmptyStateCard
+            icon={<Flag className="size-5" />}
+            title="No roadmap milestones yet"
+            description="Create a milestone to group task work around a project delivery point, then track composition and date risk here."
+            action={<Button onClick={onAddMilestone}>Create first milestone</Button>}
+          />
         ) : filteredMilestones.length === 0 ? (
-          <section className="rounded-2xl border border-dashed border-gray-300 bg-white p-8 text-center">
-            <h3 className="text-lg font-semibold text-gray-950">No milestones match these filters</h3>
-            <p className="mx-auto mt-2 max-w-xl text-sm text-gray-600">
-              Adjust the project, health, or date filters to bring milestones back into view.
-            </p>
-            <Button onClick={resetFilters} variant="outline" className="mt-5">
-              Reset filters
-            </Button>
-          </section>
+          <EmptyStateCard
+            icon={<Filter className="size-5" />}
+            title="No milestones match these filters"
+            description="Adjust the project, health, or date filters to bring milestones back into view."
+            action={<Button onClick={resetFilters} variant="outline">Reset filters</Button>}
+          />
         ) : (
           <section className="flex h-full min-h-0 flex-col overflow-hidden border-t border-gray-200 bg-white">
             <div ref={chartViewportRef} className="relative min-h-0 flex-1 overflow-hidden">
@@ -834,7 +829,14 @@ export function RoadmapView({
                         </button>
 
                         {sortedTasks.length === 0 ? (
-                          <div className="absolute left-4 top-[64px] text-sm text-gray-500">No linked tasks yet.</div>
+                          <div className="absolute left-4 right-4 top-[64px]">
+                            <EmptyStateCard
+                              compact
+                              icon={<Flag className="size-4" />}
+                              title="No linked tasks yet"
+                              description="Link tasks to this milestone to show delivery progress and dependency context."
+                            />
+                          </div>
                         ) : sortedTasks.map((task, index) => {
                           const left = getTaskLeft(task, range.start);
                           const width = getTaskWidth(task);

@@ -1,6 +1,7 @@
-import { Copy, Download, RefreshCcw } from 'lucide-react';
+import { Activity, Copy, Download, RefreshCcw, ShieldAlert } from 'lucide-react';
 import type { McpHealthCheckResult } from '../services/mcp/types';
 import { Button } from './ui/button';
+import { EmptyStateCard } from './EmptyStateCard';
 import { Label } from './ui/label';
 
 interface McpActivityLogSectionProps {
@@ -55,9 +56,12 @@ export function McpActivityLogSection({
       </div>
 
       {auditLog.length === 0 ? (
-        <p className="rounded-xl bg-[#fafafa] px-3 py-4 text-xs leading-4 text-[#6a7282]">
-          No MCP activity recorded yet.
-        </p>
+        <EmptyStateCard
+          compact
+          icon={<Activity className="size-4" />}
+          title="No MCP activity recorded yet"
+          description="Run a tool call or refresh after MCP traffic starts and the latest reads and writes will appear here."
+        />
       ) : (
         <div className="max-h-[422px] overflow-y-auto rounded-xl bg-[#f7f7f8] px-3 py-3">
           {auditLog.map((entry) => (
@@ -139,9 +143,12 @@ export function McpHealthDiagnosticsSection({
         </Button>
       </div>
       {!result && (
-        <p className="text-xs text-gray-500">
-          Checks MCP tools, resources/read availability, snapshot parity, and median logical call count.
-        </p>
+        <EmptyStateCard
+          compact
+          icon={<ShieldAlert className="size-4" />}
+          title="No diagnostic run yet"
+          description="Run the health check to inspect MCP tools, read availability, snapshot parity, and logical call count."
+        />
       )}
       {result && (
         <div className="space-y-1 text-xs text-gray-600">

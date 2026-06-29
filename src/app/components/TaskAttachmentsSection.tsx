@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, Folder, Paperclip } from 'lucide-react';
 import type { TaskAttachment } from '../types';
+import { EmptyStateCard } from './EmptyStateCard';
 
 interface TaskAttachmentsSectionProps {
   attachments?: TaskAttachment[];
@@ -14,6 +15,7 @@ export function TaskAttachmentsSection({
   onRevealAttachment,
 }: TaskAttachmentsSectionProps) {
   const [availabilityByPath, setAvailabilityByPath] = useState<Record<string, boolean | undefined>>({});
+  const missingCount = attachments.filter(attachment => availabilityByPath[attachment.path] === false).length;
 
   useEffect(() => {
     let isMounted = true;
@@ -41,6 +43,17 @@ export function TaskAttachmentsSection({
 
   return (
     <div className="min-w-0">
+      {missingCount > 0 ? (
+        <div className="mb-3">
+          <EmptyStateCard
+            compact
+            icon={<AlertTriangle className="size-4" />}
+            title={missingCount === 1 ? '1 attachment is unavailable' : `${missingCount} attachments are unavailable`}
+            description="These files are no longer reachable on disk, so reveal actions are disabled until the file paths are fixed."
+            className="border-red-200 bg-red-50/70"
+          />
+        </div>
+      ) : null}
       {attachments.length > 0 ? (
         <div className="max-h-72 space-y-1 overflow-y-auto pr-1">
           {attachments.map(attachment => {
@@ -82,9 +95,12 @@ export function TaskAttachmentsSection({
           })}
         </div>
       ) : (
-        <div className="rounded-xl border border-dashed border-[#71717a]/10 bg-[#71717a]/5 px-3 py-2 text-sm text-[#71717a]">
-          No files attached.
-        </div>
+        <EmptyStateCard
+          compact
+          icon={<Paperclip className="size-4" />}
+          title="No files attached"
+          description="Add files to keep source material and supporting artifacts attached to this task."
+        />
       )}
     </div>
   );

@@ -1,45 +1,59 @@
-const BestFor = () => {
-  const groups = [
-    {
-      title: 'Product and engineering leads',
-      description:
-        'Useful when you need one place to see schedules, execution status, ownership, and review flow without adopting a heavyweight project suite.',
-    },
-    {
-      title: 'Client-facing and operations teams',
-      description:
-        'Helpful for teams managing several streams of work at once, especially when priorities shift often and handoffs need to stay visible.',
-    },
-    {
-      title: 'Teams replacing spreadsheet-plus-chat workflows',
-      description:
-        'A strong fit if you have outgrown ad hoc planning and want a calmer, simpler tool that is easier to trust than a cloud-heavy stack.',
-    },
-  ]
+const illustrationBase = `${import.meta.env.BASE_URL}illustrations`
 
+const audiences = [
+  {
+    title: 'Contributors',
+    description:
+      'Useful when you need one place to see schedules, status, ownership, and milestones without adopting a heavyweight project suite.',
+    illustration: 'less-overhead-01.svg',
+    widthClassName: 'w-[10.5rem] md:w-[11.6rem]',
+  },
+  {
+    title: 'Managers',
+    description:
+      'Helpful for those managing several streams of work at once, especially when priorities shift often and handoffs need to stay visible.',
+    illustration: 'less-overhead-02.svg',
+    widthClassName: 'w-[10.7rem] md:w-[11.7rem]',
+  },
+  {
+    title: 'Builders',
+    description:
+      'A strong fit if you have outgrown ad hoc planning and want a calmer, simpler tool that is easier to trust than a cloud-heavy stack.',
+    illustration: 'less-overhead-03.svg',
+    widthClassName: 'w-[10.3rem] md:w-[11.2rem]',
+  },
+] as const
+
+const BestFor = () => {
   return (
-    <section id="best-for" className="bg-white py-24 md:py-28">
-      <div className="container mx-auto px-6">
-        <div className="mx-auto max-w-6xl">
-          <div className="mx-auto mb-14 max-w-3xl text-center md:mb-20">
-            <h2 className="mb-6 text-4xl font-normal tracking-[-0.03em] text-black md:text-5xl">
-              Built for teams that want less overhead
+    <section id="best-for" className="bg-[#fbfaf8] py-24 md:py-28">
+      <div className="landing-container">
+        <div className="mx-auto max-w-[72rem]">
+          <div className="mx-auto max-w-3xl text-center">
+            <h2 className="text-balance text-[clamp(2.9rem,5vw,4rem)] font-medium leading-[1.04] tracking-[-0.05em] text-[#5b5966]">
+              Built for less overhead
             </h2>
-            <p className="text-lg font-normal leading-8 text-[#6B6B6B] md:text-xl">
-              Omvra is especially strong for teams that need better planning clarity but do not want another bloated
-              system to administer.
+            <p className="mx-auto mt-7 max-w-[37rem] text-pretty text-lg leading-9 text-[#6d6a73] sm:text-[1.35rem]">
+              Strong for people that need better planning clarity but less headaches and bloat.
             </p>
           </div>
 
-          <div className="grid gap-12 md:grid-cols-3 md:gap-8 xl:gap-12">
-            {groups.map((group, index) => (
-              <article key={group.title} className="border-t border-black/10 pt-6">
-                <div className="mb-6 text-sm font-medium tracking-[0.2em] text-black/40">0{index + 1}</div>
-                <h3 className="max-w-[16ch] text-xl font-medium leading-tight text-black md:text-2xl">
-                  {group.title}
+          <div className="mt-16 grid gap-12 md:grid-cols-3 md:gap-8">
+            {audiences.map((audience) => (
+              <article key={audience.title} className="flex flex-col items-center text-center">
+                <div className="flex min-h-[12.5rem] items-start justify-center">
+                  <img
+                    src={`${illustrationBase}/${audience.illustration}`}
+                    alt=""
+                    className={`h-auto ${audience.widthClassName}`}
+                    loading="lazy"
+                  />
+                </div>
+                <h3 className="mt-7 text-[2rem] font-medium leading-[1.08] tracking-[-0.05em] text-[#1f1f24]">
+                  {audience.title}
                 </h3>
-                <p className="max-w-[32ch] pt-6 text-base font-normal leading-6 text-[#6B6B6B]">
-                  {group.description}
+                <p className="mt-6 max-w-[15rem] text-left text-base text-[#77737c] md:max-w-[15.2rem]">
+                  {audience.description}
                 </p>
               </article>
             ))}

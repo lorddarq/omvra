@@ -1,58 +1,65 @@
-const Footer = () => {
-  const linkClassName =
-    'text-sm font-normal text-black transition-colors duration-200 hover:text-[#6C4FE0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D5CEF1] focus-visible:ring-offset-2'
+const logoSrc = `${import.meta.env.BASE_URL}illustrations/logo.svg`
 
+const linkClassName =
+  'text-sm font-medium text-[#232228] transition-colors duration-150 hover:text-[#5b5966] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/8 focus-visible:ring-offset-2 focus-visible:ring-offset-[#fbfaf8]'
+
+const Footer = () => {
   return (
-    <footer className="border-t border-black/8 bg-[#FAFAF8]">
-      <div className="container mx-auto px-6 py-16 md:py-20">
-        <div className="grid gap-12 lg:grid-cols-[minmax(0,1.2fr)_repeat(3,minmax(0,0.8fr))] lg:gap-10">
-          <div className="max-w-sm">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="h-2.5 w-2.5 rounded-full bg-[#6C4FE0]/45" />
-              <span className="text-xl font-semibold tracking-[-0.03em] text-black">omvra</span>
-            </div>
-            <p className="text-sm font-normal leading-6 text-[#656565]">
+    <footer className="bg-[#fbfaf8]">
+      <div className="landing-container py-20 md:py-24">
+        <div className="grid gap-14 lg:grid-cols-[250px_minmax(0,648px)] lg:items-start lg:justify-between">
+          <div className="max-w-[15.625rem]">
+            <img src={logoSrc} alt="Omvra" className="h-8 w-auto" />
+            <p className="mt-5 text-sm leading-9 text-[#6d6a73]">
               Open-source, local-first planning for teams that want clarity without the usual overhead.
             </p>
           </div>
 
-          <div>
-            <h4 className="mb-4 text-sm font-normal uppercase tracking-[0.14em] text-black/60">Product</h4>
-            <ul className="space-y-3">
-              <li><a href="#why-omvra" className={linkClassName}>Why Omvra</a></li>
-              <li><a href="#features" className={linkClassName}>Features</a></li>
-              <li><a href="#how-it-works" className={linkClassName}>How it works</a></li>
-              <li><a href="#privacy" className={linkClassName}>Privacy</a></li>
-              <li><a href="#download" className={linkClassName}>Download</a></li>
-            </ul>
-          </div>
+          <div className="grid gap-12 sm:grid-cols-3 sm:gap-8 lg:gap-12">
+            <div>
+              <h4 className="text-[0.72rem] font-medium uppercase tracking-[0.22em] text-[#8f8b93]">
+                Product
+              </h4>
+              <ul className="mt-4 space-y-3">
+                <li><a href="#why-omvra" className={linkClassName}>Why Omvra</a></li>
+                <li><a href="#features" className={linkClassName}>Features</a></li>
+                <li><a href="#how-it-works" className={linkClassName}>How it works</a></li>
+                <li><a href="#privacy" className={linkClassName}>Privacy</a></li>
+                <li><a href="#download" className={linkClassName}>Download</a></li>
+              </ul>
+            </div>
 
-          <div>
-            <h4 className="mb-4 text-sm font-normal uppercase tracking-[0.14em] text-black/60">Proof</h4>
-            <ul className="space-y-3">
-              <li><a href="https://github.com/lorddarq/omvra" className={linkClassName}>GitHub repository</a></li>
-              <li><a href="https://github.com/lorddarq/omvra/releases" className={linkClassName}>Releases</a></li>
-              <li><a href="https://github.com/lorddarq/omvra#readme" className={linkClassName}>Documentation</a></li>
-              <li><a href="#agent-prompts" className={linkClassName}>AI workflows</a></li>
-            </ul>
-          </div>
+            <div>
+              <h4 className="text-[0.72rem] font-medium uppercase tracking-[0.22em] text-[#8f8b93]">
+                Proof
+              </h4>
+              <ul className="mt-4 space-y-3">
+                <li><a href="https://github.com/lorddarq/omvra" className={linkClassName}>GitHub repository</a></li>
+                <li><a href="https://github.com/lorddarq/omvra/releases" className={linkClassName}>Releases</a></li>
+                <li><a href="https://github.com/lorddarq/omvra#readme" className={linkClassName}>Documentation</a></li>
+                <li><a href="#agent-prompts" className={linkClassName}>AI workflows</a></li>
+              </ul>
+            </div>
 
-          <div>
-            <h4 className="mb-4 text-sm font-normal uppercase tracking-[0.14em] text-black/60">Project</h4>
-            <ul className="space-y-3">
-              <li><a href="https://github.com/lorddarq/omvra/blob/main/LICENSE" className={linkClassName}>License</a></li>
-              <li><a href="https://github.com/lorddarq/omvra/issues" className={linkClassName}>Issues</a></li>
-              <li><a href="https://github.com/lorddarq/omvra/actions" className={linkClassName}>Build status</a></li>
-            </ul>
+            <div>
+              <h4 className="text-[0.72rem] font-medium uppercase tracking-[0.22em] text-[#8f8b93]">
+                Project
+              </h4>
+              <ul className="mt-4 space-y-3">
+                <li><a href="https://github.com/lorddarq/omvra/blob/main/LICENSE" className={linkClassName}>License</a></li>
+                <li><a href="https://github.com/lorddarq/omvra/issues" className={linkClassName}>Issues</a></li>
+                <li><a href="https://github.com/lorddarq/omvra/actions" className={linkClassName}>Build status</a></li>
+              </ul>
+            </div>
           </div>
         </div>
 
-        <div className="mt-12 border-t border-black/8 pt-8">
-          <div className="flex flex-col items-center justify-between gap-2 text-center md:flex-row md:text-left">
-            <p className="text-sm font-normal text-[#656565]">© 2026 Omvra. All rights reserved.</p>
+        <div className="mt-14 border-t border-black/6 pt-7">
+          <div className="flex flex-col gap-4 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
+            <p className="text-sm text-[#78737b]">© 2026 Omvra. All rights reserved.</p>
             <a
               href="https://grazy.sorinjurcut.com/"
-              className="text-sm font-normal text-[#656565] transition-colors duration-200 hover:text-[#6C4FE0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D5CEF1] focus-visible:ring-offset-2"
+              className="text-sm text-[#78737b] transition-colors duration-150 hover:text-[#5b5966] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/8 focus-visible:ring-offset-2 focus-visible:ring-offset-[#fbfaf8]"
             >
               Built with Grazy in Figma
             </a>

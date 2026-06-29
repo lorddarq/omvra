@@ -1,112 +1,74 @@
+const illustrationBase = `${import.meta.env.BASE_URL}illustrations`
+
+const pillars = [
+  {
+    title: 'No account',
+    description:
+      'Download and start using it right away. No user profiles, or password accounts to worry about.',
+    illustration: 'local-by-design-01.svg',
+    widthClassName: 'w-[8.5rem] md:w-[9rem]',
+  },
+  {
+    title: 'No Cloud',
+    description:
+      'No embedded analytics SDKs silently tracking routine product usage in the app runtime.',
+    illustration: 'local-by-design-02.svg',
+    widthClassName: 'w-[8.8rem] md:w-[9.2rem]',
+  },
+  {
+    title: 'Limited Network',
+    description:
+      'Controlled traffic, token-secured MCP endpoints, or external MCP tools. You control when.',
+    illustration: 'local-by-design-03.svg',
+    widthClassName: 'w-[8.6rem] md:w-[9.1rem]',
+  },
+] as const
+
 const PrivacyProof = () => {
-  const proofPoints = [
-    {
-      title: 'Your plans stay on your machine',
-      description:
-        'Tasks, comments, people, settings, and workspace backups are stored locally through the desktop app instead of being pushed into a hosted planning service.',
-    },
-    {
-      title: 'No account required',
-      description:
-        'You can download Omvra and start using it without sign-up flows, user profiles, or another shared admin surface to manage.',
-    },
-    {
-      title: 'No hidden telemetry',
-      description:
-        'There are no embedded analytics SDKs silently tracking routine product usage in the app runtime.',
-    },
-    {
-      title: 'Network access stays explicit',
-      description:
-        'Outbound traffic is limited to user-initiated actions such as release downloads, MCP endpoints you explicitly enable, or external MCP tools you choose to connect through your assistant.',
-    },
-  ]
-
-  const cardSpans = [
-    'md:col-span-7',
-    'md:col-span-5',
-    'md:col-span-5',
-    'md:col-span-7',
-  ]
-
   return (
-    <section id="privacy" className="bg-white py-24 md:py-28">
-      <div className="container mx-auto px-6">
-        <div className="mx-auto max-w-6xl">
-          <h2 className="mb-6 text-center text-4xl font-normal tracking-[-0.03em] text-black md:text-5xl">
-            Local by design
-          </h2>
-          <p className="mx-auto mb-14 max-w-3xl text-center text-lg font-normal leading-8 text-[#6B6B6B] md:mb-16 md:text-xl">
-            Omvra is designed for teams that want more control, fewer surprises, and a planning tool that does not treat their work like a source of telemetry.
-          </p>
-
-          <div className="grid gap-6 md:grid-cols-12">
-            <article
-              className={`relative overflow-hidden rounded-[30px] bg-[#FCFDE8] p-8 shadow-[0_18px_44px_rgba(104,121,18,0.10)] md:min-h-[22rem] md:p-10 ${cardSpans[0]}`}
-            >
-              <div className="absolute inset-x-0 top-0 h-[4px] bg-[#B0C81A]" />
-              <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(13rem,0.52fr)] md:items-start">
-                <div>
-                  <h3 className="mb-5 max-w-[10ch] text-[2.35rem] font-normal leading-[0.98] tracking-[-0.045em] text-[#687912] md:text-[3rem]">
-                    {proofPoints[0].title}
-                  </h3>
-                  <p className="max-w-2xl text-base font-normal leading-8 text-black md:text-lg">
-                    {proofPoints[0].description}
-                  </p>
-                </div>
-                <div className="border-t border-black/10 pt-5 md:border-l md:border-t-0 md:pl-6 md:pt-0">
-                  <p className="mb-2 text-sm font-medium uppercase tracking-[0.18em] text-black/55">
-                    Practical effect
-                  </p>
-                  <p className="text-sm leading-5 text-black/80">
-                    Your tasks, comments, people, and backup exports stay part of your own desktop workflow rather than a hosted account system.
-                  </p>
-                </div>
-              </div>
-            </article>
-
-            <article
-              className={`flex min-h-[22rem] flex-col rounded-[30px] bg-[#F4F7D8] p-7 md:p-8 ${cardSpans[1]}`}
-            >
-              <div>
-                <h3 className="mb-4 max-w-[12ch] text-2xl font-normal leading-tight tracking-[-0.03em] text-[#687912] md:text-[2rem]">
-                  {proofPoints[1].title}
-                </h3>
-                <p className="text-base leading-6 text-black">{proofPoints[1].description}</p>
-              </div>
-              <p className="mt-auto border-t border-black/10 pt-4 text-sm leading-5 text-black/65">
-                Open the app, download a release, and start planning without another signup step in the middle.
-              </p>
-            </article>
-
-            <article
-              className={`flex min-h-[17rem] flex-col rounded-[30px] bg-[#FAFBEF] p-7 md:min-h-[18rem] md:p-8 ${cardSpans[2]}`}
-            >
-              <h3 className="mb-4 max-w-[14ch] text-2xl font-normal leading-tight tracking-[-0.03em] text-[#687912]">
-                {proofPoints[2].title}
-              </h3>
-              <p className="text-base leading-6 text-black">{proofPoints[2].description}</p>
-            </article>
-
-            <article
-              className={`rounded-[30px] bg-[#F7F9E6] p-7 md:p-8 ${cardSpans[3]}`}
-            >
-              <div className="grid gap-6 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)] md:items-start">
-                <div>
-                  <h3 className="mb-4 max-w-[13ch] text-2xl font-normal leading-tight tracking-[-0.03em] text-[#687912] md:text-[2rem]">
-                    {proofPoints[3].title}
-                  </h3>
-                </div>
-                <p className="text-base leading-6 text-black">
-                  {proofPoints[3].description}
-                </p>
-              </div>
-            </article>
+    <section id="privacy" className="bg-[#fbfaf8] py-24 md:py-28">
+      <div className="landing-container">
+        <div className="mx-auto max-w-[72rem]">
+          <div className="mx-auto max-w-3xl text-center">
+            <h2 className="text-balance text-[clamp(2.9rem,5vw,4rem)] font-medium leading-[1.04] tracking-[-0.05em] text-[#5b5966]">
+              Local by design
+            </h2>
+            <p className="mx-auto mt-7 max-w-[36rem] text-pretty text-lg leading-9 text-[#6d6a73] sm:text-[1.35rem]">
+              Designed for people that want more control, fewer surprises, and a tool that does
+              not mine their work for data.
+            </p>
           </div>
 
-          <p className="mx-auto mt-8 max-w-2xl text-center text-sm font-normal leading-5 text-black/70">
-            Audit basis: app renderer and Electron main/preload paths checked for telemetry, analytics, and auto-upload behavior.
-          </p>
+          <div className="mx-auto mt-16 max-w-[72rem]">
+            <div className="rounded-[1.75rem] border border-black/6 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(249,247,244,0.96)_100%)] shadow-[0_2px_8px_rgba(17,24,39,0.04),0_16px_36px_rgba(17,24,39,0.04)]">
+              <div className="grid md:grid-cols-3">
+                {pillars.map((pillar, index) => (
+                  <article
+                    key={pillar.title}
+                    className={`flex flex-col items-start px-9 pb-8 pt-10 text-left md:min-h-[24.875rem] md:px-9 md:pb-10 md:pt-12 ${
+                      index < pillars.length - 1 ? 'border-b border-black/6 md:border-b-0 md:border-r' : ''
+                    }`}
+                  >
+                    <div className="flex min-h-[9.5rem] w-full items-start justify-center">
+                      <img
+                        src={`${illustrationBase}/${pillar.illustration}`}
+                        alt=""
+                        className={`h-auto ${pillar.widthClassName}`}
+                        loading="lazy"
+                      />
+                    </div>
+
+                    <h3 className="mt-3 text-[2.1rem] font-medium leading-[1.08] tracking-[-0.05em] text-[#5b5966]">
+                      {pillar.title}
+                    </h3>
+                    <p className="mt-4 max-w-[16rem] text-base text-[#77737c]">
+                      {pillar.description}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>

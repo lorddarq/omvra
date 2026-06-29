@@ -1,313 +1,202 @@
+const illustrationBase = `${import.meta.env.BASE_URL}illustrations`
+const iconBase = `${import.meta.env.BASE_URL}icons`
+
+const spotlightCards = [
+  {
+    title: 'Plan on a timeline,\nexecute in Kanban',
+    description:
+      'Start with visual scheduling, switch to execution, and keep the same tasks connected across both views.',
+    illustration: 'what-can-do-01.svg',
+    chips: ['Timeline', 'Kanban', 'Roadmap'],
+    minHeight: 'md:min-h-[30.25rem]',
+  },
+  {
+    title: 'A workspace for you\nand your agents',
+    description:
+      "Assign work to an agent the same way you'd assign it to your teammates, or yourself.",
+    extra:
+      'Full context included, no markdown files or copy-pasted instructions.',
+    illustration: 'what-can-do-02.svg',
+    chips: ['MCP STDIO', 'MCP HTTP'],
+    minHeight: 'md:min-h-[33.25rem]',
+  },
+  {
+    title: 'AI with guardrails',
+    description:
+      'Use the built-in MCP inside Codex, Claude, or any MCP-capable assistant to read task context, make revision-protected updates, and hand work back for human review.',
+    illustration: 'what-can-do-03.svg',
+    chips: ['Codex', 'Claude Code', 'Agentic-capable LLMs'],
+    minHeight: 'md:min-h-[29.5rem]',
+  },
+] as const
+
+const supportingFeatures = [
+  {
+    title: 'See schedules clearly',
+    description:
+      'Use drag-and-drop timeline planning, swimlanes, and date resizing to spot collisions.',
+    icon: 'what-can-do-icon-01.svg',
+  },
+  {
+    title: 'Keep work moving',
+    description:
+      'Organize tasks in status columns, search, and use card previews so handoffs and prioritization take less effort.',
+    icon: 'what-can-do-icon-02.svg',
+  },
+  {
+    title: 'Coordinate across projects',
+    description:
+      'Assign work to multiple projects while keeping one primary scheduling context, to reduce duplication.',
+    icon: 'what-can-do-icon-03.svg',
+  },
+  {
+    title: 'Map milestones and dependencies',
+    description:
+      'Use the roadmap to group tasks into milestones, filter by project, and see dependency across scheduled work.',
+    icon: 'what-can-do-icon-04.svg',
+  },
+  {
+    title: 'Keep context with the task',
+    description:
+      'Attach markdown notes, comments, local file references, and task details in one place for the full picture.',
+    icon: 'what-can-do-icon-05.svg',
+  },
+  {
+    title: 'Spot workload before it becomes overload',
+    description:
+      'Track load with separate execution and pipeline metrics to rebalance work before it starts blocking delivery.',
+    icon: 'what-can-do-icon-06.svg',
+  },
+  {
+    title: 'Back up everything when you want',
+    description:
+      'Perform full workspace backups, inspect storage usage, and manage local settings without the hassle of cloud.',
+    icon: 'what-can-do-icon-07.svg',
+  },
+] as const
+
+const supportNotes = [
+  {
+    label: 'Human in the loop',
+    body:
+      "When an agent finishes work, it doesn't just mark a task done, but assign it to you to review, so nothing ships without you present.",
+  },
+  {
+    label: 'Connection',
+    body:
+      'For MCP use STDIO or local HTTP with token and capability controls when you need a URL.',
+  },
+  {
+    label: 'Visibility',
+    body:
+      'Audit logs, listener status, and health checks make agent access easier to inspect and debug.',
+  },
+  {
+    label: 'Watchers',
+    body:
+      'Agents can watch a chosen board, project, and search filter for new or changed work.',
+  },
+] as const
+
+const chipClassName =
+  'inline-flex items-center rounded-full bg-[#f1f1f3] px-3 py-1 text-[0.7rem] font-medium tracking-[-0.01em] text-[#7b7680]'
+
 const Features = () => {
-  const features = [
-    {
-      title: 'Plan on a timeline, then execute in Kanban',
-      description:
-        'Start with visual scheduling, switch to execution when the work is moving, and keep the same tasks connected across both views.',
-      icon: (
-        <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"
-          />
-        </svg>
-      ),
-    },
-    {
-      title: 'See schedules clearly',
-      description:
-        'Use drag-and-drop timeline planning, swimlanes, and date resizing to spot collisions early and keep delivery dates realistic.',
-      icon: (
-        <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-          />
-        </svg>
-      ),
-    },
-    {
-      title: 'Keep work moving',
-      description:
-        'Organize tasks in flexible status columns, search quickly, and use richer card previews so handoffs and prioritization take less effort.',
-      icon: (
-        <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M9 4H5a2 2 0 00-2 2v14a2 2 0 002 2h4M9 4h6M9 4v16M15 4h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M15 4v16"
-          />
-        </svg>
-      ),
-    },
-    {
-      title: 'Coordinate across projects',
-      description:
-        'Assign work to multiple projects while keeping one primary scheduling context, so cross-team tasks stay visible without duplication.',
-      icon: (
-        <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4"
-          />
-        </svg>
-      ),
-    },
-    {
-      title: 'Map milestones and dependencies',
-      description:
-        'Use the roadmap view to group tasks into milestones, filter by project or delivery health, and see dependency lines across scheduled work.',
-      icon: (
-        <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M4 6h5m6 0h5M4 18h5m6 0h5M9 6a3 3 0 016 0M9 18a3 3 0 016 0M12 9v6"
-          />
-        </svg>
-      ),
-    },
-    {
-      title: 'Keep context with the task',
-      description:
-        'Store markdown notes, structured comments, local file references, and task details in one place so the next person has the full picture.',
-      icon: (
-        <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"
-          />
-        </svg>
-      ),
-    },
-    {
-      title: 'Spot workload before it becomes overload',
-      description:
-        'Track person-level load with separate execution and pipeline metrics so you can rebalance work before it starts blocking delivery.',
-      icon: (
-        <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-      ),
-    },
-    {
-      title: 'Back up everything when you want',
-      description:
-        'Export and import full workspace backups, inspect storage usage, and manage local settings without handing your planning data to a hosted service.',
-      icon: (
-        <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.757.426 1.757 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.757-2.924 1.757-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.757-.426-1.757-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.607 2.296.07 2.572-1.065z"
-          />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      ),
-    },
-    {
-      title: 'Bring AI in with guardrails',
-      description:
-        'Use Omvra MCP from Codex, Claude, or any MCP-capable assistant to read task context, make revision-protected updates, and hand work back for human review.',
-      icon: (
-        <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M7.5 12h9m-9 0a3 3 0 110-6h9a3 3 0 010 6m-9 0a3 3 0 100 6h9a3 3 0 100-6"
-          />
-        </svg>
-      ),
-    },
-  ]
-
-  const [leadFeature, ...supportingFeatures] = features
-  const mcpFeature = supportingFeatures[supportingFeatures.length - 1]
-  const supportingList = supportingFeatures.slice(0, -1)
-
   return (
-    <section id="features" className="bg-white py-24 md:py-32">
-      <div className="container mx-auto px-6">
-        <div className="mx-auto max-w-6xl">
-          <div className="mx-auto mb-16 max-w-3xl text-center md:mb-20">
-            <h2
-              className="mb-6 text-4xl font-medium leading-[1.08] tracking-[-0.03em] text-[#101828] md:text-5xl"
-              style={{ fontFamily: 'Figtree, sans-serif' }}
-            >
-              What you can do in Omvra
+    <section id="features" className="bg-[#fbfaf8] py-24 md:py-28">
+      <div className="landing-container">
+        <div className="mx-auto max-w-[72rem]">
+          <div className="mx-auto max-w-3xl text-center">
+            <h2 className="text-balance text-[clamp(2.7rem,5vw,4rem)] font-medium leading-[1.04] tracking-[-0.05em] text-[#5b5966]">
+              What can it do?
             </h2>
-            <p className="text-lg leading-8 text-[#4a5565] md:text-xl">
-              Every part of the product is aimed at the same outcome: clearer planning, smoother execution, and less
-              work lost between tools.
+            <p className="mx-auto mt-7 max-w-[48rem] text-pretty text-lg leading-9 text-[#6d6a73] sm:text-[1.35rem]">
+              Every part of the product is aimed at the same outcome: clearer planning, smoother
+              execution, and less work lost between tools.
             </p>
           </div>
 
-          <div className="grid gap-14 lg:grid-cols-[minmax(0,1.05fr)_minmax(18rem,0.95fr)] lg:items-start lg:gap-14">
-            <div className="space-y-10">
-              <article className="rounded-[32px] border border-[#ebe7f8] bg-[linear-gradient(180deg,#fbf9ff_0%,#ffffff_70%)] p-8 shadow-[0_18px_40px_rgba(108,79,224,0.07)] md:p-10">
-                <div className="mb-8 flex flex-wrap items-start justify-between gap-6">
-                  <div className="flex items-center justify-center text-[#6c4fe0]">
-                    {leadFeature.icon}
-                  </div>
-                  <span className="text-sm font-semibold tracking-[0.22em] text-[#99a1af]">01</span>
-                </div>
-                <div className="space-y-4 xl:space-y-5">
-                  <div>
-                    <p className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-[#6c4fe0]">
-                      Core workflow
-                    </p>
-                    <h3
-                      className="max-w-[13ch] text-3xl font-semibold leading-[1.02] tracking-[-0.04em] text-[#101828] md:text-[2.6rem]"
-                      style={{ fontFamily: 'Figtree, sans-serif' }}
-                    >
-                      {leadFeature.title}
-                    </h3>
-                  </div>
-                  <div className="space-y-5">
-                    <p className="text-base leading-6 text-[#4a5565] md:text-lg">{leadFeature.description}</p>
-                    <div className="grid gap-4 border-t border-[#e4def8] pt-5 xl:grid-cols-2">
-                      <div>
-                        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#99a1af]">
-                          Why it matters
-                        </p>
-                        <p className="text-sm leading-5 text-[#4a5565]">
-                          The timeline stays strategic while Kanban keeps execution moving in the same workspace.
-                        </p>
-                      </div>
-                      <div>
-                        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#99a1af]">
-                          Result
-                        </p>
-                        <p className="text-sm leading-5 text-[#4a5565]">
-                          Less status translation, less duplicated planning, and a clearer handoff from planning to delivery.
-                        </p>
-                      </div>
+          <div className="mt-16 grid gap-8 xl:grid-cols-[minmax(0,560px)_minmax(0,560px)] xl:items-start xl:gap-8">
+            <div className="space-y-8">
+              {spotlightCards.map((card) => (
+                <article
+                  key={card.title}
+                  className={`relative overflow-hidden rounded-[2rem] border border-black/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(248,246,243,0.96)_100%)] px-8 pb-9 pt-8 shadow-[0_2px_8px_rgba(17,24,39,0.04),0_16px_36px_rgba(17,24,39,0.04)] ${card.minHeight}`}
+                >
+                  <div className="relative flex flex-col items-center text-center">
+                    <div className="flex size-32 items-center justify-center">
+                      <img
+                        src={`${illustrationBase}/${card.illustration}`}
+                        alt=""
+                        className="h-32 w-32 object-contain"
+                        loading="lazy"
+                      />
                     </div>
-                  </div>
-                </div>
-              </article>
 
-              <article className="rounded-[30px] bg-[linear-gradient(180deg,rgba(108,79,224,0.08)_0%,rgba(108,79,224,0.03)_100%)] p-8 md:p-9">
-                <div className="mb-5 inline-flex items-center rounded-full border border-[#6c4fe0]/20 bg-white/80 px-4 py-1.5 text-sm font-medium text-[#6c4fe0]">
-                  MCP support
-                </div>
-                <div className="w-full space-y-8">
-                  <div>
-                    <h3
-                      className="mb-4 text-2xl font-medium leading-tight tracking-[-0.03em] text-[#101828] md:text-[2rem]"
-                      style={{ fontFamily: 'Figtree, sans-serif' }}
-                    >
-                      A shared workspace for humans and MCP agents
+                    <h3 className="mt-4 whitespace-pre-line text-balance text-[2rem] font-medium leading-[1.14] tracking-[-0.05em] text-[#5a5866] md:text-[2.25rem]">
+                      {card.title}
                     </h3>
-                    <p className="text-base leading-6 text-[#4a5565]">
-                      Omvra can expose the same planning context to local stdio clients or the local HTTP MCP endpoint.
-                      Agents can inspect resources and prompts, watch configured boards for incoming work, update tasks
-                      safely, attach local file references, log time, and maintain roadmap milestones without replacing
-                      human review.
+
+                    <p className="mt-5 max-w-[20rem] text-base text-[#77737c]">
+                      {card.description}
                     </p>
-                  </div>
-                  <div>
-                    <p
-                      className="mb-2 text-lg font-semibold leading-tight tracking-[-0.02em] text-[#101828]"
-                      style={{ fontFamily: 'Figtree, sans-serif' }}
-                    >
-                      {mcpFeature.title}
-                    </p>
-                    <p className="text-sm leading-5 tracking-tight text-[#4a5565]">{mcpFeature.description}</p>
-                  </div>
-                  <div className="grid gap-3 border-t border-[#d9d1f3] pt-5 sm:grid-cols-2">
-                    <div>
-                      <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#6c4fe0]">
-                        Connection
+
+                    {card.extra ? (
+                      <p className="mt-5 max-w-[20rem] text-base text-[#8a8690]">
+                        {card.extra}
                       </p>
-                      <p className="text-sm leading-5 text-[#4a5565]">
-                        Prefer stdio for same-machine clients, or use the local HTTP endpoint with token and capability
-                        controls when you need a URL.
-                      </p>
-                    </div>
-                    <div>
-                      <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#6c4fe0]">
-                        Collaboration
-                      </p>
-                      <p className="text-sm leading-5 text-[#4a5565]">
-                        When your assistant has MCP servers for Glean, Atlassian Rovo, Microsoft 365, or Figma connected,
-                        it can connect planning tasks to the wider work context.
-                      </p>
+                    ) : null}
+
+                    <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                      {card.chips.map((chip) => (
+                        <span key={chip} className={chipClassName}>
+                          {chip}
+                        </span>
+                      ))}
                     </div>
                   </div>
-                  <div className="grid gap-3 border-t border-[#d9d1f3] pt-5 sm:grid-cols-2">
-                    <div>
-                      <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#6c4fe0]">
-                        Visibility
-                      </p>
-                      <p className="text-sm leading-5 text-[#4a5565]">
-                        Audit logs, listener status, and health checks make agent access easier to inspect and debug.
-                      </p>
-                    </div>
-                    <div>
-                      <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#6c4fe0]">
-                        Watches
-                      </p>
-                      <p className="text-sm leading-5 text-[#4a5565]">
-                        Agentic people can watch a chosen board, project, and search filter for new or changed work.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </article>
+                </article>
+              ))}
             </div>
 
-            <div className="space-y-10">
-              <div>
-                <p className="mb-5 text-sm font-semibold uppercase tracking-[0.18em] text-[#99a1af]">
-                  Supporting capabilities
-                </p>
-                <div className="space-y-4">
-                  {supportingList.map((feature, index) => (
-                    <article
-                      key={feature.title}
-                      className="grid gap-3 border-t border-[#ece8f7] pt-4 sm:grid-cols-[auto_minmax(0,1fr)] sm:gap-4"
-                    >
-                      <div className="flex items-center gap-3 sm:items-start">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#f6f3ff] text-[#6c4fe0]">
-                          {feature.icon}
-                        </div>
-                        <span className="text-xs font-semibold tracking-[0.18em] text-[#99a1af]">
-                          0{index + 2}
-                        </span>
-                      </div>
-                      <div>
-                        <h3
-                          className="mb-1 text-xl font-semibold leading-tight tracking-[-0.025em] text-[#101828]"
-                          style={{ fontFamily: 'Figtree, sans-serif' }}
-                        >
-                          {feature.title}
-                        </h3>
-                        <p className="max-w-[40ch] text-sm leading-6 text-[#4a5565] md:text-[0.97rem]">
-                          {feature.description}
-                        </p>
-                      </div>
-                    </article>
-                  ))}
-                </div>
+            <div className="rounded-[2rem] bg-[linear-gradient(180deg,rgba(245,244,241,0.96)_0%,rgba(242,240,236,0.96)_100%)] px-8 py-6 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.03)] md:px-9 md:py-7">
+              <div className="divide-y divide-black/8">
+                {supportingFeatures.map((feature) => (
+                  <article key={feature.title} className="grid gap-3 py-6 sm:grid-cols-[24px_minmax(0,1fr)] sm:gap-4">
+                    <div className="flex items-start justify-center pt-0.5">
+                      <img
+                        src={`${iconBase}/${feature.icon}`}
+                        alt=""
+                        className="h-6 w-6 object-contain opacity-35"
+                        loading="lazy"
+                      />
+                    </div>
+                    <div>
+                      <h3 className="text-[1.35rem] font-semibold leading-tight tracking-[-0.035em] text-[#66626c]">
+                        {feature.title}
+                      </h3>
+                      <p className="mt-3 max-w-[24rem] text-[0.97rem] text-[#807c84]">
+                        {feature.description}
+                      </p>
+                    </div>
+                  </article>
+                ))}
               </div>
+            </div>
+          </div>
+
+          <div className="mt-10 border-t border-black/6 pt-8">
+            <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-4 xl:gap-10">
+              {supportNotes.map((note) => (
+                <article key={note.label}>
+                  <h3 className="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-[#918c95]">
+                    {note.label}
+                  </h3>
+                  <p className="mt-3 max-w-[16rem] text-sm leading-6 text-[#86818a]">
+                    {note.body}
+                  </p>
+                </article>
+              ))}
             </div>
           </div>
         </div>

@@ -1,13 +1,14 @@
 import { Download } from 'lucide-react'
 
-import { Projects } from '../illustrations/heroTimeline'
-
 const navLinks = [
   { href: '#why-omvra', label: 'Why Omvra' },
   { href: '#features', label: 'Features' },
   { href: '#how-it-works', label: 'How it works' },
   { href: '#privacy', label: 'Privacy' },
 ]
+
+const logoSrc = `${import.meta.env.BASE_URL}illustrations/logo.svg`
+const timelineSrc = `${import.meta.env.BASE_URL}illustrations/timeline.svg`
 
 const Hero = () => {
   return (
@@ -16,20 +17,11 @@ const Hero = () => {
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(214,195,170,0.38),transparent_34%),radial-gradient(circle_at_left,rgba(210,204,195,0.24),transparent_42%),linear-gradient(180deg,#f8f7f5_0%,#fbfaf8_50%,#f7f5f2_100%)]"
       />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute left-1/2 top-[7.5rem] h-[18rem] w-[18rem] -translate-x-1/2 rounded-full border border-[#f0c59d]/70"
-      />
 
       <nav className="landing-container relative z-10 py-6 sm:py-8">
         <div className="flex items-center justify-between gap-6">
-          <a href="#" className="inline-flex items-center gap-2.5 text-[1.65rem] font-semibold tracking-[-0.04em] text-[#4e4d5d]">
-            <span className="inline-flex size-7 items-center justify-center rounded-full bg-[linear-gradient(180deg,#253565_0%,#ebc39f_100%)] text-[0.8rem] font-semibold text-white">
-              o
-            </span>
-            <span className="text-[1.45rem] font-medium lowercase tracking-[-0.05em] text-[#4f4d59]">
-              omvra
-            </span>
+          <a href="#" className="inline-flex items-center">
+            <img src={logoSrc} alt="Omvra" className="h-8 w-auto sm:h-9" />
           </a>
 
           <div className="hidden items-center gap-8 md:flex">
@@ -59,20 +51,6 @@ const Hero = () => {
             <br />
             <span className="relative inline-block pr-2">
               Delegate to agents.
-              <svg
-                aria-hidden="true"
-                className="pointer-events-none absolute -bottom-3 right-[-0.6rem] h-[1.55em] w-[1.85em] text-[#f08a2f]"
-                viewBox="0 0 118 70"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M12 36.3C12 21.7 34.8 10 63 10s51 11.7 51 26.3S91.2 62.7 63 62.7 12 50.9 12 36.3Z"
-                  stroke="currentColor"
-                  strokeWidth="5"
-                  strokeLinecap="round"
-                />
-              </svg>
             </span>
           </h1>
 
@@ -103,7 +81,11 @@ const Hero = () => {
             aria-hidden="true"
             className="pointer-events-none absolute inset-x-10 top-10 h-32 rounded-full bg-[rgba(211,193,169,0.22)] blur-[90px] sm:h-44 sm:blur-[110px]"
           />
-          <Projects className="absolute left-1/2 top-0 -translate-x-1/2 origin-top scale-[0.18] sm:scale-[0.25] md:scale-[0.33] lg:scale-[0.42] xl:scale-100" />
+          <img
+            src={timelineSrc}
+            alt="Omvra timeline preview"
+            className="absolute left-1/2 top-0 h-auto w-[58rem] max-w-[155%] -translate-x-1/2 drop-shadow-[0_24px_48px_rgba(17,24,39,0.08)] sm:w-[70rem] md:w-[82rem] lg:w-[90rem] xl:w-[1442px]"
+          />
         </div>
       </div>
     </section>

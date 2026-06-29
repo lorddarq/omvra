@@ -4,21 +4,21 @@ const reasons = [
     description:
       'Plan work on a timeline, move it through Kanban. Spend less time translating status between tools.',
     illustration: 'Illustration01.svg',
-    glow: 'bg-[radial-gradient(circle_at_50%_34%,rgba(239,229,123,0.55),transparent_56%)]',
+    glow: 'bg-[linear-gradient(180deg,rgba(149,218,255,1)_20%,rgba(255,202,22,0.2)_100%)] blur-xl',
   },
   {
     title: 'Keep things\nin one place',
     description:
       'Task details, markdown notes, comments, and review-ready handoffs stay attached to the work.',
     illustration: 'Illustration02.svg',
-    glow: 'bg-[radial-gradient(circle_at_50%_34%,rgba(223,227,243,0.7),transparent_58%)]',
+    glow: 'bg-[linear-gradient(180deg,rgba(149,218,255,0.88)_20%,rgba(245,188,185,0.3)_100%)] blur-xl',
   },
   {
     title: 'Stay in control\nof your data',
     description:
       'Local-first and open source, with no account required, no hidden telemetry, and full-workspace backups.',
     illustration: 'Illustration03.svg',
-    glow: 'bg-[radial-gradient(circle_at_50%_34%,rgba(255,208,107,0.5),transparent_56%)]',
+    glow: 'bg-[linear-gradient(180deg,rgba(244,192,222,0.5)_20%,rgba(255,202,22,0.3)_100%)] blur-xl',
   },
 ] as const
 
@@ -55,7 +55,7 @@ const WhyOmvra = () => {
                 key={reason.title}
                 className="relative overflow-hidden rounded-[2rem] border border-black/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.88)_0%,rgba(247,245,242,0.96)_100%)] px-8 pb-8 pt-8 shadow-[0_2px_6px_rgba(17,24,39,0.04),0_18px_40px_rgba(17,24,39,0.04)]"
               >
-                <div aria-hidden="true" className={`pointer-events-none absolute inset-x-0 top-0 h-40 ${reason.glow}`} />
+                <div aria-hidden="true" className={`rounded-full pointer-events-none absolute inset-x-0 -top-60 h-130 w-130 left-1/2 -translate-x-1/2 ${reason.glow}`} />
                 <div className="relative">
                   <div className="flex justify-end">
                     <div className="flex size-32 items-center justify-center">

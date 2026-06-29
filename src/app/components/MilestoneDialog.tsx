@@ -14,6 +14,15 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
+import {
+  taskEditFieldClassName,
+  taskEditLabelClassName,
+  taskEditTextAreaClassName,
+} from './taskFormStyles';
+
+const milestoneDialogPanelClassName = 'rounded-[24px] border border-black/6 bg-white/70 p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_10px_24px_rgba(15,23,42,0.05)]';
+const milestoneDialogCheckboxCardClassName = 'flex cursor-pointer items-center gap-3 rounded-2xl border border-black/6 bg-white px-3 py-3 text-sm transition-colors hover:bg-[#f7f7f8]';
+const milestoneDialogSearchInputClassName = `${taskEditFieldClassName} h-10 rounded-2xl bg-white`;
 
 interface MilestoneDialogProps {
   isOpen: boolean;
@@ -182,36 +191,39 @@ export function MilestoneDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-[720px]">
+      <DialogContent className="max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-[28px] border-white/70 bg-[#f3f4f6] p-0 shadow-[0_24px_80px_rgba(15,23,42,0.18)] sm:max-w-[760px]">
         <form onSubmit={handleSubmit}>
-          <DialogHeader>
-            <DialogTitle>{milestone ? 'Edit roadmap milestone' : 'Create roadmap milestone'}</DialogTitle>
-            <DialogDescription>
+          <DialogHeader className="border-b border-black/6 px-6 py-5 text-left">
+            <DialogTitle className="text-[1.1rem] font-semibold tracking-[-0.02em] text-[#111827]">
+              {milestone ? 'Edit roadmap milestone' : 'Create roadmap milestone'}
+            </DialogTitle>
+            <DialogDescription className="max-w-[44rem] text-sm leading-6 text-[#6b7280]">
               Milestones can be scoped to one product or span multiple projects under a shared release frame.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-5 py-5">
+          <div className="grid gap-5 px-6 py-5">
             <div className="grid gap-2">
-              <Label htmlFor="milestone-title">Title</Label>
+              <Label htmlFor="milestone-title" className={taskEditLabelClassName}>Title</Label>
               <Input
                 id="milestone-title"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 placeholder="e.g., Launch readiness review"
+                className={taskEditFieldClassName}
                 required
               />
             </div>
 
             <div className="grid gap-2">
-              <Label>Projects</Label>
-              <div className="grid gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 sm:grid-cols-2">
+              <Label className={taskEditLabelClassName}>Projects</Label>
+              <div className={`${milestoneDialogPanelClassName} grid gap-2 sm:grid-cols-2`}>
                 {projects.map(project => {
                   const isChecked = projectIds.includes(project.id);
                   return (
                     <label
                       key={project.id}
-                      className="flex cursor-pointer items-center gap-3 rounded-lg bg-white px-3 py-2 text-sm hover:bg-gray-100"
+                      className={`${milestoneDialogCheckboxCardClassName} ${isChecked ? 'border-[#1a60cb]/15 bg-[#edf3ff]' : ''}`}
                     >
                       <input
                         type="checkbox"
@@ -224,67 +236,70 @@ export function MilestoneDialog({
                         style={{ backgroundColor: project.color || '#3b82f6' }}
                         aria-hidden="true"
                       />
-                      <span className="min-w-0 truncate font-medium text-gray-800">{project.name}</span>
+                      <span className="min-w-0 truncate font-medium text-[#1f2937]">{project.name}</span>
                     </label>
                   );
                 })}
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs leading-5 text-[#7b8190]">
                 Select one project for product-specific milestones, or multiple projects for release-frame milestones.
               </p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
-                <Label htmlFor="milestone-start">Start date</Label>
+                <Label htmlFor="milestone-start" className={taskEditLabelClassName}>Start date</Label>
                 <Input
                   id="milestone-start"
                   type="date"
                   value={startDate}
                   onChange={(event) => setStartDate(event.target.value)}
+                  className={taskEditFieldClassName}
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="milestone-end">End date</Label>
+                <Label htmlFor="milestone-end" className={taskEditLabelClassName}>End date</Label>
                 <Input
                   id="milestone-end"
                   type="date"
                   value={endDate}
                   onChange={(event) => setEndDate(event.target.value)}
+                  className={taskEditFieldClassName}
                   required
                 />
               </div>
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="milestone-color">Color</Label>
+              <Label htmlFor="milestone-color" className={taskEditLabelClassName}>Color</Label>
               <Input
                 id="milestone-color"
                 type="color"
                 value={color}
                 onChange={(event) => setColor(event.target.value)}
-                className="h-11 w-24 p-1"
+                className="h-11 w-24 rounded-2xl border border-black/8 bg-white p-1 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
               />
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="milestone-notes">Notes</Label>
+              <Label htmlFor="milestone-notes" className={taskEditLabelClassName}>Notes</Label>
               <Textarea
                 id="milestone-notes"
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
                 placeholder="Goal details, launch criteria, or manager notes."
                 rows={4}
+                className={taskEditTextAreaClassName}
               />
             </div>
 
-            <section className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <section className={milestoneDialogPanelClassName}>
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900">Linked tasks</h3>
-                  <p className="text-sm text-gray-600">These tasks drive the milestone rollup and deadline flags.</p>
+                  <h3 className="text-sm font-semibold text-[#111827]">Linked tasks</h3>
+                  <p className="text-sm text-[#6b7280]">These tasks drive the milestone rollup and deadline flags.</p>
                 </div>
-                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-gray-600">
+                <span className="rounded-full border border-black/6 bg-white px-2.5 py-1 text-xs font-medium text-[#6b7280]">
                   {linkedTaskIds.length} selected
                 </span>
               </div>
@@ -295,15 +310,15 @@ export function MilestoneDialog({
                   value={taskSearchQuery}
                   onChange={(event) => setTaskSearchQuery(event.target.value)}
                   placeholder="Search tasks by title, notes, status, or project..."
-                  className="h-10 rounded-xl border-gray-200 bg-white"
+                  className={milestoneDialogSearchInputClassName}
                 />
               </div>
               {projectTasks.length === 0 ? (
-                <p className="rounded-lg bg-white p-3 text-sm text-gray-600">
+                <p className="rounded-2xl border border-dashed border-black/8 bg-white px-4 py-4 text-sm text-[#6b7280]">
                   No tasks are currently assigned to the selected project scope.
                 </p>
               ) : filteredProjectTasks.length === 0 ? (
-                <p className="rounded-lg bg-white p-3 text-sm text-gray-600">
+                <p className="rounded-2xl border border-dashed border-black/8 bg-white px-4 py-4 text-sm text-[#6b7280]">
                   No tasks match this search.
                 </p>
               ) : (
@@ -314,7 +329,14 @@ export function MilestoneDialog({
                       option => option.id !== task.id && linkedTaskIds.includes(option.id)
                     );
                     return (
-                      <div key={task.id} className="rounded-lg bg-white p-3 text-sm hover:bg-gray-100">
+                      <div
+                        key={task.id}
+                        className={`rounded-2xl border p-3 text-sm transition-colors ${
+                          isLinked
+                            ? 'border-[#1a60cb]/15 bg-[#edf3ff]'
+                            : 'border-black/6 bg-white hover:bg-[#f8fafc]'
+                        }`}
+                      >
                         <label className="flex cursor-pointer items-center gap-3">
                           <input
                             type="checkbox"
@@ -323,18 +345,18 @@ export function MilestoneDialog({
                             aria-label={`Link ${task.title} to this milestone`}
                             className="size-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
                           />
-                          <span className="min-w-0 flex-1 truncate font-medium text-gray-800">{task.title}</span>
-                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{task.status}</span>
+                          <span className="min-w-0 flex-1 truncate font-medium text-[#1f2937]">{task.title}</span>
+                          <span className="rounded-full border border-black/6 bg-white px-2 py-0.5 text-xs text-[#6b7280]">{task.status}</span>
                         </label>
 
                         {isLinked && dependencyOptions.length > 0 && (
-                          <div className="mt-3 border-l border-gray-200 pl-7">
-                            <div className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
+                          <div className="mt-3 border-l border-[#dbe4f1] pl-7">
+                            <div className="mb-2 text-xs font-medium uppercase tracking-wide text-[#7b8190]">
                               Depends on
                             </div>
                             <div className="grid gap-1.5">
                               {dependencyOptions.map(option => (
-                                <label key={option.id} className="flex cursor-pointer items-center gap-2 text-xs text-gray-700">
+                                <label key={option.id} className="flex cursor-pointer items-center gap-2 text-xs text-[#4b5563]">
                                   <input
                                     type="checkbox"
                                     checked={(dependencyIdsByTaskId[task.id] || []).includes(option.id)}
@@ -356,21 +378,21 @@ export function MilestoneDialog({
             </section>
           </div>
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="gap-2 border-t border-black/6 px-6 py-5">
             {milestone && onDelete && (
               <Button
                 type="button"
                 variant="destructive"
                 onClick={() => onDelete(milestone.id)}
-                className="mr-auto"
+                className="mr-auto h-10 rounded-2xl"
               >
                 Delete
               </Button>
             )}
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={onClose} className="h-10 rounded-2xl">
               Cancel
             </Button>
-            <Button type="submit" disabled={!title.trim() || projectIds.length === 0 || !endDate}>
+            <Button type="submit" disabled={!title.trim() || projectIds.length === 0 || !endDate} className="h-10 rounded-2xl">
               Save milestone
             </Button>
           </DialogFooter>

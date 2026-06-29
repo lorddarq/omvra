@@ -18,6 +18,8 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 
+const milestoneDetailsPanelClassName = 'rounded-[24px] border border-black/6 bg-white/70 p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_10px_24px_rgba(15,23,42,0.05)]';
+
 interface MilestoneDetailsDialogProps {
   isOpen: boolean;
   milestone?: ProjectMilestone | null;
@@ -115,48 +117,48 @@ export function MilestoneDetailsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] overflow-x-hidden overflow-y-auto sm:max-w-[760px]">
-        <DialogHeader>
-          <DialogTitle className="break-words [overflow-wrap:anywhere]">
+      <DialogContent className="max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] overflow-x-hidden overflow-y-auto rounded-[28px] border-white/70 bg-[#f3f4f6] p-0 shadow-[0_24px_80px_rgba(15,23,42,0.18)] sm:max-w-[760px]">
+        <DialogHeader className="border-b border-black/6 px-6 py-5 text-left">
+          <DialogTitle className="break-words text-[1.1rem] font-semibold tracking-[-0.02em] text-[#111827] [overflow-wrap:anywhere]">
             {milestone?.title || 'Roadmap milestone'}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-sm leading-6 text-[#6b7280]">
             Review milestone health, linked task progress, and date risk.
           </DialogDescription>
         </DialogHeader>
 
         {milestone && summary && (
-          <div className="min-w-0 space-y-4 py-2">
-            <section className="grid grid-cols-1 gap-3 rounded-md bg-gray-50 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <div className="min-w-0 space-y-4 px-6 py-5">
+            <section className={`${milestoneDetailsPanelClassName} grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]`}>
               <div className="min-w-0">
-                <div className="text-xs uppercase tracking-wide text-gray-500">Projects</div>
-                <div className="break-words text-sm font-medium text-gray-900 [overflow-wrap:anywhere]">
+                <div className="text-xs uppercase tracking-wide text-[#7b8190]">Projects</div>
+                <div className="break-words text-sm font-medium text-[#111827] [overflow-wrap:anywhere]">
                   {milestoneProjects.length > 0
                     ? milestoneProjects.map(project => project.name).join(', ')
                     : 'Unknown project'}
                 </div>
               </div>
               <div className="min-w-0">
-                <div className="text-xs uppercase tracking-wide text-gray-500">Date range</div>
-                <div className="flex items-center gap-1.5 text-sm font-medium text-gray-900">
-                  <CalendarDays className="size-3.5 text-gray-500" />
+                <div className="text-xs uppercase tracking-wide text-[#7b8190]">Date range</div>
+                <div className="flex items-center gap-1.5 text-sm font-medium text-[#111827]">
+                  <CalendarDays className="size-3.5 text-[#7b8190]" />
                   {getMilestoneDateRangeLabel(milestone)}
                 </div>
               </div>
               <div className="min-w-0">
-                <div className="text-xs uppercase tracking-wide text-gray-500">Health</div>
+                <div className="text-xs uppercase tracking-wide text-[#7b8190]">Health</div>
                 <Badge variant="outline" className={HEALTH_CLASSES[summary.health]}>
                   {HEALTH_LABELS[summary.health]}
                 </Badge>
               </div>
               <div className="min-w-0">
-                <div className="text-xs uppercase tracking-wide text-gray-500">Completion</div>
-                <div className="text-sm font-medium text-gray-900">
+                <div className="text-xs uppercase tracking-wide text-[#7b8190]">Completion</div>
+                <div className="text-sm font-medium text-[#111827]">
                   {summary.completionPercent}% ({summary.completedTasks} of {summary.totalTasks} tasks)
                 </div>
               </div>
               <div className="min-w-0 sm:col-span-2">
-                <div className="mb-2 text-xs uppercase tracking-wide text-gray-500">Status composition</div>
+                <div className="mb-2 text-xs uppercase tracking-wide text-[#7b8190]">Status composition</div>
                 <MilestoneStatusComposition
                   counts={summary.counts}
                   totalTasks={summary.totalTasks}
@@ -179,10 +181,10 @@ export function MilestoneDetailsDialog({
               </section>
             )}
 
-            <section className="rounded-md border bg-white p-4">
-              <h3 className="text-sm font-semibold text-gray-900">Linked tasks</h3>
+            <section className={milestoneDetailsPanelClassName}>
+              <h3 className="text-sm font-semibold text-[#111827]">Linked tasks</h3>
               {sortedTasks.length === 0 ? (
-                <p className="mt-3 rounded-lg bg-gray-50 p-3 text-sm text-gray-600">
+                <p className="mt-3 rounded-2xl border border-dashed border-black/8 bg-white px-4 py-4 text-sm text-[#6b7280]">
                   No tasks are linked to this milestone yet.
                 </p>
               ) : (
@@ -197,19 +199,19 @@ export function MilestoneDetailsDialog({
                         key={task.id}
                         type="button"
                         onClick={() => onTaskClick(task)}
-                        className={`flex items-start justify-between gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20 ${
-                          isLate ? 'border-red-200 bg-red-50/60' : 'border-gray-200 bg-white'
+                        className={`flex items-start justify-between gap-3 rounded-2xl border p-3 text-left transition-colors hover:bg-[#f8fafc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20 ${
+                          isLate ? 'border-red-200 bg-red-50/60' : 'border-black/6 bg-white'
                         }`}
                       >
                         <span className="min-w-0">
-                          <span className="block break-words text-sm font-medium text-gray-900 [overflow-wrap:anywhere]">
+                          <span className="block break-words text-sm font-medium text-[#111827] [overflow-wrap:anywhere]">
                             {task.title}
                           </span>
-                          <span className="mt-1 block text-xs text-gray-500">
+                          <span className="mt-1 block text-xs text-[#7b8190]">
                             {task.startDate || 'No start'} to {task.endDate || 'No end'}
                           </span>
                           {dependencyTasks.length > 0 && (
-                            <span className="mt-1 block break-words text-xs text-gray-500 [overflow-wrap:anywhere]">
+                            <span className="mt-1 block break-words text-xs text-[#7b8190] [overflow-wrap:anywhere]">
                               Depends on {dependencyTasks.map(item => item.title).join(', ')}
                             </span>
                           )}
@@ -228,9 +230,9 @@ export function MilestoneDetailsDialog({
             </section>
 
             {milestone.notes?.trim() && (
-              <section className="rounded-md border bg-white p-4">
-                <h3 className="text-sm font-semibold text-gray-900">Notes</h3>
-                <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-gray-700 [overflow-wrap:anywhere]">
+              <section className={milestoneDetailsPanelClassName}>
+                <h3 className="text-sm font-semibold text-[#111827]">Notes</h3>
+                <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-[#4b5563] [overflow-wrap:anywhere]">
                   {milestone.notes}
                 </p>
               </section>
@@ -238,12 +240,12 @@ export function MilestoneDetailsDialog({
           </div>
         )}
 
-        <DialogFooter className="gap-2">
-          <Button type="button" variant="outline" onClick={onClose}>
+        <DialogFooter className="gap-2 border-t border-black/6 px-6 py-5">
+          <Button type="button" variant="outline" onClick={onClose} className="h-10 rounded-2xl">
             Close
           </Button>
           {milestone && (
-            <Button type="button" onClick={() => onEdit(milestone)} className="gap-2">
+            <Button type="button" onClick={() => onEdit(milestone)} className="h-10 gap-2 rounded-2xl">
               <Edit3 className="size-4" />
               Edit milestone
             </Button>

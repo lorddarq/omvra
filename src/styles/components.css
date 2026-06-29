@@ -8,17 +8,137 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+.app-header {
+  padding: 0.875rem 1rem 0;
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.92), transparent 36%),
+    linear-gradient(180deg, #f7f7f8 0%, #f3f4f6 100%);
+}
+
+.app-header-shell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: 1.5rem;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 0.75rem 0.875rem;
+  box-shadow:
+    0 12px 32px rgba(15, 23, 42, 0.05),
+    0 2px 10px rgba(15, 23, 42, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+}
+
+.app-header-primary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.875rem;
+}
+
+.app-header-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  padding-right: 0.25rem;
+}
+
+.app-header-brand-mark {
+  display: inline-flex;
+  size: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(241, 245, 249, 0.92) 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(148, 163, 184, 0.14),
+    0 6px 18px rgba(15, 23, 42, 0.08);
+}
+
+.app-header-brand-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1;
+}
+
+.app-header-brand-eyebrow {
+  color: #7c8798;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.app-header-brand-name {
+  margin-top: 0.28rem;
+  color: #111827;
+  font-size: 0.975rem;
+  font-weight: 600;
+}
+
+.app-header-nav {
+  min-width: 0;
+}
+
+.app-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.app-header-icon-button {
+  size: 2.5rem;
+  border-radius: 0.95rem;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  color: #5f6b7a;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.05),
+    0 6px 12px rgba(15, 23, 42, 0.04);
+  transition-property: border-color, background-color, color, transform, box-shadow;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
+}
+
+.app-header-icon-button:hover {
+  background: linear-gradient(180deg, #ffffff 0%, #eef2f7 100%);
+  color: #111827;
+  box-shadow:
+    0 8px 18px rgba(15, 23, 42, 0.08),
+    0 2px 6px rgba(15, 23, 42, 0.06);
+}
+
+.app-header-icon-button:focus-visible {
+  outline: 0;
+  border-color: rgba(26, 96, 203, 0.36);
+  box-shadow:
+    0 0 0 1px rgba(74, 146, 255, 0.8),
+    0 0 0 4px rgba(26, 96, 203, 0.1),
+    0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
 .view-toggle {
   position: relative;
   display: grid;
   grid-template-columns: repeat(3, minmax(max-content, 1fr));
   align-items: center;
   gap: 0.25rem;
-  max-height: 2.5rem;
+  min-height: 2.5rem;
   overflow: hidden;
   border-radius: 999px;
-  background-color: #f3f4f6;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(241, 245, 249, 0.92) 100%);
   padding: 0.25rem;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 1px 2px rgba(15, 23, 42, 0.05);
 }
 
 .view-toggle-indicator {
@@ -52,12 +172,12 @@
   min-height: 2rem;
   align-items: center;
   justify-content: center;
-  gap: 0.25rem;
+  gap: 0.375rem;
   border: 0;
   border-radius: 999px;
   background: transparent;
-  padding: 0.5rem 1rem;
-  color: #4b5563;
+  padding: 0.625rem 1rem;
+  color: #5f6b7a;
   font-size: 0.875rem;
   font-weight: 500;
   line-height: 1rem;
@@ -91,6 +211,48 @@
   .view-toggle-indicator,
   .view-toggle-button {
     transition: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .app-header-shell {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .app-header-primary {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .app-header-actions {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-header {
+    padding: 0.75rem 0.75rem 0;
+  }
+
+  .app-header-shell {
+    border-radius: 1.25rem;
+    padding: 0.75rem;
+  }
+
+  .app-header-brand-copy {
+    display: none;
+  }
+
+  .view-toggle {
+    width: 100%;
+  }
+
+  .view-toggle-button {
+    padding-inline: 0.75rem;
+    font-size: 0.8125rem;
   }
 }
 

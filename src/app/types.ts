@@ -42,6 +42,7 @@ export interface Person {
   avatar?: string;
   color?: string;
   agentInstructions?: string;
+  agentOperationalInstructions?: string;
 }
 
 export interface Task {

@@ -76,7 +76,7 @@ interface AppPanelsProps {
   onSaveSwimlane: (swimlaneData: Partial<TimelineSwimlane>) => void;
   onDeleteSwimlane: (swimlaneId: string) => void;
   onAddPerson: (personData: Omit<Person, 'id'>) => void;
-  onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions'>) => void;
+  onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions' | 'agentOperationalInstructions'>) => void;
   onDeletePerson: (personId: string) => void;
   onSaveAgentWatchConfig: (config: AgentWatchConfig) => void;
   onRemoveAgentWatchConfig: (personId: string) => void;
@@ -286,6 +286,7 @@ export function AppPanels({
         pipelineLoadStatusIds={pipelineLoadStatusIds}
         people={people}
         tasks={tasks}
+        timelineSwimlanes={timelineSwimlanes}
         agentWatchConfigs={agentWatchConfigs}
         agentWatchRuntime={agentWatchRuntime}
         storageMeter={storageMeter}

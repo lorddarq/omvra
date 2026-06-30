@@ -1,14 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { X } from 'lucide-react';
 import { TimelineSwimlane } from '../types';
-import {
-  Dialog,
-  DialogFooter,
-} from '../components/ui/dialog';
+import { Dialog, DialogTitle } from '../components/ui/dialog';
 import { Button } from '../components/ui/button';
-import { DialogSurface, DialogSurfaceHeader, DialogSurfaceSection } from './DialogSurface';
+import { DialogSurface } from './DialogSurface';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { taskEditFieldClassName, taskEditLabelClassName } from './taskFormStyles';
+import { DeleteConfirmDialog } from './DeleteConfirmDialog';
 
 interface SwimlaneDialogProps {
   isOpen: boolean;
@@ -16,6 +14,25 @@ interface SwimlaneDialogProps {
   onSave: (swimlane: Partial<TimelineSwimlane>) => void;
   onDelete?: (swimlaneId: string) => void;
   swimlane?: TimelineSwimlane | null;
+}
+
+const FALLBACK_SWIMLANE_COLOR = '#3B82F6';
+
+function normalizeHexColor(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const prefixed = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+  if (!/^#([\da-fA-F]{3}|[\da-fA-F]{6})$/.test(prefixed)) {
+    return null;
+  }
+
+  if (prefixed.length === 4) {
+    const [, r, g, b] = prefixed;
+    return `#${r}${r}${g}${g}${b}${b}`.toUpperCase();
+  }
+
+  return prefixed.toUpperCase();
 }
 
 export function SwimlaneDialog({
@@ -26,17 +43,20 @@ export function SwimlaneDialog({
   swimlane,
 }: SwimlaneDialogProps) {
   const [name, setName] = useState('');
-  const [color, setColor] = useState('#3b82f6');
+  const [color, setColor] = useState(FALLBACK_SWIMLANE_COLOR);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (swimlane) {
       setName(swimlane.name);
-      setColor(swimlane.color || '#3b82f6');
+      setColor(swimlane.color || FALLBACK_SWIMLANE_COLOR);
     } else {
       setName('');
-      setColor('#3b82f6');
+      setColor(FALLBACK_SWIMLANE_COLOR);
     }
   }, [swimlane, isOpen]);
+
+  const normalizedColor = normalizeHexColor(color) ?? FALLBACK_SWIMLANE_COLOR;
 
   const handleSave = () => {
     if (!name.trim()) return;
@@ -44,7 +64,7 @@ export function SwimlaneDialog({
     const swimlaneData: Partial<TimelineSwimlane> = {
       ...(swimlane && { id: swimlane.id }),
       name: name.trim(),
-      color: color || '#3b82f6',
+      color: normalizedColor,
     };
 
     onSave(swimlaneData);
@@ -54,72 +74,117 @@ export function SwimlaneDialog({
   const handleDelete = () => {
     if (swimlane && onDelete) {
       onDelete(swimlane.id);
+      setDeleteConfirmOpen(false);
       onClose();
     }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogSurface className="sm:max-w-[400px]">
-        <DialogSurfaceHeader
-          title={swimlane ? 'Edit Swimlane' : 'Create Swimlane'}
-          description={swimlane ? 'Edit the swimlane details.' : 'Create a new swimlane.'}
-        />
+      <DialogSurface
+        showClose={false}
+        overlayClassName="omvra-settings-overlay"
+        className="w-[min(429px,calc(100vw-2rem))] gap-0 overflow-hidden rounded-[28px] border border-black/5 bg-white p-0 shadow-[0_24px_70px_rgba(15,23,42,0.24)] sm:max-w-none"
+      >
+        <div className="flex items-start justify-between px-8 pb-0 pt-8">
+          <DialogTitle className="text-[15px] font-medium tracking-[-0.02em] text-[#67676f]">
+            {swimlane ? 'Edit Swimlane' : 'Create Swimlane'}
+          </DialogTitle>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex size-8 items-center justify-center rounded-full text-[#2f2f35] transition-colors hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/10"
+            aria-label="Close dialog"
+          >
+            <X className="size-5 stroke-[1.75]" />
+          </button>
+        </div>
 
-        <div className="space-y-4 py-4">
-          <div className="space-y-2 px-6">
-            <Label htmlFor="name" className={taskEditLabelClassName}>Swimlane Name</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., Frontend Team, Project Alpha, John Doe"
-              autoFocus
-              className={`${taskEditFieldClassName} h-10`}
-            />
-            <p className="text-xs leading-5 text-[#7b8190]">
-              Name this swimlane by project, team, or person.
+        <div className="space-y-5 px-8 pb-8 pt-7">
+          <div className="space-y-2">
+            <Label htmlFor="name" className="text-[15px] font-medium text-[#67676f]">
+              Swimlane name
+            </Label>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_128px]">
+              <Input
+                id="name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder={swimlane ? '' : 'Swimlane name'}
+                autoFocus
+                className="h-9 rounded-[13px] border-[#d9d9df] bg-white px-3 text-[15px] font-normal text-[#3d3d45] shadow-none placeholder:text-[#b7b7c0] focus-visible:border-[#d0d0d7] focus-visible:ring-2 focus-visible:ring-black/5"
+              />
+              <div className="relative flex h-9 items-center rounded-[13px] border border-[#d9d9df] bg-white pl-3 pr-3 focus-within:border-[#d0d0d7] focus-within:ring-2 focus-within:ring-black/5">
+                <input
+                  id="color"
+                  type="color"
+                  value={normalizedColor}
+                  onChange={(event) => setColor(event.target.value)}
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                  aria-label="Pick swimlane color"
+                />
+                <span
+                  aria-hidden="true"
+                  className="mr-3 size-4 rounded-full border border-black/5"
+                  style={{ backgroundColor: normalizedColor }}
+                />
+                <Input
+                  value={color}
+                  onChange={(event) => setColor(event.target.value)}
+                  placeholder={FALLBACK_SWIMLANE_COLOR}
+                  className="h-full border-0 bg-transparent px-0 py-0 font-mono text-[15px] text-[#3d3d45] shadow-none focus-visible:ring-0"
+                />
+              </div>
+            </div>
+            <p className="max-w-[365px] text-[13px] leading-4 text-[#71717a]">
+              Assign a default color for the swimlane to help you identify timeline rows faster.
             </p>
           </div>
 
-          <DialogSurfaceSection className="mx-6 space-y-2">
-            <Label htmlFor="color" className={taskEditLabelClassName}>Swimlane Color</Label>
-            <div className="flex items-center gap-3">
-              <Input
-                id="color"
-                type="color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                className="h-11 w-20 cursor-pointer rounded-2xl border border-black/8 bg-white p-1"
-              />
-              <Input
-                type="text"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                placeholder="#3b82f6"
-                className={`${taskEditFieldClassName} h-10 flex-1 font-mono text-sm`}
-              />
+          <div className="flex items-end justify-between gap-3 pt-8">
+            <div>
+              {swimlane && onDelete && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setDeleteConfirmOpen(true)}
+                  className="h-8 rounded-[13px] border-[#f0c8c8] bg-[#fbeaea] px-4 text-[15px] font-normal text-[#ff0000] shadow-none hover:bg-[#f7dddd] hover:text-[#ff0000]"
+                >
+                  Delete
+                </Button>
+              )}
             </div>
-            <p className="text-xs leading-5 text-[#7b8190]">
-              Color for swimlane label and timeline row background.
-            </p>
-          </DialogSurfaceSection>
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                className="h-8 rounded-[13px] border-[#d9d9df] bg-white px-4 text-[15px] font-normal text-[#67676f] shadow-none hover:bg-[#f3f3f3] hover:text-[#67676f]"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSave}
+                disabled={!name.trim()}
+                className="h-8 rounded-[13px] border border-[#d9d9df] bg-white px-4 text-[15px] font-normal text-[#67676f] shadow-none hover:bg-[#f3f3f3] hover:text-[#67676f]"
+              >
+                {swimlane ? 'Update' : 'Create'}
+              </Button>
+            </div>
+          </div>
         </div>
-
-        <DialogFooter className="gap-2">
-          {swimlane && onDelete && (
-            <Button variant="destructive" onClick={handleDelete} className="mr-auto">
-              Delete
-            </Button>
-          )}
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={!name.trim()}>
-            {swimlane ? 'Update' : 'Create'}
-          </Button>
-        </DialogFooter>
       </DialogSurface>
+
+      <DeleteConfirmDialog
+        isOpen={deleteConfirmOpen}
+        title="Delete swimlane?"
+        description="This removes the swimlane from your roadmap layout."
+        confirmLabel="Delete swimlane"
+        onOpenChange={setDeleteConfirmOpen}
+        onCancel={() => setDeleteConfirmOpen(false)}
+        onConfirm={handleDelete}
+      />
     </Dialog>
   );
 }

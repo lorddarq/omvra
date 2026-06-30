@@ -281,6 +281,9 @@ export function sanitizePeople(value: unknown, fallback: Person[] = []): Person[
         agentInstructions: item.kind === 'agentic' && typeof item.agentInstructions === 'string'
           ? item.agentInstructions.trim() || undefined
           : undefined,
+        agentOperationalInstructions: item.kind === 'agentic' && typeof item.agentOperationalInstructions === 'string'
+          ? item.agentOperationalInstructions.trim() || undefined
+          : undefined,
       };
     })
     .filter(item => item !== null) as Person[];

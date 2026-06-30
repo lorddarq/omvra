@@ -557,7 +557,12 @@
 
 /* Settings panel motion */
 .omvra-settings-overlay {
+  transform: translateZ(0);
   transform-origin: center;
+  backface-visibility: hidden;
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  will-change: opacity;
 }
 
 .omvra-settings-overlay[data-state='open'] {
@@ -806,26 +811,18 @@
 @keyframes omvra-settings-overlay-enter {
   from {
     opacity: 0;
-    transform: scale(1.015);
-    backdrop-filter: blur(0);
   }
   to {
     opacity: 1;
-    transform: scale(1);
-    backdrop-filter: blur(3px);
   }
 }
 
 @keyframes omvra-settings-overlay-exit {
   from {
     opacity: 1;
-    transform: scale(1);
-    backdrop-filter: blur(3px);
   }
   to {
     opacity: 0;
-    transform: scale(1.006);
-    backdrop-filter: blur(0);
   }
 }
 

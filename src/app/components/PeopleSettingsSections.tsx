@@ -1,25 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Bot, Users } from 'lucide-react';
-import type { Person, PersonKind, StatusColumn, Task, TaskStatus } from '../types';
-import { getLoadPercentageForTasks } from '../utils/taskLoad';
+import { Bot, FileText, Pencil, Trash2, Users } from 'lucide-react';
+import type { Person, PersonKind, StatusColumn, Task, TaskStatus, TimelineSwimlane } from '../types';
+import { getLoadPercentageForTasks, getTaskLoadPoints, PERSON_CAPACITY_POINTS } from '../utils/taskLoad';
 import { AnchoredPanelSection } from './AnchoredPanel';
 import { EmptyStateCard } from './EmptyStateCard';
 import { AgentCard, PersonCard } from './PersonCards';
 import { Button } from './ui/button';
+import { DeleteConfirmDialog } from './DeleteConfirmDialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Textarea } from './ui/textarea';
+import { OverflowActionMenu } from './OverflowActionMenu';
+import { exportPdfDocument } from '../utils/pdfExport';
+import { buildPersonPdfExportHtml, buildPersonTaskExportListItem, createPersonPdfFileName } from '../utils/personPdfExport';
+import { AgentInstructionFields } from './AgentInstructionFields';
 
 interface PeopleManagementSectionsProps {
   people: Person[];
   tasks: Task[];
+  projects: TimelineSwimlane[];
   statusColumns: StatusColumn[];
   executionLoadStatusIds: TaskStatus[];
   pipelineLoadStatusIds: TaskStatus[];
   onAddPerson: (person: Omit<Person, 'id'>) => void;
-  onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions'>) => void;
+  onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions' | 'agentOperationalInstructions'>) => void;
   onDeletePerson: (personId: string) => void;
 }
 
@@ -31,6 +36,7 @@ const SETTINGS_POPOVER_PROMPT_CLASS = 'max-h-[min(220px,32vh)] min-h-[125px] res
 export function PeopleManagementSections({
   people,
   tasks,
+  projects,
   statusColumns,
   executionLoadStatusIds,
   pipelineLoadStatusIds,
@@ -43,11 +49,16 @@ export function PeopleManagementSections({
   const [newRole, setNewRole] = useState('');
   const [newKind, setNewKind] = useState<PersonKind>('human');
   const [newAgentInstructions, setNewAgentInstructions] = useState('');
+  const [newAgentOperationalInstructions, setNewAgentOperationalInstructions] = useState('');
   const [editingPersonId, setEditingPersonId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editRole, setEditRole] = useState('');
   const [editKind, setEditKind] = useState<PersonKind>('human');
   const [editAgentInstructions, setEditAgentInstructions] = useState('');
+  const [editAgentOperationalInstructions, setEditAgentOperationalInstructions] = useState('');
+  const [pendingDeletePerson, setPendingDeletePerson] = useState<Person | null>(null);
+  const [activeActionPersonId, setActiveActionPersonId] = useState<string | null>(null);
+  const [exportingPersonId, setExportingPersonId] = useState<string | null>(null);
 
   function getTaskCountForPerson(personId: string, status?: string): number {
     return tasks.filter(task => {
@@ -63,11 +74,76 @@ export function PeopleManagementSections({
     return getLoadPercentageForTasks(personTasks);
   }
 
+  function getStatusTitle(status: TaskStatus): string {
+    return statusColumns.find(column => column.id === status)?.title || status;
+  }
+
+  function getProjectLabelsForTask(task: Task): string[] {
+    const labels = new Set<string>();
+    const projectIds = task.projectIds?.length ? task.projectIds : task.swimlaneId ? [task.swimlaneId] : [];
+    projectIds.forEach(projectId => {
+      const projectName = projects.find(project => project.id === projectId)?.name;
+      if (projectName) labels.add(projectName);
+    });
+    if (task.project?.trim()) {
+      labels.add(task.project.trim());
+    }
+    return Array.from(labels);
+  }
+
+  async function handleExportPersonTasks(person: Person) {
+    if (!window.electron?.tasks?.exportPdf || exportingPersonId === person.id) return;
+
+    const assignedTasks = tasks.filter(task => task.assigneeId === person.id);
+    const exportProjectLabels = new Set<string>();
+    assignedTasks.forEach(task => {
+      getProjectLabelsForTask(task).forEach(label => exportProjectLabels.add(label));
+    });
+
+    const html = buildPersonPdfExportHtml({
+      person,
+      exportedAt: new Date().toISOString(),
+      projectLabels: Array.from(exportProjectLabels),
+      summaryFields: [
+        { label: 'Type', value: person.kind === 'agentic' ? 'Agent' : 'Human' },
+        { label: 'Role', value: person.role || 'Team Member' },
+        { label: 'Assigned Tasks', value: assignedTasks.length },
+        { label: 'Execution Load', value: `${getLoadPercentageForPerson(person.id, executionLoadStatusIds)}%` },
+        { label: 'Pipeline Load', value: `${getLoadPercentageForPerson(person.id, pipelineLoadStatusIds)}%` },
+        { label: 'Load Points', value: `${assignedTasks.reduce((sum, task) => sum + getTaskLoadPoints(task), 0).toFixed(1)} / ${PERSON_CAPACITY_POINTS}` },
+      ],
+      assignedTasks: assignedTasks
+        .slice()
+        .sort((left, right) => {
+          const leftStatus = getStatusTitle(left.status);
+          const rightStatus = getStatusTitle(right.status);
+          if (leftStatus !== rightStatus) return leftStatus.localeCompare(rightStatus);
+          return left.title.localeCompare(right.title);
+        })
+        .map(task => buildPersonTaskExportListItem(task, {
+          statusLabel: getStatusTitle(task.status),
+          projectLabels: getProjectLabelsForTask(task),
+        })),
+    });
+
+    setExportingPersonId(person.id);
+    try {
+      await exportPdfDocument({
+        html,
+        defaultFileName: createPersonPdfFileName(person.name),
+        entityLabel: person.kind === 'agentic' ? 'agent' : 'person',
+      });
+    } finally {
+      setExportingPersonId(null);
+    }
+  }
+
   function resetAddForm(nextKind: PersonKind = 'human') {
     setNewName('');
     setNewRole('');
     setNewKind(nextKind);
     setNewAgentInstructions('');
+    setNewAgentOperationalInstructions('');
   }
 
   function startAdd(section: AddSection) {
@@ -95,6 +171,7 @@ export function PeopleManagementSections({
       role: newRole.trim() || 'Team Member',
       kind: newKind,
       agentInstructions: newKind === 'agentic' ? newAgentInstructions.trim() || undefined : undefined,
+      agentOperationalInstructions: newKind === 'agentic' ? newAgentOperationalInstructions.trim() || undefined : undefined,
     });
     cancelAdd();
   }
@@ -105,6 +182,7 @@ export function PeopleManagementSections({
     setEditRole(person.role);
     setEditKind(person.kind === 'agentic' ? 'agentic' : 'human');
     setEditAgentInstructions(person.agentInstructions || '');
+    setEditAgentOperationalInstructions(person.agentOperationalInstructions || '');
   }
 
   function cancelEditPerson() {
@@ -113,6 +191,7 @@ export function PeopleManagementSections({
     setEditRole('');
     setEditKind('human');
     setEditAgentInstructions('');
+    setEditAgentOperationalInstructions('');
   }
 
   function saveEditedPerson(personId: string) {
@@ -122,6 +201,7 @@ export function PeopleManagementSections({
       role: editRole.trim() || 'Team Member',
       kind: editKind,
       agentInstructions: editKind === 'agentic' ? editAgentInstructions.trim() || undefined : undefined,
+      agentOperationalInstructions: editKind === 'agentic' ? editAgentOperationalInstructions.trim() || undefined : undefined,
     });
     cancelEditPerson();
   }
@@ -138,38 +218,49 @@ export function PeopleManagementSections({
       .map(column => ({ column, count: getTaskCountForPerson(person.id, column.id) }))
       .filter(({ count }) => count > 0);
     const editInstructionsId = `person-agent-instructions-${person.id}`;
+    const editOperationalInstructionsId = `person-agent-operational-instructions-${person.id}`;
     const displayActions = (
-      <div className="flex items-center gap-2 text-[#1a60cb]">
-        <EditPersonPopover
-          open={isEditing}
-          person={person}
-          name={editName}
-          role={editRole}
-          kind={editKind}
-          agentInstructions={editAgentInstructions}
-          agentInstructionsInputId={editInstructionsId}
-          onOpenChange={(open) => {
-            if (open) {
-              startEditPerson(person);
-              return;
-            }
-            cancelEditPerson();
-          }}
-          onNameChange={setEditName}
-          onRoleChange={setEditRole}
-          onKindChange={setEditKind}
-          onAgentInstructionsChange={setEditAgentInstructions}
-          onCancel={cancelEditPerson}
-          onSubmit={() => saveEditedPerson(person.id)}
-        />
-        <button
-          type="button"
-          onClick={() => onDeletePerson(person.id)}
-          className="h-auto rounded-sm px-0 py-0 text-xs font-semibold leading-4 text-[#1a60cb] hover:text-[#164ea4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
-        >
-          Delete
-        </button>
-      </div>
+      <PersonCardActions
+        open={isEditing}
+        person={person}
+        name={editName}
+        role={editRole}
+        kind={editKind}
+        agentInstructions={editAgentInstructions}
+        agentOperationalInstructions={editAgentOperationalInstructions}
+        agentInstructionsInputId={editInstructionsId}
+        agentOperationalInstructionsInputId={editOperationalInstructionsId}
+        onOpenChange={(open) => {
+          if (open) {
+            startEditPerson(person);
+            setActiveActionPersonId(person.id);
+            return;
+          }
+          cancelEditPerson();
+          setActiveActionPersonId(current => (current === person.id ? null : current));
+        }}
+        onActionOpenChange={(open) => {
+          setActiveActionPersonId(current => {
+            if (open) return person.id;
+            return current === person.id ? null : current;
+          });
+        }}
+        onNameChange={setEditName}
+        onRoleChange={setEditRole}
+        onKindChange={setEditKind}
+        onAgentInstructionsChange={setEditAgentInstructions}
+        onAgentOperationalInstructionsChange={setEditAgentOperationalInstructions}
+        onCancel={cancelEditPerson}
+        onSubmit={() => saveEditedPerson(person.id)}
+        onDelete={() => {
+          setPendingDeletePerson(person);
+          setActiveActionPersonId(current => (current === person.id ? null : current));
+        }}
+        onExportPdf={() => {
+          void handleExportPersonTasks(person);
+        }}
+        canExportPdf={Boolean(window.electron?.tasks?.exportPdf) && exportingPersonId !== person.id}
+      />
     );
 
     const cardProps = {
@@ -192,7 +283,10 @@ export function PeopleManagementSections({
     <>
       <PeopleSettingsSection
         empty={humanPeople.length === 0}
-        popupOpen={addingSection === 'people' || humanPeople.some(person => person.id === editingPersonId)}
+        popupOpen={
+          addingSection === 'people'
+          || humanPeople.some(person => person.id === editingPersonId || person.id === activeActionPersonId)
+        }
         action={(
           <AddPersonPopover
             open={addingSection === 'people'}
@@ -213,17 +307,22 @@ export function PeopleManagementSections({
 
       <AgentsSettingsSection
         empty={agenticPeople.length === 0}
-        popupOpen={addingSection === 'agents' || agenticPeople.some(person => person.id === editingPersonId)}
+        popupOpen={
+          addingSection === 'agents'
+          || agenticPeople.some(person => person.id === editingPersonId || person.id === activeActionPersonId)
+        }
         action={(
           <AddAgentPopover
             open={addingSection === 'agents'}
             name={newName}
             role={newRole}
             agentInstructions={newAgentInstructions}
+            agentOperationalInstructions={newAgentOperationalInstructions}
             onOpenChange={(open) => setAddOpen('agents', open)}
             onNameChange={setNewName}
             onRoleChange={setNewRole}
             onAgentInstructionsChange={setNewAgentInstructions}
+            onAgentOperationalInstructionsChange={setNewAgentOperationalInstructions}
             onCancel={cancelAdd}
             onSubmit={handleAddPerson}
           />
@@ -233,6 +332,26 @@ export function PeopleManagementSections({
           {agenticPeople.map(renderPersonItem)}
         </div>
       </AgentsSettingsSection>
+
+      <DeleteConfirmDialog
+        isOpen={Boolean(pendingDeletePerson)}
+        title={pendingDeletePerson?.kind === 'agentic' ? 'Delete agent?' : 'Delete person?'}
+        description={
+          pendingDeletePerson?.kind === 'agentic'
+            ? 'This removes the agent from your workspace and unassigns any work currently linked to it.'
+            : 'This removes the person from your workspace and unassigns any work currently linked to them.'
+        }
+        confirmLabel={pendingDeletePerson?.kind === 'agentic' ? 'Delete agent' : 'Delete person'}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeletePerson(null);
+        }}
+        onCancel={() => setPendingDeletePerson(null)}
+        onConfirm={() => {
+          if (!pendingDeletePerson) return;
+          onDeletePerson(pendingDeletePerson.id);
+          setPendingDeletePerson(null);
+        }}
+      />
     </>
   );
 }
@@ -304,10 +423,12 @@ interface AddAgentPopoverProps {
   name: string;
   role: string;
   agentInstructions: string;
+  agentOperationalInstructions: string;
   onOpenChange: (open: boolean) => void;
   onNameChange: (name: string) => void;
   onRoleChange: (role: string) => void;
   onAgentInstructionsChange: (instructions: string) => void;
+  onAgentOperationalInstructionsChange: (instructions: string) => void;
   onCancel: () => void;
   onSubmit: () => void;
 }
@@ -317,10 +438,12 @@ function AddAgentPopover({
   name,
   role,
   agentInstructions,
+  agentOperationalInstructions,
   onOpenChange,
   onNameChange,
   onRoleChange,
   onAgentInstructionsChange,
+  onAgentOperationalInstructionsChange,
   onCancel,
   onSubmit,
 }: AddAgentPopoverProps) {
@@ -369,16 +492,17 @@ function AddAgentPopover({
             onChange={onRoleChange}
           />
         </div>
-        <div className="space-y-2 px-4 pb-5">
-          <Label htmlFor="settings-agent-instructions" className="text-xs font-medium leading-5 text-[#71717a]">
-            Optional Prompt
-          </Label>
-          <Textarea
-            id="settings-agent-instructions"
-            value={agentInstructions}
-            onChange={(event) => onAgentInstructionsChange(event.target.value)}
-            placeholder="Enter prompt..."
-            className={SETTINGS_POPOVER_PROMPT_CLASS}
+        <div className="px-4 pb-5">
+          <AgentInstructionFields
+            behaviorInstructions={agentInstructions}
+            operationalInstructions={agentOperationalInstructions}
+            behaviorInputId="settings-agent-instructions"
+            operationalInputId="settings-agent-operational-instructions"
+            onBehaviorChange={onAgentInstructionsChange}
+            onOperationalChange={onAgentOperationalInstructionsChange}
+            fieldClassName={SETTINGS_POPOVER_PROMPT_CLASS}
+            labelClassName="text-xs font-medium leading-5 text-[#71717a]"
+            descriptionClassName="text-xs leading-5 text-[#71717a]"
           />
         </div>
         <SettingsPopoverActions
@@ -398,14 +522,18 @@ interface EditPersonPopoverProps {
   role: string;
   kind: PersonKind;
   agentInstructions: string;
+  agentOperationalInstructions: string;
   agentInstructionsInputId: string;
+  agentOperationalInstructionsInputId: string;
   onOpenChange: (open: boolean) => void;
   onNameChange: (name: string) => void;
   onRoleChange: (role: string) => void;
   onKindChange: (kind: PersonKind) => void;
   onAgentInstructionsChange: (instructions: string) => void;
+  onAgentOperationalInstructionsChange: (instructions: string) => void;
   onCancel: () => void;
   onSubmit: () => void;
+  hideTrigger?: boolean;
 }
 
 function EditPersonPopover({
@@ -415,83 +543,242 @@ function EditPersonPopover({
   role,
   kind,
   agentInstructions,
+  agentOperationalInstructions,
   agentInstructionsInputId,
+  agentOperationalInstructionsInputId,
   onOpenChange,
   onNameChange,
   onRoleChange,
   onKindChange,
   onAgentInstructionsChange,
+  onAgentOperationalInstructionsChange,
   onCancel,
   onSubmit,
+  hideTrigger = false,
 }: EditPersonPopoverProps) {
+  return (
+    <SettingsAddPopupShell open={open} onOpenChange={onOpenChange}>
+      {!hideTrigger ? (
+        <SettingsAddPopupTrigger>
+          <button
+            type="button"
+            onClick={() => onOpenChange(!open)}
+            className="h-auto rounded-sm px-0 py-0 text-xs font-semibold leading-4 text-[#1a60cb] hover:text-[#164ea4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
+            aria-expanded={open}
+          >
+            Edit
+          </button>
+        </SettingsAddPopupTrigger>
+      ) : null}
+      <SettingsAddPopupContent open={open}>
+        <EditPersonPopoverContent
+          person={person}
+          name={name}
+          role={role}
+          kind={kind}
+          agentInstructions={agentInstructions}
+          agentOperationalInstructions={agentOperationalInstructions}
+          agentInstructionsInputId={agentInstructionsInputId}
+          agentOperationalInstructionsInputId={agentOperationalInstructionsInputId}
+          onNameChange={onNameChange}
+          onRoleChange={onRoleChange}
+          onKindChange={onKindChange}
+          onAgentInstructionsChange={onAgentInstructionsChange}
+          onAgentOperationalInstructionsChange={onAgentOperationalInstructionsChange}
+          onCancel={onCancel}
+          onSubmit={onSubmit}
+        />
+      </SettingsAddPopupContent>
+    </SettingsAddPopupShell>
+  );
+}
+
+function EditPersonPopoverContent({
+  person,
+  name,
+  role,
+  kind,
+  agentInstructions,
+  agentOperationalInstructions,
+  agentInstructionsInputId,
+  agentOperationalInstructionsInputId,
+  onNameChange,
+  onRoleChange,
+  onKindChange,
+  onAgentInstructionsChange,
+  onAgentOperationalInstructionsChange,
+  onCancel,
+  onSubmit,
+}: Omit<EditPersonPopoverProps, 'open' | 'onOpenChange' | 'hideTrigger'>) {
   const entityLabel = person.kind === 'agentic' ? 'agent' : 'person';
 
   return (
-    <SettingsAddPopupShell open={open} onOpenChange={onOpenChange}>
-      <SettingsAddPopupTrigger>
-        <button
-          type="button"
-          onClick={() => onOpenChange(!open)}
-          className="h-auto rounded-sm px-0 py-0 text-xs font-semibold leading-4 text-[#1a60cb] hover:text-[#164ea4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
-          aria-expanded={open}
-        >
-          Edit
-        </button>
-      </SettingsAddPopupTrigger>
+    <>
+      <div className="grid gap-3 px-4 pb-5 pt-4 sm:grid-cols-2">
+        <SettingsPopoverField
+          id={`settings-edit-person-name-${person.id}`}
+          label="Name"
+          value={name}
+          placeholder={`Enter ${entityLabel} name...`}
+          autoFocus
+          onChange={onNameChange}
+        />
+        <div className="space-y-1">
+          <Label htmlFor={`settings-edit-person-kind-${person.id}`} className="text-xs font-medium leading-5 text-[#71717a]">
+            Type
+          </Label>
+          <Select value={kind} onValueChange={(value) => onKindChange(value as PersonKind)}>
+            <SelectTrigger
+              id={`settings-edit-person-kind-${person.id}`}
+              className={SETTINGS_POPOVER_FIELD_CLASS}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="human">Human</SelectItem>
+              <SelectItem value="agentic">Agentic</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="px-4 pb-4">
+        <SettingsPopoverField
+          id={`settings-edit-person-role-${person.id}`}
+          label="Role"
+          value={role}
+          placeholder="Enter role..."
+          onChange={onRoleChange}
+        />
+      </div>
+      {kind === 'agentic' && (
+        <div className="px-4 pb-5">
+          <AgentInstructionFields
+            behaviorInstructions={agentInstructions}
+            operationalInstructions={agentOperationalInstructions}
+            behaviorInputId={agentInstructionsInputId}
+            operationalInputId={agentOperationalInstructionsInputId}
+            onBehaviorChange={onAgentInstructionsChange}
+            onOperationalChange={onAgentOperationalInstructionsChange}
+            fieldClassName={SETTINGS_POPOVER_PROMPT_CLASS}
+            labelClassName="text-xs font-medium leading-5 text-[#71717a]"
+            descriptionClassName="text-xs leading-5 text-[#71717a]"
+          />
+        </div>
+      )}
+      <SettingsPopoverActions
+        addDisabled={!name.trim()}
+        submitLabel="Save"
+        onCancel={onCancel}
+        onSubmit={onSubmit}
+      />
+    </>
+  );
+}
+
+interface PersonCardActionsProps extends Omit<EditPersonPopoverProps, 'hideTrigger'> {
+  onDelete: () => void;
+  onExportPdf: () => void;
+  canExportPdf: boolean;
+  onActionOpenChange: (open: boolean) => void;
+}
+
+function PersonCardActions({
+  open,
+  person,
+  name,
+  role,
+  kind,
+  agentInstructions,
+  agentOperationalInstructions,
+  agentInstructionsInputId,
+  agentOperationalInstructionsInputId,
+  onOpenChange,
+  onActionOpenChange,
+  onNameChange,
+  onRoleChange,
+  onKindChange,
+  onAgentInstructionsChange,
+  onAgentOperationalInstructionsChange,
+  onCancel,
+  onSubmit,
+  onDelete,
+  onExportPdf,
+  canExportPdf,
+}: PersonCardActionsProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const handleMenuOpenChange = (nextOpen: boolean) => {
+    setMenuOpen(nextOpen);
+    onActionOpenChange(nextOpen || open);
+  };
+
+  const handleEditOpenChange = (nextOpen: boolean) => {
+    onOpenChange(nextOpen);
+    onActionOpenChange(menuOpen || nextOpen);
+  };
+
+  return (
+    <SettingsAddPopupShell
+      open={menuOpen || open}
+      onOpenChange={() => {
+        if (open) {
+          handleEditOpenChange(false);
+          return;
+        }
+        handleMenuOpenChange(false);
+      }}
+    >
+      <div className="flex justify-end">
+        <OverflowActionMenu
+          menuLabel={`${person.kind === 'agentic' ? 'Agent' : 'Person'} actions`}
+          buttonClassName="h-8 w-9 rounded-xl border-black/10 bg-white/85 text-[#71717a] shadow-none hover:bg-[#71717a]/5"
+          onOpenChange={handleMenuOpenChange}
+          items={[
+            {
+              label: 'Edit',
+              icon: Pencil,
+              onSelect: () => {
+                handleMenuOpenChange(false);
+                handleEditOpenChange(true);
+              },
+            },
+            {
+              label: 'Delete',
+              icon: Trash2,
+              tone: 'danger',
+              onSelect: () => {
+                handleMenuOpenChange(false);
+                onDelete();
+              },
+            },
+            {
+              label: 'Export tasks',
+              icon: FileText,
+              disabled: !canExportPdf,
+              onSelect: () => {
+                handleMenuOpenChange(false);
+                onExportPdf();
+              },
+            },
+          ]}
+        />
+      </div>
+
       <SettingsAddPopupContent open={open}>
-        <div className="grid gap-3 px-4 pb-5 pt-4 sm:grid-cols-2">
-          <SettingsPopoverField
-            id={`settings-edit-person-name-${person.id}`}
-            label="Name"
-            value={name}
-            placeholder={`Enter ${entityLabel} name...`}
-            autoFocus
-            onChange={onNameChange}
-          />
-          <div className="space-y-1">
-            <Label htmlFor={`settings-edit-person-kind-${person.id}`} className="text-xs font-medium leading-5 text-[#71717a]">
-              Type
-            </Label>
-            <Select value={kind} onValueChange={(value) => onKindChange(value as PersonKind)}>
-              <SelectTrigger
-                id={`settings-edit-person-kind-${person.id}`}
-                className={SETTINGS_POPOVER_FIELD_CLASS}
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="human">Human</SelectItem>
-                <SelectItem value="agentic">Agentic</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <div className="px-4 pb-4">
-          <SettingsPopoverField
-            id={`settings-edit-person-role-${person.id}`}
-            label="Role"
-            value={role}
-            placeholder="Enter role..."
-            onChange={onRoleChange}
-          />
-        </div>
-        {kind === 'agentic' && (
-          <div className="space-y-2 px-4 pb-5">
-            <Label htmlFor={agentInstructionsInputId} className="text-xs font-medium leading-5 text-[#71717a]">
-              Optional Prompt
-            </Label>
-            <Textarea
-              id={agentInstructionsInputId}
-              value={agentInstructions}
-              onChange={(event) => onAgentInstructionsChange(event.target.value)}
-              placeholder="Enter prompt..."
-              className={SETTINGS_POPOVER_PROMPT_CLASS}
-            />
-          </div>
-        )}
-        <SettingsPopoverActions
-          addDisabled={!name.trim()}
-          submitLabel="Save"
+        <EditPersonPopoverContent
+          person={person}
+          name={name}
+          role={role}
+          kind={kind}
+          agentInstructions={agentInstructions}
+          agentOperationalInstructions={agentOperationalInstructions}
+          agentInstructionsInputId={agentInstructionsInputId}
+          agentOperationalInstructionsInputId={agentOperationalInstructionsInputId}
+          onNameChange={onNameChange}
+          onRoleChange={onRoleChange}
+          onKindChange={onKindChange}
+          onAgentInstructionsChange={onAgentInstructionsChange}
+          onAgentOperationalInstructionsChange={onAgentOperationalInstructionsChange}
           onCancel={onCancel}
           onSubmit={onSubmit}
         />

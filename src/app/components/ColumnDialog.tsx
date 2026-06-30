@@ -1,14 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { X } from 'lucide-react';
 import { StatusColumn } from '../types';
-import {
-  Dialog,
-  DialogFooter,
-} from '../components/ui/dialog';
+import { Dialog, DialogTitle } from '../components/ui/dialog';
 import { Button } from '../components/ui/button';
-import { DialogSurface, DialogSurfaceHeader, DialogSurfaceSection } from './DialogSurface';
+import { DialogSurface } from './DialogSurface';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { taskEditFieldClassName, taskEditLabelClassName } from './taskFormStyles';
 
 interface ColumnDialogProps {
   isOpen: boolean;
@@ -16,6 +13,25 @@ interface ColumnDialogProps {
   onSave: (title: string, color: string) => void;
   onDelete?: () => void;
   column?: StatusColumn | null;
+}
+
+const FALLBACK_COLUMN_COLOR = '#9CA3AF';
+
+function normalizeHexColor(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const prefixed = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+  if (!/^#([\da-fA-F]{3}|[\da-fA-F]{6})$/.test(prefixed)) {
+    return null;
+  }
+
+  if (prefixed.length === 4) {
+    const [, r, g, b] = prefixed;
+    return `#${r}${r}${g}${g}${b}${b}`.toUpperCase();
+  }
+
+  return prefixed.toUpperCase();
 }
 
 export function ColumnDialog({
@@ -26,21 +42,23 @@ export function ColumnDialog({
   column,
 }: ColumnDialogProps) {
   const [title, setTitle] = useState('');
-  const [color, setColor] = useState('#9CA3AF');
+  const [color, setColor] = useState(FALLBACK_COLUMN_COLOR);
 
   useEffect(() => {
     if (column) {
       setTitle(column.title || '');
-      setColor(column.color || '#9CA3AF');
+      setColor(column.color || FALLBACK_COLUMN_COLOR);
     } else {
       setTitle('');
-      setColor('#9CA3AF');
+      setColor(FALLBACK_COLUMN_COLOR);
     }
   }, [column, isOpen]);
 
+  const normalizedColor = normalizeHexColor(color) ?? FALLBACK_COLUMN_COLOR;
+
   const handleSave = () => {
     if (!title.trim()) return;
-    onSave(title.trim(), color);
+    onSave(title.trim(), normalizedColor);
     onClose();
   };
 
@@ -53,62 +71,99 @@ export function ColumnDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogSurface className="sm:max-w-[425px]">
-        <DialogSurfaceHeader
-          title={column ? 'Edit Column' : 'Create Column'}
-          description={column ? 'Edit the column details below.' : 'Create a new column for your board.'}
-        />
-
-        <div className="space-y-4 py-4">
-          <div className="space-y-2 px-6">
-            <Label htmlFor="title" className={taskEditLabelClassName}>Column Title</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g., In Progress, Review, Done"
-              autoFocus
-              className={`${taskEditFieldClassName} h-10`}
-            />
-          </div>
-
-          <DialogSurfaceSection className="mx-6 space-y-2">
-            <Label htmlFor="color" className={taskEditLabelClassName}>Column Color</Label>
-            <div className="flex items-center gap-3">
-              <Input
-                id="color"
-                type="color"
-                value={color.startsWith('#') ? color : '#9CA3AF'}
-                onChange={(e) => setColor(e.target.value)}
-                className="h-11 w-20 cursor-pointer rounded-2xl border border-black/8 bg-white p-1"
-              />
-              <Input
-                type="text"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                placeholder="#9CA3AF"
-                className={`${taskEditFieldClassName} h-10 flex-1 font-mono text-sm`}
-              />
-            </div>
-            <p className="text-xs leading-5 text-[#7b8190]">
-              Choose a color to help identify this column.
-            </p>
-          </DialogSurfaceSection>
+      <DialogSurface
+        showClose={false}
+        overlayClassName="omvra-settings-overlay"
+        className="w-[min(429px,calc(100vw-2rem))] gap-0 overflow-hidden rounded-[28px] border border-black/5 bg-white p-0 shadow-[0_24px_70px_rgba(15,23,42,0.24)] sm:max-w-none"
+      >
+        <div className="flex items-start justify-between px-8 pb-0 pt-8">
+          <DialogTitle className="text-[15px] font-medium tracking-[-0.02em] text-[#67676f]">
+            {column ? 'Edit Column' : 'Create Column'}
+          </DialogTitle>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex size-8 items-center justify-center rounded-full text-[#2f2f35] transition-colors hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/10"
+            aria-label="Close dialog"
+          >
+            <X className="size-5 stroke-[1.75]" />
+          </button>
         </div>
 
-        <DialogFooter className="gap-2">
-          {column && onDelete && (
-            <Button variant="destructive" onClick={handleDelete} className="mr-auto">
-              Delete Column
-            </Button>
-          )}
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={!title.trim()}>
-            {column ? 'Update' : 'Create'}
-          </Button>
-        </DialogFooter>
+        <div className="space-y-5 px-8 pb-8 pt-7">
+          <div className="space-y-2">
+            <Label htmlFor="title" className="text-[15px] font-medium text-[#67676f]">
+              Task name
+            </Label>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_128px]">
+              <Input
+                id="title"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder={column ? '' : 'Column name'}
+                autoFocus
+                className="h-9 rounded-[13px] border-[#d9d9df] bg-white px-3 text-[15px] font-normal text-[#3d3d45] shadow-none placeholder:text-[#b7b7c0] focus-visible:border-[#d0d0d7] focus-visible:ring-2 focus-visible:ring-black/5"
+              />
+              <div className="relative flex h-9 items-center rounded-[13px] border border-[#d9d9df] bg-white pl-3 pr-3 focus-within:border-[#d0d0d7] focus-within:ring-2 focus-within:ring-black/5">
+                <input
+                  id="color"
+                  type="color"
+                  value={normalizedColor}
+                  onChange={(event) => setColor(event.target.value)}
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                  aria-label="Pick column color"
+                />
+                <span
+                  aria-hidden="true"
+                  className="mr-3 size-4 rounded-full border border-black/5"
+                  style={{ backgroundColor: normalizedColor }}
+                />
+                <Input
+                  value={color}
+                  onChange={(event) => setColor(event.target.value)}
+                  placeholder={FALLBACK_COLUMN_COLOR}
+                  className="h-full border-0 bg-transparent px-0 py-0 font-mono text-[15px] text-[#3d3d45] shadow-none focus-visible:ring-0"
+                />
+              </div>
+            </div>
+            <p className="max-w-[365px] text-[13px] leading-4 text-[#71717a]">
+              Assign a default color for the column to help you identify tasks associated faster.
+            </p>
+          </div>
+
+          <div className="flex items-end justify-between gap-3 pt-8">
+            <div>
+              {column && onDelete && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleDelete}
+                  className="h-8 rounded-[13px] border-[#f0c8c8] bg-[#fbeaea] px-4 text-[15px] font-normal text-[#ff0000] shadow-none hover:bg-[#f7dddd] hover:text-[#ff0000]"
+                >
+                  Delete
+                </Button>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                className="h-8 rounded-[13px] border-[#d9d9df] bg-white px-4 text-[15px] font-normal text-[#67676f] shadow-none hover:bg-[#f3f3f3] hover:text-[#67676f]"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSave}
+                disabled={!title.trim()}
+                className="h-8 rounded-[13px] border border-[#d9d9df] bg-white px-4 text-[15px] font-normal text-[#67676f] shadow-none hover:bg-[#f3f3f3] hover:text-[#67676f]"
+              >
+                {column ? 'Update' : 'Create'}
+              </Button>
+            </div>
+          </div>
+        </div>
       </DialogSurface>
     </Dialog>
   );

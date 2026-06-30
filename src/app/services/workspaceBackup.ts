@@ -290,6 +290,9 @@ export function sanitizePeople(value: unknown, fallback: Person[] = []): Person[
         agentInstructions: candidate.kind === 'agentic' && typeof candidate.agentInstructions === 'string'
           ? candidate.agentInstructions.trim() || undefined
           : undefined,
+        agentOperationalInstructions: candidate.kind === 'agentic' && typeof candidate.agentOperationalInstructions === 'string'
+          ? candidate.agentOperationalInstructions.trim() || undefined
+          : undefined,
       };
     })
     .filter((item): item is NonNullable<typeof item> => item !== null);

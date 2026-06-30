@@ -20,6 +20,7 @@ export function usePeopleActions({
       kind: personData.kind === 'agentic' ? 'agentic' : 'human',
       avatar: personData.avatar,
       agentInstructions: personData.kind === 'agentic' ? personData.agentInstructions?.trim() || undefined : undefined,
+      agentOperationalInstructions: personData.kind === 'agentic' ? personData.agentOperationalInstructions?.trim() || undefined : undefined,
     };
     setPeople(prevPeople => [...prevPeople, newPerson]);
   }, [setPeople]);
@@ -32,7 +33,7 @@ export function usePeopleActions({
 
   const updatePerson = useCallback((
     personId: string,
-    updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions'>
+    updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions' | 'agentOperationalInstructions'>
   ) => {
     setPeople(prevPeople => prevPeople.map(p => {
       if (p.id !== personId) return p;
@@ -42,6 +43,7 @@ export function usePeopleActions({
         ...updates,
         kind: nextKind,
         agentInstructions: nextKind === 'agentic' ? updates.agentInstructions?.trim() || undefined : undefined,
+        agentOperationalInstructions: nextKind === 'agentic' ? updates.agentOperationalInstructions?.trim() || undefined : undefined,
       };
     }));
   }, [setPeople]);

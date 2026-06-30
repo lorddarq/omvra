@@ -29,6 +29,7 @@ import {
 import { AppHeader } from './components/AppHeader';
 import { AppMainViews } from './components/AppMainViews';
 import { AppPanels } from './components/AppPanels';
+import { DeleteConfirmDialog } from './components/DeleteConfirmDialog';
 import { buildWorkspaceReadModel } from './domain/workspaceReadModel';
 import { swimlanes as defaultSwimlanes } from './constants/swimlanes';
 import {
@@ -177,6 +178,7 @@ function App() {
     scrollTop: 0,
   });
   const [importFeedback, setImportFeedback] = useState<ImportFeedbackState | null>(null);
+  const [resetLocalDataConfirmOpen, setResetLocalDataConfirmOpen] = useState(false);
 
   const [tasks, setTasks] = useState<Task[]>(() => {
     const stored = readInitialWorkspaceJSON<Task[]>(TASKS_KEY, DEFAULT_TASKS_SEED);
@@ -846,13 +848,7 @@ function App() {
     setIsMilestoneDialogOpen(false);
   }, [milestones, tasks]);
 
-  const handleNukeLocalData = async () => {
-    if (typeof window === 'undefined') return;
-    const confirmed = window.confirm(
-      'This will clear local storage data for this app and reset your workspace. Continue?'
-    );
-    if (!confirmed) return;
-
+  const handleConfirmNukeLocalData = async () => {
     try {
       window.localStorage.clear();
       await clearPortableElectronStoreKeys();
@@ -877,6 +873,11 @@ function App() {
       mcpAccessTokenIssuedAt: undefined,
       mcpAccessTokenTtlMinutes: 60,
     });
+    setResetLocalDataConfirmOpen(false);
+  };
+
+  const handleNukeLocalData = () => {
+    setResetLocalDataConfirmOpen(true);
   };
 
   const handleExportTasksAndProjects = async () => {
@@ -1071,8 +1072,9 @@ function App() {
   });
 
   return (
-    <div className="flex h-dvh flex-col bg-gray-50">
-      <AppHeader
+    <>
+      <div className="flex h-dvh flex-col bg-gray-50">
+        <AppHeader
         currentView={viewState.currentView}
         onViewChange={(view) => {
           if (viewState.currentView === 'timeline') {
@@ -1106,7 +1108,7 @@ function App() {
         onOpenAgents={handleOpenAgentsPanel}
       />
 
-      <AppMainViews
+        <AppMainViews
         currentView={viewState.currentView}
         viewRefreshKey={viewRefreshKey}
         timelineContainerRef={timelineContainerRef}
@@ -1150,7 +1152,7 @@ function App() {
         onRoadmapTaskClick={handleTaskClick}
       />
 
-      <AppPanels
+        <AppPanels
         isTaskDialogOpen={isTaskDialogOpen}
         isTaskDetailsOpen={isTaskDetailsOpen}
         isSwimlaneDialogOpen={isSwimlaneDialogOpen}
@@ -1280,7 +1282,18 @@ function App() {
         onRunMcpHealthCheck={mcpHealth.runHealthCheck}
         onRefreshMcpAuditLog={refreshMcpAuditLog}
       />
-    </div>
+      </div>
+
+      <DeleteConfirmDialog
+        isOpen={resetLocalDataConfirmOpen}
+        title="Erase local storage?"
+        description="This clears local workspace data stored by the app and resets your workspace. This cannot be undone."
+        confirmLabel="Erase local storage"
+        onOpenChange={setResetLocalDataConfirmOpen}
+        onCancel={() => setResetLocalDataConfirmOpen(false)}
+        onConfirm={handleConfirmNukeLocalData}
+      />
+    </>
   );
 }
 

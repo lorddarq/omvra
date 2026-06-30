@@ -90,6 +90,11 @@ export interface McpHealthCheckResult {
 }
 
 export interface McpWorkspaceSnapshot {
+  contentBoundary?: {
+    classification?: string;
+    instructionPrecedence?: string;
+    note?: string;
+  };
   workspaceId?: string;
   name?: string;
   tasks?: unknown[];
@@ -99,6 +104,15 @@ export interface McpWorkspaceSnapshot {
   readOnly?: boolean;
   schemaVersion?: string;
   generatedAt?: string;
+  meta?: {
+    fieldSemantics?: {
+      people?: {
+        agentInstructions?: string;
+        agentOperationalInstructions?: string;
+      };
+    };
+    [key: string]: unknown;
+  };
   workspace?: {
     tasks?: unknown[];
     people?: unknown[];

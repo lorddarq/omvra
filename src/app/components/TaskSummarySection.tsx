@@ -2,6 +2,7 @@ import { Ban, GitBranch, Sparkles, User } from 'lucide-react';
 import { ReactNode } from 'react';
 import { TaskPriority, Person } from '../types';
 import { PERSON_CAPACITY_POINTS } from '../utils/taskLoad';
+import { getReadableTextClassFor } from '../utils/contrast';
 import { EmptyStateCard } from './EmptyStateCard';
 import { TASK_PRIORITY_ICONS } from './taskPriorityIcons';
 
@@ -122,16 +123,31 @@ export function TaskDependencyDetailsSection({ dependencies }: TaskDependencyDet
               </div>
             </div>
             {dependency.status && (
-              <div
-                className="flex min-h-5 shrink-0 items-center rounded-full px-1.5 py-1 text-xs font-medium leading-none text-white"
-                style={{ backgroundColor: statusColor }}
-              >
-                {dependency.status}
-              </div>
+              <DependencyStatusPill label={dependency.status} statusColor={statusColor} />
             )}
           </div>
         );
       })}
+    </div>
+  );
+}
+
+export function DependencyStatusPill({
+  label,
+  statusColor,
+}: {
+  label: string;
+  statusColor?: string;
+}) {
+  const resolvedStatusColor = getDependencyStatusColor(label, statusColor);
+  const textClassName = getReadableTextClassFor(`dependency-status-pill-${resolvedStatusColor}`, resolvedStatusColor);
+
+  return (
+    <div
+      className={`flex min-h-5 shrink-0 items-center rounded-full px-1.5 py-1 text-xs font-medium leading-none ${textClassName}`}
+      style={{ backgroundColor: resolvedStatusColor }}
+    >
+      {label}
     </div>
   );
 }

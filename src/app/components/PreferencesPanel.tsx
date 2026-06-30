@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Person, StorageMeter, Task, TaskStatus, StatusColumn } from '../types';
+import { Person, StorageMeter, Task, TaskStatus, StatusColumn, TimelineSwimlane } from '../types';
 import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import { McpHealthCheckResult } from '../services/mcp/types';
@@ -26,12 +26,13 @@ interface PreferencesPanelProps {
   pipelineLoadStatusIds: TaskStatus[];
   people: Person[];
   tasks: Task[];
+  timelineSwimlanes: TimelineSwimlane[];
   agentWatchConfigs: AgentWatchConfig[];
   agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
   onExecutionLoadStatusChange: (statusId: TaskStatus) => void;
   onPipelineLoadStatusChange: (statusId: TaskStatus) => void;
   onAddPerson: (person: Omit<Person, 'id'>) => void;
-  onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions'>) => void;
+  onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions' | 'agentOperationalInstructions'>) => void;
   onDeletePerson: (personId: string) => void;
   onSaveAgentWatchConfig: (config: AgentWatchConfig) => void;
   onRemoveAgentWatchConfig: (personId: string) => void;
@@ -79,6 +80,7 @@ export function PreferencesPanel({
   pipelineLoadStatusIds,
   people,
   tasks,
+  timelineSwimlanes,
   agentWatchConfigs,
   agentWatchRuntime,
   onExecutionLoadStatusChange,
@@ -290,6 +292,7 @@ export function PreferencesPanel({
       <PeopleManagementSections
         people={people}
         tasks={tasks}
+        projects={timelineSwimlanes}
         statusColumns={statusColumns}
         executionLoadStatusIds={executionLoadStatusIds}
         pipelineLoadStatusIds={pipelineLoadStatusIds}

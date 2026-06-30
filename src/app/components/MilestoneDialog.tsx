@@ -8,6 +8,7 @@ import {
 } from './ui/dialog';
 import { Button } from './ui/button';
 import { DialogSurface, DialogSurfaceHeader, DialogSurfaceSection } from './DialogSurface';
+import { DeleteConfirmDialog } from './DeleteConfirmDialog';
 import { EmptyStateCard } from './EmptyStateCard';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -54,6 +55,7 @@ export function MilestoneDialog({
   const [linkedTaskIds, setLinkedTaskIds] = useState<string[]>([]);
   const [dependencyIdsByTaskId, setDependencyIdsByTaskId] = useState<Record<string, string[]>>({});
   const [taskSearchQuery, setTaskSearchQuery] = useState('');
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   useEffect(() => {
     setTitle(milestone?.title || '');
@@ -380,7 +382,7 @@ export function MilestoneDialog({
               <Button
                 type="button"
                 variant="destructive"
-                onClick={() => onDelete(milestone.id)}
+                onClick={() => setDeleteConfirmOpen(true)}
                 className="mr-auto h-10 rounded-2xl"
               >
                 Delete
@@ -395,6 +397,21 @@ export function MilestoneDialog({
           </DialogFooter>
         </form>
       </DialogSurface>
+
+      <DeleteConfirmDialog
+        isOpen={deleteConfirmOpen}
+        title="Delete milestone?"
+        description="This removes the milestone and clears milestone-linked dependency wiring from the affected tasks."
+        confirmLabel="Delete milestone"
+        onOpenChange={setDeleteConfirmOpen}
+        onCancel={() => setDeleteConfirmOpen(false)}
+        onConfirm={() => {
+          if (!milestone || !onDelete) return;
+          onDelete(milestone.id);
+          setDeleteConfirmOpen(false);
+          onClose();
+        }}
+      />
     </Dialog>
   );
 }

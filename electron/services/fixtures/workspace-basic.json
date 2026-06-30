@@ -21,7 +21,8 @@
       "kind": "agentic",
       "role": "Agent",
       "color": "#f97316",
-      "agentInstructions": "Use the durable Codex persona instructions when working assigned tasks."
+      "agentInstructions": "Use the durable Codex persona instructions when working assigned tasks.",
+      "agentOperationalInstructions": "Read the assigned task, inspect relevant roadmap links, and validate changes before handoff."
     }
   ],
   "omvra.tasks.v1": [

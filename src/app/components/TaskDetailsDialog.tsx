@@ -8,6 +8,7 @@ import { getTaskLoadContributionPercent, getTaskLoadPoints, PERSON_CAPACITY_POIN
 import { getMilestoneForTask } from '../utils/roadmap';
 import { formatTaskDetailsForClipboard } from '../utils/taskClipboard';
 import { buildTaskPdfExportHtml, createTaskPdfFileName } from '../utils/taskPdfExport';
+import { exportPdfDocument } from '../utils/pdfExport';
 import { TaskAttachmentsSection } from './TaskAttachmentsSection';
 import { TaskCommentsSection } from './TaskCommentsSection';
 import { TaskDescriptionSection } from './TaskDescriptionSection';
@@ -216,22 +217,11 @@ export function TaskDetailsDialog({
     });
 
     try {
-      const result = await window.electron.tasks.exportPdf({
+      await exportPdfDocument({
         html,
         defaultFileName: createTaskPdfFileName(task.title),
+        entityLabel: 'task',
       });
-
-      if (!result.success && !result.canceled) {
-        window.alert(result.error || 'Could not export this task as a PDF.');
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '';
-      const missingHandler = message.includes("No handler registered for 'tasks/export-pdf'");
-      window.alert(
-        missingHandler
-          ? 'PDF export is available, but Omvra needs to restart once to load the new Electron export handler.'
-          : message || 'Could not export this task as a PDF.'
-      );
     } finally {
       setIsExportingPdf(false);
     }

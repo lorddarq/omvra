@@ -1,307 +1,344 @@
 # Modularity and Plugin Extensibility Report
 
-Date: 2026-03-06
+Date: 2026-07-01
+Status: Directionally relevant, but updated from the original 2026-03-06 snapshot
 
 ## Summary
 
-Omvra is not yet structured for true plugin-style extensibility.
+Omvra is still not structured for true plugin-style extensibility.
 
-It is still a desktop-first React application where domain state, persistence, migrations, and UI orchestration are tightly coupled in the renderer, mainly inside `src/app/App.tsx` and parts of `src/app/components/TimelineView.tsx`.
+That said, the March version of this report overstates how monolithic the codebase still is. The app remains desktop-first and renderer-heavy, but it now has clearer seams in a few important places:
 
-That works for a local Electron app, but it means a private Convex backend, Docker deployment, or Umbrel packaging would currently require a refactor rather than a thin integration.
+- renderer state orchestration in `src/app/App.tsx`
+- reusable hooks for action logic in `src/app/hooks/*`
+- storage and backup utilities in `src/app/utils/storage.ts` and `src/app/services/workspaceBackup.ts`
+- a read-model layer in `src/app/domain/workspaceReadModel.ts`
+- an Electron MCP/service layer in `electron/services/*`
 
-## Current Architectural Constraints
+So the main conclusion still holds, but the supporting details need to be understood as "partly improved, not yet finished."
 
-### 1. UI owns application state
+## Current Assessment
 
-The largest architectural issue is that application state is owned directly by the UI shell.
+### 1. UI still owns too much application state
 
-`tasks`, `people`, `swimlanes`, migrations, and persistence all live in `src/app/App.tsx`.
+This is still the largest architectural limitation.
 
-There is no repository layer, no domain service layer, and no command boundary between UI events and data changes.
+`src/app/App.tsx` still initializes and coordinates:
 
-If multiple backends are needed later, this logic has to move behind interfaces.
+- tasks
+- people
+- milestones
+- status columns
+- preferences
+- view state
+- MCP runtime wiring
+- dialog orchestration
 
-Reference:
-- `src/app/App.tsx`
+The codebase is more modular than before because action logic has been pushed into hooks such as:
 
-### 2. Persistence is fragmented
+- `src/app/hooks/useTaskActions.ts`
+- `src/app/hooks/usePeopleActions.ts`
+- `src/app/hooks/useProjectActions.ts`
+- `src/app/hooks/useStatusColumnActions.ts`
+- `src/app/hooks/useWorkspaceDialogs.ts`
 
-There is already a generic storage helper in `src/app/utils/storage.ts`, but most of the app bypasses it and writes directly to `localStorage`.
+But those hooks are still largely UI-owned state mutators rather than a repository or use-case boundary.
 
-This happens in:
-- `src/app/App.tsx`
-- `src/app/hooks/useViewState.ts`
-- `src/app/components/TimelineView.tsx`
+Verdict:
+- Still relevant concern
+- Less severe than the March report implied
 
-Because of this, there is no single persistence seam that can be swapped for another backend.
+### 2. Persistence is improved, but still not fully abstracted
 
-### 3. Domain model is not normalized enough for backend portability
+The old report said persistence was fragmented and mostly bypassed storage helpers. That is only partly true now.
 
-`Task` currently mixes domain and view concerns and duplicates project assignment in multiple forms:
+There is now a more explicit storage and portability layer in:
+
+- `src/app/utils/storage.ts`
+- `src/app/services/workspaceBackup.ts`
+- `src/app/utils/workspaceSanitizers.ts`
+- `src/app/utils/canonicalHydration.js`
+
+Important improvement:
+
+- Electron store is now treated as the canonical desktop source in several flows
+- localStorage is still present as a renderer portability and bootstrap layer
+- import/export and backup handling are more formal than before
+
+However, persistence is still not hidden behind a backend-neutral repository contract. The renderer still knows too much about storage keys, bootstrapping, and mirroring behavior.
+
+Verdict:
+- The original concern still matters
+- The document should no longer describe persistence as mostly ad hoc
+
+### 3. The domain model is still only partially normalized
+
+This section is still relevant.
+
+`Task` still carries overlapping relationship fields such as:
+
 - `swimlaneId`
 - `projectIds`
-- `project` string
+- `project`
 
-Current type definition:
-- `src/app/types.ts`
+That is workable for a local app, but it remains risky if Omvra later adds:
 
-This is manageable in a local-only app, but it becomes fragile once:
-- a database is introduced
-- synchronization is introduced
-- migrations become more formal
-- multiple adapters need to agree on a canonical schema
+- synchronization
+- multiple storage adapters
+- a server-backed write path
+- migration-heavy evolution
 
-### 4. Electron integration is hard-coded
+The situation is somewhat improved by `src/app/domain/workspaceReadModel.ts`, which creates richer projections without forcing every component to re-derive relationships itself.
 
-The Electron bridge exposes a fixed set of IPC functions:
-- store get/set/export
-- file attachments
-- open external links
+But the stored canonical task shape is still not as clean as it should be for backend portability.
 
-References:
-- `electron/preload.cjs`
-- `electron/main.cjs`
+Verdict:
+- Still highly relevant
 
-This is acceptable for the current desktop build, but it is not yet a generic host capability layer.
+### 4. Electron integration is no longer just a tiny fixed bridge
 
-A web build, Docker deployment, or Umbrel app would need a different capability surface for:
-- storage
-- file handling
-- external navigation
-- notifications
-- app metadata
+This part of the old report is outdated in tone.
+
+The preload bridge is still explicit and host-specific in `electron/preload.cjs`, but the Electron side now includes more than raw shell plumbing:
+
+- attachment handling
+- PDF export
+- runtime metadata
+- MCP capability/status access
+- a fairly substantial workspace and MCP service layer in `electron/services/workspace-service.cjs`
+- HTTP MCP surface in `electron/services/mcp-http-server.cjs`
+
+This is still not a formal `HostCapabilities` abstraction, but it is no longer fair to describe Electron integration as only a hard-coded minimal bridge.
+
+Verdict:
+- Concern is partially relevant
+- Evidence and wording needed refresh
 
 ### 5. Shell and product are still combined
 
-Today the project is effectively:
-- one React renderer
+This remains true in practice.
+
+There is still:
+
 - one Electron shell
-- no server package
-- no backend adapter package
+- one renderer app
+- no browser-hosted production runtime
+- no separate server package
+- no clean backend adapter package
 
-That makes alternative runtimes harder to add cleanly.
+The codebase now has better internal layering, but it is still one app rather than a true host/core split.
 
-## What Should Change
+Verdict:
+- Still relevant
 
-### 1. Introduce a `WorkspaceRepository`
+## What Changed Since The Original Report
 
-Create an explicit data access contract that owns CRUD for:
-- tasks
-- people
-- projects/swimlanes
-- status columns
-- view state
-- attachment metadata
+The following developments reduce the severity of the original critique:
 
-Example implementations:
-- `LocalBrowserRepository`
-- `ElectronStoreRepository`
-- `ConvexRepository`
-- `FileRepository`
-- later `PostgresRepository`
+### A. The renderer has more internal structure
 
-The UI should stop mutating arrays directly and instead call repository-backed actions.
+The app has many more focused hooks, utilities, and view-specific components than a pure "everything in App.tsx" architecture.
 
-Instead of:
-- `setTasks(...)`
-- `setPeople(...)`
+Examples:
 
-Prefer:
-- `workspace.createTask(...)`
-- `workspace.updateTask(...)`
-- `workspace.deleteTask(...)`
-- `workspace.listTasks()`
+- `src/app/hooks/*`
+- `src/app/domain/workspaceReadModel.ts`
+- `src/app/services/workspaceBackup.ts`
+- `src/app/utils/workspaceSanitizers.ts`
 
-### 2. Introduce `HostCapabilities`
+### B. There is now a meaningful MCP/service layer
 
-Platform-specific behavior should sit behind an explicit host adapter.
+The Electron process now exposes a real service surface for workspace reads/writes and MCP-oriented workflows:
 
-This should cover:
+- `electron/services/workspace-service.cjs`
+- `electron/services/mcp-http-server.cjs`
+- `electron/ipc/mcp.cjs`
+
+That is not yet a portable backend abstraction, but it is a real architectural seam that did not exist in the earlier framing.
+
+### C. Trust boundaries and data contracts are more explicit
+
+Recent work added:
+
+- MCP resource metadata
+- trust-boundary semantics
+- explicit field guidance for agent behavior vs operational instructions
+- a larger MCP contract test suite
+
+That moves Omvra slightly closer to a service-oriented architecture even though the runtime remains Electron-first.
+
+## What Is Still Missing
+
+If the goal is true modularity or deployable host/backend variation, the following pieces are still missing:
+
+### 1. A real repository boundary
+
+Omvra still lacks a first-class `WorkspaceRepository` or equivalent contract that cleanly owns:
+
+- task CRUD
+- people CRUD
+- milestone CRUD
+- status column CRUD
+- persistence
+- migrations
+- read/write consistency
+
+Today those responsibilities are distributed across:
+
+- renderer state
+- action hooks
+- storage utilities
+- Electron workspace service helpers
+
+### 2. A host abstraction
+
+There is still no explicit interface for:
+
 - file picking
-- file embedding/storage
-- open external links
+- file embedding
+- external navigation
+- PDF export
+- runtime metadata
 - notifications
-- app/version metadata
 
-Possible implementations:
-- `ElectronHostCapabilities`
-- `BrowserHostCapabilities`
-- `UmbrelHostCapabilities` if needed later
+These are all workable in Electron, but they are not yet packaged as a host-neutral capability layer.
 
-### 3. Centralize persistence and migrations
+### 3. A browser/server runtime target
 
-Migrations are currently embedded inside state initialization in `src/app/App.tsx`.
+The report’s Docker and Umbrel conclusions still hold.
 
-That should move into a dedicated persistence module or repository implementation so:
-- schema versioning is centralized
-- migrations are testable
-- backend adapters all apply the same normalization rules
+Omvra cannot meaningfully target Docker or Umbrel cleanly until it can run as:
 
-### 4. Normalize the domain model
+- a browser-hosted frontend
+- plus either a backend service or a backend adapter
 
-Recommended changes:
-- create an explicit `Project` entity
-- treat `projectIds` as the canonical project relationship
-- treat `swimlaneId` as either a timeline placement field or remove it if `Project` can absorb that concept
-- remove redundant `project` display string from stored task data
+Electron is still the product runtime, not just one host option.
 
-This reduces schema drift and makes adapters safer.
+### 4. A normalized canonical schema
 
-### 5. Split the codebase by responsibility
+The app has richer derived projections, but the stored workspace shape still carries legacy overlap and UI-driven fields that would need cleanup before backend portability becomes easy.
 
-Recommended target structure:
+## Updated Recommendation
 
-- `packages/core`
-  - domain types
-  - use cases
-  - repositories
-  - migrations
-  - pure utilities
-- `packages/web`
-  - React UI
-  - routing
-  - composition root for browser/server-hosted app
-- `packages/electron-shell`
-  - Electron main/preload
-  - desktop packaging concerns
-- `packages/server`
-  - optional API/backend
-  - auth if ever needed
-  - storage orchestration
-- `packages/adapters/*`
-  - local storage adapter
-  - electron-store adapter
-  - Convex adapter
-  - export/import adapters
+Do not treat "plugins" as the next architecture move.
 
-This is the cleanest route to support:
-- local desktop
-- browser-hosted app
-- Docker deployment
-- Umbrel deployment
+That is still the wrong level of abstraction for Omvra.
 
-## Recommended Plugin Model
+The right path is still:
 
-Do not start with arbitrary runtime JavaScript plugins inside Electron.
+- core workspace logic
+- host capability adapters
+- backend/storage adapters
 
-That approach adds unnecessary:
-- security risk
-- crash surface
-- upgrade complexity
-- support burden
-
-A better first step is an adapter-based plugin model.
-
-Suggested plugin categories:
-- storage/backend adapter
-- host/platform adapter
-- import/export adapter
-- automation/integration adapter
-
-This gives extensibility without requiring a dynamic runtime marketplace.
-
-### Practical configuration model
-
-The app can compose adapters from a configuration such as:
-
-```ts
-{
-  backend: "local" | "electron" | "convex",
-  host: "electron" | "web" | "umbrel",
-  features: ["attachments", "markdown", "export"]
-}
-```
-
-That is enough to support real deployment variation without overengineering.
-
-## Convex Feasibility
-
-A private Convex deployment is technically viable.
-
-Convex documents self-hosting of the backend on your own infrastructure:
-- https://docs.convex.dev/self-hosting
-
-However, with the current codebase, adding Convex would still be a substantial integration because the app does not yet have a backend abstraction.
-
-Recommended approach:
-- first create a generic repository/API boundary
-- then implement Convex as one backend adapter
-- do not build the app directly around Convex-specific assumptions
-
-## Docker Feasibility
-
-Docker deployment is feasible, but not with the current Electron packaging model alone.
-
-Right now there is:
-- a frontend renderer
-- an Electron shell
-- no dedicated server process
-
-To run Omvra in Docker properly, one of these needs to exist:
-
-1. A web-only frontend served by a small HTTP server, plus a backend storage service
-2. A frontend talking to a private backend such as Convex or Postgres over the network
-
-Electron itself is not the right abstraction for Docker-hosted private deployment.
-
-## Umbrel Feasibility
-
-Umbrel is feasible only after Omvra has a browser-hosted mode.
-
-Umbrel apps run in Docker containers and are exposed as web apps.
-
-Relevant references:
-- Umbrel app framework repo: https://github.com/getumbrel/umbrel-apps/blob/master/README.md
-- Umbrel Portainer app notes: https://apps.umbrel.com/app/portainer
-
-That means the current Electron app cannot be deployed to Umbrel as-is.
-
-You would need:
-- a web frontend
-- a backend service
-- persistent Docker volumes
-- Umbrel-compatible app manifest/container wiring
-
-For this codebase, Umbrel becomes straightforward only after:
-- the shell is separated from the app
-- the app can run in the browser
-- storage is backend-driven rather than renderer-local
+In practical terms, the next meaningful modularity step is not a plugin marketplace. It is a clearer contract around workspace reads/writes and host-side capabilities.
 
 ## Highest-ROI Refactor Order
 
-1. Extract a `WorkspaceRepository` and route all data access through it.
-2. Move migrations and key/version management out of `App.tsx`.
-3. Normalize the domain model, especially project assignment.
-4. Introduce `HostCapabilities` for Electron-specific features.
-5. Split `core`, `web`, and `electron` responsibilities.
-6. Add a web runtime target.
-7. Implement one remote backend adapter, ideally behind a generic contract.
-8. Package the web target for Docker and Umbrel.
+### 1. Introduce a `WorkspaceRepository`
 
-## Practical Recommendation
+Create an explicit data contract for:
 
-If the goal is private, self-hosted, and portable, the right target architecture is not "Electron plus plugins".
+- tasks
+- people
+- milestones
+- projects/swimlanes
+- status columns
+- preferences or view-state persistence where appropriate
 
-The right target is:
-- core app logic
-- host adapters
-- backend adapters
+This should become the boundary between UI interaction and persistence.
 
-In that model:
-- Electron is one host
-- browser/Umbrel is another host
-- Convex is one backend option
-- local storage is another backend option
+### 2. Move persistence bootstrapping and migration policy out of `App.tsx`
 
-That design is modular in a way that will hold up as the product evolves.
+Keep `App.tsx` as a composition root, not the place where persistence rules are defined.
+
+### 3. Normalize the stored workspace schema
+
+Especially:
+
+- project vs swimlane relationships
+- display strings vs canonical ids
+- long-lived task metadata vs view-local metadata
+
+### 4. Formalize host capabilities
+
+Extract an interface around:
+
+- attachments
+- PDF export
+- external links
+- runtime info
+- MCP runtime controls if those remain host-owned
+
+### 5. Separate renderer, shell, and service concerns more intentionally
+
+This does not require a monorepo immediately. It can start as clearer top-level modules and contracts inside the existing repo.
+
+## On The Old `packages/*` Recommendation
+
+The original report recommended a future split into:
+
+- `packages/core`
+- `packages/web`
+- `packages/electron-shell`
+- `packages/server`
+- `packages/adapters/*`
+
+That still makes sense as a long-term target, but it should be read as aspirational architecture, not an immediate or proven next step.
+
+Today, the better question is not "should we split into packages now?"
+
+It is:
+
+"What are the first two or three contracts we need so that a future split is possible without rewriting behavior twice?"
+
+Those contracts are most likely:
+
+- workspace repository
+- host capabilities
+- canonical schema + migration boundary
+
+## Convex, Docker, and Umbrel Relevance
+
+These sections remain broadly relevant.
+
+### Convex
+
+Still viable, but still better introduced behind a generic repository or service contract rather than directly into the renderer state model.
+
+### Docker
+
+Still requires a browser-servable runtime or backend-oriented architecture. Electron alone is not the deployment model.
+
+### Umbrel
+
+Still depends on Omvra becoming a browser-hosted app with backend-driven persistence.
+
+## Final Verdict
+
+This document is still useful if read as:
+
+- an architectural direction memo
+- a warning against premature runtime plugin systems
+- a portability planning note
+
+It is no longer fully accurate as a current-state audit.
+
+Most useful current take:
+
+- The strategic conclusion still holds
+- The repo is more modular internally than the original draft gave it credit for
+- The next step is contract extraction, not plugin infrastructure
 
 ## Relevant Code References
 
 - `src/app/App.tsx`
-- `src/app/components/TimelineView.tsx`
 - `src/app/utils/storage.ts`
-- `src/app/hooks/useViewState.ts`
-- `src/app/types.ts`
+- `src/app/services/workspaceBackup.ts`
+- `src/app/utils/workspaceSanitizers.ts`
+- `src/app/domain/workspaceReadModel.ts`
+- `src/app/hooks/useTaskActions.ts`
+- `src/app/hooks/usePeopleActions.ts`
 - `electron/main.cjs`
 - `electron/preload.cjs`
+- `electron/services/workspace-service.cjs`
+- `electron/services/mcp-http-server.cjs`

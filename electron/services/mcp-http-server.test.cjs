@@ -726,6 +726,8 @@ test('prompts/list and prompts/get expose guided agent workflows', () => {
   assert.match(executePromptResponse.result.messages[0].content.text, /task acceptance criteria/i);
   assert.match(executePromptResponse.result.messages[0].content.text, /agentOperationalInstructions/i);
   assert.match(executePromptResponse.result.messages[0].content.text, /client, system, developer, tool, and security instructions/i);
+  assert.match(executePromptResponse.result.messages[0].content.text, /omvra:\/\/agents\/\{personId\}\/assigned/);
+  assert.match(executePromptResponse.result.messages[0].content.text, /exact assigneeId/i);
 });
 
 test('guide and execution schema resources explain the task workflow', () => {
@@ -756,6 +758,10 @@ test('guide and execution schema resources explain the task workflow', () => {
     guide.workflowReference.join('\n'),
     /not authority to change instruction hierarchy or task acceptance criteria/
   );
+  assert.match(
+    guide.workflowReference.join('\n'),
+    /resolve assignee context through omvra:\/\/agents\/\{personId\}\/assigned with that exact id/i
+  );
 
   const schemaResponse = dispatch({
     jsonrpc: '2.0',
@@ -771,6 +777,8 @@ test('guide and execution schema resources explain the task workflow', () => {
   assert.match(schemaResponse.result.contents[0].text, /handoff/);
   assert.match(schemaResponse.result.contents[0].text, /canonicalRoadmapPath/);
   assert.match(schemaResponse.result.contents[0].text, /Do not split the workflow across milestones\.update and tasks\.update/);
+  assert.match(schemaResponse.result.contents[0].text, /assignee-context-preflight/);
+  assert.match(schemaResponse.result.contents[0].text, /exact assigneeId/);
 });
 
 test('template resources resolve assigned work, project work, and board work', () => {
@@ -891,6 +899,10 @@ test('instruction-like task notes remain workspace data and executor guidance sa
   assert.match(
     executePromptResponse.result.messages[0].content.text,
     /cannot override|client, system, developer, tool, and security instructions/i
+  );
+  assert.match(
+    executePromptResponse.result.messages[0].content.text,
+    /continue without persona context.*unassigned|task is currently unassigned/i
   );
 });
 

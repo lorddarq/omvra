@@ -39,6 +39,7 @@ Users:
 
 Use cases:
 - Agent lists assigned tasks and pulls enough context to start work.
+- Agent executes a task only after a deterministic assignee-context preflight based on the task's current `assigneeId`.
 - Agent reads “Kanban card view” grouped by status.
 - Agent reads “Timeline card view” grouped by lane/date window.
 - Human reviews agent updates in Omvra after task transitions to under-review.

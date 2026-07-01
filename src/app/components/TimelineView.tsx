@@ -166,6 +166,7 @@ interface TimelineViewProps {
   people?: Person[];
   agentWatchConfigs?: AgentWatchConfig[];
   agentWatchRuntime?: Record<string, AgentWatchRuntimeState>;
+  mcpAuditLog?: McpAuditEntry[];
   mcpAgentAccessEnabled?: boolean;
   mcpListenerStatus?: McpListenerStatus | null;
   mcpRestartPending?: boolean;
@@ -188,6 +189,7 @@ export function TimelineView({
   people = [],
   agentWatchConfigs = [],
   agentWatchRuntime = {},
+  mcpAuditLog = [],
   mcpAgentAccessEnabled = false,
   mcpListenerStatus = null,
   mcpRestartPending = false,
@@ -1447,9 +1449,11 @@ export function TimelineView({
         )}
 
         <AppStatusBar
+          tasks={tasks}
           people={people}
           agentWatchConfigs={agentWatchConfigs}
           agentWatchRuntime={agentWatchRuntime}
+          mcpAuditLog={mcpAuditLog}
           mcpAgentAccessEnabled={mcpAgentAccessEnabled}
           mcpListenerStatus={mcpListenerStatus}
           mcpRestartPending={mcpRestartPending}

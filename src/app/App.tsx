@@ -11,7 +11,7 @@ import { useSharedHorizontalScroll } from './hooks/useSharedHorizontalScroll';
 import { useVirtualizedTimeline } from './hooks/useVirtualizedTimeline';
 import { useMcpDiagnostics } from './hooks/useMcpDiagnostics';
 import { useMcpHealthValidation } from './hooks/useMcpHealthValidation';
-import { useAgentWatchRuntime } from './hooks/useAgentWatchRuntime';
+import { getAgentWatchPollingInterval, useAgentWatchRuntime } from './hooks/useAgentWatchRuntime';
 import { useMcpPanelState } from './hooks/useMcpPanelState';
 import { usePeopleActions } from './hooks/usePeopleActions';
 import { useProjectActions } from './hooks/useProjectActions';
@@ -718,6 +718,26 @@ function App() {
     setIsPreferencesOpen(true);
   }, []);
 
+  useEffect(() => {
+    if (!preferences.mcpAgentAccessEnabled) return;
+    void refreshMcpAuditLog();
+  }, [preferences.mcpAgentAccessEnabled, refreshMcpAuditLog]);
+
+  useEffect(() => {
+    if (!preferences.mcpAgentAccessEnabled) return;
+
+    const intervalMs = getAgentWatchPollingInterval(agentWatchConfigs);
+    if (intervalMs <= 0) return;
+
+    const timer = window.setInterval(() => {
+      void refreshMcpAuditLog();
+    }, intervalMs);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [agentWatchConfigs, preferences.mcpAgentAccessEnabled, refreshMcpAuditLog]);
+
   const handleCloseTaskDetails = useCallback(() => {
     setIsTaskDetailsOpen(false);
   }, []);
@@ -1119,6 +1139,7 @@ function App() {
         people={people}
         agentWatchConfigs={agentWatchConfigs}
         agentWatchRuntime={agentWatchRuntime}
+        mcpAuditLog={mcpAuditLog}
         mcpAgentAccessEnabled={preferences.mcpAgentAccessEnabled}
         mcpListenerStatus={mcpListenerStatus}
         mcpRestartPending={isMcpRestartPending}

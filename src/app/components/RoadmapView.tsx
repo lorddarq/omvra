@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
 import { Filter, Flag, TriangleAlert } from 'lucide-react';
 import { ProjectMilestone, Task, TaskStatus, TimelineSwimlane } from '../types';
 import {
+  getStatusVisual,
   getMilestoneProjectIds,
   summarizeMilestone,
   type MilestoneHealth,
@@ -13,8 +13,6 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { EmptyStateCard } from './EmptyStateCard';
 import {
-  MILESTONE_HEALTH_CLASSES,
-  MILESTONE_HEALTH_LABELS,
   MilestoneStatusComposition,
 } from './MilestoneSections';
 import { RoadmapMilestoneSidebar } from './RoadmapMilestoneSidebar';
@@ -47,34 +45,6 @@ const TASK_ROW_HEIGHT = 48;
 const MILESTONE_ROW_GAP = 0;
 const MIN_ROADMAP_ROW_HEIGHT = 132;
 const CHART_PADDING_BOTTOM = 24;
-
-function getStatusTitle(statusColumns: RoadmapViewProps['statusColumns'], status: TaskStatus): string {
-  return statusColumns.find(column => column.id === status)?.title || status;
-}
-
-function getStatusColorProps(
-  statusColumns: RoadmapViewProps['statusColumns'],
-  status: TaskStatus
-): { className?: string; style?: CSSProperties } {
-  const color = statusColumns.find(column => column.id === status)?.color;
-
-  if (color?.startsWith('#')) {
-    return { style: { backgroundColor: color } };
-  }
-
-  if (color) {
-    return { className: color };
-  }
-
-  return { style: { backgroundColor: '#d1d5db' } };
-}
-
-function getTaskProgress(status: TaskStatus): number {
-  if (status === 'done') return 100;
-  if (status === 'under-review') return 80;
-  if (status === 'in-progress') return 45;
-  return 15;
-}
 
 function startOfDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -484,8 +454,7 @@ export function RoadmapView({
                 headerHeight={HEADER_HEIGHT}
                 chartHeight={chartHeight}
                 chartScrollTop={chartScrollTop}
-                healthLabels={MILESTONE_HEALTH_LABELS}
-                healthClasses={MILESTONE_HEALTH_CLASSES}
+                statusColumns={statusColumns}
                 onAddMilestone={onAddMilestone}
                 onMilestoneClick={onMilestoneClick}
                 renderRollupBar={summary => (
@@ -646,9 +615,8 @@ export function RoadmapView({
                         ) : sortedTasks.map((task, index) => {
                           const left = getTaskLeft(task, range.start);
                           const width = getTaskWidth(task);
-                          const progress = getTaskProgress(task.status);
                           const isLate = lateTaskIds.has(task.id);
-                          const statusColorProps = getStatusColorProps(statusColumns, task.status);
+                          const statusVisual = getStatusVisual(statusColumns, task.status);
                           return (
                             <button
                               key={task.id}
@@ -662,13 +630,13 @@ export function RoadmapView({
                                 top: MILESTONE_ROW_HEIGHT + index * TASK_ROW_HEIGHT + 9,
                                 width,
                               }}
-                              title={`${task.title} - ${getStatusTitle(statusColumns, task.status)}`}
+                              title={`${task.title} - ${statusVisual.label}`}
                             >
                               <span
-                                className={`absolute inset-y-0 left-0 opacity-45 ${statusColorProps.className || ''}`}
+                                className={`absolute inset-y-0 left-0 opacity-45 ${statusVisual.backgroundClassName || ''}`}
                                 style={{
-                                  ...statusColorProps.style,
-                                  width: `${progress}%`,
+                                  ...statusVisual.backgroundStyle,
+                                  width: `${statusVisual.progressPercent}%`,
                                 }}
                                 aria-hidden="true"
                               />

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { ProjectMilestone, TaskStatus, TimelineSwimlane } from '../types';
-import type { MilestoneHealth } from '../utils/roadmap';
+import { getMilestoneHealthVisual, getStatusVisual, type MilestoneHealth } from '../utils/roadmap';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 
@@ -25,8 +25,7 @@ interface RoadmapMilestoneSidebarProps {
   headerHeight: number;
   chartHeight: number;
   chartScrollTop: number;
-  healthLabels: Record<MilestoneHealth, string>;
-  healthClasses: Record<MilestoneHealth, string>;
+  statusColumns: Array<{ id: TaskStatus; title: string; color?: string }>;
   onAddMilestone: () => void;
   onMilestoneClick: (milestone: ProjectMilestone) => void;
   renderRollupBar: (summary: RoadmapMilestoneSummary) => ReactNode;
@@ -38,8 +37,7 @@ export function RoadmapMilestoneSidebar({
   headerHeight,
   chartHeight,
   chartScrollTop,
-  healthLabels,
-  healthClasses,
+  statusColumns,
   onAddMilestone,
   onMilestoneClick,
   renderRollupBar,
@@ -83,12 +81,14 @@ export function RoadmapMilestoneSidebar({
           }}
         >
           {rows.map(row => {
-            const statusCounts = [
-              { key: 'open' as const, color: '#c5c5c5', count: row.summary.counts.open || 0 },
-              { key: 'done' as const, color: '#3ddfa9', count: row.summary.counts.done || 0 },
-              { key: 'under-review' as const, color: '#ffbb28', count: row.summary.counts['under-review'] || 0 },
-              { key: 'in-progress' as const, color: '#4c90ff', count: row.summary.counts['in-progress'] || 0 },
-            ].filter(item => item.count > 0);
+            const healthVisual = getMilestoneHealthVisual(row.summary.health);
+            const statusCounts = (['open', 'done', 'under-review', 'in-progress'] as TaskStatus[])
+              .map(status => ({
+                status,
+                color: getStatusVisual(statusColumns, status).color,
+                count: row.summary.counts[status] || 0,
+              }))
+              .filter(item => item.count > 0);
 
             const remainingCount = Math.max(
               0,
@@ -142,7 +142,7 @@ export function RoadmapMilestoneSidebar({
                     <div className="flex min-w-0 flex-wrap items-center gap-1">
                       {statusCounts.map(item => (
                         <div
-                          key={`${row.milestone.id}-${item.key}`}
+                          key={`${row.milestone.id}-${item.status}`}
                           className="flex h-5 items-center gap-1 rounded-full border border-black/5 bg-white px-1.5 text-xs font-bold text-[#71717a]"
                         >
                           <span className="size-2 rounded-full" style={{ backgroundColor: item.color }} aria-hidden="true" />
@@ -158,9 +158,9 @@ export function RoadmapMilestoneSidebar({
                     </div>
                     <Badge
                       variant="outline"
-                      className={`h-5 rounded-full px-2 text-[10px] font-medium ${healthClasses[row.summary.health]}`}
+                      className={`h-5 rounded-full px-2 text-[10px] font-medium ${healthVisual.className}`}
                     >
-                      {healthLabels[row.summary.health]}
+                      {healthVisual.label}
                     </Badge>
                   </div>
                 </div>

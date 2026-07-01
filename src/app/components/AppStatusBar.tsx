@@ -1,121 +1,146 @@
 import { Bot, Server } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import type React from 'react';
-import type { Person } from '../types';
+import { cn } from './ui/utils';
+import {
+  deriveAgentStatuses,
+  getMcpStatusSummary,
+  getRecentMcpActivitySignal,
+  rollupActiveAgentProvenance,
+  rollupAgentStatuses,
+  type AgentStatusTone,
+} from '../utils/statusBar';
+import type { Person, Task } from '../types';
 import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
-import { cn } from './ui/utils';
 
 interface AppStatusBarProps {
+  tasks: Task[];
   people: Person[];
   agentWatchConfigs: AgentWatchConfig[];
   agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
+  mcpAuditLog: McpAuditEntry[];
   mcpAgentAccessEnabled: boolean;
   mcpListenerStatus: McpListenerStatus | null;
   mcpRestartPending: boolean;
 }
 
-function getAgentAvailabilitySummary({
-  people,
-  agentWatchConfigs,
-  agentWatchRuntime,
-}: Pick<AppStatusBarProps, 'people' | 'agentWatchConfigs' | 'agentWatchRuntime'>) {
-  const agentIds = new Set(people.filter(person => person.kind === 'agentic').map(person => person.id));
-  const activeAgentIds = new Set(
-    agentWatchConfigs
-      .filter(config => config.enabled && agentIds.has(config.personId) && !agentWatchRuntime[config.personId]?.error)
-      .map(config => config.personId)
-  );
-
-  return {
-    active: activeAgentIds.size,
-    inactive: Math.max(0, agentIds.size - activeAgentIds.size),
-    total: agentIds.size,
-  };
-}
-
-function getMcpStatusSummary({
-  mcpAgentAccessEnabled,
-  mcpListenerStatus,
-  mcpRestartPending,
-}: Pick<AppStatusBarProps, 'mcpAgentAccessEnabled' | 'mcpListenerStatus' | 'mcpRestartPending'>) {
-  if (!mcpAgentAccessEnabled) {
-    return {
-      label: 'MCP offline',
-      tone: 'muted' as const,
-    };
-  }
-
-  if (mcpRestartPending || mcpListenerStatus?.restartRequired) {
-    return {
-      label: 'MCP restart needed',
-      tone: 'warning' as const,
-    };
-  }
-
-  if (!mcpListenerStatus) {
-    return {
-      label: 'MCP unknown',
-      tone: 'unknown' as const,
-    };
-  }
-
-  if (mcpListenerStatus.status === 'running' && mcpListenerStatus.listening) {
-    return {
-      label: 'MCP running',
-      tone: 'success' as const,
-    };
-  }
-
-  if (mcpListenerStatus.status === 'starting') {
-    return {
-      label: 'MCP starting',
-      tone: 'unknown' as const,
-    };
-  }
-
-  if (mcpListenerStatus.status === 'error') {
-    return {
-      label: 'MCP error',
-      tone: 'danger' as const,
-    };
-  }
-
-  return {
-    label: 'MCP offline',
-    tone: 'muted' as const,
-  };
-}
-
 export function AppStatusBar({
+  tasks,
   people,
   agentWatchConfigs,
   agentWatchRuntime,
+  mcpAuditLog,
   mcpAgentAccessEnabled,
   mcpListenerStatus,
   mcpRestartPending,
 }: AppStatusBarProps) {
-  const agents = getAgentAvailabilitySummary({ people, agentWatchConfigs, agentWatchRuntime });
+  const agents = rollupAgentStatuses(
+    deriveAgentStatuses({ people, tasks, agentWatchConfigs, agentWatchRuntime, mcpAuditLog })
+  );
+  const activeProvenance = rollupActiveAgentProvenance(agents.statuses);
   const mcp = getMcpStatusSummary({ mcpAgentAccessEnabled, mcpListenerStatus, mcpRestartPending });
+  const recentMcpActivity = getRecentMcpActivitySignal({ mcpAuditLog, tasks });
   const mcpValue = getMcpBadgeValue(mcp.label);
+  const [isMcpActivityPulsing, setIsMcpActivityPulsing] = useState(recentMcpActivity.isActive);
+
+  useEffect(() => {
+    if (!recentMcpActivity.isActive || !recentMcpActivity.timestamp) {
+      setIsMcpActivityPulsing(false);
+      return;
+    }
+
+    setIsMcpActivityPulsing(true);
+    const activityAgeMs = Math.max(0, Date.now() - Date.parse(recentMcpActivity.timestamp));
+    const remainingMs = Math.max(0, 1_500 - activityAgeMs);
+    const timeoutId = window.setTimeout(() => {
+      setIsMcpActivityPulsing(false);
+    }, remainingMs);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [recentMcpActivity.isActive, recentMcpActivity.timestamp]);
+
+  const statusPills = [
+    {
+      key: 'writing',
+      label: 'Writing',
+      value: String(agents.counts.writing),
+      tone: 'warning' as const,
+      title: agents.byState.writing.map(agent => agent.name).join(', ') || 'No agents are writing to MCP',
+    },
+    {
+      key: 'working',
+      label: 'Working',
+      value: String(agents.counts.working),
+      tone: 'success' as const,
+      title: agents.byState.working.map(agent => agent.name).join(', ') || 'No agents are actively working',
+    },
+    {
+      key: 'idle',
+      label: 'Idle',
+      value: String(agents.counts.idle),
+      tone: 'muted' as const,
+      title: agents.byState.idle.map(agent => agent.name).join(', ') || 'No agents are idle',
+    },
+    {
+      key: 'unavailable',
+      label: 'Unavailable',
+      value: String(agents.counts.unavailable),
+      tone: 'unknown' as const,
+      title: agents.byState.unavailable.map(agent => agent.name).join(', ') || 'No agents are unavailable',
+    },
+  ].filter(item => agents.total > 0 ? Number(item.value) > 0 : item.key === 'unavailable');
 
   return (
     <div
-      className="flex h-8 items-center gap-6 border-t border-black/5 bg-gray-50 px-4 py-2 text-xs text-gray-600"
-      aria-label={`Agent status: ${agents.active} active, ${agents.inactive} inactive. ${mcp.label}.`}
+      className="flex min-h-8 items-center gap-3 border-t border-black/5 bg-gray-50 px-4 py-2 text-xs text-gray-600"
+      aria-label={`Agent status: ${agents.counts.writing} writing to MCP, ${agents.counts.working} working, ${agents.counts.idle} idle, ${agents.counts.unavailable} unavailable. ${mcp.label}.`}
     >
-      <StatusPill
-        icon={<Bot className="size-3.5" aria-hidden="true" />}
-        label="Running Agents:"
-        value={String(agents.active)}
-        tone={agents.active > 0 ? 'success' : 'muted'}
-        title={`${agents.active} active, ${agents.inactive} inactive`}
-      />
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="shrink-0 text-gray-500">
+          <Bot className="size-3.5" aria-hidden="true" />
+        </span>
+        <span className="whitespace-nowrap text-center text-xs font-medium text-[#828282]">Agents:</span>
+        {agents.total === 0 ? (
+          <StateBadge label="No agents" value="0" tone="muted" title="No agentic teammates are configured" />
+        ) : (
+          statusPills.map(item => (
+            <StateBadge
+              key={item.key}
+              label={item.label}
+              value={item.value}
+              tone={item.tone}
+              title={item.title}
+            />
+          ))
+        )}
+        {activeProvenance.length > 0 ? (
+          <>
+            <span className="whitespace-nowrap text-center text-xs font-medium text-[#b0b0b7]">Via:</span>
+            {activeProvenance.map(item => (
+              <ProvenanceBadge
+                key={item.id}
+                label={item.label}
+                value={String(item.count)}
+                dotColor={item.dotColor}
+                backgroundColor={item.badgeBackground}
+                textColor={item.badgeTextColor}
+                title={item.people.join(', ')}
+              />
+            ))}
+          </>
+        ) : null}
+      </div>
       <StatusPill
         icon={<Server className="size-3.5" aria-hidden="true" />}
         label="MCP:"
         value={mcpValue}
         tone={mcp.tone}
-        title={mcp.label}
+        title={recentMcpActivity.title ? `${mcp.label} • ${recentMcpActivity.title}` : mcp.label}
+        isPulsing={isMcpActivityPulsing}
+        pulseTone={recentMcpActivity.provenance?.dotColor}
       />
     </div>
   );
@@ -130,29 +155,131 @@ interface StatusPillProps {
   icon: React.ReactNode;
   label: string;
   value: string;
-  tone?: 'success' | 'warning' | 'danger' | 'unknown' | 'muted';
+  tone?: AgentStatusTone;
   title?: string;
+  isPulsing?: boolean;
+  pulseTone?: string;
 }
 
-function StatusPill({ icon, label, value, tone = 'muted', title }: StatusPillProps) {
+function StatusPill({
+  icon,
+  label,
+  value,
+  tone = 'muted',
+  title,
+  isPulsing = false,
+  pulseTone,
+}: StatusPillProps) {
+  const showsSteadyGlow = tone === 'success';
+  const ledColor = isPulsing && pulseTone
+    ? pulseTone
+    : tone === 'success'
+      ? '#2ea147'
+      : tone === 'warning'
+        ? '#f59e0b'
+        : tone === 'danger'
+          ? '#da0004'
+          : tone === 'unknown'
+            ? '#94a3b8'
+            : '#d1d5db';
+
   return (
     <div className="flex min-w-0 shrink-0 items-center gap-1" title={title}>
       <span className="shrink-0 text-gray-500">{icon}</span>
       <span className="whitespace-nowrap text-center text-xs font-medium text-[#828282]">{label}</span>
       <span className="flex min-h-[17px] shrink-0 items-center justify-center gap-1 rounded-full border border-black/10 px-1.5 py-0.5">
-        <span
-          className={cn(
-            'size-2 shrink-0 rounded-full',
-            tone === 'success' && 'bg-[#2ea147]',
-            tone === 'warning' && 'bg-amber-500',
-            tone === 'danger' && 'bg-[#da0004]',
-            tone === 'unknown' && 'bg-slate-400',
-            tone === 'muted' && 'bg-gray-300'
-          )}
-          aria-hidden="true"
-        />
+        <span className="relative flex size-2 shrink-0 items-center justify-center" aria-hidden="true">
+          {showsSteadyGlow ? (
+            <span
+              className="absolute inline-flex size-3.5 animate-pulse rounded-full blur-[4px] opacity-[0.1]"
+              style={{ backgroundColor: ledColor }}
+            />
+          ) : null}
+          {isPulsing ? (
+            <span
+              className="absolute inline-flex size-4 animate-ping rounded-full blur-[3px] opacity-[0.2]"
+              style={{ backgroundColor: pulseTone || '#2ea147' }}
+            />
+          ) : null}
+          <span
+            className={cn(
+              'relative size-2 rounded-full',
+              tone === 'success' && 'bg-[#2ea147]',
+              tone === 'warning' && 'bg-amber-500',
+              tone === 'danger' && 'bg-[#da0004]',
+              tone === 'unknown' && 'bg-slate-400',
+              tone === 'muted' && 'bg-gray-300'
+            )}
+            style={{
+              backgroundColor: ledColor,
+              boxShadow: showsSteadyGlow || isPulsing ? `0 0 8px ${ledColor}` : undefined,
+            }}
+          />
+        </span>
         <span className="whitespace-nowrap text-[11px] font-semibold leading-none text-[#a8a8a8]">{value}</span>
       </span>
     </div>
+  );
+}
+
+interface StateBadgeProps {
+  label: string;
+  value: string;
+  tone: AgentStatusTone;
+  title?: string;
+}
+
+function StateBadge({ label, value, tone, title }: StateBadgeProps) {
+  return (
+    <span
+      className="flex min-h-[17px] shrink-0 items-center justify-center gap-1 rounded-full border border-black/10 px-1.5 py-0.5"
+      title={title}
+    >
+      <span
+        className={cn(
+          'size-2 shrink-0 rounded-full',
+          tone === 'success' && 'bg-[#2ea147]',
+          tone === 'warning' && 'bg-amber-500',
+          tone === 'danger' && 'bg-[#da0004]',
+          tone === 'unknown' && 'bg-slate-400',
+          tone === 'muted' && 'bg-gray-300'
+        )}
+        aria-hidden="true"
+      />
+      <span className="whitespace-nowrap text-[11px] font-medium leading-none text-[#8b8b93]">
+        {label} {value}
+      </span>
+    </span>
+  );
+}
+
+interface ProvenanceBadgeProps {
+  label: string;
+  value: string;
+  dotColor: string;
+  backgroundColor: string;
+  textColor: string;
+  title?: string;
+}
+
+function ProvenanceBadge({
+  label,
+  value,
+  dotColor,
+  backgroundColor,
+  textColor,
+  title,
+}: ProvenanceBadgeProps) {
+  return (
+    <span
+      className="flex min-h-[17px] shrink-0 items-center justify-center gap-1 rounded-full border border-black/5 px-1.5 py-0.5"
+      style={{ backgroundColor, color: textColor }}
+      title={title}
+    >
+      <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: dotColor }} aria-hidden="true" />
+      <span className="whitespace-nowrap text-[11px] font-medium leading-none">
+        {label} {value}
+      </span>
+    </span>
   );
 }

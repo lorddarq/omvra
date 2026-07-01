@@ -1,5 +1,10 @@
 import { CalendarDays, Search, TriangleAlert } from 'lucide-react';
-import type { RoadmapMilestoneSummary } from '../utils/roadmap';
+import {
+  getMilestoneHealthVisual,
+  getStatusLabel,
+  getStatusVisual,
+  type RoadmapMilestoneSummary,
+} from '../utils/roadmap';
 import type { Task, TaskStatus, TimelineSwimlane } from '../types';
 import { EmptyStateCard } from './EmptyStateCard';
 import { DependencyStatusPill } from './TaskSummarySection';
@@ -8,49 +13,9 @@ import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 
-export const MILESTONE_HEALTH_LABELS = {
-  complete: 'Complete',
-  'at-risk': 'At risk',
-  'in-progress': 'In progress',
-  planned: 'Planned',
-  empty: 'No tasks',
-} as const;
-
-export const MILESTONE_HEALTH_CLASSES = {
-  complete: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  'at-risk': 'border-red-200 bg-red-50 text-red-700',
-  'in-progress': 'border-blue-200 bg-blue-50 text-blue-700',
-  planned: 'border-gray-200 bg-gray-50 text-gray-700',
-  empty: 'border-gray-200 bg-white text-gray-500',
-} as const;
-
-const STATUS_DOT_FALLBACK_CLASSES: Record<TaskStatus, string> = {
-  open: 'bg-gray-300',
-  'in-progress': 'bg-blue-500',
-  'under-review': 'bg-amber-500',
-  done: 'bg-emerald-500',
-};
-
 const milestoneDialogSearchInputClassName = 'h-10 rounded-2xl border border-black/8 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]';
 
 type MilestoneStatusColumn = Array<{ id: TaskStatus; title: string; color?: string }>;
-
-function getStatusTitle(statusColumns: MilestoneStatusColumn, status: TaskStatus): string {
-  return statusColumns.find(column => column.id === status)?.title || status;
-}
-
-function getStatusDotColorClass(statusColumns: MilestoneStatusColumn, status: TaskStatus): string | undefined {
-  const color = statusColumns.find(column => column.id === status)?.color;
-  return color && !color.startsWith('#') ? color : undefined;
-}
-
-function getStatusSegmentStyle(statusColumns: MilestoneStatusColumn, status: TaskStatus) {
-  const color = statusColumns.find(column => column.id === status)?.color;
-  if (color?.startsWith('#')) {
-    return { backgroundColor: color };
-  }
-  return undefined;
-}
 
 function formatDisplayDate(value?: string): string {
   if (!value) return 'No date';
@@ -78,16 +43,16 @@ export function MilestoneStatusComposition({
         const count = counts[column.id] || 0;
         if (count === 0) return null;
 
-        const colorClassName = getStatusDotColorClass(statusColumns, column.id);
+        const visual = getStatusVisual(statusColumns, column.id);
         return (
           <div
             key={column.id}
-            className={colorClassName}
+            className={visual.backgroundClassName}
             style={{
-              ...getStatusSegmentStyle(statusColumns, column.id),
+              ...visual.backgroundStyle,
               width: `${(count / totalTasks) * 100}%`,
             }}
-            title={`${count} ${getStatusTitle(statusColumns, column.id)} task${count === 1 ? '' : 's'}`}
+            title={`${count} ${visual.label} task${count === 1 ? '' : 's'}`}
           />
         );
       })}
@@ -108,6 +73,8 @@ export function MilestoneSummaryCard({
   startDate?: string;
   endDate?: string;
 }) {
+  const healthVisual = getMilestoneHealthVisual(summary.health);
+
   return (
     <>
       <section className="space-y-4">
@@ -143,8 +110,8 @@ export function MilestoneSummaryCard({
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className="text-[12px] font-medium text-[#71717a]">Health</div>
-                <Badge variant="outline" className={`mt-2 ${MILESTONE_HEALTH_CLASSES[summary.health]}`}>
-                  {MILESTONE_HEALTH_LABELS[summary.health]}
+                <Badge variant="outline" className={`mt-2 ${healthVisual.className}`}>
+                  {healthVisual.label}
                 </Badge>
               </div>
               <div className="shrink-0 rounded-full border border-black/10 bg-white px-2 py-0.5 text-[11px] font-semibold text-[#71717a]">
@@ -179,17 +146,16 @@ export function MilestoneSummaryCard({
             statusColumns={statusColumns}
           />
           <div className="mt-4 flex flex-wrap gap-1.5">
-            {(Object.keys(STATUS_DOT_FALLBACK_CLASSES) as TaskStatus[]).map(status => {
+            {(['open', 'in-progress', 'under-review', 'done'] as TaskStatus[]).map(status => {
               const count = summary.counts[status] || 0;
               if (count === 0) return null;
-              const colorClassName = getStatusDotColorClass(statusColumns, status) || STATUS_DOT_FALLBACK_CLASSES[status];
-              const colorStyle = getStatusSegmentStyle(statusColumns, status);
+              const visual = getStatusVisual(statusColumns, status);
               return (
                 <span
                   key={status}
                   className="inline-flex items-center gap-1 rounded-full border border-black/5 bg-white px-2 py-0.5 text-[12px] font-bold text-[#71717a]"
                 >
-                  <span className={`size-2 rounded-full ${colorClassName}`} style={colorStyle} />
+                  <span className={`size-2 rounded-full ${visual.backgroundClassName || ''}`} style={visual.backgroundStyle} />
                   {count}
                 </span>
               );
@@ -274,7 +240,7 @@ export function MilestoneLinkedTasksSection({
                     <span className="flex shrink-0 items-center gap-2">
                       {isLate && <TriangleAlert className="size-4 text-red-700" />}
                       <DependencyStatusPill
-                        label={getStatusTitle(statusColumns, task.status)}
+                        label={getStatusLabel(statusColumns, task.status)}
                         statusColor={statusColumns.find(column => column.id === task.status)?.color}
                       />
                     </span>

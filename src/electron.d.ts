@@ -131,6 +131,9 @@ declare global {
     method?: string;
     origin?: string;
     transport?: string;
+    userAgent?: string;
+    clientName?: string;
+    clientVersion?: string;
     remoteAddress?: string;
     capabilityProfile?: string;
     [key: string]: unknown;

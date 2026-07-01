@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { ProjectMilestone, Task, TimelineSwimlane } from '../types';
-import { getMilestoneProjectIds } from '../utils/roadmap';
+import { getMilestoneProjectIds, wouldCreateDependencyCycle } from '../utils/roadmap';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import {
   Dialog,
@@ -145,9 +145,20 @@ export function MilestoneDialog({
     if (taskId === dependencyId) return;
     setDependencyIdsByTaskId(prev => {
       const currentDependencyIds = prev[taskId] || [];
-      const nextDependencyIds = currentDependencyIds.includes(dependencyId)
+      const isRemoving = currentDependencyIds.includes(dependencyId);
+      const nextDependencyIds = isRemoving
         ? currentDependencyIds.filter(id => id !== dependencyId)
         : [...currentDependencyIds, dependencyId];
+
+      if (
+        !isRemoving
+        && wouldCreateDependencyCycle(taskId, dependencyId, currentTaskId => {
+          if (currentTaskId === taskId) return nextDependencyIds;
+          return prev[currentTaskId] || [];
+        })
+      ) {
+        return prev;
+      }
 
       return {
         ...prev,

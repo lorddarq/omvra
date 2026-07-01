@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Bot, FileText, Pencil, Trash2, Users } from 'lucide-react';
 import type { Person, PersonKind, StatusColumn, Task, TaskStatus, TimelineSwimlane } from '../types';
+import { getStatusLabel } from '../utils/roadmap';
 import { getLoadPercentageForTasks, getTaskLoadPoints, PERSON_CAPACITY_POINTS } from '../utils/taskLoad';
 import { AnchoredPanelSection } from './AnchoredPanel';
 import { EmptyStateCard } from './EmptyStateCard';
@@ -74,10 +75,6 @@ export function PeopleManagementSections({
     return getLoadPercentageForTasks(personTasks);
   }
 
-  function getStatusTitle(status: TaskStatus): string {
-    return statusColumns.find(column => column.id === status)?.title || status;
-  }
-
   function getProjectLabelsForTask(task: Task): string[] {
     const labels = new Set<string>();
     const projectIds = task.projectIds?.length ? task.projectIds : task.swimlaneId ? [task.swimlaneId] : [];
@@ -115,13 +112,13 @@ export function PeopleManagementSections({
       assignedTasks: assignedTasks
         .slice()
         .sort((left, right) => {
-          const leftStatus = getStatusTitle(left.status);
-          const rightStatus = getStatusTitle(right.status);
+          const leftStatus = getStatusLabel(statusColumns, left.status);
+          const rightStatus = getStatusLabel(statusColumns, right.status);
           if (leftStatus !== rightStatus) return leftStatus.localeCompare(rightStatus);
           return left.title.localeCompare(right.title);
         })
         .map(task => buildPersonTaskExportListItem(task, {
-          statusLabel: getStatusTitle(task.status),
+          statusLabel: getStatusLabel(statusColumns, task.status),
           projectLabels: getProjectLabelsForTask(task),
         })),
     });

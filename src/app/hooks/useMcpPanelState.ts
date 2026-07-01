@@ -107,6 +107,18 @@ export function useMcpPanelState<TPreferences extends McpPreferencesShape>({
     adoptAppliedSignatureFromListener(mcpListenerStatus);
   }, [adoptAppliedSignatureFromListener, mcpListenerStatus]);
 
+  useEffect(() => {
+    if (!preferences.mcpAgentAccessEnabled) return;
+
+    const unsubscribe = window.electron?.onStoreChanged?.(() => {
+      void refreshMcpAuditLog();
+    });
+
+    return () => {
+      unsubscribe?.();
+    };
+  }, [preferences.mcpAgentAccessEnabled, refreshMcpAuditLog]);
+
   const handleRestartMcpServer = useCallback(async () => {
     try {
       if (window.electron?.mcp?.restartServer) {

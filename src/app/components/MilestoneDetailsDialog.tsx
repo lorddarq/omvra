@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ProjectMilestone, Task, TaskStatus, TimelineSwimlane } from '../types';
 import {
   getMilestoneDateRangeLabel,
+  getMilestoneHealthVisual,
   getMilestoneProjectIds,
+  getStatusLabel,
   summarizeMilestone,
-  type MilestoneHealth,
 } from '../utils/roadmap';
 import {
   Dialog,
@@ -15,7 +16,6 @@ import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import { DialogSurface, DialogSurfaceBody, DialogSurfaceFooter, DialogSurfaceHeader, DialogSurfaceSection } from './DialogSurface';
 import { EmptyStateCard } from './EmptyStateCard';
 import {
-  MILESTONE_HEALTH_LABELS,
   MilestoneLinkedTasksSection,
   MilestoneSummaryCard,
 } from './MilestoneSections';
@@ -35,13 +35,6 @@ interface MilestoneDetailsDialogProps {
   onEdit: (milestone: ProjectMilestone) => void;
   onDelete?: (milestoneId: string) => void;
   onTaskClick: (task: Task) => void;
-}
-
-function getStatusTitle(
-  statusColumns: MilestoneDetailsDialogProps['statusColumns'],
-  status: TaskStatus
-): string {
-  return statusColumns.find(column => column.id === status)?.title || status;
 }
 
 export function MilestoneDetailsDialog({
@@ -66,6 +59,7 @@ export function MilestoneDetailsDialog({
     : []);
   const summary = enrichedMilestone?.summary ?? (milestone ? summarizeMilestone(milestone, tasks) : null);
   const lateTaskIds = new Set(summary?.lateTasks.map(task => task.id) || []);
+  const healthVisual = summary ? getMilestoneHealthVisual(summary.health) : null;
   const sortedTasks = summary
     ? [...summary.linkedTasks].sort((a, b) => (a.endDate || '').localeCompare(b.endDate || ''))
     : [];
@@ -104,7 +98,7 @@ export function MilestoneDetailsDialog({
       milestoneId: milestone.id,
       title: milestone.title,
       projectLabels: milestoneProjects.map(project => project.name),
-      healthLabel: MILESTONE_HEALTH_LABELS[summary.health],
+      healthLabel: healthVisual?.label || '',
       completionLabel: `${summary.completionPercent}% (${summary.completedTasks} of ${summary.totalTasks} tasks)`,
       dateRangeLabel: getMilestoneDateRangeLabel(milestone),
     });
@@ -144,7 +138,7 @@ export function MilestoneDetailsDialog({
       exportedAt: new Date().toISOString(),
       projectLabels: milestoneProjects.map(project => project.name),
       summaryFields: [
-        { label: 'Health', value: MILESTONE_HEALTH_LABELS[summary.health] },
+        { label: 'Health', value: healthVisual?.label || '' },
         { label: 'Completion', value: `${summary.completionPercent}% (${summary.completedTasks} of ${summary.totalTasks} tasks)` },
         { label: 'Date Range', value: getMilestoneDateRangeLabel(milestone) },
         { label: 'Late Tasks', value: summary.lateTasks.length > 0 ? summary.lateTasks.length : 'None' },
@@ -161,7 +155,7 @@ export function MilestoneDetailsDialog({
         return {
           title: task.title,
           detail: detailParts.join(' | '),
-          badge: getStatusTitle(statusColumns, task.status),
+          badge: getStatusLabel(statusColumns, task.status),
         };
       }),
     });

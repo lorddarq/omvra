@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, Filter, Plus, Search, X } from 'lucide-react';
 import type { MilestoneHealth } from '../utils/roadmap';
 import type { TimelineSwimlane } from '../types';
-import { MILESTONE_HEALTH_LABELS } from './MilestoneSections';
+import { MILESTONE_HEALTH_VISUALS } from '../utils/roadmap';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import {
@@ -123,9 +123,9 @@ export function RoadmapToolbar({
           onClear={() => onHealthFilterChange('all')}
         >
           <SelectItem value="all">All health</SelectItem>
-          {(Object.keys(MILESTONE_HEALTH_LABELS) as MilestoneHealth[]).map(health => (
+          {(Object.keys(MILESTONE_HEALTH_VISUALS) as MilestoneHealth[]).map(health => (
             <SelectItem key={health} value={health}>
-              {MILESTONE_HEALTH_LABELS[health]}
+              {MILESTONE_HEALTH_VISUALS[health].label}
             </SelectItem>
           ))}
         </RoadmapFilterSelect>

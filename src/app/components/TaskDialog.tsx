@@ -3,7 +3,7 @@ import { AlertTriangle, Briefcase, CalendarDays, ChevronsUpDown, FileText, Info,
 import { Task, TaskStatus, TimelineSwimlane, Person, TaskSize, TaskComplexity, TaskPriority, StatusColumn, ProjectMilestone, TaskAttachment } from '../types';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import { toLocalISODate } from '../utils/date';
-import { getMilestoneForTask, getMilestoneProjectIds } from '../utils/roadmap';
+import { getMilestoneForTask, getMilestoneProjectIds, wouldCreateDependencyCycle } from '../utils/roadmap';
 import {
   Dialog,
 } from '@/app/components/ui/dialog';
@@ -162,17 +162,13 @@ export function TaskDialog({
     [readModel, tasks]
   );
 
-  const wouldCreateDependencyCycle = (dependencyId: string): boolean => {
+  const wouldCreateTaskDependencyCycle = (dependencyId: string): boolean => {
     if (!task?.id) return false;
-    const visited = new Set<string>();
-    const visit = (taskId: string): boolean => {
-      if (taskId === task.id) return true;
-      if (visited.has(taskId)) return false;
-      visited.add(taskId);
-      const nextTask = taskById.get(taskId);
-      return (nextTask?.dependencyIds || []).some(visit);
-    };
-    return visit(dependencyId);
+    return wouldCreateDependencyCycle(
+      task.id,
+      dependencyId,
+      currentTaskId => taskById.get(currentTaskId)?.dependencyIds
+    );
   };
 
   useEffect(() => {
@@ -271,7 +267,7 @@ export function TaskDialog({
   }, [dependencyCandidates, milestoneId]);
 
   const toggleDependency = (dependencyId: string) => {
-    if (wouldCreateDependencyCycle(dependencyId)) return;
+    if (wouldCreateTaskDependencyCycle(dependencyId)) return;
     setDependencyIds(previousIds =>
       previousIds.includes(dependencyId)
         ? previousIds.filter(id => id !== dependencyId)
@@ -731,7 +727,7 @@ export function TaskDialog({
               dependencyCandidates={dependencyCandidates}
               dependencyIds={dependencyIds}
               taskTitle={title}
-              wouldCreateDependencyCycle={wouldCreateDependencyCycle}
+              wouldCreateDependencyCycle={wouldCreateTaskDependencyCycle}
               onToggleDependency={toggleDependency}
             />
           </AnchoredPanelSection>

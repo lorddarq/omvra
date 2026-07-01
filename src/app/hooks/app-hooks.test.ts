@@ -143,14 +143,25 @@ test('useTaskActions saves, comments, and promotes agentic tasks to review', asy
 });
 
 test('useMcpPanelState tracks listener status, audit logs, and restart flow', async () => {
+  let storeChangedListener: (() => void) | null = null;
+  let auditLogCalls = 0;
   const originalWindow = setWindowMock({
     electron: {
+      onStoreChanged: (listener: () => void) => {
+        storeChangedListener = listener;
+        return () => {
+          storeChangedListener = null;
+        };
+      },
       mcp: {
         getListenerStatus: async () => ({ ok: true, data: { boundHost: '127.0.0.1', boundPort: 3456 } }),
-        getAuditLog: async () => ({
-          ok: true,
-          data: [{ auditId: 'audit-1', timestamp: '2026-03-27T10:00:00.000Z', type: 'test' }],
-        }),
+        getAuditLog: async () => {
+          auditLogCalls += 1;
+          return {
+            ok: true,
+            data: [{ auditId: `audit-${auditLogCalls}`, timestamp: '2026-03-27T10:00:00.000Z', type: 'test' }],
+          };
+        },
         restartServer: async () => ({
           success: true,
           listenerStatus: { boundHost: '127.0.0.1', boundPort: 3456 },
@@ -203,6 +214,13 @@ test('useMcpPanelState tracks listener status, audit logs, and restart flow', as
     assert.deepEqual(refreshed.mcpListenerStatus, { boundHost: '127.0.0.1', boundPort: 3456 });
     assert.equal(refreshed.mcpAuditLog.length, 1);
     assert.equal(refreshed.mcpAuditLog[0].auditId, 'audit-1');
+
+    await act(async () => {
+      storeChangedListener?.();
+      await Promise.resolve();
+    });
+    await harness.rerender({ nextPreferences: preferences });
+    assert.equal(harness.result().mcpAuditLog[0].auditId, 'audit-2');
 
     refreshed.handleRotateMcpAccessToken();
     await harness.rerender({ nextPreferences: preferences });

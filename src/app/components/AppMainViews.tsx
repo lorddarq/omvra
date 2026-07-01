@@ -21,6 +21,7 @@ export interface AppMainViewsProps {
   people: Person[];
   agentWatchConfigs: AgentWatchConfig[];
   agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
+  mcpAuditLog: McpAuditEntry[];
   mcpAgentAccessEnabled: boolean;
   mcpListenerStatus: McpListenerStatus | null;
   mcpRestartPending: boolean;
@@ -65,6 +66,7 @@ export function AppMainViews({
   people,
   agentWatchConfigs,
   agentWatchRuntime,
+  mcpAuditLog,
   mcpAgentAccessEnabled,
   mcpListenerStatus,
   mcpRestartPending,
@@ -107,6 +109,7 @@ export function AppMainViews({
             people={people}
             agentWatchConfigs={agentWatchConfigs}
             agentWatchRuntime={agentWatchRuntime}
+            mcpAuditLog={mcpAuditLog}
             mcpAgentAccessEnabled={mcpAgentAccessEnabled}
             mcpListenerStatus={mcpListenerStatus}
             mcpRestartPending={mcpRestartPending}

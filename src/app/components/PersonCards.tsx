@@ -1,6 +1,7 @@
 import { Bot, User } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { Person, StatusColumn } from '../types';
+import { getAgentAvatarStyle, getAgentCardBackground } from '../utils/agentProvenance';
 import { cn } from './ui/utils';
 
 interface PersonStatusCount {
@@ -152,22 +153,6 @@ function getHumanAvatarColor(person: Person) {
 
   const palette = ['#ff06b4', '#80c53f', '#1a60cb', '#f59e0b'];
   return palette[getStableIndex(person.name, palette.length)];
-}
-
-function getAgentAvatarStyle(name: string) {
-  const normalizedName = name.toLowerCase();
-  if (normalizedName.includes('claude')) return { background: '#cd9169' };
-  if (normalizedName.includes('codex')) return { background: 'linear-gradient(135deg, #80a8e1 0%, #8d72cf 100%)' };
-  return undefined;
-}
-
-function getAgentCardBackground(name: string) {
-  const normalizedName = name.toLowerCase();
-  if (normalizedName.includes('claude')) {
-    return 'linear-gradient(141deg, rgba(224, 211, 202, 0.2) 0.9%, rgba(255, 255, 255, 0.2) 34.3%), #ffffff';
-  }
-
-  return 'linear-gradient(141deg, rgba(186, 206, 235, 0.2) 0.9%, rgba(255, 255, 255, 0.2) 34.3%), #ffffff';
 }
 
 function getStableIndex(value: string, modulo: number) {

@@ -1,6 +1,7 @@
 import { Ban, GitBranch, Sparkles, User } from 'lucide-react';
 import { ReactNode } from 'react';
 import { TaskPriority, Person } from '../types';
+import { resolveStatusColor } from '../utils/roadmap';
 import { PERSON_CAPACITY_POINTS } from '../utils/taskLoad';
 import { getReadableTextClassFor } from '../utils/contrast';
 import { EmptyStateCard } from './EmptyStateCard';
@@ -109,7 +110,7 @@ export function TaskDependencyDetailsSection({ dependencies }: TaskDependencyDet
   return (
     <div className="flex max-w-[566px] flex-col gap-1 overflow-hidden">
       {dependencies.map(dependency => {
-        const statusColor = getDependencyStatusColor(dependency.status, dependency.statusColor);
+        const statusColor = resolveStatusColor(dependency.status, dependency.statusColor);
 
         return (
           <div
@@ -139,7 +140,7 @@ export function DependencyStatusPill({
   label: string;
   statusColor?: string;
 }) {
-  const resolvedStatusColor = getDependencyStatusColor(label, statusColor);
+  const resolvedStatusColor = resolveStatusColor(label, statusColor);
   const textClassName = getReadableTextClassFor(`dependency-status-pill-${resolvedStatusColor}`, resolvedStatusColor);
 
   return (
@@ -151,52 +152,6 @@ export function DependencyStatusPill({
     </div>
   );
 }
-
-function getDependencyStatusColor(status?: string, statusColor?: string): string {
-  if (statusColor && isCssColor(statusColor)) {
-    return statusColor;
-  }
-
-  if (statusColor) {
-    const mappedColor = tailwindStatusColorMap[statusColor];
-    if (mappedColor) {
-      return mappedColor;
-    }
-  }
-
-  const normalizedStatus = (status || '').toLowerCase();
-  if (normalizedStatus.includes('bug')) {
-    return '#da0004';
-  }
-  if (normalizedStatus.includes('done') || normalizedStatus.includes('complete')) {
-    return '#69b86d';
-  }
-  if (normalizedStatus.includes('review')) {
-    return '#d1923a';
-  }
-  if (normalizedStatus.includes('progress')) {
-    return '#1a60cb';
-  }
-  return '#71717a';
-}
-
-function isCssColor(value: string): boolean {
-  return value.startsWith('#') || value.startsWith('rgb') || value.startsWith('hsl');
-}
-
-const tailwindStatusColorMap: Record<string, string> = {
-  'bg-cyan-500': '#06b6d4',
-  'bg-blue-500': '#3b82f6',
-  'bg-amber-500': '#f59e0b',
-  'bg-orange-500': '#f97316',
-  'bg-red-500': '#ef4444',
-  'bg-emerald-500': '#10b981',
-  'bg-green-500': '#22c55e',
-  'bg-pink-500': '#ec4899',
-  'bg-purple-500': '#a855f7',
-  'bg-zinc-500': '#71717a',
-  'bg-gray-500': '#6b7280',
-};
 
 interface SummaryFieldProps {
   label: string;

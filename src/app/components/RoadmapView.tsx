@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { ChevronLeft, ChevronRight, Filter, Flag, Plus, Search, TriangleAlert, X } from 'lucide-react';
+import { Filter, Flag, TriangleAlert } from 'lucide-react';
 import { ProjectMilestone, Task, TaskStatus, TimelineSwimlane } from '../types';
 import {
   getMilestoneProjectIds,
@@ -12,15 +12,13 @@ import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { EmptyStateCard } from './EmptyStateCard';
-import { RoadmapMilestoneSidebar } from './RoadmapMilestoneSidebar';
-import { Input } from './ui/input';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from './ui/select';
+  MILESTONE_HEALTH_CLASSES,
+  MILESTONE_HEALTH_LABELS,
+  MilestoneStatusComposition,
+} from './MilestoneSections';
+import { RoadmapMilestoneSidebar } from './RoadmapMilestoneSidebar';
+import { RoadmapToolbar, type RoadmapDateWindow } from './RoadmapToolbar';
 
 interface RoadmapViewProps {
   milestones: ProjectMilestone[];
@@ -32,8 +30,6 @@ interface RoadmapViewProps {
   onMilestoneClick: (milestone: ProjectMilestone) => void;
   onTaskClick: (task: Task) => void;
 }
-
-type RoadmapDateWindow = 'all' | '30' | '90' | 'overdue';
 
 interface RoadmapRow {
   milestone: ProjectMilestone;
@@ -51,22 +47,6 @@ const TASK_ROW_HEIGHT = 48;
 const MILESTONE_ROW_GAP = 0;
 const MIN_ROADMAP_ROW_HEIGHT = 132;
 const CHART_PADDING_BOTTOM = 24;
-
-const HEALTH_LABELS: Record<MilestoneHealth, string> = {
-  complete: 'Complete',
-  'at-risk': 'At risk',
-  'in-progress': 'In progress',
-  planned: 'Planned',
-  empty: 'No tasks',
-};
-
-const HEALTH_CLASSES: Record<MilestoneHealth, string> = {
-  complete: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  'at-risk': 'border-red-200 bg-red-50 text-red-700',
-  'in-progress': 'border-blue-200 bg-blue-50 text-blue-700',
-  planned: 'border-gray-200 bg-gray-50 text-gray-700',
-  empty: 'border-gray-200 bg-white text-gray-500',
-};
 
 function getStatusTitle(statusColumns: RoadmapViewProps['statusColumns'], status: TaskStatus): string {
   return statusColumns.find(column => column.id === status)?.title || status;
@@ -215,42 +195,6 @@ function getRoadmapRowHeight(taskCount: number): number {
   return Math.max(
     MIN_ROADMAP_ROW_HEIGHT,
     MILESTONE_ROW_HEIGHT + Math.max(1, taskCount) * TASK_ROW_HEIGHT + MILESTONE_ROW_GAP
-  );
-}
-
-function MilestoneRollupBar({
-  counts,
-  totalTasks,
-  statusColumns,
-}: {
-  counts: Record<TaskStatus, number>;
-  totalTasks: number;
-  statusColumns: RoadmapViewProps['statusColumns'];
-}) {
-  if (totalTasks === 0) {
-    return <div className="h-2 rounded-full bg-gray-100" aria-label="No linked tasks" />;
-  }
-
-  return (
-    <div className="flex h-2 overflow-hidden rounded-full bg-gray-100" aria-label="Milestone task status composition">
-      {statusColumns.map(column => {
-        const status = column.id;
-        const count = counts[status] || 0;
-        if (count === 0) return null;
-        const colorProps = getStatusColorProps(statusColumns, status);
-        return (
-          <div
-            key={status}
-            className={colorProps.className}
-            style={{
-              ...colorProps.style,
-              width: `${(count / totalTasks) * 100}%`,
-            }}
-            title={`${count} ${getStatusTitle(statusColumns, status)} task${count === 1 ? '' : 's'}`}
-          />
-        );
-      })}
-    </div>
   );
 }
 
@@ -495,161 +439,25 @@ export function RoadmapView({
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-gray-50">
-      <div className="kanban-toolbar">
-        <div className="kanban-toolbar-search">
-          <Search className="kanban-toolbar-search-icon" />
-          <Input
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search milestones, projects, or linked tasks..."
-            className="kanban-toolbar-search-input"
-          />
-        </div>
-        <div className="roadmap-toolbar-center" aria-label="Roadmap date navigation">
-          <span className="roadmap-toolbar-date-range">
-            {toLocalISODate(range.start)} to {toLocalISODate(range.end)}
-          </span>
-          {todayLeft !== null && (
-            <div className="timeline-toolbar-controls" aria-label="Roadmap navigation">
-              <button
-                type="button"
-                onClick={scrollTimelineLeft}
-                className="timeline-icon-button timeline-icon-button-left"
-                aria-label="Scroll roadmap left"
-                title="Scroll roadmap left"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={scrollToToday}
-                className="timeline-toolbar-button-primary"
-              >
-                Today
-              </button>
-              <button
-                type="button"
-                onClick={scrollTimelineRight}
-                className="timeline-icon-button timeline-icon-button-right"
-                aria-label="Scroll roadmap right"
-                title="Scroll roadmap right"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          )}
-        </div>
-        <div className="kanban-toolbar-actions">
-          <div className="kanban-filter-control">
-            <Select value={projectFilter} onValueChange={setProjectFilter}>
-              <SelectTrigger size="sm" className={`kanban-filter-trigger ${projectFilter !== 'all' ? 'is-active' : ''}`}>
-                <SelectValue placeholder="Project" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All projects</SelectItem>
-                {projects.map(project => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {projectFilter !== 'all' && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setProjectFilter('all')}
-                className="kanban-filter-clear"
-                aria-label="Clear project filter"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-
-          <div className="kanban-filter-control">
-            <Select
-              value={healthFilter}
-              onValueChange={(value) => setHealthFilter(value as MilestoneHealth | 'all')}
-            >
-              <SelectTrigger size="sm" className={`kanban-filter-trigger ${healthFilter !== 'all' ? 'is-active' : ''}`}>
-                <SelectValue placeholder="Health" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All health</SelectItem>
-                {(Object.keys(HEALTH_LABELS) as MilestoneHealth[]).map(health => (
-                  <SelectItem key={health} value={health}>
-                    {HEALTH_LABELS[health]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {healthFilter !== 'all' && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setHealthFilter('all')}
-                className="kanban-filter-clear"
-                aria-label="Clear health filter"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-
-          <div className="kanban-filter-control">
-            <Select
-              value={dateWindow}
-              onValueChange={(value) => setDateWindow(value as RoadmapDateWindow)}
-            >
-              <SelectTrigger size="sm" className={`kanban-filter-trigger ${dateWindow !== 'all' ? 'is-active' : ''}`}>
-                <SelectValue placeholder="Date" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All dates</SelectItem>
-                <SelectItem value="30">Next 30 days</SelectItem>
-                <SelectItem value="90">Next 90 days</SelectItem>
-                <SelectItem value="overdue">Overdue</SelectItem>
-              </SelectContent>
-            </Select>
-            {dateWindow !== 'all' && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setDateWindow('all')}
-                className="kanban-filter-clear"
-                aria-label="Clear date filter"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-
-          {hasActiveFilters && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={resetFilters}
-              className="kanban-toolbar-clear"
-            >
-              <Filter className="h-4 w-4" />
-              Clear
-            </Button>
-          )}
-          <button
-            type="button"
-            onClick={onAddMilestone}
-            className="kanban-toolbar-add-board"
-          >
-            <Plus className="size-4" />
-            <span>Add milestone</span>
-          </button>
-        </div>
-      </div>
+      <RoadmapToolbar
+        searchQuery={searchQuery}
+        projectFilter={projectFilter}
+        healthFilter={healthFilter}
+        dateWindow={dateWindow}
+        hasActiveFilters={hasActiveFilters}
+        projects={projects}
+        rangeLabel={`${toLocalISODate(range.start)} to ${toLocalISODate(range.end)}`}
+        showTimelineNavigation={todayLeft !== null}
+        onSearchQueryChange={setSearchQuery}
+        onProjectFilterChange={setProjectFilter}
+        onHealthFilterChange={setHealthFilter}
+        onDateWindowChange={setDateWindow}
+        onResetFilters={resetFilters}
+        onAddMilestone={onAddMilestone}
+        onScrollTimelineLeft={scrollTimelineLeft}
+        onScrollTimelineRight={scrollTimelineRight}
+        onScrollToToday={scrollToToday}
+      />
 
       <div className="min-h-0 flex-1 overflow-hidden">
 
@@ -676,12 +484,12 @@ export function RoadmapView({
                 headerHeight={HEADER_HEIGHT}
                 chartHeight={chartHeight}
                 chartScrollTop={chartScrollTop}
-                healthLabels={HEALTH_LABELS}
-                healthClasses={HEALTH_CLASSES}
+                healthLabels={MILESTONE_HEALTH_LABELS}
+                healthClasses={MILESTONE_HEALTH_CLASSES}
                 onAddMilestone={onAddMilestone}
                 onMilestoneClick={onMilestoneClick}
                 renderRollupBar={summary => (
-                  <MilestoneRollupBar
+                  <MilestoneStatusComposition
                     counts={summary.counts}
                     totalTasks={summary.totalTasks}
                     statusColumns={statusColumns}

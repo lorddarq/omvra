@@ -9,9 +9,9 @@ import {
 import { Button } from './ui/button';
 import { DialogSurface, DialogSurfaceHeader, DialogSurfaceSection } from './DialogSurface';
 import { DeleteConfirmDialog } from './DeleteConfirmDialog';
-import { EmptyStateCard } from './EmptyStateCard';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
+import { MilestoneTaskLinker } from './MilestoneSections';
 import { Textarea } from './ui/textarea';
 import {
   taskEditFieldClassName,
@@ -20,7 +20,6 @@ import {
 } from './taskFormStyles';
 
 const milestoneDialogCheckboxCardClassName = 'flex cursor-pointer items-center gap-3 rounded-2xl border border-black/6 bg-white px-3 py-3 text-sm transition-colors hover:bg-[#f7f7f8]';
-const milestoneDialogSearchInputClassName = `${taskEditFieldClassName} h-10 rounded-2xl bg-white`;
 
 interface MilestoneDialogProps {
   isOpen: boolean;
@@ -288,93 +287,16 @@ export function MilestoneDialog({
               />
             </div>
 
-            <DialogSurfaceSection>
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-[#111827]">Linked tasks</h3>
-                  <p className="text-sm text-[#6b7280]">These tasks drive the milestone rollup and deadline flags.</p>
-                </div>
-                <span className="rounded-full border border-black/6 bg-white px-2.5 py-1 text-xs font-medium text-[#6b7280]">
-                  {linkedTaskIds.length} selected
-                </span>
-              </div>
-              <div className="mb-3">
-                <Label htmlFor="milestone-task-search" className="sr-only">Search milestone tasks</Label>
-                <Input
-                  id="milestone-task-search"
-                  value={taskSearchQuery}
-                  onChange={(event) => setTaskSearchQuery(event.target.value)}
-                  placeholder="Search tasks by title, notes, status, or project..."
-                  className={milestoneDialogSearchInputClassName}
-                />
-              </div>
-              {projectTasks.length === 0 ? (
-                <EmptyStateCard
-                  compact
-                  title="No tasks in this project scope"
-                  description="Add tasks to the selected roadmap projects first, then link the milestone work from this list."
-                />
-              ) : filteredProjectTasks.length === 0 ? (
-                <EmptyStateCard
-                  compact
-                  title="No tasks match this search"
-                  description="Try a different task title, status, note, or project keyword to find the right milestone work."
-                />
-              ) : (
-                <div className="grid gap-2">
-                  {filteredProjectTasks.map(task => {
-                    const isLinked = linkedTaskIds.includes(task.id);
-                    const dependencyOptions = projectTasks.filter(
-                      option => option.id !== task.id && linkedTaskIds.includes(option.id)
-                    );
-                    return (
-                      <div
-                        key={task.id}
-                        className={`rounded-2xl border p-3 text-sm transition-colors ${
-                          isLinked
-                            ? 'border-[#1a60cb]/15 bg-[#edf3ff]'
-                            : 'border-black/6 bg-white hover:bg-[#f8fafc]'
-                        }`}
-                      >
-                        <label className="flex cursor-pointer items-center gap-3">
-                          <input
-                            type="checkbox"
-                            checked={isLinked}
-                            onChange={() => toggleTask(task.id)}
-                            aria-label={`Link ${task.title} to this milestone`}
-                            className="size-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
-                          />
-                          <span className="min-w-0 flex-1 truncate font-medium text-[#1f2937]">{task.title}</span>
-                          <span className="rounded-full border border-black/6 bg-white px-2 py-0.5 text-xs text-[#6b7280]">{task.status}</span>
-                        </label>
-
-                        {isLinked && dependencyOptions.length > 0 && (
-                          <div className="mt-3 border-l border-[#dbe4f1] pl-7">
-                            <div className="mb-2 text-xs font-medium uppercase tracking-wide text-[#7b8190]">
-                              Depends on
-                            </div>
-                            <div className="grid gap-1.5">
-                              {dependencyOptions.map(option => (
-                                <label key={option.id} className="flex cursor-pointer items-center gap-2 text-xs text-[#4b5563]">
-                                  <input
-                                    type="checkbox"
-                                    checked={(dependencyIdsByTaskId[task.id] || []).includes(option.id)}
-                                    onChange={() => toggleDependency(task.id, option.id)}
-                                    aria-label={`${task.title} depends on ${option.title}`}
-                                    className="size-3.5 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
-                                  />
-                                  <span className="min-w-0 truncate">{option.title}</span>
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </DialogSurfaceSection>
+            <MilestoneTaskLinker
+              projectTasks={projectTasks}
+              filteredProjectTasks={filteredProjectTasks}
+              linkedTaskIds={linkedTaskIds}
+              dependencyIdsByTaskId={dependencyIdsByTaskId}
+              taskSearchQuery={taskSearchQuery}
+              onTaskSearchQueryChange={setTaskSearchQuery}
+              onToggleTask={toggleTask}
+              onToggleDependency={toggleDependency}
+            />
           </div>
 
           <DialogFooter className="gap-2 border-t border-black/6 px-6 py-5">

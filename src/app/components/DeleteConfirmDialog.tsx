@@ -23,16 +23,17 @@ export function DeleteConfirmDialog({
 }: DeleteConfirmDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogSurface
-        showClose={false}
-        overlayClassName="omvra-settings-overlay"
-        className="max-w-[430px] rounded-[28px] border border-black/5 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.18)]"
-      >
-        <DialogSurfaceHeader
-          title={title}
-          description={description}
-        />
-        <DialogSurfaceFooter className="bg-white">
+        <DialogSurface
+          showClose={false}
+          overlayClassName="omvra-settings-overlay"
+          className="max-w-[430px] rounded-[28px] border border-black/5 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.18)]"
+        >
+          <DialogSurfaceHeader
+            title={title}
+            description={description}
+            className="border-b-0"
+          />
+        <DialogSurfaceFooter className="border-t-0 bg-white pt-2">
           <Button
             type="button"
             variant="outline"

@@ -1,4 +1,3 @@
-import { CalendarDays, Search, TriangleAlert } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { ProjectMilestone, Task, TaskStatus, TimelineSwimlane } from '../types';
 import {
@@ -10,14 +9,17 @@ import {
 import {
   Dialog,
 } from './ui/dialog';
-import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import { DialogSurface, DialogSurfaceBody, DialogSurfaceFooter, DialogSurfaceHeader, DialogSurfaceSection } from './DialogSurface';
 import { EmptyStateCard } from './EmptyStateCard';
+import {
+  MILESTONE_HEALTH_LABELS,
+  MilestoneLinkedTasksSection,
+  MilestoneSummaryCard,
+} from './MilestoneSections';
 import { TaskDetailsActionMenu } from './TaskDetailsActionMenu';
-import { DependencyStatusPill } from './TaskSummarySection';
 import { buildMilestonePdfExportHtml, createMilestonePdfFileName } from '../utils/milestonePdfExport';
 import { formatMilestoneDetailsForClipboard } from '../utils/milestoneClipboard';
 import { exportPdfDocument } from '../utils/pdfExport';
@@ -35,80 +37,11 @@ interface MilestoneDetailsDialogProps {
   onTaskClick: (task: Task) => void;
 }
 
-const HEALTH_LABELS: Record<MilestoneHealth, string> = {
-  complete: 'Complete',
-  'at-risk': 'At risk',
-  'in-progress': 'In progress',
-  planned: 'Planned',
-  empty: 'No tasks',
-};
-
-const HEALTH_CLASSES: Record<MilestoneHealth, string> = {
-  complete: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  'at-risk': 'border-red-200 bg-red-50 text-red-700',
-  'in-progress': 'border-blue-200 bg-blue-50 text-blue-700',
-  planned: 'border-gray-200 bg-gray-50 text-gray-700',
-  empty: 'border-gray-200 bg-white text-gray-500',
-};
-
-const STATUS_SEGMENT_CLASSES: Record<TaskStatus, string> = {
-  open: 'bg-gray-300',
-  'in-progress': 'bg-blue-500',
-  'under-review': 'bg-amber-500',
-  done: 'bg-emerald-500',
-};
-
-const STATUS_DOT_CLASSES: Record<TaskStatus, string> = {
-  open: 'bg-gray-300',
-  'in-progress': 'bg-blue-500',
-  'under-review': 'bg-amber-500',
-  done: 'bg-emerald-500',
-};
-
 function getStatusTitle(
   statusColumns: MilestoneDetailsDialogProps['statusColumns'],
   status: TaskStatus
 ): string {
   return statusColumns.find(column => column.id === status)?.title || status;
-}
-
-function MilestoneStatusComposition({
-  counts,
-  totalTasks,
-  statusColumns,
-}: {
-  counts: Record<TaskStatus, number>;
-  totalTasks: number;
-  statusColumns: MilestoneDetailsDialogProps['statusColumns'];
-}) {
-  if (totalTasks === 0) {
-    return <div className="h-2 rounded-full bg-gray-100" aria-label="No linked tasks" />;
-  }
-
-  return (
-    <div className="flex h-2 overflow-hidden rounded-full bg-gray-100" aria-label="Milestone task status composition">
-      {(Object.keys(STATUS_SEGMENT_CLASSES) as TaskStatus[]).map(status => {
-        const count = counts[status] || 0;
-        if (count === 0) return null;
-
-        return (
-          <div
-            key={status}
-            className={STATUS_SEGMENT_CLASSES[status]}
-            style={{ width: `${(count / totalTasks) * 100}%` }}
-            title={`${count} ${getStatusTitle(statusColumns, status)} task${count === 1 ? '' : 's'}`}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
-function formatDisplayDate(value?: string): string {
-  if (!value) return 'No date';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString('en-CA');
 }
 
 export function MilestoneDetailsDialog({
@@ -171,7 +104,7 @@ export function MilestoneDetailsDialog({
       milestoneId: milestone.id,
       title: milestone.title,
       projectLabels: milestoneProjects.map(project => project.name),
-      healthLabel: HEALTH_LABELS[summary.health],
+      healthLabel: MILESTONE_HEALTH_LABELS[summary.health],
       completionLabel: `${summary.completionPercent}% (${summary.completedTasks} of ${summary.totalTasks} tasks)`,
       dateRangeLabel: getMilestoneDateRangeLabel(milestone),
     });
@@ -211,7 +144,7 @@ export function MilestoneDetailsDialog({
       exportedAt: new Date().toISOString(),
       projectLabels: milestoneProjects.map(project => project.name),
       summaryFields: [
-        { label: 'Health', value: HEALTH_LABELS[summary.health] },
+        { label: 'Health', value: MILESTONE_HEALTH_LABELS[summary.health] },
         { label: 'Completion', value: `${summary.completionPercent}% (${summary.completedTasks} of ${summary.totalTasks} tasks)` },
         { label: 'Date Range', value: getMilestoneDateRangeLabel(milestone) },
         { label: 'Late Tasks', value: summary.lateTasks.length > 0 ? summary.lateTasks.length : 'None' },
@@ -275,91 +208,13 @@ export function MilestoneDetailsDialog({
 
           {milestone && summary && (
             <DialogSurfaceBody className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto bg-white px-8 py-8">
-              <section className="space-y-4">
-                <h3 className="text-[14px] font-semibold text-[#71717a]">Basic Information</h3>
-                <DialogSurfaceSection className="grid grid-cols-1 gap-3 rounded-[12px] border-0 bg-[rgba(113,113,122,0.05)] px-4 py-4 shadow-none sm:grid-cols-2 sm:gap-x-10 sm:gap-y-3">
-                  <div className="space-y-3">
-                    <div>
-                      <div className="text-[12px] font-medium text-[#71717a]">Projects:</div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {milestoneProjects.length > 0 ? milestoneProjects.map(project => (
-                          <span
-                            key={project.id}
-                            className="rounded-full border border-black/10 bg-white px-2 py-0.5 text-[11px] font-semibold text-[#71717a]"
-                          >
-                            {project.name}
-                          </span>
-                        )) : (
-                          <span className="text-[12px] text-[#71717a]">Unknown project</span>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-[12px] font-medium text-[#71717a]">Start Date</div>
-                      <div className="mt-2 flex items-center gap-1.5">
-                        <CalendarDays className="size-4 text-[#71717a]" />
-                        <span className="rounded-full border border-black/10 bg-white px-2 py-0.5 text-[11px] font-semibold text-[#71717a]">
-                          {formatDisplayDate(milestone.startDate)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <div className="text-[12px] font-medium text-[#71717a]">Health</div>
-                        <Badge variant="outline" className={`mt-2 ${HEALTH_CLASSES[summary.health]}`}>
-                          {HEALTH_LABELS[summary.health]}
-                        </Badge>
-                      </div>
-                      <div className="shrink-0 rounded-full border border-black/10 bg-white px-2 py-0.5 text-[11px] font-semibold text-[#71717a]">
-                        {summary.completedTasks} / {summary.totalTasks}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-[12px] font-medium text-[#71717a]">Completion</div>
-                      <div className="mt-2 text-[14px] font-medium text-[#1f2937]">
-                        {summary.completionPercent}% ({summary.completedTasks} of {summary.totalTasks} tasks)
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-[12px] font-medium text-[#71717a]">End Date</div>
-                      <div className="mt-2 flex items-center gap-1.5">
-                        <CalendarDays className="size-4 text-[#71717a]" />
-                        <span className="rounded-full border border-black/10 bg-white px-2 py-0.5 text-[11px] font-semibold text-[#71717a]">
-                          {formatDisplayDate(milestone.endDate)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </DialogSurfaceSection>
-              </section>
-
-              <section className="space-y-4">
-                <h3 className="text-[14px] font-semibold text-[#71717a]">Status Composition</h3>
-                <DialogSurfaceSection className="rounded-[12px] border-0 bg-[rgba(113,113,122,0.05)] px-4 py-4 shadow-none">
-                  <MilestoneStatusComposition
-                    counts={summary.counts}
-                    totalTasks={summary.totalTasks}
-                    statusColumns={statusColumns}
-                  />
-                  <div className="mt-4 flex flex-wrap gap-1.5">
-                    {(Object.keys(STATUS_DOT_CLASSES) as TaskStatus[]).map(status => {
-                      const count = summary.counts[status] || 0;
-                      if (count === 0) return null;
-                      return (
-                        <span
-                          key={status}
-                          className="inline-flex items-center gap-1 rounded-full border border-black/5 bg-white px-2 py-0.5 text-[12px] font-bold text-[#71717a]"
-                        >
-                          <span className={`size-2 rounded-full ${STATUS_DOT_CLASSES[status]}`} />
-                          {count}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </DialogSurfaceSection>
-              </section>
+              <MilestoneSummaryCard
+                projects={milestoneProjects}
+                summary={summary}
+                statusColumns={statusColumns}
+                startDate={milestone.startDate}
+                endDate={milestone.endDate}
+              />
 
               <section className="space-y-4">
                 <h3 className="text-[14px] font-semibold text-[#71717a]">Description</h3>
@@ -372,82 +227,37 @@ export function MilestoneDetailsDialog({
                 </DialogSurfaceSection>
               </section>
 
-              <section className="space-y-6">
-                <h3 className="text-[14px] font-semibold text-[#71717a]">Dependencies</h3>
-
-                <div className="space-y-1">
-                  <label htmlFor="milestone-task-search" className="text-[12px] font-medium text-[#71717a]">
-                    Search task:
-                  </label>
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#b5b5ba]" />
+              {sortedTasks.length > 0 && filteredTasks.length === 0 ? (
+                <section className="space-y-6">
+                  <h3 className="text-[14px] font-semibold text-[#71717a]">Dependencies</h3>
+                  <div className="space-y-1">
+                    <label htmlFor="milestone-task-search" className="text-[12px] font-medium text-[#71717a]">
+                      Search task:
+                    </label>
                     <Input
                       id="milestone-task-search"
                       value={taskSearchQuery}
                       onChange={(event) => setTaskSearchQuery(event.target.value)}
                       placeholder="Task name"
-                      className="h-10 rounded-[12px] border-black/10 bg-white pl-9 text-sm font-normal text-[#4a4a4f] shadow-none placeholder:text-[#b5b5ba] focus-visible:ring-[#71717a]/15"
+                      className="h-10 rounded-[12px] border-black/10 bg-white text-sm font-normal text-[#4a4a4f] shadow-none placeholder:text-[#b5b5ba] focus-visible:ring-[#71717a]/15"
                     />
                   </div>
-                </div>
-
-                {sortedTasks.length === 0 ? (
-                  <EmptyStateCard
-                    compact
-                    title="No linked tasks yet"
-                    description="Link task work to this milestone to populate rollout progress, dependency context, and date health."
-                  />
-                ) : filteredTasks.length === 0 ? (
                   <EmptyStateCard
                     compact
                     title="No linked tasks match this search"
                     description="Try a different task title or dependency keyword."
                   />
-                ) : (
-                  <DialogSurfaceSection className="relative h-[320px] overflow-hidden rounded-[18px] border border-black/6 bg-white p-3 shadow-[0_0_1px_rgba(0,0,0,0.05),0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06)]">
-                    <div className="h-full overflow-y-auto pr-1">
-                      <div className="divide-y divide-black/5">
-                        {filteredTasks.map(task => {
-                          const isLate = lateTaskIds.has(task.id);
-                          const dependencyTasks = (task.dependencyIds || [])
-                            .map(dependencyId => sortedTasks.find(item => item.id === dependencyId))
-                            .filter((item): item is Task => Boolean(item));
-                          return (
-                            <button
-                              key={task.id}
-                              type="button"
-                              onClick={() => onTaskClick(task)}
-                              className="flex w-full items-start justify-between gap-3 px-0 py-3 text-left transition-colors hover:bg-[#f8fafc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gray-900/10"
-                            >
-                              <span className="min-w-0 pl-1">
-                                <span className="block break-words text-[12px] font-medium leading-5 text-[#4a4a4f] [overflow-wrap:anywhere]">
-                                  {task.title}
-                                </span>
-                                <span className="mt-1 block text-xs leading-5 text-[#7b8190]">
-                                  {formatDisplayDate(task.startDate)} to {formatDisplayDate(task.endDate)}
-                                </span>
-                                {dependencyTasks.length > 0 && (
-                                  <span className="mt-1 block break-words text-xs leading-5 text-[#7b8190] [overflow-wrap:anywhere]">
-                                    Depends on {dependencyTasks.map(item => item.title).join(', ')}
-                                  </span>
-                                )}
-                              </span>
-                              <span className="flex shrink-0 items-center gap-2">
-                                {isLate && <TriangleAlert className="size-4 text-red-700" />}
-                                <DependencyStatusPill
-                                  label={getStatusTitle(statusColumns, task.status)}
-                                  statusColor={statusColumns.find(column => column.id === task.status)?.color}
-                                />
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-white via-white/92 to-transparent" />
-                  </DialogSurfaceSection>
-                )}
-              </section>
+                </section>
+              ) : (
+                <MilestoneLinkedTasksSection
+                  tasks={filteredTasks}
+                  lateTaskIds={lateTaskIds}
+                  statusColumns={statusColumns}
+                  searchQuery={taskSearchQuery}
+                  onSearchQueryChange={setTaskSearchQuery}
+                  onTaskClick={onTaskClick}
+                />
+              )}
             </DialogSurfaceBody>
           )}
 
@@ -473,8 +283,9 @@ export function MilestoneDetailsDialog({
           <DialogSurfaceHeader
             title="Delete milestone?"
             description="This removes the milestone and clears milestone-linked dependency wiring from the affected tasks."
+            className="border-b-0"
           />
-          <DialogSurfaceFooter className="bg-white">
+          <DialogSurfaceFooter className="border-t-0 bg-white pt-2">
             <Button
               type="button"
               variant="outline"

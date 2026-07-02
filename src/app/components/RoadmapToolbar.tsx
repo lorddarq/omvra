@@ -3,6 +3,8 @@ import { ChevronLeft, ChevronRight, Filter, Plus, Search, X } from 'lucide-react
 import type { MilestoneHealth } from '../utils/roadmap';
 import type { TimelineSwimlane } from '../types';
 import { MILESTONE_HEALTH_VISUALS } from '../utils/roadmap';
+import { DateRangeLabel } from './DateRangeLabel';
+import { TodayButton } from './TodayButton';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import {
@@ -22,7 +24,8 @@ interface RoadmapToolbarProps {
   dateWindow: RoadmapDateWindow;
   hasActiveFilters: boolean;
   projects: TimelineSwimlane[];
-  rangeLabel: string;
+  rangeStart: string;
+  rangeEnd: string;
   showTimelineNavigation: boolean;
   onSearchQueryChange: (value: string) => void;
   onProjectFilterChange: (value: string) => void;
@@ -42,7 +45,8 @@ export function RoadmapToolbar({
   dateWindow,
   hasActiveFilters,
   projects,
-  rangeLabel,
+  rangeStart,
+  rangeEnd,
   showTimelineNavigation,
   onSearchQueryChange,
   onProjectFilterChange,
@@ -66,7 +70,7 @@ export function RoadmapToolbar({
         />
       </div>
       <div className="roadmap-toolbar-center" aria-label="Roadmap date navigation">
-        <span className="roadmap-toolbar-date-range">{rangeLabel}</span>
+        <DateRangeLabel startDate={rangeStart} endDate={rangeEnd} className="roadmap-toolbar-date-range" />
         {showTimelineNavigation ? (
           <div className="timeline-toolbar-controls" aria-label="Roadmap navigation">
             <button
@@ -78,13 +82,7 @@ export function RoadmapToolbar({
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <button
-              type="button"
-              onClick={onScrollToToday}
-              className="timeline-toolbar-button-primary"
-            >
-              Today
-            </button>
+            <TodayButton onClick={onScrollToToday} />
             <button
               type="button"
               onClick={onScrollTimelineRight}

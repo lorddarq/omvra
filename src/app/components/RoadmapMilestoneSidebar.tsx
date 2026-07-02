@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import type { ProjectMilestone, TaskStatus, TimelineSwimlane } from '../types';
+import { getProjectVisual } from '../utils/projectVisual';
 import { getMilestoneHealthVisual, getStatusVisual, type MilestoneHealth } from '../utils/roadmap';
-import { Badge } from './ui/badge';
+import { ProjectBadge } from './ProjectBadge';
 import { Button } from './ui/button';
 
 interface RoadmapMilestoneSummary {
@@ -82,6 +83,9 @@ export function RoadmapMilestoneSidebar({
         >
           {rows.map(row => {
             const healthVisual = getMilestoneHealthVisual(row.summary.health);
+            const milestoneProjectVisual = getProjectVisual(row.projects[0], {
+              explicitColor: row.milestone.color,
+            });
             const statusCounts = (['open', 'done', 'under-review', 'in-progress'] as TaskStatus[])
               .map(status => ({
                 status,
@@ -104,11 +108,7 @@ export function RoadmapMilestoneSidebar({
                 style={{ top: row.top - headerHeight, height: row.height }}
               >
                 <div className="flex min-w-0 items-center gap-2">
-                  <span
-                    className="size-3 shrink-0 rounded-full"
-                    style={{ backgroundColor: row.milestone.color || row.projects[0]?.color || '#6b7280' }}
-                    aria-hidden="true"
-                  />
+                  <span className="size-3 shrink-0 rounded-full" style={milestoneProjectVisual.markerStyle} aria-hidden="true" />
                   <span className="min-w-0 flex-1 truncate text-sm font-medium text-black">{row.milestone.title}</span>
                   <span className="shrink-0 text-xs font-semibold text-[#1a60cb]">Open</span>
                 </div>
@@ -118,21 +118,13 @@ export function RoadmapMilestoneSidebar({
                 <div className="flex min-w-0 flex-wrap gap-1">
                   {row.projects.length > 0 ? (
                     row.projects.map(project => (
-                      <Badge
+                      <ProjectBadge
                         key={`${row.milestone.id}-${project.id}`}
-                        variant="outline"
-                        className="h-5 rounded-full border-transparent bg-black/5 px-2 text-[11px] font-semibold text-[#71717a]"
-                      >
-                        {project.name}
-                      </Badge>
+                        project={project}
+                      />
                     ))
                   ) : (
-                    <Badge
-                      variant="outline"
-                      className="h-5 rounded-full border-transparent bg-black/5 px-2 text-[11px] font-semibold text-[#71717a]"
-                    >
-                      Unknown project
-                    </Badge>
+                    <ProjectBadge label="Unknown project" showDot={false} />
                   )}
                 </div>
 

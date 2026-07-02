@@ -30,7 +30,6 @@ import {
 } from './DraggableSwimlaneLabel';
 import { DraggableSwimlaneRow } from './DraggableSwimlaneRow';
 import { allocateTasksToTracks, calculateSwimlaneHeight } from '../utils/trackAllocation';
-import { getReadableTextClassFor } from '../utils/contrast';
 import { getStatusVisual } from '../utils/roadmap';
 import { parseISODateLocal, toLocalISODate } from '../utils/date';
 import { applyTimelineTaskDrop } from '../utils/timelineTaskDrop';
@@ -1051,6 +1050,7 @@ export function TimelineView({
       if (statusColumns?.some(column => column.id === status)) {
         const visual = getStatusVisual(statusColumns, status as TaskStatus);
         return {
+          className: visual.backgroundClassName,
           style: visual.backgroundStyle,
           textClass: visual.textClassName,
         };
@@ -1058,7 +1058,7 @@ export function TimelineView({
 
       const defaultColor = '#e5e7eb';
       return {
-        textClass: getReadableTextClassFor(defaultColor, defaultColor),
+        textClass: 'text-black',
         style: { backgroundColor: defaultColor },
       };
     },

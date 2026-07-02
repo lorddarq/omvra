@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Filter, Flag, TriangleAlert } from 'lucide-react';
 import { ProjectMilestone, Task, TaskStatus, TimelineSwimlane } from '../types';
+import { getProjectVisual } from '../utils/projectVisual';
 import {
   getStatusVisual,
   getMilestoneProjectIds,
@@ -309,7 +310,8 @@ export function RoadmapView({
         dateWindow={dateWindow}
         hasActiveFilters={hasActiveFilters}
         projects={projects}
-        rangeLabel={`${toLocalISODate(range.start)} to ${toLocalISODate(range.end)}`}
+        rangeStart={toLocalISODate(range.start)}
+        rangeEnd={toLocalISODate(range.end)}
         showTimelineNavigation={todayLeft !== null}
         onSearchQueryChange={setSearchQuery}
         onProjectFilterChange={setProjectFilter}
@@ -478,6 +480,9 @@ export function RoadmapView({
                   const milestoneLeft = daysBetweenLocal(range.start, parseISODateLocal(row.milestone.endDate) || range.start) * DAY_WIDTH + DAY_WIDTH / 2;
                   const lateTaskIds = new Set(row.summary.lateTasks.map(task => task.id));
                   const sortedTasks = sortRoadmapTasks(row.summary.linkedTasks);
+                  const milestoneProjectVisual = getProjectVisual(row.projects[0], {
+                    explicitColor: row.milestone.color,
+                  });
 
                   return (
                     <div key={row.milestone.id}>
@@ -491,10 +496,7 @@ export function RoadmapView({
                           className="absolute top-4 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-900 shadow-sm hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20"
                           style={{ left: milestoneLeft }}
                         >
-                          <span
-                            className="size-2 rotate-45"
-                            style={{ backgroundColor: row.milestone.color || row.projects[0]?.color || '#6b7280' }}
-                          />
+                          <span className="size-2 rotate-45" style={milestoneProjectVisual.markerStyle} />
                           {row.milestone.title}
                         </button>
 

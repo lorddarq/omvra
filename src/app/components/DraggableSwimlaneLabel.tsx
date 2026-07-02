@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { Edit2, User } from 'lucide-react';
 import { TimelineSwimlane } from '../types';
+import { getProjectVisual } from '../utils/projectVisual';
 
 export const SWIMLANE_ROW_ITEM_TYPE = 'SWIMLANE_ROW';
 
@@ -100,7 +101,7 @@ export function DraggableSwimlaneLabel({
   // attach drag to the handle
   drag(dragHandleRef);
 
-  const projectIconStyle = swimlane.color ? { color: swimlane.color } : undefined;
+  const projectVisual = getProjectVisual(swimlane);
 
   return (
     <div
@@ -113,7 +114,7 @@ export function DraggableSwimlaneLabel({
         height: `${rowHeight || 48}px`, 
         boxSizing: 'border-box', 
         minHeight: `${rowHeight || 48}px`,
-        '--timeline-row-accent': swimlane.color || '#4f7eff',
+        ...projectVisual.accentStyle,
       } as CSSProperties}
     >
       <div className="flex items-center justify-between w-full gap-2">
@@ -147,7 +148,7 @@ export function DraggableSwimlaneLabel({
           </>
         ) : (
           <>
-            <span className="timeline-project-icon" style={projectIconStyle} aria-hidden="true">
+            <span className="timeline-project-icon" style={projectVisual.iconStyle} aria-hidden="true">
               <span />
               <span />
               <span />

@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight, Users } from 'lucide-react';
+import { TodayButton } from './TodayButton';
 
 interface TimelineToolbarProps {
   mode: 'projects' | 'people';
@@ -59,13 +60,7 @@ export function TimelineToolbar({
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <button
-            type="button"
-            onClick={onScrollToToday}
-            className="timeline-toolbar-button-primary"
-          >
-            Today
-          </button>
+          <TodayButton onClick={onScrollToToday} />
           <button
             type="button"
             onClick={onScrollRight}

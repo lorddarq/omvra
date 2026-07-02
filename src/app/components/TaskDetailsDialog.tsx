@@ -4,8 +4,9 @@ import { Activity, FileText, GitBranch, Info, MessageSquare, Paperclip } from 'l
 import {
   Dialog,
 } from '@/app/components/ui/dialog';
+import { formatDateRangeLabel } from '../utils/dateRange';
 import { getTaskLoadContributionPercent, getTaskLoadPoints, PERSON_CAPACITY_POINTS } from '../utils/taskLoad';
-import { getMilestoneForTask, getStatusLabel, resolveStatusColor } from '../utils/roadmap';
+import { getMilestoneForTask, getStatusLabel, getStatusVisual } from '../utils/roadmap';
 import { formatTaskDetailsForClipboard } from '../utils/taskClipboard';
 import { buildTaskPdfExportHtml, createTaskPdfFileName } from '../utils/taskPdfExport';
 import { exportPdfDocument } from '../utils/pdfExport';
@@ -95,7 +96,7 @@ export function TaskDetailsDialog({
     ? getTaskLoadContributionPercent(task)
     : null;
   const assigneeLabel = `${personLabel}${assignee ? ` (${assignee.kind === 'agentic' ? 'Agentic' : 'Human'})` : ''}`;
-  const timelineLabel = task ? `${formatDate(task.startDate)} - ${formatDate(task.endDate)}` : '';
+  const timelineLabel = task ? formatDateRangeLabel(task.startDate, task.endDate) : '';
   const milestoneLabel = milestone ? `${milestone.title} (${formatDate(milestone.endDate)})` : 'No roadmap milestone';
   const priorityLabel = task
     ? ({
@@ -355,16 +356,19 @@ export function TaskDetailsDialog({
             title="Dependencies"
           >
             <TaskDependencyDetailsSection
-              dependencies={dependencyTasks.map(dependencyTask => ({
-                id: dependencyTask.id,
-                title: dependencyTask.title,
-                status: getStatusLabel(statusColumns, dependencyTask.status),
-                statusColor: resolveStatusColor(
+              dependencies={dependencyTasks.map(dependencyTask => {
+                const dependencyStatusVisual = getStatusVisual(
+                  statusColumns,
                   dependencyTask.status,
                   enrichedTask?.dependencyTasks.find(item => item.task.id === dependencyTask.id)?.statusColumn?.color
-                    ?? statusColumns.find(column => column.id === dependencyTask.status)?.color
-                ),
-              }))}
+                );
+                return {
+                  id: dependencyTask.id,
+                  title: dependencyTask.title,
+                  status: dependencyStatusVisual.label,
+                  statusColor: dependencyStatusVisual.color,
+                };
+              })}
             />
           </AnchoredPanelSection>
 

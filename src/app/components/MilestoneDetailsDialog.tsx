@@ -7,6 +7,7 @@ import {
   getStatusLabel,
   summarizeMilestone,
 } from '../utils/roadmap';
+import { formatDateRangeLabel } from '../utils/dateRange';
 import {
   Dialog,
 } from './ui/dialog';
@@ -148,7 +149,7 @@ export function MilestoneDetailsDialog({
         const dependencyTasks = (task.dependencyIds || [])
           .map(dependencyId => sortedTasks.find(item => item.id === dependencyId))
           .filter((item): item is Task => Boolean(item));
-        const detailParts = [`${task.startDate || 'No start'} to ${task.endDate || 'No end'}`];
+        const detailParts = [formatDateRangeLabel(task.startDate || 'No start', task.endDate || 'No end')];
         if (dependencyTasks.length > 0) {
           detailParts.push(`Depends on ${dependencyTasks.map(item => item.title).join(', ')}`);
         }

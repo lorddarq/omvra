@@ -2,10 +2,11 @@ import { CalendarDays, Search, TriangleAlert } from 'lucide-react';
 import {
   getMilestoneHealthVisual,
   getStatusLabel,
-  resolveStatusColor,
   getStatusVisual,
   type RoadmapMilestoneSummary,
 } from '../utils/roadmap';
+import { DateRangeLabel } from './DateRangeLabel';
+import { ProjectBadge } from './ProjectBadge';
 import type { Task, TaskStatus, TimelineSwimlane } from '../types';
 import { EmptyStateCard } from './EmptyStateCard';
 import { DependencyStatusPill } from './TaskSummarySection';
@@ -17,13 +18,6 @@ import { Label } from './ui/label';
 const milestoneDialogSearchInputClassName = 'h-10 rounded-2xl border border-black/8 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]';
 
 type MilestoneStatusColumn = Array<{ id: TaskStatus; title: string; color?: string }>;
-
-function formatDisplayDate(value?: string): string {
-  if (!value) return 'No date';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString('en-CA');
-}
 
 export function MilestoneStatusComposition({
   counts,
@@ -86,12 +80,11 @@ export function MilestoneSummaryCard({
               <div className="text-[12px] font-medium text-[#71717a]">Projects:</div>
               <div className="mt-2 flex flex-wrap gap-2">
                 {projects.length > 0 ? projects.map(project => (
-                  <span
+                  <ProjectBadge
                     key={project.id}
-                    className="rounded-full border border-black/10 bg-white px-2 py-0.5 text-[11px] font-semibold text-[#71717a]"
-                  >
-                    {project.name}
-                  </span>
+                    project={project}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-white px-2 py-0.5 text-[11px] font-semibold text-[#71717a]"
+                  />
                 )) : (
                   <span className="text-[12px] text-[#71717a]">Unknown project</span>
                 )}
@@ -102,7 +95,7 @@ export function MilestoneSummaryCard({
               <div className="mt-2 flex items-center gap-1.5">
                 <CalendarDays className="size-4 text-[#71717a]" />
                 <span className="rounded-full border border-black/10 bg-white px-2 py-0.5 text-[11px] font-semibold text-[#71717a]">
-                  {formatDisplayDate(startDate)}
+                  <DateRangeLabel startDate={startDate} className="" />
                 </span>
               </div>
             </div>
@@ -130,7 +123,7 @@ export function MilestoneSummaryCard({
               <div className="mt-2 flex items-center gap-1.5">
                 <CalendarDays className="size-4 text-[#71717a]" />
                 <span className="rounded-full border border-black/10 bg-white px-2 py-0.5 text-[11px] font-semibold text-[#71717a]">
-                  {formatDisplayDate(endDate)}
+                  <DateRangeLabel endDate={endDate} className="" />
                 </span>
               </div>
             </div>
@@ -215,6 +208,7 @@ export function MilestoneLinkedTasksSection({
             <div className="divide-y divide-black/5">
               {tasks.map(task => {
                 const isLate = lateTaskIds.has(task.id);
+                const statusVisual = getStatusVisual(statusColumns, task.status);
                 const dependencyTasks = (task.dependencyIds || [])
                   .map(dependencyId => tasks.find(item => item.id === dependencyId))
                   .filter((item): item is Task => Boolean(item));
@@ -230,7 +224,7 @@ export function MilestoneLinkedTasksSection({
                         {task.title}
                       </span>
                       <span className="mt-1 block text-xs leading-5 text-[#7b8190]">
-                        {formatDisplayDate(task.startDate)} to {formatDisplayDate(task.endDate)}
+                        <DateRangeLabel startDate={task.startDate} endDate={task.endDate} />
                       </span>
                       {dependencyTasks.length > 0 && (
                         <span className="mt-1 block break-words text-xs leading-5 text-[#7b8190] [overflow-wrap:anywhere]">
@@ -241,11 +235,8 @@ export function MilestoneLinkedTasksSection({
                     <span className="flex shrink-0 items-center gap-2">
                       {isLate && <TriangleAlert className="size-4 text-red-700" />}
                       <DependencyStatusPill
-                        label={getStatusLabel(statusColumns, task.status)}
-                        statusColor={resolveStatusColor(
-                          task.status,
-                          statusColumns.find(column => column.id === task.status)?.color
-                        )}
+                        label={statusVisual.label}
+                        statusColor={statusVisual.color}
                       />
                     </span>
                   </button>

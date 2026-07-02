@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { ProjectMilestone, StatusColumn, Task, TimelineSwimlane } from '../types';
+import { resolveProjectColor } from '../utils/projectVisual';
 import { getMilestoneProjectIds, getTaskProjectIds, wouldCreateDependencyCycle } from '../utils/roadmap';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import {
@@ -65,7 +66,7 @@ export function MilestoneDialog({
     setEndDate(milestone?.endDate || '');
     setNotes(milestone?.notes || '');
     const firstProjectId = milestone ? getMilestoneProjectIds(milestone)[0] : defaultProjectId;
-    setColor(milestone?.color || projects.find(project => project.id === firstProjectId)?.color || '#3b82f6');
+    setColor(milestone?.color || resolveProjectColor(projects.find(project => project.id === firstProjectId)));
     setLinkedTaskIds(milestone?.linkedTaskIds || []);
     setDependencyIdsByTaskId(
       Object.fromEntries(tasks.map(task => [task.id, Array.isArray(task.dependencyIds) ? task.dependencyIds : []]))
@@ -237,7 +238,7 @@ export function MilestoneDialog({
                       />
                       <span
                         className="size-2.5 rounded-full"
-                        style={{ backgroundColor: project.color || '#3b82f6' }}
+                        style={{ backgroundColor: resolveProjectColor(project) }}
                         aria-hidden="true"
                       />
                       <span className="min-w-0 truncate font-medium text-[#1f2937]">{project.name}</span>

@@ -2,6 +2,7 @@ import { Fragment, useRef, useState, type RefObject } from 'react';
 import { useDragLayer, useDrop } from 'react-dnd';
 import { GripVertical } from 'lucide-react';
 import { Task, TaskStatus, StatusColumn } from '../types';
+import { getStatusVisual } from '../utils/roadmap';
 import {
   DraggableTaskCard,
   TASK_ITEM_TYPE,
@@ -55,18 +56,10 @@ function TaskInsertionMarker({
   );
 }
 
-function getColumnAccentStyle(color: string | undefined): React.CSSProperties | undefined {
-  if (!color?.startsWith('#')) return undefined;
-  return { '--kanban-column-accent': color } as React.CSSProperties;
-}
-
-function getColumnAccentClass(color: string | undefined): string {
-  if (!color || color.startsWith('#')) return '';
-  return color;
-}
-
 interface KanbanColumnHeaderProps {
   swimlane: StatusColumn;
+  accentClassName?: string;
+  accentStyle?: React.CSSProperties;
   taskCount: number;
   columnDragHandleRef?: RefObject<HTMLButtonElement | null>;
   onEdit: () => void;
@@ -74,6 +67,8 @@ interface KanbanColumnHeaderProps {
 
 function KanbanColumnHeader({
   swimlane,
+  accentClassName,
+  accentStyle,
   taskCount,
   columnDragHandleRef,
   onEdit,
@@ -90,7 +85,7 @@ function KanbanColumnHeader({
           <GripVertical className="size-4" />
         </button>
       )}
-      <div className={`kanban-column-accent ${getColumnAccentClass(swimlane.color)}`} aria-hidden="true" />
+      <div className={`kanban-column-accent ${accentClassName || ''}`} style={accentStyle} aria-hidden="true" />
       <div className="min-w-0 flex-1">
         <div className="kanban-column-title-row">
           <span className="kanban-column-title-text">{swimlane.title}</span>
@@ -190,14 +185,20 @@ export function DroppableColumn({
   const handleDeleteColumn = () => {
     if (onDeleteColumn) onDeleteColumn(swimlane.id);
   };
+  const statusVisual = getStatusVisual(swimlanes, swimlane.id);
+  const accentStyle = statusVisual.backgroundStyle
+    ? { '--kanban-column-accent': statusVisual.color } as React.CSSProperties
+    : undefined;
 
   return (
     <div
       className="kanban-column-shell"
-      style={getColumnAccentStyle(swimlane.color)}
+      style={accentStyle}
     >
       <KanbanColumnHeader
         swimlane={swimlane}
+        accentClassName={statusVisual.backgroundClassName}
+        accentStyle={accentStyle}
         taskCount={swimlaneTasks.length}
         columnDragHandleRef={columnDragHandleRef}
         onEdit={() => setIsDialogOpen(true)}

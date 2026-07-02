@@ -1,6 +1,7 @@
-import { getReadableTextClassFor } from '../utils/contrast.ts';
 import { parseISODateLocal } from '../utils/date.ts';
-import type { ProjectMilestone, StatusColumn, Task, TaskStatus } from '../types.ts';
+import { formatDateRangeLabel } from '../utils/dateRange.ts';
+import type { StatusVisual } from '../utils/statusVisual.ts';
+import type { ProjectMilestone, Task, TaskStatus } from '../types.ts';
 
 export type MilestoneHealth = 'complete' | 'at-risk' | 'in-progress' | 'planned' | 'empty';
 
@@ -16,16 +17,6 @@ export interface RoadmapMilestoneSummary {
   health: MilestoneHealth;
 }
 
-export interface StatusVisual {
-  id: string;
-  label: string;
-  color: string;
-  backgroundClassName?: string;
-  backgroundStyle?: { backgroundColor: string };
-  textClassName: string;
-  progressPercent: number;
-}
-
 export interface MilestoneHealthVisual {
   label: string;
   className: string;
@@ -36,35 +27,6 @@ const EMPTY_COUNTS: MilestoneStatusCounts = {
   'in-progress': 0,
   'under-review': 0,
   done: 0,
-};
-
-const STATUS_PROGRESS: Record<TaskStatus, number> = {
-  open: 15,
-  'in-progress': 45,
-  'under-review': 80,
-  done: 100,
-};
-
-const STATUS_FALLBACK_COLORS: Record<TaskStatus, string> = {
-  open: '#d1d5db',
-  'in-progress': '#3b82f6',
-  'under-review': '#f59e0b',
-  done: '#10b981',
-};
-
-const STATUS_COLOR_CLASS_TO_HEX: Record<string, string> = {
-  'bg-cyan-500': '#06b6d4',
-  'bg-blue-500': '#3b82f6',
-  'bg-amber-500': '#f59e0b',
-  'bg-orange-500': '#f97316',
-  'bg-red-500': '#ef4444',
-  'bg-emerald-500': '#10b981',
-  'bg-green-500': '#22c55e',
-  'bg-pink-500': '#ec4899',
-  'bg-purple-500': '#a855f7',
-  'bg-zinc-500': '#71717a',
-  'bg-gray-500': '#6b7280',
-  'bg-gray-300': '#d1d5db',
 };
 
 export const MILESTONE_HEALTH_VISUALS: Record<MilestoneHealth, MilestoneHealthVisual> = {
@@ -89,75 +51,6 @@ export const MILESTONE_HEALTH_VISUALS: Record<MilestoneHealth, MilestoneHealthVi
     className: 'border-gray-200 bg-white text-gray-500',
   },
 };
-
-function isCssColor(value: string): boolean {
-  return value.startsWith('#') || value.startsWith('rgb') || value.startsWith('hsl');
-}
-
-function resolveStatusColumn(statusColumns: Array<Pick<StatusColumn, 'id' | 'title' | 'color'>>, status: string) {
-  return statusColumns.find(column => column.id === status);
-}
-
-export function getStatusLabel(
-  statusColumns: Array<Pick<StatusColumn, 'id' | 'title' | 'color'>>,
-  status: string
-): string {
-  return resolveStatusColumn(statusColumns, status)?.title || status;
-}
-
-export function resolveStatusColor(status?: string, explicitColor?: string): string {
-  if (explicitColor && isCssColor(explicitColor)) {
-    return explicitColor;
-  }
-
-  if (explicitColor) {
-    const mappedColor = STATUS_COLOR_CLASS_TO_HEX[explicitColor];
-    if (mappedColor) return mappedColor;
-  }
-
-  switch ((status || '').toLowerCase()) {
-    case 'open':
-      return STATUS_FALLBACK_COLORS.open;
-    case 'in-progress':
-      return STATUS_FALLBACK_COLORS['in-progress'];
-    case 'under-review':
-      return STATUS_FALLBACK_COLORS['under-review'];
-    case 'done':
-      return STATUS_FALLBACK_COLORS.done;
-    default:
-      break;
-  }
-
-  const normalizedStatus = (status || '').toLowerCase();
-  if (normalizedStatus.includes('bug')) return '#da0004';
-  if (normalizedStatus.includes('done') || normalizedStatus.includes('complete')) return '#69b86d';
-  if (normalizedStatus.includes('review')) return '#d1923a';
-  if (normalizedStatus.includes('progress')) return '#1a60cb';
-  return '#71717a';
-}
-
-export function getTaskProgress(status: TaskStatus): number {
-  return STATUS_PROGRESS[status] ?? STATUS_PROGRESS.open;
-}
-
-export function getStatusVisual(
-  statusColumns: Array<Pick<StatusColumn, 'id' | 'title' | 'color'>>,
-  status: TaskStatus
-): StatusVisual {
-  const column = resolveStatusColumn(statusColumns, status);
-  const color = resolveStatusColor(status, column?.color);
-  const backgroundClassName = column?.color && !isCssColor(column.color) ? column.color : undefined;
-
-  return {
-    id: status,
-    label: getStatusLabel(statusColumns, status),
-    color,
-    backgroundClassName,
-    backgroundStyle: backgroundClassName ? undefined : { backgroundColor: color },
-    textClassName: getReadableTextClassFor(backgroundClassName || `status-visual-${status}-${color}`, color),
-    progressPercent: getTaskProgress(status),
-  };
-}
 
 export function getMilestoneHealthVisual(health: MilestoneHealth): MilestoneHealthVisual {
   return MILESTONE_HEALTH_VISUALS[health];
@@ -233,10 +126,7 @@ export function summarizeMilestone(milestone: ProjectMilestone, tasks: Task[]): 
 }
 
 export function getMilestoneDateRangeLabel(milestone: ProjectMilestone): string {
-  if (milestone.startDate && milestone.startDate !== milestone.endDate) {
-    return `${milestone.startDate} to ${milestone.endDate}`;
-  }
-  return milestone.endDate;
+  return formatDateRangeLabel(milestone.startDate, milestone.endDate);
 }
 
 export function wouldCreateDependencyCycle(

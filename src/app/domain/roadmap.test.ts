@@ -4,12 +4,14 @@ import type { ProjectMilestone, Task } from '../types.ts';
 import {
   assertNoDependencyCycle,
   getMilestoneHealthVisual,
-  getStatusLabel,
-  getStatusVisual,
-  resolveStatusColor,
   summarizeMilestone,
   wouldCreateDependencyCycle,
 } from './roadmap.ts';
+import {
+  getStatusLabel,
+  getStatusVisual,
+  resolveStatusColor,
+} from '../utils/statusVisual.ts';
 
 const statusColumns = [
   { id: 'open', title: 'Open', color: '#d1d5db' },
@@ -81,4 +83,21 @@ test('wouldCreateDependencyCycle catches loops across linked tasks', () => {
 test('resolveStatusColor normalizes tailwind-style status colors for shared pills', () => {
   assert.equal(resolveStatusColor('under-review', 'bg-amber-500'), '#f59e0b');
   assert.equal(resolveStatusColor('bug', undefined), '#da0004');
+});
+
+test('getStatusVisual keeps class-based tokens available to non-roadmap views', () => {
+  const visual = getStatusVisual(statusColumns as any, 'under-review');
+
+  assert.equal(visual.backgroundClassName, 'bg-amber-500');
+  assert.equal(visual.backgroundStyle, undefined);
+  assert.equal(visual.textClassName, 'text-white');
+});
+
+test('getStatusVisual accepts an explicit color override for shared dependency surfaces', () => {
+  const visual = getStatusVisual(statusColumns as any, 'done', 'bg-blue-500');
+
+  assert.equal(visual.label, 'Done');
+  assert.equal(visual.color, '#3b82f6');
+  assert.equal(visual.backgroundClassName, 'bg-blue-500');
+  assert.equal(visual.backgroundStyle, undefined);
 });

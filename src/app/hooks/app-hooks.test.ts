@@ -3,8 +3,11 @@ import assert from 'node:assert/strict';
 import * as React from 'react';
 import TestRenderer from 'react-test-renderer';
 import type { Task, Person } from '../types.ts';
+import { usePeopleActions } from './usePeopleActions.ts';
+import { useStatusColumnActions } from './useStatusColumnActions.ts';
 import { useTaskActions } from './useTaskActions.ts';
 import { useMcpPanelState } from './useMcpPanelState.ts';
+import { useViewState, type AllViewStates } from './useViewState.ts';
 import {
   useAgentWatchRuntime,
   getAgentWatchPollingInterval,
@@ -138,6 +141,148 @@ test('useTaskActions saves, comments, and promotes agentic tasks to review', asy
 
   assert.equal(tasks[0].status, 'under-review');
   assert.equal(tasks[1].status, 'in-progress');
+
+  await harness.unmount();
+});
+
+test('useViewState exposes hydrated timeline state on first render and preserves it across view switching', async () => {
+  const restoreWindow = setWindowMock({
+    localStorage: {
+      setItem: () => {},
+      removeItem: () => {},
+      getItem: () => null,
+    },
+    electron: {
+      storeSet: async () => {},
+    },
+  });
+
+  try {
+    const hydratedStates: AllViewStates = {
+      timeline: {
+        scrollLeft: 320,
+        collapsedSwimlanes: ['project-1'],
+        mode: 'people',
+        selectedSwimlaneId: 'person-1',
+      },
+      kanban: {
+        scrollLeft: 48,
+        scrollTop: 96,
+      },
+      roadmap: {
+        scrollLeft: 12,
+        scrollTop: 18,
+      },
+    };
+
+    const harness = await renderHook(
+      ({ initialStates }: { initialStates: AllViewStates }) => useViewState('timeline', initialStates),
+      { initialStates: hydratedStates }
+    );
+
+    const firstRender = harness.result();
+    assert.equal(firstRender.currentView, 'timeline');
+    assert.equal(firstRender.getViewState('timeline').scrollLeft, 320);
+    assert.equal(firstRender.getViewState('timeline').mode, 'people');
+    assert.deepEqual(firstRender.getViewState('timeline').collapsedSwimlanes, ['project-1']);
+
+    await act(async () => {
+      firstRender.switchView('kanban');
+    });
+    await act(async () => {
+      harness.result().saveViewState('kanban', { scrollLeft: 144, scrollTop: 222 });
+    });
+    await act(async () => {
+      harness.result().switchView('timeline');
+    });
+
+    const afterSwitchBack = harness.result();
+    assert.equal(afterSwitchBack.currentView, 'timeline');
+    assert.equal(afterSwitchBack.getViewState('timeline').scrollLeft, 320);
+    assert.equal(afterSwitchBack.getViewState('timeline').mode, 'people');
+    assert.deepEqual(afterSwitchBack.getViewState('timeline').collapsedSwimlanes, ['project-1']);
+    assert.equal(afterSwitchBack.getViewState('kanban').scrollLeft, 144);
+    assert.equal(afterSwitchBack.getViewState('kanban').scrollTop, 222);
+
+    await harness.unmount();
+  } finally {
+    restoreWindow();
+  }
+});
+
+test('useStatusColumnActions reorders columns and reassigns tasks when deleting a populated column', async () => {
+  let statusColumns = [
+    { id: 'open', title: 'Open Tasks', color: '#999999' },
+    { id: 'review', title: 'In Review', color: '#2563eb' },
+    { id: 'done', title: 'Done', color: '#22c55e' },
+  ];
+  let tasks: Task[] = [
+    { id: 'task-1', title: 'Ship store', status: 'review' as Task['status'] } as Task,
+  ];
+
+  const setStatusColumns = (updater: React.SetStateAction<typeof statusColumns>) => {
+    statusColumns = typeof updater === 'function'
+      ? (updater as (prev: typeof statusColumns) => typeof statusColumns)(statusColumns)
+      : updater;
+  };
+  const setTasks = (updater: React.SetStateAction<Task[]>) => {
+    tasks = typeof updater === 'function'
+      ? (updater as (prev: Task[]) => Task[])(tasks)
+      : updater;
+  };
+
+  const harness = await renderHook(
+    () => useStatusColumnActions({ statusColumns, tasks, setStatusColumns, setTasks }),
+    {}
+  );
+
+  harness.result().reorderStatusColumns(2, 0);
+  assert.deepEqual(statusColumns.map(column => column.id), ['done', 'open', 'review']);
+
+  await harness.rerender({});
+  harness.result().deleteStatusColumn('review');
+  assert.deepEqual(statusColumns.map(column => column.id), ['done', 'open']);
+  assert.equal(tasks[0].status, 'done');
+
+  await harness.unmount();
+});
+
+test('usePeopleActions deletes assignees and clears their agent watch config', async () => {
+  let people: Person[] = [
+    { id: 'person-1', name: 'Casey', role: 'Engineer', kind: 'human' },
+    { id: 'person-2', name: 'Edgar', role: 'Agent', kind: 'agentic', agentInstructions: 'Focus' },
+  ];
+  let tasks: Task[] = [
+    { id: 'task-1', title: 'Store slice', status: 'open', assigneeId: 'person-2' } as Task,
+  ];
+  let removedWatcherFor: string | null = null;
+
+  const setPeople = (updater: React.SetStateAction<Person[]>) => {
+    people = typeof updater === 'function'
+      ? (updater as (prev: Person[]) => Person[])(people)
+      : updater;
+  };
+  const setTasks = (updater: React.SetStateAction<Task[]>) => {
+    tasks = typeof updater === 'function'
+      ? (updater as (prev: Task[]) => Task[])(tasks)
+      : updater;
+  };
+
+  const harness = await renderHook(
+    () => usePeopleActions({
+      setPeople,
+      setTasks,
+      onDeleteAgentWatchConfig: (personId: string) => {
+        removedWatcherFor = personId;
+      },
+    }),
+    {}
+  );
+
+  harness.result().deletePerson('person-2');
+  assert.deepEqual(people.map(person => person.id), ['person-1']);
+  assert.equal(tasks[0].assigneeId, undefined);
+  assert.equal(removedWatcherFor, 'person-2');
 
   await harness.unmount();
 });

@@ -1,0 +1,692 @@
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import type { Task, TaskStatus } from '../types.ts';
+import { useWorkspaceStore } from '../store/workspaceStore.tsx';
+import { useUiLayoutStore } from '../store/uiLayoutStore.tsx';
+import { useStorageMeter } from './useStorageMeter.ts';
+import { buildWorkspaceReadModel } from '../domain/workspaceReadModel.ts';
+import { useTaskActions } from './useTaskActions.ts';
+import { useProjectActions } from './useProjectActions.ts';
+import { useStatusColumnActions } from './useStatusColumnActions.ts';
+import { getMilestoneProjectIds } from '../utils/roadmap.ts';
+import { createMcpReadService } from '../services/mcp/service.ts';
+import { useMcpHealthValidation } from './useMcpHealthValidation.ts';
+import { useMcpPanelState } from './useMcpPanelState.ts';
+import { getAgentWatchPollingInterval, useAgentWatchRuntime } from './useAgentWatchRuntime.ts';
+import { usePeopleActions } from './usePeopleActions.ts';
+import {
+  buildWorkspaceBackupPayload,
+  parseWorkspaceBackupJson,
+  repairWorkspaceBackupPayload,
+  WORKSPACE_BACKUP_SCHEMA_VERSION,
+} from '../services/workspaceBackup.ts';
+import {
+  clearPortableElectronStoreKeys,
+  getPortableElectronStoreSnapshot,
+  getPortableStorageSnapshot,
+  restorePortableStorageSnapshot,
+} from '../utils/storage.ts';
+import { useMcpDiagnostics } from './useMcpDiagnostics.ts';
+import type { AppMainViewsProps } from '../components/AppMainViews.tsx';
+import type { AppPanelsProps } from '../components/AppPanels.tsx';
+import type { ComponentProps } from 'react';
+import { AppHeader } from '../components/AppHeader.tsx';
+import { DeleteConfirmDialog } from '../components/DeleteConfirmDialog.tsx';
+import {
+  normalizeMcpBindHost,
+  normalizeMcpPort,
+  normalizeMcpServerAddress,
+} from '../constants/mcp.ts';
+
+function areSerializedValuesEqual(left: unknown, right: unknown): boolean {
+  try {
+    return JSON.stringify(left) === JSON.stringify(right);
+  } catch {
+    return false;
+  }
+}
+
+function normalizeLoadStatusIds(
+  value: unknown,
+  fallback: TaskStatus[],
+  statusColumns: Array<{ id: string }>
+): TaskStatus[] {
+  const validIds = new Set(statusColumns.map(column => column.id));
+  const candidates = Array.isArray(value) ? value : typeof value === 'string' ? [value] : fallback;
+  const normalized = candidates.filter((statusId): statusId is TaskStatus => (
+    typeof statusId === 'string' && validIds.has(statusId)
+  ));
+
+  return Array.from(new Set(normalized));
+}
+
+export interface AppShellState {
+  isHydrated: boolean;
+  headerProps: ComponentProps<typeof AppHeader>;
+  mainViewsProps: AppMainViewsProps;
+  panelsProps: AppPanelsProps;
+  deleteConfirmProps: ComponentProps<typeof DeleteConfirmDialog>;
+}
+
+export function useAppShell(): AppShellState {
+  const {
+    tasks,
+    setTasks,
+    timelineSwimlanes,
+    setTimelineSwimlanes,
+    people,
+    setPeople,
+    milestones,
+    setMilestones,
+    statusColumns,
+    setStatusColumns,
+    agentWatchConfigs,
+    setAgentWatchConfigs,
+    preferences,
+    setPreferences,
+    replaceWorkspaceSnapshot,
+    saveMilestone,
+    deleteMilestone,
+    linkTaskMilestone,
+    removeTaskMilestoneLinks,
+    applyRoadmapTaskDependencies,
+    toggleExecutionLoadStatus,
+    togglePipelineLoadStatus,
+    setMcpAgentAccessEnabled,
+    setMcpServerAddress,
+    setMcpBindHost,
+    setMcpPort,
+    setMcpAccessToken,
+    setMcpAccessTokenTtlMinutes,
+    setMcpCapabilityProfile,
+    hasHydratedCanonicalWorkspace,
+    resetWorkspaceData,
+  } = useWorkspaceStore();
+  const {
+    hasHydratedUiState,
+    timelineLayoutState,
+    setTimelineLayoutState,
+    hydratedKanbanFilters,
+    isTaskDialogOpen,
+    isTaskDetailsOpen,
+    isSwimlaneDialogOpen,
+    isPreferencesOpen,
+    preferencesInitialAnchor,
+    selectedTask,
+    detailsTask,
+    selectedSwimlane,
+    defaultStatus,
+    defaultDate,
+    defaultEndDate,
+    defaultSwimlaneId,
+    defaultAssigneeId,
+    selectedMilestone,
+    detailsMilestone,
+    isMilestoneDialogOpen,
+    importFeedback,
+    resetLocalDataConfirmOpen,
+    currentView,
+    switchView,
+    getViewStateSnapshot,
+    applyKanbanScrollState,
+    setTimelineScrollState,
+    restoreKanbanScroll,
+    buildBackupUiState,
+    restoreImportedUiState,
+    viewRefreshKey,
+    bumpViewRefreshKey,
+    setImportFeedback,
+    setResetLocalDataConfirmOpen,
+    openPreferences,
+    closePreferences,
+    openPeoplePanel,
+    openAgentsPanel,
+    closeTaskDetails,
+    addMilestone,
+    openMilestoneDetails,
+    editMilestoneFromDetails,
+    closeMilestoneDialog,
+    closeMilestoneDetails,
+    handleMilestoneTaskClick,
+    handleTaskClick,
+    handleEditTaskFromKanban,
+    handleEditTaskFromDetails,
+    handleAddTaskFromTimeline,
+    handleAddTaskFromSwimlane,
+    handleCloseTaskDialog,
+    handleEditSwimlane,
+    handleAddSwimlane,
+    handleCloseSwimlaneDialog,
+    resetUiLayoutState,
+  } = useUiLayoutStore();
+
+  const timelineContainerRef = useRef<HTMLDivElement>(null);
+  const kanbanContainerRef = useRef<HTMLDivElement>(null);
+
+  const storageMeter = useStorageMeter({
+    enabled: isPreferencesOpen,
+    dependencies: [
+      tasks,
+      timelineSwimlanes,
+      people,
+      milestones,
+      statusColumns,
+      preferences,
+    ],
+  });
+
+  const workspaceReadModel = useMemo(
+    () => buildWorkspaceReadModel({
+      tasks,
+      milestones,
+      projects: timelineSwimlanes,
+      people,
+      statusColumns,
+    }),
+    [milestones, people, statusColumns, tasks, timelineSwimlanes]
+  );
+
+  const {
+    saveTask: handleSaveTask,
+    addTaskComment: handleAddTaskComment,
+    updateTaskAttachments: handleUpdateTaskAttachments,
+    deleteTask: handleDeleteTask,
+    moveTask: handleMoveTask,
+    moveAgentTaskToReview: handleMoveAgentTaskToReview,
+    updateTaskDates: handleUpdateTaskDates,
+  } = useTaskActions({
+    people,
+    setTasks,
+    onTaskMilestoneChange: linkTaskMilestone,
+    onTaskDeleted: removeTaskMilestoneLinks,
+  });
+  const {
+    saveSwimlane: handleSaveSwimlane,
+    deleteSwimlane: deleteSwimlaneBase,
+    reorderSwimlanes: handleReorderSwimlanes,
+  } = useProjectActions({
+    timelineSwimlanes,
+    setTimelineSwimlanes,
+    setTasks,
+  });
+  const handleDeleteSwimlane = useCallback((swimlaneId: string) => {
+    deleteSwimlaneBase(swimlaneId);
+    setMilestones(prevMilestones =>
+      prevMilestones
+        .map(milestone => {
+          const projectIds = getMilestoneProjectIds(milestone)
+            .filter(projectId => projectId !== swimlaneId);
+          return { ...milestone, projectIds, projectId: projectIds[0] };
+        })
+        .filter(milestone => milestone.projectIds.length > 0)
+    );
+  }, [deleteSwimlaneBase, setMilestones]);
+  const {
+    renameStatusColumn: handleRenameStatusColumn,
+    changeStatusColumnColor: handleChangeStatusColumnColor,
+    reorderStatusColumns: handleReorderStatusColumns,
+    addStatusColumn: handleAddStatusColumn,
+    deleteStatusColumn: handleDeleteStatusColumn,
+  } = useStatusColumnActions({
+    statusColumns,
+    tasks,
+    setStatusColumns,
+    setTasks,
+  });
+
+  const mcpReadService = useMemo(() => createMcpReadService({
+    enabled: preferences.mcpAgentAccessEnabled,
+    endpoint: preferences.mcpServerAddress,
+    headers: preferences.mcpAccessToken
+      ? { Authorization: `Bearer ${preferences.mcpAccessToken}` }
+      : undefined,
+  }), [preferences.mcpAccessToken, preferences.mcpAgentAccessEnabled, preferences.mcpServerAddress]);
+  const mcpHealth = useMcpHealthValidation({
+    enabled: preferences.mcpAgentAccessEnabled,
+    endpoint: preferences.mcpServerAddress,
+    headers: preferences.mcpAccessToken
+      ? { Authorization: `Bearer ${preferences.mcpAccessToken}` }
+      : undefined,
+    expectation: {
+      counts: {
+        tasks: tasks.length,
+        people: people.length,
+        swimlanes: timelineSwimlanes.length,
+        statusColumns: statusColumns.length,
+      },
+      requiredTaskKeys: ['id', 'title', 'status'],
+      requiredPersonKeys: ['id', 'name'],
+      requiredStatusColumnKeys: ['id', 'title'],
+    },
+  });
+  const {
+    appliedMcpSettingsSignature,
+    mcpListenerStatus,
+    mcpAuditLog,
+    refreshMcpListenerStatus,
+    refreshMcpAuditLog,
+    handleRestartMcpServer,
+    handleRotateMcpAccessToken,
+    isMcpRestartPending,
+  } = useMcpPanelState({
+    preferences,
+    setPreferences,
+    runHealthCheck: mcpHealth.runHealthCheck,
+  });
+  const {
+    agentWatchRuntime,
+    pollAgentWatcher,
+    upsertAgentWatchConfig,
+    removeAgentWatchConfig,
+  } = useAgentWatchRuntime({
+    mcpReadService,
+    enabled: preferences.mcpAgentAccessEnabled,
+    agentWatchConfigs,
+    setAgentWatchConfigs,
+  });
+
+  useEffect(() => {
+    if (!preferences.mcpAgentAccessEnabled) return;
+    void refreshMcpAuditLog();
+  }, [preferences.mcpAgentAccessEnabled, refreshMcpAuditLog]);
+
+  useEffect(() => {
+    if (!preferences.mcpAgentAccessEnabled) return;
+
+    const intervalMs = getAgentWatchPollingInterval(agentWatchConfigs);
+    if (intervalMs <= 0) return;
+
+    const timer = window.setInterval(() => {
+      void refreshMcpAuditLog();
+    }, intervalMs);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [agentWatchConfigs, preferences.mcpAgentAccessEnabled, refreshMcpAuditLog]);
+
+  const handleTimelineScroll = useCallback((state: { scrollLeft: number; scrollTop: number }) => {
+    setTimelineScrollState(state);
+  }, [setTimelineScrollState]);
+
+  useEffect(() => {
+    const handleKanbanScroll = (event: Event) => {
+      const { scrollLeft = 0, scrollTop = 0 } = (event as CustomEvent<{
+        scrollLeft?: number;
+        scrollTop?: number;
+      }>).detail ?? {};
+
+      applyKanbanScrollState({ scrollLeft, scrollTop });
+    };
+
+    document.addEventListener('kanbanScroll', handleKanbanScroll);
+    return () => document.removeEventListener('kanbanScroll', handleKanbanScroll);
+  }, [applyKanbanScrollState]);
+
+  const handlePollAgentWatchFromPanel = useCallback((personId: string) => {
+    const config = agentWatchConfigs.find(item => item.personId === personId) || {
+      personId,
+      enabled: true,
+      statusId: statusColumns[0]?.id || 'open',
+      action: 'inspect_and_work' as const,
+      intervalSeconds: 60,
+    };
+    void pollAgentWatcher(config);
+  }, [agentWatchConfigs, pollAgentWatcher, statusColumns]);
+  const {
+    addPerson: handleAddPerson,
+    deletePerson: handleDeletePerson,
+    updatePerson: handleUpdatePerson,
+    reorderPeople: handleReorderPeople,
+  } = usePeopleActions({
+    setPeople,
+    setTasks,
+    onDeleteAgentWatchConfig: removeAgentWatchConfig,
+  });
+
+  const handleReorderTasks = useCallback((reorderedTasks: Task[]) => {
+    setTasks(reorderedTasks);
+  }, [setTasks]);
+
+  const handleConfirmNukeLocalData = useCallback(async () => {
+    try {
+      window.localStorage.clear();
+      await clearPortableElectronStoreKeys();
+    } catch {
+      // ignore
+    }
+
+    resetWorkspaceData();
+    resetUiLayoutState();
+    setResetLocalDataConfirmOpen(false);
+  }, [resetUiLayoutState, resetWorkspaceData, setResetLocalDataConfirmOpen]);
+
+  const handleNukeLocalData = useCallback(() => {
+    setResetLocalDataConfirmOpen(true);
+  }, [setResetLocalDataConfirmOpen]);
+
+  const handleExportTasksAndProjects = useCallback(async () => {
+    if (typeof window === 'undefined') return;
+    const payload = buildWorkspaceBackupPayload({
+      tasks,
+      milestones,
+      projects: timelineSwimlanes,
+      people,
+      statusColumns,
+      preferences,
+      ui: buildBackupUiState(),
+      storage: getPortableStorageSnapshot(),
+      electronStore: await getPortableElectronStoreSnapshot(),
+      version: WORKSPACE_BACKUP_SCHEMA_VERSION,
+      exportedAt: new Date().toISOString(),
+    });
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.download = `omvra-backup-${dateStamp}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }, [
+    buildBackupUiState,
+    milestones,
+    people,
+    preferences,
+    statusColumns,
+    tasks,
+    timelineSwimlanes,
+  ]);
+
+  const handleImportTasksAndProjects = useCallback(async (file: File) => {
+    try {
+      setImportFeedback(null);
+      const text = await file.text();
+      const parsed = parseWorkspaceBackupJson(text);
+      if (!parsed.ok || !parsed.payload) {
+        setImportFeedback({
+          type: 'error',
+          message: parsed.error || 'Could not import backup. Please select a valid JSON export file.',
+        });
+        return;
+      }
+
+      const parsedPayload = parsed.payload as Record<string, unknown>;
+
+      if (!Array.isArray(parsedPayload.tasks) || !Array.isArray(parsedPayload.projects)) {
+        setImportFeedback({
+          type: 'error',
+          message: 'Invalid backup format. Expected "tasks" and "projects" arrays.',
+        });
+        return;
+      }
+
+      const repaired = repairWorkspaceBackupPayload(parsedPayload, {
+        fallbackProjects: timelineSwimlanes,
+        fallbackPeople: people,
+        fallbackStatusColumns: statusColumns,
+        fallbackPreferences: preferences,
+        fallbackTasks: tasks,
+        fallbackMilestones: milestones,
+        allowFallbackForMissingArrays: false,
+      });
+
+      if (!repaired.ok) {
+        setImportFeedback({
+          type: 'error',
+          message: repaired.error || 'Could not import backup. Please select a valid JSON export file.',
+        });
+        return;
+      }
+
+      await restorePortableStorageSnapshot(repaired.storageSnapshot, repaired.electronStoreSnapshot);
+
+      replaceWorkspaceSnapshot({
+        timelineSwimlanes: repaired.projects,
+        tasks: repaired.tasks,
+        milestones: repaired.milestones,
+        people: repaired.people,
+        statusColumns: repaired.statusColumns,
+        preferences: repaired.preferences,
+      });
+      await restoreImportedUiState(repaired.ui, repaired.projects, repaired.people);
+      setImportFeedback({
+        type: 'success',
+        message: `Restored ${repaired.tasks.length} tasks, ${repaired.projects.length} projects, ${repaired.people.length} people, and ${repaired.milestones.length} milestones from backup.`,
+      });
+      bumpViewRefreshKey();
+    } catch {
+      setImportFeedback({
+        type: 'error',
+        message: 'Could not import backup. Please select a valid JSON export file.',
+      });
+    }
+  }, [
+    bumpViewRefreshKey,
+    milestones,
+    people,
+    preferences,
+    replaceWorkspaceSnapshot,
+    restoreImportedUiState,
+    setImportFeedback,
+    statusColumns,
+    tasks,
+    timelineSwimlanes,
+  ]);
+
+  useEffect(() => {
+    setPreferences(prev => {
+      const nextExecution = normalizeLoadStatusIds(prev.executionLoadStatusIds, [], statusColumns);
+      const nextPipeline = normalizeLoadStatusIds(prev.pipelineLoadStatusIds, [], statusColumns);
+
+      if (
+        areSerializedValuesEqual(nextExecution, prev.executionLoadStatusIds) &&
+        areSerializedValuesEqual(nextPipeline, prev.pipelineLoadStatusIds)
+      ) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        executionLoadStatusIds: nextExecution,
+        pipelineLoadStatusIds: nextPipeline,
+      };
+    });
+  }, [setPreferences, statusColumns]);
+
+  useEffect(() => {
+    const validPeople = new Set(people.filter(person => person.kind === 'agentic').map(person => person.id));
+    const validStatuses = new Set<string>(statusColumns.map(column => column.id));
+
+    setAgentWatchConfigs(prev => prev.filter(config => validPeople.has(config.personId) && validStatuses.has(config.statusId)));
+  }, [people, setAgentWatchConfigs, statusColumns]);
+
+  useEffect(() => {
+    if (!isPreferencesOpen) return;
+    void refreshMcpListenerStatus();
+    void refreshMcpAuditLog();
+  }, [isPreferencesOpen, refreshMcpAuditLog, refreshMcpListenerStatus]);
+
+  useMcpDiagnostics({
+    enabled: preferences.mcpAgentAccessEnabled,
+    endpoint: preferences.mcpServerAddress,
+  });
+
+  return {
+    isHydrated: hasHydratedCanonicalWorkspace && hasHydratedUiState,
+    headerProps: {
+      currentView,
+      onViewChange: (view) => {
+        switchView(view);
+        if (view === 'kanban') {
+          restoreKanbanScroll(kanbanContainerRef);
+        }
+      },
+      onOpenPreferences: openPreferences,
+      onOpenPeople: openPeoplePanel,
+      onOpenAgents: openAgentsPanel,
+    },
+    mainViewsProps: {
+      currentView,
+      frame: {
+        viewRefreshKey,
+        timelineContainerRef,
+        kanbanContainerRef,
+      },
+      data: {
+        tasks,
+        timelineSwimlanes,
+        people,
+        statusColumns,
+        milestones,
+        readModel: workspaceReadModel,
+      },
+      timeline: {
+        agentWatchConfigs,
+        agentWatchRuntime,
+        mcpAuditLog,
+        mcpAgentAccessEnabled: preferences.mcpAgentAccessEnabled,
+        mcpListenerStatus,
+        mcpRestartPending: isMcpRestartPending,
+        timelineInitialScrollLeft: getViewStateSnapshot('timeline').scrollLeft || 0,
+        timelineInitialLayoutState: timelineLayoutState,
+        onTimelineLayoutStateChange: setTimelineLayoutState,
+        onTimelineTaskClick: handleTaskClick,
+        onTimelineAddTask: handleAddTaskFromTimeline,
+        onTimelineUpdateTaskDates: handleUpdateTaskDates,
+        onTimelineEditSwimlane: handleEditSwimlane,
+        onTimelineAddSwimlane: handleAddSwimlane,
+        onTimelineReorderSwimlanes: handleReorderSwimlanes,
+        onTimelineReorderPeople: handleReorderPeople,
+        onTimelineReorderTasks: handleReorderTasks,
+        onTimelineScroll: handleTimelineScroll,
+      },
+      kanban: {
+        kanbanInitialFilters: hydratedKanbanFilters,
+        kanbanInitialScrollLeft: getViewStateSnapshot('kanban').scrollLeft || 0,
+        kanbanInitialScrollTop: getViewStateSnapshot('kanban').scrollTop || 0,
+        onKanbanTaskClick: handleTaskClick,
+        onKanbanEditTask: handleEditTaskFromKanban,
+        onKanbanAddTask: handleAddTaskFromSwimlane,
+        onKanbanMoveTask: handleMoveTask,
+        onKanbanReorderTasks: handleReorderTasks,
+        onKanbanReorderColumns: handleReorderStatusColumns,
+        onKanbanRenameColumn: handleRenameStatusColumn,
+        onKanbanChangeColumnColor: handleChangeStatusColumnColor,
+        onKanbanAddColumn: handleAddStatusColumn,
+        onKanbanDeleteColumn: handleDeleteStatusColumn,
+      },
+      roadmap: {
+        onRoadmapAddMilestone: addMilestone,
+        onRoadmapMilestoneClick: openMilestoneDetails,
+        onRoadmapTaskClick: handleTaskClick,
+      },
+    },
+    panelsProps: {
+      dialogs: {
+        isTaskDialogOpen,
+        isTaskDetailsOpen,
+        isSwimlaneDialogOpen,
+        isPreferencesOpen,
+        preferencesInitialAnchor,
+        selectedTask,
+        detailsTask,
+        selectedMilestone,
+        detailsMilestone,
+        selectedSwimlane,
+        defaultStatus,
+        defaultDate,
+        defaultEndDate,
+        defaultSwimlaneId,
+        defaultAssigneeId,
+        isMilestoneDialogOpen,
+      },
+      workspace: {
+        tasks,
+        timelineSwimlanes,
+        people,
+        statusColumns,
+        milestones,
+        readModel: workspaceReadModel,
+      },
+      preferences: {
+        executionLoadStatusIds: preferences.executionLoadStatusIds,
+        pipelineLoadStatusIds: preferences.pipelineLoadStatusIds,
+        agentWatchConfigs,
+        agentWatchRuntime,
+        storageMeter,
+        importFeedback,
+        mcpAgentAccessEnabled: preferences.mcpAgentAccessEnabled,
+        mcpAddress: preferences.mcpServerAddress,
+        mcpBindHost: preferences.mcpBindHost,
+        mcpPort: preferences.mcpPort,
+        mcpAccessToken: preferences.mcpAccessToken,
+        mcpAccessTokenIssuedAt: preferences.mcpAccessTokenIssuedAt,
+        mcpAccessTokenTtlMinutes: preferences.mcpAccessTokenTtlMinutes,
+        mcpCapabilityProfile: preferences.mcpCapabilityProfile,
+        mcpListenerStatus,
+        mcpAuditLog,
+        mcpHealthResult: mcpHealth.result,
+        mcpHealthCheckRunning: mcpHealth.isRunning,
+        mcpRestartPending: isMcpRestartPending,
+      },
+      taskActions: {
+        onCloseTaskDialog: handleCloseTaskDialog,
+        onSaveTask: handleSaveTask,
+        onDeleteTask: handleDeleteTask,
+        onCloseTaskDetails: closeTaskDetails,
+        onEditTaskFromDetails: handleEditTaskFromDetails,
+        onMoveAgentTaskToReview: handleMoveAgentTaskToReview,
+        onAddTaskComment: handleAddTaskComment,
+        onUpdateTaskAttachments: handleUpdateTaskAttachments,
+      },
+      milestoneActions: {
+        onCloseMilestoneDialog: closeMilestoneDialog,
+        onSaveMilestone: saveMilestone,
+        onDeleteMilestone: deleteMilestone,
+        onUpdateRoadmapTaskDependencies: applyRoadmapTaskDependencies,
+        onCloseMilestoneDetails: closeMilestoneDetails,
+        onEditMilestoneFromDetails: editMilestoneFromDetails,
+        onMilestoneTaskClick: handleMilestoneTaskClick,
+      },
+      adminActions: {
+        onCloseSwimlaneDialog: handleCloseSwimlaneDialog,
+        onSaveSwimlane: handleSaveSwimlane,
+        onDeleteSwimlane: handleDeleteSwimlane,
+        onAddPerson: handleAddPerson,
+        onUpdatePerson: handleUpdatePerson,
+        onDeletePerson: handleDeletePerson,
+        onSaveAgentWatchConfig: upsertAgentWatchConfig,
+        onRemoveAgentWatchConfig: removeAgentWatchConfig,
+        onPollAgentWatch: handlePollAgentWatchFromPanel,
+        onClosePreferences: closePreferences,
+        onNukeLocalData: handleNukeLocalData,
+        onExportTasksAndProjects: handleExportTasksAndProjects,
+        onImportTasksAndProjects: handleImportTasksAndProjects,
+        onExecutionLoadStatusChange: toggleExecutionLoadStatus,
+        onPipelineLoadStatusChange: togglePipelineLoadStatus,
+        onMcpAgentAccessToggle: setMcpAgentAccessEnabled,
+        onMcpAddressChange: (address) => setMcpServerAddress(normalizeMcpServerAddress(address)),
+        onMcpBindHostChange: (host) => setMcpBindHost(normalizeMcpBindHost(host)),
+        onMcpPortChange: (port) => setMcpPort(normalizeMcpPort(port)),
+        onMcpAccessTokenChange: setMcpAccessToken,
+        onMcpAccessTokenRotate: handleRotateMcpAccessToken,
+        onMcpAccessTokenTtlMinutesChange: setMcpAccessTokenTtlMinutes,
+        onMcpCapabilityProfileChange: setMcpCapabilityProfile,
+        onRestartMcpServer: handleRestartMcpServer,
+        onRunMcpHealthCheck: mcpHealth.runHealthCheck,
+        onRefreshMcpAuditLog: refreshMcpAuditLog,
+      },
+    },
+    deleteConfirmProps: {
+      isOpen: resetLocalDataConfirmOpen,
+      title: 'Erase local storage?',
+      description: 'This clears local workspace data stored by the app and resets your workspace. This cannot be undone.',
+      confirmLabel: 'Erase local storage',
+      onOpenChange: setResetLocalDataConfirmOpen,
+      onCancel: () => setResetLocalDataConfirmOpen(false),
+      onConfirm: handleConfirmNukeLocalData,
+    },
+  };
+}

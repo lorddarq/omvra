@@ -18,7 +18,6 @@ import {
   filterKanbanTasks,
   hasActiveKanbanTaskFilters,
   persistKanbanTaskFilters,
-  readInitialKanbanTaskFilters,
   sanitizeKanbanTaskFilters,
   type KanbanTaskFilterKey,
   type KanbanTaskFilters,
@@ -32,6 +31,7 @@ interface KanbanViewProps {
   swimlanes: StatusColumn[];
   projects: TimelineSwimlane[];
   people: Person[];
+  initialFilters?: KanbanTaskFilters;
   scrollContainerRef?: RefObject<HTMLDivElement | null>;
   initialScrollLeft?: number;
   initialScrollTop?: number;
@@ -52,6 +52,7 @@ export function KanbanView({
   swimlanes,
   projects,
   people,
+  initialFilters,
   scrollContainerRef,
   initialScrollLeft = 0,
   initialScrollTop = 0,
@@ -73,7 +74,7 @@ export function KanbanView({
   const didRestoreInitialScrollRef = useRef(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<KanbanTaskFilters>(() =>
-    readInitialKanbanTaskFilters(projects, people)
+    sanitizeKanbanTaskFilters(initialFilters, projects, people)
   );
   const [scrollMetrics, setScrollMetrics] = useState({
     clientWidth: 0,
@@ -114,6 +115,15 @@ export function KanbanView({
         : nextFilters;
     });
   }, [people, projects]);
+
+  useEffect(() => {
+    setFilters(previousFilters => {
+      const nextFilters = sanitizeKanbanTaskFilters(initialFilters, projects, people);
+      return JSON.stringify(previousFilters) === JSON.stringify(nextFilters)
+        ? previousFilters
+        : nextFilters;
+    });
+  }, [initialFilters, people, projects]);
 
   const projectFilterValue = activeFilters.projectId || ALL_FILTER_VALUE;
   const priorityFilterValue = activeFilters.priority || ALL_FILTER_VALUE;

@@ -1,9 +1,6 @@
 import type { Person, Task, TaskPriority, TimelineSwimlane } from '../types.ts';
 import { getTaskProjectIds } from './roadmap.ts';
-import {
-  persistJSONWithElectronMirror,
-  readInitialWorkspaceJSON,
-} from './storage.ts';
+import { persistJSONWithElectronMirror } from './storage.ts';
 
 export const KANBAN_TASK_FILTERS_STORAGE_KEY = 'omvra.filters.v1';
 export const UNASSIGNED_ASSIGNEE_FILTER_VALUE = '__omvra_unassigned__';
@@ -68,17 +65,6 @@ export function sanitizeKanbanTaskFilters(
   }
 
   return nextFilters;
-}
-
-export function readInitialKanbanTaskFilters(
-  projects: TimelineSwimlane[],
-  people: Person[]
-): KanbanTaskFilters {
-  const stored = readInitialWorkspaceJSON<unknown>(
-    KANBAN_TASK_FILTERS_STORAGE_KEY,
-    EMPTY_KANBAN_TASK_FILTERS
-  );
-  return sanitizeKanbanTaskFilters(stored, projects, people);
 }
 
 export function persistKanbanTaskFilters(filters: KanbanTaskFilters): void {

@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { Task, TaskStatus, StatusColumn } from '../types';
+import type { Task, TaskStatus, StatusColumn } from '../types.ts';
 
 interface UseStatusColumnActionsOptions {
   statusColumns: StatusColumn[];

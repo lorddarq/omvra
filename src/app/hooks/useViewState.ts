@@ -20,8 +20,8 @@
  *   const savedState = viewState.getViewState('timeline');
  */
 
-import { useEffect, useCallback, useRef, useState } from 'react';
-import { deleteStoredValue, getJSON, persistJSONWithElectronMirror } from '../utils/storage';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { deleteStoredValue, persistJSONWithElectronMirror } from '../utils/storage.ts';
 
 export type ViewType = 'timeline' | 'kanban' | 'roadmap';
 
@@ -54,7 +54,7 @@ export type AllViewStates = {
 /**
  * Default states for each view.
  */
-const DEFAULT_STATES: AllViewStates = {
+export const DEFAULT_STATES: AllViewStates = {
   timeline: {
     scrollLeft: 0,
     collapsedSwimlanes: [],
@@ -70,57 +70,24 @@ const DEFAULT_STATES: AllViewStates = {
   },
 };
 
-export function useViewState(initialView: ViewType = 'timeline') {
+export function useViewState(initialView: ViewType = 'timeline', initialStates: AllViewStates = DEFAULT_STATES) {
   // Currently active view
   const [currentView, setCurrentView] = useState<ViewType>(initialView);
 
   // Per-view session state (stored in memory, not persisted by default)
   const viewStatesRef = useRef<Record<string, Record<string, any>>>({
-    timeline: { ...DEFAULT_STATES.timeline },
-    kanban: { ...DEFAULT_STATES.kanban },
-    roadmap: { ...DEFAULT_STATES.roadmap },
+    timeline: { ...DEFAULT_STATES.timeline, ...initialStates.timeline },
+    kanban: { ...DEFAULT_STATES.kanban, ...initialStates.kanban },
+    roadmap: { ...DEFAULT_STATES.roadmap, ...initialStates.roadmap },
   });
 
   useEffect(() => {
-    let cancelled = false;
-
-    const hydrateStoredViewStates = async () => {
-      const [timelineState, kanbanState, roadmapState] = await Promise.all([
-        getJSON<Record<string, any>>('omvra_viewstate_timeline', null),
-        getJSON<Record<string, any>>('omvra_viewstate_kanban', null),
-        getJSON<Record<string, any>>('omvra_viewstate_roadmap', null),
-      ]);
-
-      if (cancelled) return;
-
-      if (timelineState) {
-        viewStatesRef.current.timeline = {
-          ...DEFAULT_STATES.timeline,
-          ...timelineState,
-        };
-      }
-
-      if (kanbanState) {
-        viewStatesRef.current.kanban = {
-          ...DEFAULT_STATES.kanban,
-          ...kanbanState,
-        };
-      }
-
-      if (roadmapState) {
-        viewStatesRef.current.roadmap = {
-          ...DEFAULT_STATES.roadmap,
-          ...roadmapState,
-        };
-      }
+    viewStatesRef.current = {
+      timeline: { ...DEFAULT_STATES.timeline, ...initialStates.timeline },
+      kanban: { ...DEFAULT_STATES.kanban, ...initialStates.kanban },
+      roadmap: { ...DEFAULT_STATES.roadmap, ...initialStates.roadmap },
     };
-
-    void hydrateStoredViewStates();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  }, [initialStates]);
 
   /**
    * Get the current view.

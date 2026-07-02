@@ -9,7 +9,16 @@ import {
   type MilestoneHealth,
 } from '../utils/roadmap';
 import { parseISODateLocal, toLocalISODate } from '../utils/date';
+import {
+  addCalendarDays,
+  buildDateRangeFromDates,
+  buildDateSequence,
+  daysBetweenLocal,
+  getMonthKey,
+  startOfLocalDay,
+} from '../utils/timeSurface';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
+import { useFixedTimeSurfaceNavigation } from '../hooks/useFixedTimeSurfaceNavigation.ts';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { EmptyStateCard } from './EmptyStateCard';
@@ -47,36 +56,18 @@ const MILESTONE_ROW_GAP = 0;
 const MIN_ROADMAP_ROW_HEIGHT = 132;
 const CHART_PADDING_BOTTOM = 24;
 
-function startOfDay(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function addDays(date: Date, days: number): Date {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
-function daysBetween(start: Date, end: Date): number {
-  return Math.round((startOfDay(end).getTime() - startOfDay(start).getTime()) / 86400000);
-}
-
-function getMonthKey(date: Date): string {
-  return `${date.getFullYear()}-${date.getMonth()}`;
-}
-
 function isMilestoneInDateWindow(milestone: ProjectMilestone, dateWindow: RoadmapDateWindow): boolean {
   if (dateWindow === 'all') return true;
   const milestoneEnd = parseISODateLocal(milestone.endDate);
   if (!milestoneEnd) return false;
 
-  const today = startOfDay(new Date());
+  const today = startOfLocalDay(new Date());
 
   if (dateWindow === 'overdue') {
     return milestoneEnd.getTime() < today.getTime();
   }
 
-  const windowEnd = addDays(today, Number(dateWindow));
+  const windowEnd = addCalendarDays(today, Number(dateWindow));
   return milestoneEnd.getTime() >= today.getTime() && milestoneEnd.getTime() <= windowEnd.getTime();
 }
 
@@ -97,31 +88,25 @@ function getDateRange(milestones: ProjectMilestone[], tasks: Task[]): { start: D
     });
   });
 
-  const today = startOfDay(new Date());
-  dates.push(today);
-
-  if (dates.length === 0) {
-    return { start: addDays(today, -7), end: addDays(today, 90) };
-  }
-
-  const min = new Date(Math.min(...dates.map(date => startOfDay(date).getTime())));
-  const max = new Date(Math.max(...dates.map(date => startOfDay(date).getTime())));
-  return {
-    start: addDays(min, -7),
-    end: addDays(max, 14),
-  };
+  return buildDateRangeFromDates(dates, {
+    includeToday: true,
+    padStartDays: 7,
+    padEndDays: 14,
+    fallbackStartOffsetDays: -7,
+    fallbackEndOffsetDays: 90,
+  });
 }
 
 function getTaskLeft(task: Task, timelineStart: Date): number {
   const taskStart = task.startDate ? parseISODateLocal(task.startDate) : null;
-  return Math.max(0, daysBetween(timelineStart, taskStart || timelineStart) * DAY_WIDTH);
+  return Math.max(0, daysBetweenLocal(timelineStart, taskStart || timelineStart) * DAY_WIDTH);
 }
 
 function getTaskWidth(task: Task): number {
   const taskStart = task.startDate ? parseISODateLocal(task.startDate) : null;
   const taskEnd = task.endDate ? parseISODateLocal(task.endDate) : taskStart;
   if (!taskStart || !taskEnd) return DAY_WIDTH * 2;
-  return Math.max(DAY_WIDTH * 1.5, (daysBetween(taskStart, taskEnd) + 1) * DAY_WIDTH);
+  return Math.max(DAY_WIDTH * 1.5, (daysBetweenLocal(taskStart, taskEnd) + 1) * DAY_WIDTH);
 }
 
 function sortRoadmapTasks(tasks: Task[]): Task[] {
@@ -179,17 +164,10 @@ export function RoadmapView({
 }: RoadmapViewProps) {
   const chartScrollRef = useRef<HTMLDivElement>(null);
   const chartViewportRef = useRef<HTMLDivElement>(null);
-  const isHeaderScrubbingRef = useRef(false);
-  const scrubStartXRef = useRef(0);
-  const scrubStartScrollLeftRef = useRef(0);
-  const autoScrolledRangeRef = useRef<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [projectFilter, setProjectFilter] = useState('all');
   const [healthFilter, setHealthFilter] = useState<MilestoneHealth | 'all'>('all');
   const [dateWindow, setDateWindow] = useState<RoadmapDateWindow>('all');
-  const [isHeaderScrubbing, setIsHeaderScrubbing] = useState(false);
-  const [chartScrollLeft, setChartScrollLeft] = useState(0);
-  const [chartScrollTop, setChartScrollTop] = useState(0);
   const [chartViewportHeight, setChartViewportHeight] = useState(0);
   const enrichedMilestoneById = readModel?.milestonesById;
 
@@ -227,10 +205,7 @@ export function RoadmapView({
 
   const hasActiveFilters = searchQuery.trim() !== '' || projectFilter !== 'all' || healthFilter !== 'all' || dateWindow !== 'all';
   const range = useMemo(() => getDateRange(filteredMilestones, tasks), [filteredMilestones, tasks]);
-  const allDates = useMemo(() => {
-    const days = Math.max(1, daysBetween(range.start, range.end) + 1);
-    return Array.from({ length: days }, (_, index) => addDays(range.start, index));
-  }, [range.end, range.start]);
+  const allDates = useMemo(() => buildDateSequence(range), [range]);
   const monthGroups = useMemo(() => {
     const groups: Array<{ key: string; label: string; startIndex: number; days: number }> = [];
     allDates.forEach((date, index) => {
@@ -291,8 +266,15 @@ export function RoadmapView({
         chartViewportHeight,
         chartContentHeight + (chartContentHeight > chartViewportHeight ? CHART_PADDING_BOTTOM : 0)
       );
-  const todayIndex = daysBetween(range.start, startOfDay(new Date()));
-  const todayLeft = todayIndex >= 0 && todayIndex < allDates.length ? todayIndex * DAY_WIDTH + DAY_WIDTH / 2 : null;
+  const navigation = useFixedTimeSurfaceNavigation({
+    scrollRef: chartScrollRef,
+    rangeStart: range.start,
+    dayCount: allDates.length,
+    dayWidth: DAY_WIDTH,
+    autoScrollKey: `${toLocalISODate(range.start)}:${toLocalISODate(range.end)}:${timelineWidth}`,
+  });
+  const todayIndex = navigation.todayMarker?.index ?? -1;
+  const todayLeft = navigation.todayMarker?.center ?? null;
 
   const resetFilters = () => {
     setSearchQuery('');
@@ -300,29 +282,6 @@ export function RoadmapView({
     setHealthFilter('all');
     setDateWindow('all');
   };
-
-  useEffect(() => {
-    const handleMove = (event: MouseEvent) => {
-      if (!isHeaderScrubbingRef.current || !chartScrollRef.current) return;
-      const dx = event.clientX - scrubStartXRef.current;
-      chartScrollRef.current.scrollLeft = scrubStartScrollLeftRef.current - dx;
-      event.preventDefault();
-    };
-
-    const handleUp = () => {
-      if (!isHeaderScrubbingRef.current) return;
-      isHeaderScrubbingRef.current = false;
-      setIsHeaderScrubbing(false);
-    };
-
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
-
-    return () => {
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleUp);
-    };
-  }, []);
 
   useLayoutEffect(() => {
     const viewportNode = chartViewportRef.current;
@@ -341,71 +300,6 @@ export function RoadmapView({
     };
   }, []);
 
-  const handleHeaderScrubStart = (event: React.MouseEvent<HTMLElement>) => {
-    if (event.button !== 0 || !chartScrollRef.current) return;
-    const target = event.target as HTMLElement;
-    const blockedTarget = target.closest('button, a, input, textarea, select, [role="button"]');
-    if (blockedTarget) return;
-
-    isHeaderScrubbingRef.current = true;
-    setIsHeaderScrubbing(true);
-    scrubStartXRef.current = event.clientX;
-    scrubStartScrollLeftRef.current = chartScrollRef.current.scrollLeft;
-    event.preventDefault();
-  };
-
-  const handleChartScroll = () => {
-    const nextScrollLeft = chartScrollRef.current?.scrollLeft || 0;
-    const nextScrollTop = chartScrollRef.current?.scrollTop || 0;
-    setChartScrollLeft(currentScrollLeft => (
-      currentScrollLeft === nextScrollLeft ? currentScrollLeft : nextScrollLeft
-    ));
-    setChartScrollTop(currentScrollTop => (
-      currentScrollTop === nextScrollTop ? currentScrollTop : nextScrollTop
-    ));
-  };
-
-  const scrollToDay = (date: Date, behavior: ScrollBehavior = 'smooth') => {
-    if (!chartScrollRef.current) return;
-    const dayIndex = daysBetween(range.start, startOfDay(date));
-    if (dayIndex < 0 || dayIndex >= allDates.length) return;
-
-    const viewportWidth = chartScrollRef.current.clientWidth;
-    const dayCenter = dayIndex * DAY_WIDTH + DAY_WIDTH / 2;
-    const targetLeft = dayCenter - viewportWidth / 2;
-    chartScrollRef.current.scrollTo({
-      left: Math.max(0, targetLeft),
-      behavior,
-    });
-  };
-
-  const scrollToToday = () => {
-    scrollToDay(new Date(), 'auto');
-  };
-
-  const scrollTimelineLeft = () => {
-    chartScrollRef.current?.scrollBy({ left: -200, behavior: 'smooth' });
-  };
-
-  const scrollTimelineRight = () => {
-    chartScrollRef.current?.scrollBy({ left: 200, behavior: 'smooth' });
-  };
-
-  useLayoutEffect(() => {
-    if (todayLeft === null) return;
-    const rangeKey = `${toLocalISODate(range.start)}:${toLocalISODate(range.end)}:${timelineWidth}`;
-    if (autoScrolledRangeRef.current === rangeKey) return;
-
-    autoScrolledRangeRef.current = rangeKey;
-    const animationFrame = window.requestAnimationFrame(() => {
-      scrollToDay(new Date(), 'auto');
-    });
-
-    return () => {
-      window.cancelAnimationFrame(animationFrame);
-    };
-  }, [range.end, range.start, timelineWidth, todayLeft]);
-
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-gray-50">
       <RoadmapToolbar
@@ -423,9 +317,11 @@ export function RoadmapView({
         onDateWindowChange={setDateWindow}
         onResetFilters={resetFilters}
         onAddMilestone={onAddMilestone}
-        onScrollTimelineLeft={scrollTimelineLeft}
-        onScrollTimelineRight={scrollTimelineRight}
-        onScrollToToday={scrollToToday}
+        onScrollTimelineLeft={navigation.scrollLeftByStep}
+        onScrollTimelineRight={navigation.scrollRightByStep}
+        onScrollToToday={() => {
+          navigation.scrollToToday();
+        }}
       />
 
       <div className="min-h-0 flex-1 overflow-hidden">
@@ -452,7 +348,7 @@ export function RoadmapView({
                 leftWidth={LEFT_WIDTH}
                 headerHeight={HEADER_HEIGHT}
                 chartHeight={chartHeight}
-                chartScrollTop={chartScrollTop}
+                chartScrollTop={navigation.scrollTop}
                 statusColumns={statusColumns}
                 onAddMilestone={onAddMilestone}
                 onMilestoneClick={onMilestoneClick}
@@ -466,9 +362,9 @@ export function RoadmapView({
               />
               <div
                 className={`absolute inset-x-0 top-0 z-50 h-[82px] select-none border-b border-gray-200 bg-white ${
-                  isHeaderScrubbing ? 'cursor-grabbing' : 'cursor-grab'
+                  navigation.isHeaderScrubbing ? 'cursor-grabbing' : 'cursor-grab'
                 }`}
-                onMouseDown={handleHeaderScrubStart}
+                onMouseDown={navigation.handleHeaderScrubStart}
               >
                 <div
                   className="absolute top-0"
@@ -476,7 +372,7 @@ export function RoadmapView({
                     left: LEFT_WIDTH,
                     width: timelineWidth,
                     height: HEADER_HEIGHT,
-                    transform: `translate3d(${-chartScrollLeft}px, 0, 0)`,
+                    transform: `translate3d(${-navigation.scrollLeft}px, 0, 0)`,
                   }}
                 >
                   {monthGroups.map(month => (
@@ -508,7 +404,7 @@ export function RoadmapView({
                 </div>
               </div>
 
-              <div ref={chartScrollRef} className="absolute bottom-0 right-0 top-0 overflow-auto" style={{ left: LEFT_WIDTH }} onScroll={handleChartScroll}>
+              <div ref={chartScrollRef} className="absolute bottom-0 right-0 top-0 overflow-auto" style={{ left: LEFT_WIDTH }} onScroll={navigation.handleScroll}>
                 <div
                   className="relative"
                   style={{
@@ -579,7 +475,7 @@ export function RoadmapView({
                 </svg>
 
                 {rows.map(row => {
-                  const milestoneLeft = daysBetween(range.start, parseISODateLocal(row.milestone.endDate) || range.start) * DAY_WIDTH + DAY_WIDTH / 2;
+                  const milestoneLeft = daysBetweenLocal(range.start, parseISODateLocal(row.milestone.endDate) || range.start) * DAY_WIDTH + DAY_WIDTH / 2;
                   const lateTaskIds = new Set(row.summary.lateTasks.map(task => task.id));
                   const sortedTasks = sortRoadmapTasks(row.summary.linkedTasks);
 

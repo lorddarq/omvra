@@ -1,5 +1,13 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Person, ProjectMilestone, StorageMeter, Task, TaskStatus, TimelineSwimlane, StatusColumn } from '../types';
+import {
+  Person,
+  ProjectMilestone,
+  StorageMeter,
+  Task,
+  TaskStatus,
+  TimelineSwimlane,
+  StatusColumn,
+} from '../types';
 import { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
@@ -12,7 +20,7 @@ import { McpHealthCheckResult } from '../services/mcp/types';
 const TaskDialog = lazy(() => import('./TaskDialog').then(module => ({ default: module.TaskDialog })));
 const TaskDetailsDialog = lazy(() => import('./TaskDetailsDialog').then(module => ({ default: module.TaskDetailsDialog })));
 
-interface AppPanelsProps {
+export interface AppPanelDialogState {
   isTaskDialogOpen: boolean;
   isTaskDetailsOpen: boolean;
   isSwimlaneDialogOpen: boolean;
@@ -28,13 +36,19 @@ interface AppPanelsProps {
   defaultEndDate?: Date;
   defaultSwimlaneId?: string;
   defaultAssigneeId?: string;
+  isMilestoneDialogOpen: boolean;
+}
+
+export interface AppPanelWorkspaceState {
   tasks: Task[];
   timelineSwimlanes: TimelineSwimlane[];
   people: Person[];
   statusColumns: StatusColumn[];
   milestones: ProjectMilestone[];
   readModel: WorkspaceReadModel;
-  isMilestoneDialogOpen: boolean;
+}
+
+export interface PreferencesPanelState {
   executionLoadStatusIds: TaskStatus[];
   pipelineLoadStatusIds: TaskStatus[];
   agentWatchConfigs: AgentWatchConfig[];
@@ -57,6 +71,9 @@ interface AppPanelsProps {
   mcpHealthResult: McpHealthCheckResult | null;
   mcpHealthCheckRunning: boolean;
   mcpRestartPending: boolean;
+}
+
+export interface TaskPanelActions {
   onCloseTaskDialog: () => void;
   onSaveTask: (taskData: Partial<Task>) => void;
   onDeleteTask: (taskId: string) => void;
@@ -65,6 +82,9 @@ interface AppPanelsProps {
   onMoveAgentTaskToReview: (taskId: string) => void;
   onAddTaskComment: (taskId: string, content: string) => void;
   onUpdateTaskAttachments: (taskId: string, attachments: Task['attachments']) => void;
+}
+
+export interface MilestonePanelActions {
   onCloseMilestoneDialog: () => void;
   onSaveMilestone: (milestone: ProjectMilestone) => void;
   onDeleteMilestone: (milestoneId: string) => void;
@@ -72,6 +92,9 @@ interface AppPanelsProps {
   onCloseMilestoneDetails: () => void;
   onEditMilestoneFromDetails: (milestone: ProjectMilestone) => void;
   onMilestoneTaskClick: (task: Task) => void;
+}
+
+export interface WorkspaceAdminActions {
   onCloseSwimlaneDialog: () => void;
   onSaveSwimlane: (swimlaneData: Partial<TimelineSwimlane>) => void;
   onDeleteSwimlane: (swimlaneId: string) => void;
@@ -100,126 +123,59 @@ interface AppPanelsProps {
   onRefreshMcpAuditLog: () => void;
 }
 
+export interface AppPanelsProps {
+  dialogs: AppPanelDialogState;
+  workspace: AppPanelWorkspaceState;
+  preferences: PreferencesPanelState;
+  taskActions: TaskPanelActions;
+  milestoneActions: MilestonePanelActions;
+  adminActions: WorkspaceAdminActions;
+}
+
 export function AppPanels({
-  isTaskDialogOpen,
-  isTaskDetailsOpen,
-  isSwimlaneDialogOpen,
-  isPreferencesOpen,
-  preferencesInitialAnchor,
-  selectedTask,
-  detailsTask,
-  selectedMilestone,
-  detailsMilestone,
-  selectedSwimlane,
-  defaultStatus,
-  defaultDate,
-  defaultEndDate,
-  defaultSwimlaneId,
-  defaultAssigneeId,
-  tasks,
-  timelineSwimlanes,
-  people,
-  statusColumns,
-  milestones,
-  readModel,
-  isMilestoneDialogOpen,
-  executionLoadStatusIds,
-  pipelineLoadStatusIds,
-  agentWatchConfigs,
-  agentWatchRuntime,
-  storageMeter,
-  importFeedback,
-  mcpAgentAccessEnabled,
-  mcpAddress,
-  mcpBindHost,
-  mcpPort,
-  mcpAccessToken,
-  mcpAccessTokenIssuedAt,
-  mcpAccessTokenTtlMinutes,
-  mcpCapabilityProfile,
-  mcpListenerStatus,
-  mcpAuditLog,
-  mcpHealthResult,
-  mcpHealthCheckRunning,
-  mcpRestartPending,
-  onCloseTaskDialog,
-  onSaveTask,
-  onDeleteTask,
-  onCloseTaskDetails,
-  onEditTaskFromDetails,
-  onMoveAgentTaskToReview,
-  onAddTaskComment,
-  onUpdateTaskAttachments,
-  onCloseMilestoneDialog,
-  onSaveMilestone,
-  onDeleteMilestone,
-  onUpdateRoadmapTaskDependencies,
-  onCloseMilestoneDetails,
-  onEditMilestoneFromDetails,
-  onMilestoneTaskClick,
-  onCloseSwimlaneDialog,
-  onSaveSwimlane,
-  onDeleteSwimlane,
-  onAddPerson,
-  onUpdatePerson,
-  onDeletePerson,
-  onSaveAgentWatchConfig,
-  onRemoveAgentWatchConfig,
-  onPollAgentWatch,
-  onClosePreferences,
-  onNukeLocalData,
-  onExportTasksAndProjects,
-  onImportTasksAndProjects,
-  onExecutionLoadStatusChange,
-  onPipelineLoadStatusChange,
-  onMcpAgentAccessToggle,
-  onMcpAddressChange,
-  onMcpBindHostChange,
-  onMcpPortChange,
-  onMcpAccessTokenChange,
-  onMcpAccessTokenRotate,
-  onMcpAccessTokenTtlMinutesChange,
-  onMcpCapabilityProfileChange,
-  onRestartMcpServer,
-  onRunMcpHealthCheck,
-  onRefreshMcpAuditLog,
+  dialogs,
+  workspace,
+  preferences,
+  taskActions,
+  milestoneActions,
+  adminActions,
 }: AppPanelsProps) {
   const [shouldRenderTaskDialog, setShouldRenderTaskDialog] = useState(false);
   const [shouldRenderTaskDetailsDialog, setShouldRenderTaskDetailsDialog] = useState(false);
 
   useEffect(() => {
-    if (isTaskDialogOpen) {
+    if (dialogs.isTaskDialogOpen) {
       setShouldRenderTaskDialog(true);
     }
-  }, [isTaskDialogOpen]);
+  }, [dialogs.isTaskDialogOpen]);
 
   useEffect(() => {
-    if (isTaskDetailsOpen) {
+    if (dialogs.isTaskDetailsOpen) {
       setShouldRenderTaskDetailsDialog(true);
     }
-  }, [isTaskDetailsOpen]);
+  }, [dialogs.isTaskDetailsOpen]);
 
   return (
     <>
       <Suspense fallback={null}>
         {shouldRenderTaskDialog && (
           <TaskDialog
-            isOpen={isTaskDialogOpen}
-            onClose={onCloseTaskDialog}
-            onSave={onSaveTask}
-            onDelete={onDeleteTask}
-            task={selectedTask}
-            defaultStatus={defaultStatus}
-            defaultDate={defaultDate}
-            defaultEndDate={defaultEndDate}
-            defaultSwimlaneId={defaultSwimlaneId}
-            defaultAssigneeId={defaultAssigneeId}
-            swimlanes={timelineSwimlanes}
-            statusColumns={statusColumns}
-            people={people}
-            tasks={tasks}
-            milestones={milestones}
-            readModel={readModel}
+            isOpen={dialogs.isTaskDialogOpen}
+            onClose={taskActions.onCloseTaskDialog}
+            onSave={taskActions.onSaveTask}
+            onDelete={taskActions.onDeleteTask}
+            task={dialogs.selectedTask}
+            defaultStatus={dialogs.defaultStatus}
+            defaultDate={dialogs.defaultDate}
+            defaultEndDate={dialogs.defaultEndDate}
+            defaultSwimlaneId={dialogs.defaultSwimlaneId}
+            defaultAssigneeId={dialogs.defaultAssigneeId}
+            swimlanes={workspace.timelineSwimlanes}
+            statusColumns={workspace.statusColumns}
+            people={workspace.people}
+            tasks={workspace.tasks}
+            milestones={workspace.milestones}
+            readModel={workspace.readModel}
           />
         )}
       </Suspense>
@@ -227,106 +183,106 @@ export function AppPanels({
       <Suspense fallback={null}>
         {shouldRenderTaskDetailsDialog && (
           <TaskDetailsDialog
-            isOpen={isTaskDetailsOpen}
-            onClose={onCloseTaskDetails}
-            onEdit={onEditTaskFromDetails}
-            onMoveAgentTaskToReview={onMoveAgentTaskToReview}
-            onAddComment={onAddTaskComment}
-            onUpdateAttachments={onUpdateTaskAttachments}
-            task={detailsTask}
-            swimlanes={timelineSwimlanes}
-            people={people}
-            statusColumns={statusColumns}
-            tasks={tasks}
-            milestones={milestones}
-            readModel={readModel}
+            isOpen={dialogs.isTaskDetailsOpen}
+            onClose={taskActions.onCloseTaskDetails}
+            onEdit={taskActions.onEditTaskFromDetails}
+            onMoveAgentTaskToReview={taskActions.onMoveAgentTaskToReview}
+            onAddComment={taskActions.onAddTaskComment}
+            onUpdateAttachments={taskActions.onUpdateTaskAttachments}
+            task={dialogs.detailsTask}
+            swimlanes={workspace.timelineSwimlanes}
+            people={workspace.people}
+            statusColumns={workspace.statusColumns}
+            tasks={workspace.tasks}
+            milestones={workspace.milestones}
+            readModel={workspace.readModel}
           />
         )}
       </Suspense>
 
       <MilestoneDetailsDialog
-        isOpen={Boolean(detailsMilestone)}
-        onClose={onCloseMilestoneDetails}
-        onEdit={onEditMilestoneFromDetails}
-        onDelete={onDeleteMilestone}
-        onTaskClick={onMilestoneTaskClick}
-        milestone={detailsMilestone}
-        projects={timelineSwimlanes}
-        tasks={tasks}
-        statusColumns={statusColumns as Array<{ id: TaskStatus; title: string; color?: string }>}
-        readModel={readModel}
+        isOpen={Boolean(dialogs.detailsMilestone)}
+        onClose={milestoneActions.onCloseMilestoneDetails}
+        onEdit={milestoneActions.onEditMilestoneFromDetails}
+        onDelete={milestoneActions.onDeleteMilestone}
+        onTaskClick={milestoneActions.onMilestoneTaskClick}
+        milestone={dialogs.detailsMilestone}
+        projects={workspace.timelineSwimlanes}
+        tasks={workspace.tasks}
+        statusColumns={workspace.statusColumns as Array<{ id: TaskStatus; title: string; color?: string }>}
+        readModel={workspace.readModel}
       />
 
       <MilestoneDialog
-        isOpen={isMilestoneDialogOpen}
-        onClose={onCloseMilestoneDialog}
-        onSave={onSaveMilestone}
-        onDelete={onDeleteMilestone}
-        onUpdateTaskDependencies={onUpdateRoadmapTaskDependencies}
-        milestone={selectedMilestone}
-        projects={timelineSwimlanes}
-        statusColumns={statusColumns}
-        tasks={tasks}
-        readModel={readModel}
+        isOpen={dialogs.isMilestoneDialogOpen}
+        onClose={milestoneActions.onCloseMilestoneDialog}
+        onSave={milestoneActions.onSaveMilestone}
+        onDelete={milestoneActions.onDeleteMilestone}
+        onUpdateTaskDependencies={milestoneActions.onUpdateRoadmapTaskDependencies}
+        milestone={dialogs.selectedMilestone}
+        projects={workspace.timelineSwimlanes}
+        statusColumns={workspace.statusColumns}
+        tasks={workspace.tasks}
+        readModel={workspace.readModel}
       />
 
       <SwimlaneDialog
-        isOpen={isSwimlaneDialogOpen}
-        onClose={onCloseSwimlaneDialog}
-        onSave={onSaveSwimlane}
-        onDelete={onDeleteSwimlane}
-        swimlane={selectedSwimlane}
+        isOpen={dialogs.isSwimlaneDialogOpen}
+        onClose={adminActions.onCloseSwimlaneDialog}
+        onSave={adminActions.onSaveSwimlane}
+        onDelete={adminActions.onDeleteSwimlane}
+        swimlane={dialogs.selectedSwimlane}
       />
 
       <PreferencesPanel
-        isOpen={isPreferencesOpen}
-        onClose={onClosePreferences}
-        initialAnchor={preferencesInitialAnchor}
-        statusColumns={statusColumns}
-        executionLoadStatusIds={executionLoadStatusIds}
-        pipelineLoadStatusIds={pipelineLoadStatusIds}
-        people={people}
-        tasks={tasks}
-        timelineSwimlanes={timelineSwimlanes}
-        agentWatchConfigs={agentWatchConfigs}
-        agentWatchRuntime={agentWatchRuntime}
-        storageMeter={storageMeter}
-        importFeedback={importFeedback}
-        onNukeLocalData={onNukeLocalData}
-        onExportTasksAndProjects={onExportTasksAndProjects}
-        onImportTasksAndProjects={onImportTasksAndProjects}
-        onExecutionLoadStatusChange={onExecutionLoadStatusChange}
-        onPipelineLoadStatusChange={onPipelineLoadStatusChange}
-        onAddPerson={onAddPerson}
-        onUpdatePerson={onUpdatePerson}
-        onDeletePerson={onDeletePerson}
-        onSaveAgentWatchConfig={onSaveAgentWatchConfig}
-        onRemoveAgentWatchConfig={onRemoveAgentWatchConfig}
-        onPollAgentWatch={onPollAgentWatch}
-        mcpAgentAccessEnabled={mcpAgentAccessEnabled}
-        mcpAddress={mcpAddress}
-        mcpBindHost={mcpBindHost}
-        mcpPort={mcpPort}
-        mcpAccessToken={mcpAccessToken}
-        mcpAccessTokenIssuedAt={mcpAccessTokenIssuedAt}
-        mcpAccessTokenTtlMinutes={mcpAccessTokenTtlMinutes}
-        mcpCapabilityProfile={mcpCapabilityProfile}
-        mcpListenerStatus={mcpListenerStatus}
-        mcpAuditLog={mcpAuditLog}
-        onMcpAgentAccessToggle={onMcpAgentAccessToggle}
-        onMcpAddressChange={onMcpAddressChange}
-        onMcpBindHostChange={onMcpBindHostChange}
-        onMcpPortChange={onMcpPortChange}
-        onMcpAccessTokenChange={onMcpAccessTokenChange}
-        onMcpAccessTokenRotate={onMcpAccessTokenRotate}
-        onMcpAccessTokenTtlMinutesChange={onMcpAccessTokenTtlMinutesChange}
-        onMcpCapabilityProfileChange={onMcpCapabilityProfileChange}
-        onRestartMcpServer={onRestartMcpServer}
-        mcpHealthResult={mcpHealthResult}
-        mcpHealthCheckRunning={mcpHealthCheckRunning}
-        onRunMcpHealthCheck={onRunMcpHealthCheck}
-        mcpRestartPending={mcpRestartPending}
-        onRefreshMcpAuditLog={onRefreshMcpAuditLog}
+        isOpen={dialogs.isPreferencesOpen}
+        onClose={adminActions.onClosePreferences}
+        initialAnchor={dialogs.preferencesInitialAnchor}
+        statusColumns={workspace.statusColumns}
+        executionLoadStatusIds={preferences.executionLoadStatusIds}
+        pipelineLoadStatusIds={preferences.pipelineLoadStatusIds}
+        people={workspace.people}
+        tasks={workspace.tasks}
+        timelineSwimlanes={workspace.timelineSwimlanes}
+        agentWatchConfigs={preferences.agentWatchConfigs}
+        agentWatchRuntime={preferences.agentWatchRuntime}
+        storageMeter={preferences.storageMeter}
+        importFeedback={preferences.importFeedback}
+        onNukeLocalData={adminActions.onNukeLocalData}
+        onExportTasksAndProjects={adminActions.onExportTasksAndProjects}
+        onImportTasksAndProjects={adminActions.onImportTasksAndProjects}
+        onExecutionLoadStatusChange={adminActions.onExecutionLoadStatusChange}
+        onPipelineLoadStatusChange={adminActions.onPipelineLoadStatusChange}
+        onAddPerson={adminActions.onAddPerson}
+        onUpdatePerson={adminActions.onUpdatePerson}
+        onDeletePerson={adminActions.onDeletePerson}
+        onSaveAgentWatchConfig={adminActions.onSaveAgentWatchConfig}
+        onRemoveAgentWatchConfig={adminActions.onRemoveAgentWatchConfig}
+        onPollAgentWatch={adminActions.onPollAgentWatch}
+        mcpAgentAccessEnabled={preferences.mcpAgentAccessEnabled}
+        mcpAddress={preferences.mcpAddress}
+        mcpBindHost={preferences.mcpBindHost}
+        mcpPort={preferences.mcpPort}
+        mcpAccessToken={preferences.mcpAccessToken}
+        mcpAccessTokenIssuedAt={preferences.mcpAccessTokenIssuedAt}
+        mcpAccessTokenTtlMinutes={preferences.mcpAccessTokenTtlMinutes}
+        mcpCapabilityProfile={preferences.mcpCapabilityProfile}
+        mcpListenerStatus={preferences.mcpListenerStatus}
+        mcpAuditLog={preferences.mcpAuditLog}
+        onMcpAgentAccessToggle={adminActions.onMcpAgentAccessToggle}
+        onMcpAddressChange={adminActions.onMcpAddressChange}
+        onMcpBindHostChange={adminActions.onMcpBindHostChange}
+        onMcpPortChange={adminActions.onMcpPortChange}
+        onMcpAccessTokenChange={adminActions.onMcpAccessTokenChange}
+        onMcpAccessTokenRotate={adminActions.onMcpAccessTokenRotate}
+        onMcpAccessTokenTtlMinutesChange={adminActions.onMcpAccessTokenTtlMinutesChange}
+        onMcpCapabilityProfileChange={adminActions.onMcpCapabilityProfileChange}
+        onRestartMcpServer={adminActions.onRestartMcpServer}
+        mcpHealthResult={preferences.mcpHealthResult}
+        mcpHealthCheckRunning={preferences.mcpHealthCheckRunning}
+        onRunMcpHealthCheck={adminActions.onRunMcpHealthCheck}
+        mcpRestartPending={preferences.mcpRestartPending}
+        onRefreshMcpAuditLog={adminActions.onRefreshMcpAuditLog}
       />
     </>
   );

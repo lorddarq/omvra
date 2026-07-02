@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { Person, Task } from '../types';
+import type { Person, Task } from '../types.ts';
 
 interface UsePeopleActionsOptions {
   setPeople: React.Dispatch<React.SetStateAction<Person[]>>;

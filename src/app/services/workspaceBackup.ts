@@ -1,4 +1,11 @@
 import type { Task, TaskAttachment, TaskStatus, TimelineSwimlane, Person, StatusColumn, ProjectMilestone } from '../types.ts';
+import type {
+  KanbanViewState,
+  RoadmapViewState,
+  TimelineViewState,
+  ViewType as WorkspaceViewType,
+} from '../hooks/useViewState.ts';
+import type { TimelineLayoutState } from './uiState.ts';
 import {
   buildLocalMcpAddress,
   normalizeMcpBindHost,
@@ -10,8 +17,6 @@ import { getDefaultStatusId, syncLocalMcpServerAddress } from '../utils/mcpPrefe
 import { flattenPortableStoreEntries, normalizePortableStorageKey } from '../utils/storage.ts';
 
 export const WORKSPACE_BACKUP_SCHEMA_VERSION = 2;
-
-export type WorkspaceViewType = 'timeline' | 'kanban' | 'roadmap';
 
 export interface WorkspacePreferences {
   executionLoadStatusIds: TaskStatus[];
@@ -47,14 +52,11 @@ export type WorkspaceStatusColumn = StatusColumn;
 export interface WorkspaceBackupUiState {
   currentView?: WorkspaceViewType;
   viewState?: {
-    timeline?: Record<string, unknown>;
-    kanban?: Record<string, unknown>;
-    roadmap?: Record<string, unknown>;
+    timeline?: TimelineViewState;
+    kanban?: KanbanViewState;
+    roadmap?: RoadmapViewState;
   };
-  timeline?: {
-    leftColWidth?: number;
-    monthWidths?: Record<string, number>;
-  };
+  timeline?: Partial<TimelineLayoutState>;
 }
 
 export interface WorkspaceBackupPayload {

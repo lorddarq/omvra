@@ -33,9 +33,15 @@ import { allocateTasksToTracks, calculateSwimlaneHeight } from '../utils/trackAl
 import { getReadableTextClassFor } from '../utils/contrast';
 import { getStatusVisual } from '../utils/roadmap';
 import { parseISODateLocal, toLocalISODate } from '../utils/date';
-import { getJSON, persistRawWithElectronMirror } from '../utils/storage';
 import { applyTimelineTaskDrop } from '../utils/timelineTaskDrop';
 import { resolveReorderDropIndex } from '../utils/swimlaneReorder';
+import {
+  findNearestVisibleDateIndex,
+  getCenteredScrollLeftForMarker,
+  getVariableDaySurfaceMarker,
+} from '../utils/timeSurface';
+import type { TimelineLayoutState } from '../services/uiState';
+import { persistTimelineLayoutState } from '../services/uiState';
 
 const PAD_DAYS = 7;
 const DEFAULT_ROW_HEIGHT = 48;
@@ -44,39 +50,8 @@ const DEFAULT_DAY_WIDTH = 60;
 const DEFAULT_LEFT_COL_WIDTH = 282;
 const MIN_LEFT_COL_WIDTH = 260;
 const MAX_LEFT_COL_WIDTH = 420;
-const MONTH_WIDTHS_KEY = 'omvra.monthWidths.v1';
-const LEFT_COL_WIDTH_KEY = 'omvra.leftColWidth.v1';
 const HORIZONTAL_RENDER_BUFFER_PX = 1200;
 const MIN_TOTAL_MONTHS = 12;
-
-function readStoredLeftColumnWidth(): number | null {
-  if (typeof window === 'undefined') return null;
-
-  try {
-    const raw = window.localStorage.getItem(LEFT_COL_WIDTH_KEY);
-    const parsed = raw ? Number(raw) : NaN;
-    return Number.isFinite(parsed)
-      ? Math.max(MIN_LEFT_COL_WIDTH, Math.min(MAX_LEFT_COL_WIDTH, parsed))
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-function readStoredMonthWidths(): Record<string, number> | null {
-  if (typeof window === 'undefined') return null;
-
-  try {
-    const raw = window.localStorage.getItem(MONTH_WIDTHS_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? parsed as Record<string, number>
-      : null;
-  } catch {
-    return null;
-  }
-}
 
 function TimelineSwimlaneInsertionMarker({
   height,
@@ -173,6 +148,8 @@ interface TimelineViewProps {
   mcpRestartPending?: boolean;
   statusColumns?: StatusColumn[];
   initialScrollLeft?: number;
+  initialLayoutState?: TimelineLayoutState;
+  onLayoutStateChange?: (layout: TimelineLayoutState) => void;
   onTaskClick: (task: Task) => void;
   onAddTask: (date: Date, swimlaneId: string, endDate?: Date, mode?: 'projects' | 'people') => void;
   onUpdateTaskDates: (taskId: string, startDate: string, endDate: string) => void;
@@ -196,6 +173,8 @@ export function TimelineView({
   mcpRestartPending = false,
   statusColumns,
   initialScrollLeft,
+  initialLayoutState,
+  onLayoutStateChange,
   onTaskClick,
   onAddTask,
   onUpdateTaskDates,
@@ -208,7 +187,7 @@ export function TimelineView({
 }: TimelineViewProps) {
   // Left column width state
   const [leftColWidth, setLeftColWidth] = useState<number>(() => {
-    return readStoredLeftColumnWidth() ?? DEFAULT_LEFT_COL_WIDTH;
+    return initialLayoutState?.leftColWidth ?? DEFAULT_LEFT_COL_WIDTH;
   });
   const [isResizingLeft, setIsResizingLeft] = useState<boolean>(false);
   const leftResizeRef = useRef<{ startX: number; startWidth: number; pendingWidth?: number } | null>(null);
@@ -266,38 +245,8 @@ export function TimelineView({
   const scrubStartScrollLeftRef = useRef<number>(0);
   const startupScrollTimersRef = useRef<number[]>([]);
   const startupScrollRafRef = useRef<number | null>(null);
-  const hasHydratedTimelineLayoutRef = useRef(false);
   const [isHeaderScrubbing, setIsHeaderScrubbing] = useState(false);
   const [needsStartupTodayScroll, setNeedsStartupTodayScroll] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const hydrateTimelineLayout = async () => {
-      const [storedLeftColWidth, storedMonthWidths] = await Promise.all([
-        getJSON<number>('omvra.leftColWidth.v1', null),
-        getJSON<Record<string, number>>('omvra.monthWidths.v1', null),
-      ]);
-
-      if (cancelled) return;
-
-      if (Number.isFinite(Number(storedLeftColWidth))) {
-        setLeftColWidth(Math.max(MIN_LEFT_COL_WIDTH, Math.min(MAX_LEFT_COL_WIDTH, Number(storedLeftColWidth))));
-      }
-
-      if (storedMonthWidths && typeof storedMonthWidths === 'object') {
-        setMonthWidths(prev => ({ ...prev, ...storedMonthWidths }));
-      }
-
-      hasHydratedTimelineLayoutRef.current = true;
-    };
-
-    void hydrateTimelineLayout();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // State for task resizing
   const [resizingTask, setResizingTask] = useState<{
@@ -355,7 +304,6 @@ export function TimelineView({
     const minDate = new Date(Math.min(...taskDates.map(d => d.getTime())));
     let maxDate = new Date(Math.max(...taskDates.map(d => d.getTime())));
 
-    minDate.setDate(minDate.getDate() - PAD_DAYS);
     maxDate.setDate(maxDate.getDate() + PAD_DAYS);
 
     // Align to month boundaries
@@ -413,8 +361,7 @@ export function TimelineView({
     Object.entries(allDatesByMonth).forEach(([k, monthDates]) => {
       defaults[k] = monthDates.length * DEFAULT_DAY_WIDTH;
     });
-    const stored = readStoredMonthWidths();
-    return stored ? { ...defaults, ...stored } : defaults;
+    return initialLayoutState?.monthWidths ? { ...defaults, ...initialLayoutState.monthWidths } : defaults;
   });
 
   // Derive day widths
@@ -443,16 +390,13 @@ export function TimelineView({
   }, [allDatesByMonth]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (!hasHydratedTimelineLayoutRef.current && !readStoredLeftColumnWidth()) return;
-    persistRawWithElectronMirror(LEFT_COL_WIDTH_KEY, String(leftColWidth));
-  }, [leftColWidth]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (!hasHydratedTimelineLayoutRef.current && !readStoredMonthWidths()) return;
-    persistRawWithElectronMirror(MONTH_WIDTHS_KEY, JSON.stringify(monthWidths));
-  }, [monthWidths]);
+    const nextLayoutState = {
+      leftColWidth,
+      monthWidths,
+    };
+    persistTimelineLayoutState(nextLayoutState);
+    onLayoutStateChange?.(nextLayoutState);
+  }, [leftColWidth, monthWidths, onLayoutStateChange]);
 
   useEffect(() => {
     const arr: number[] = [];
@@ -585,25 +529,16 @@ export function TimelineView({
   }, []);
 
   const todayIndex = useMemo(() => {
-    if (allDates.length === 0) return -1;
-    const exactIdx = allDates.findIndex(d => d.getTime() === today.getTime());
-    if (exactIdx >= 0) return exactIdx;
     // In 5-day mode, weekend "today" may be filtered out; use nearest visible day.
-    for (let i = 0; i < allDates.length; i++) {
-      if (allDates[i].getTime() >= today.getTime()) return i;
-    }
-    return allDates.length - 1;
+    return findNearestVisibleDateIndex(allDates, today);
   }, [allDates, today]);
 
-  const todayOffset = useMemo(() => {
-    if (todayIndex < 0) return null;
-    return dayWidths.slice(0, todayIndex).reduce((a, b) => a + b, 0);
-  }, [todayIndex, dayWidths]);
+  const todayMarker = useMemo(
+    () => getVariableDaySurfaceMarker(dayWidths, todayIndex, DEFAULT_DAY_WIDTH),
+    [dayWidths, todayIndex]
+  );
 
-  const todayCenterOffset = useMemo(() => {
-    if (todayOffset === null || todayIndex < 0) return null;
-    return todayOffset + (dayWidths[todayIndex] ?? DEFAULT_DAY_WIDTH) / 2;
-  }, [dayWidths, todayIndex, todayOffset]);
+  const todayCenterOffset = todayMarker?.center ?? null;
 
   // Calculate total timeline width
   const totalTimelineWidth = useMemo(() => {
@@ -829,39 +764,38 @@ export function TimelineView({
   // Scroll to today
   const scrollToToday = useCallback((opts?: { smooth?: boolean }) => {
     if (!rowsContainerRef.current) return 0;
-    
-    let offset = todayOffset;
-    if (offset === null) {
-      const todayDate = new Date();
-      const todayOnly = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate());
-      let idx = allDates.findIndex(d => d.getTime() === todayOnly.getTime());
-      if (idx < 0) {
-        idx = allDates.findIndex(d => d.getTime() >= todayOnly.getTime());
-      }
-      if (idx < 0 && allDates.length > 0) {
-        idx = allDates.length - 1;
-      }
-      if (idx >= 0) {
-        offset = dayWidths.slice(0, idx).reduce((a, b) => a + b, 0);
+
+    let targetLeft = todayCenterOffset === null
+      ? null
+      : getCenteredScrollLeftForMarker(todayCenterOffset, rowsContainerRef.current.clientWidth);
+
+    if (targetLeft === null) {
+      const fallbackMarker = getVariableDaySurfaceMarker(
+        dayWidths,
+        findNearestVisibleDateIndex(allDates, new Date()),
+        DEFAULT_DAY_WIDTH
+      );
+      if (fallbackMarker) {
+        targetLeft = getCenteredScrollLeftForMarker(fallbackMarker.center, rowsContainerRef.current.clientWidth);
       }
     }
-    
-    if (offset === null) {
+
+    if (targetLeft === null) {
       // Default to scrolling to middle of content
-      offset = Math.max(0, (totalTimelineWidth - rowsContainerRef.current.clientWidth) / 2);
+      targetLeft = Math.max(0, (totalTimelineWidth - rowsContainerRef.current.clientWidth) / 2);
     }
 
     const maxScrollLeft = Math.max(0, totalTimelineWidth - rowsContainerRef.current.clientWidth);
-    offset = Math.max(0, Math.min(offset, maxScrollLeft));
+    targetLeft = Math.max(0, Math.min(targetLeft, maxScrollLeft));
 
     // Use deterministic jump to avoid smooth-scroll drift while virtualization window updates.
-    rowsContainerRef.current.scrollLeft = offset;
+    rowsContainerRef.current.scrollLeft = targetLeft;
     setHorizontalMetrics({
-      scrollLeft: offset,
+      scrollLeft: targetLeft,
       viewportWidth: rowsContainerRef.current.clientWidth,
     });
-    return offset;
-  }, [todayOffset, allDates, dayWidths, totalTimelineWidth]);
+    return targetLeft;
+  }, [todayCenterOffset, allDates, dayWidths, totalTimelineWidth]);
 
   // Scroll handlers
   const handleScrollLeft = useCallback(() => {
@@ -1098,7 +1032,10 @@ export function TimelineView({
     const idx = getVisibleIndexForDate(revealDate, 'start');
     if (idx < 0) return;
 
-    const left = dayWidths.slice(0, idx).reduce((a, b) => a + b, 0);
+    const marker = getVariableDaySurfaceMarker(dayWidths, idx, DEFAULT_DAY_WIDTH);
+    if (!marker) return;
+
+    const left = marker.left;
     const target = Math.max(0, left - rowsContainerRef.current.clientWidth * 0.25);
     try {
       rowsContainerRef.current.scrollTo({ left: target, behavior: 'smooth' });
@@ -1310,20 +1247,23 @@ export function TimelineView({
               />
             )}
 
-            {/* Swimlane rows: tasks */}
-            {visibleTaskCount === 0 ? (
-              <div className="timeline-rows-container flex items-center justify-center p-6">
+            {/* Swimlane rows: keep them interactive even when there are no tasks yet */}
+            {visibleTaskCount === 0 && (
+              <div
+                className="pointer-events-none absolute inset-x-6 z-20 flex justify-center"
+                style={{ top: 'calc(var(--timeline-header-height) + 1rem)' }}
+              >
                 <div className="w-full max-w-2xl">
                   <EmptyStateCard
                     icon={<CalendarDays className="size-5" />}
                     title="No scheduled timeline work yet"
                     description={mode === 'people'
-                      ? 'Assign or date work for these people to start seeing it on the timeline.'
-                      : 'Add dated tasks to these projects and they will appear here with duration and overlap context.'}
+                      ? 'Drag across a row to schedule work for these people.'
+                      : 'Drag across a project row to create the first dated task on the timeline.'}
                   />
                 </div>
               </div>
-            ) : (
+            )}
             <div className="timeline-rows-container">
               {displaySwimlanes.map((swimlane, idx) => {
                 const swimlaneTasks = mode === 'people'
@@ -1429,7 +1369,6 @@ export function TimelineView({
                 onSwimlaneDropIndicatorClear={() => setSwimlaneDropIndicator(null)}
               />
             </div>
-            )}
             </div>
           </div>
         </div>

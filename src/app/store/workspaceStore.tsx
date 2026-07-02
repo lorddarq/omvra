@@ -67,6 +67,7 @@ const DEFAULT_MILESTONES_SEED = ENABLE_SAMPLE_WORKSPACE ? initialMilestones : []
 export interface AppPreferences {
   executionLoadStatusIds: TaskStatus[];
   pipelineLoadStatusIds: TaskStatus[];
+  updateChannel: 'stable' | 'rc';
   mcpAgentAccessEnabled: boolean;
   mcpCapabilityProfile: 'read_only' | 'task_write' | 'admin';
   mcpBindHost: string;
@@ -108,6 +109,7 @@ interface WorkspaceStoreValue {
   applyRoadmapTaskDependencies: (updates: Array<{ taskId: string; dependencyIds: string[] }>) => void;
   toggleExecutionLoadStatus: (statusId: TaskStatus) => void;
   togglePipelineLoadStatus: (statusId: TaskStatus) => void;
+  setUpdateChannel: (channel: AppPreferences['updateChannel']) => void;
   setMcpAgentAccessEnabled: (enabled: boolean) => void;
   setMcpServerAddress: (address: string) => void;
   setMcpBindHost: (host: string) => void;
@@ -164,6 +166,7 @@ export function createDefaultAppPreferences(
   return {
     executionLoadStatusIds: [getDefaultStatusId(statusColumns, 'in-progress')],
     pipelineLoadStatusIds: [getDefaultStatusId(statusColumns, 'open')],
+    updateChannel: 'stable',
     mcpAgentAccessEnabled: false,
     mcpCapabilityProfile: 'read_only',
     mcpBindHost: DEFAULT_MCP_BIND_HOST,
@@ -222,6 +225,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
         [pipelineDefault],
         defaultSwimlanes
       ),
+      updateChannel: stored.updateChannel === 'rc' ? 'rc' : 'stable',
       mcpAgentAccessEnabled: Boolean(stored.mcpAgentAccessEnabled),
       mcpCapabilityProfile:
         stored.mcpCapabilityProfile === 'task_write' || stored.mcpCapabilityProfile === 'admin'
@@ -507,6 +511,13 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     }));
   }, []);
 
+  const setUpdateChannel = useCallback((channel: AppPreferences['updateChannel']) => {
+    setPreferences(previous => ({
+      ...previous,
+      updateChannel: channel === 'rc' ? 'rc' : 'stable',
+    }));
+  }, []);
+
   const setMcpAgentAccessEnabled = useCallback((enabled: boolean) => {
     setPreferences(previous => ({ ...previous, mcpAgentAccessEnabled: enabled }));
   }, []);
@@ -584,6 +595,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     applyRoadmapTaskDependencies: applyRoadmapDependencies,
     toggleExecutionLoadStatus,
     togglePipelineLoadStatus,
+    setUpdateChannel,
     setMcpAgentAccessEnabled,
     setMcpServerAddress,
     setMcpBindHost,
@@ -613,6 +625,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     setMcpCapabilityProfile,
     setMcpPort,
     setMcpServerAddress,
+    setUpdateChannel,
     statusColumns,
     tasks,
     timelineSwimlanes,

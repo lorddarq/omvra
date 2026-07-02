@@ -51,6 +51,7 @@ export interface AppPanelWorkspaceState {
 export interface PreferencesPanelState {
   executionLoadStatusIds: TaskStatus[];
   pipelineLoadStatusIds: TaskStatus[];
+  updateChannel: 'stable' | 'rc';
   agentWatchConfigs: AgentWatchConfig[];
   agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
   storageMeter: StorageMeter;
@@ -106,10 +107,11 @@ export interface WorkspaceAdminActions {
   onPollAgentWatch: (personId: string) => void;
   onClosePreferences: () => void;
   onNukeLocalData: () => void;
-  onExportTasksAndProjects: () => void;
+  onExportWorkspaceBackup: () => Promise<boolean>;
   onImportTasksAndProjects: (file: File) => void;
   onExecutionLoadStatusChange: (statusId: TaskStatus) => void;
   onPipelineLoadStatusChange: (statusId: TaskStatus) => void;
+  onUpdateChannelChange: (channel: 'stable' | 'rc') => void;
   onMcpAgentAccessToggle: (enabled: boolean) => void;
   onMcpAddressChange: (address: string) => void;
   onMcpBindHostChange: (host: string) => void;
@@ -241,6 +243,7 @@ export function AppPanels({
         statusColumns={workspace.statusColumns}
         executionLoadStatusIds={preferences.executionLoadStatusIds}
         pipelineLoadStatusIds={preferences.pipelineLoadStatusIds}
+        updateChannel={preferences.updateChannel}
         people={workspace.people}
         tasks={workspace.tasks}
         timelineSwimlanes={workspace.timelineSwimlanes}
@@ -249,10 +252,11 @@ export function AppPanels({
         storageMeter={preferences.storageMeter}
         importFeedback={preferences.importFeedback}
         onNukeLocalData={adminActions.onNukeLocalData}
-        onExportTasksAndProjects={adminActions.onExportTasksAndProjects}
+        onExportWorkspaceBackup={adminActions.onExportWorkspaceBackup}
         onImportTasksAndProjects={adminActions.onImportTasksAndProjects}
         onExecutionLoadStatusChange={adminActions.onExecutionLoadStatusChange}
         onPipelineLoadStatusChange={adminActions.onPipelineLoadStatusChange}
+        onUpdateChannelChange={adminActions.onUpdateChannelChange}
         onAddPerson={adminActions.onAddPerson}
         onUpdatePerson={adminActions.onUpdatePerson}
         onDeletePerson={adminActions.onDeletePerson}

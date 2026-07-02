@@ -296,7 +296,7 @@ function TaskStatusChoiceGroup({
 interface DataSettingsSectionProps {
   storageMeter: StorageMeter;
   onNukeLocalData: () => void;
-  onExportTasksAndProjects: () => void;
+  onExportWorkspaceBackup: () => Promise<boolean>;
   onImportTasksAndProjects: (file: File) => void;
   importFeedback?: {
     type: 'success' | 'error';
@@ -307,7 +307,7 @@ interface DataSettingsSectionProps {
 export function DataSettingsSection({
   storageMeter,
   onNukeLocalData,
-  onExportTasksAndProjects,
+  onExportWorkspaceBackup,
   onImportTasksAndProjects,
   importFeedback,
 }: DataSettingsSectionProps) {
@@ -346,7 +346,9 @@ export function DataSettingsSection({
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
-              onClick={onExportTasksAndProjects}
+              onClick={() => {
+                void onExportWorkspaceBackup();
+              }}
               className="inline-flex h-8 items-center gap-2 rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-[#67676f] outline-none hover:bg-[#71717a]/5 focus-visible:ring-2 focus-visible:ring-gray-300"
             >
               <Download className="size-4 shrink-0" />

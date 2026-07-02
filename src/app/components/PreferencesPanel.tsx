@@ -24,6 +24,7 @@ interface PreferencesPanelProps {
   statusColumns: StatusColumn[];
   executionLoadStatusIds: TaskStatus[];
   pipelineLoadStatusIds: TaskStatus[];
+  updateChannel: 'stable' | 'rc';
   people: Person[];
   tasks: Task[];
   timelineSwimlanes: TimelineSwimlane[];
@@ -38,7 +39,7 @@ interface PreferencesPanelProps {
   onRemoveAgentWatchConfig: (personId: string) => void;
   onPollAgentWatch: (personId: string) => void;
   onNukeLocalData: () => void;
-  onExportTasksAndProjects: () => void;
+  onExportWorkspaceBackup: () => Promise<boolean>;
   onImportTasksAndProjects: (file: File) => void;
   importFeedback?: {
     type: 'success' | 'error';
@@ -54,6 +55,7 @@ interface PreferencesPanelProps {
   mcpCapabilityProfile: 'read_only' | 'task_write' | 'admin';
   mcpListenerStatus: McpListenerStatus | null;
   mcpAuditLog: McpAuditEntry[];
+  onUpdateChannelChange: (channel: 'stable' | 'rc') => void;
   onMcpAgentAccessToggle: (enabled: boolean) => void;
   onMcpAddressChange: (address: string) => void;
   onMcpBindHostChange: (host: string) => void;
@@ -78,6 +80,7 @@ export function PreferencesPanel({
   statusColumns,
   executionLoadStatusIds,
   pipelineLoadStatusIds,
+  updateChannel,
   people,
   tasks,
   timelineSwimlanes,
@@ -92,7 +95,7 @@ export function PreferencesPanel({
   onRemoveAgentWatchConfig,
   onPollAgentWatch,
   onNukeLocalData,
-  onExportTasksAndProjects,
+  onExportWorkspaceBackup,
   onImportTasksAndProjects,
   importFeedback,
   mcpAgentAccessEnabled,
@@ -105,6 +108,7 @@ export function PreferencesPanel({
   mcpCapabilityProfile,
   mcpListenerStatus,
   mcpAuditLog,
+  onUpdateChannelChange,
   onMcpAgentAccessToggle,
   onMcpAddressChange,
   onMcpBindHostChange,
@@ -369,12 +373,16 @@ export function PreferencesPanel({
       <DataSettingsSection
         storageMeter={storageMeter}
         onNukeLocalData={onNukeLocalData}
-        onExportTasksAndProjects={onExportTasksAndProjects}
+        onExportWorkspaceBackup={onExportWorkspaceBackup}
         onImportTasksAndProjects={onImportTasksAndProjects}
         importFeedback={importFeedback}
       />
 
-      <AboutSettingsSection />
+      <AboutSettingsSection
+        updateChannel={updateChannel}
+        onUpdateChannelChange={onUpdateChannelChange}
+        onExportWorkspaceBackup={onExportWorkspaceBackup}
+      />
       <HelpSettingsSection />
     </SettingsPanel>
   );

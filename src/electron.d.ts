@@ -139,6 +139,26 @@ declare global {
     [key: string]: unknown;
   }
 
+  interface AppUpdateInfo {
+    version: string;
+    releaseDate: string | null;
+    releaseName: string | null;
+    releaseNotes: string | null;
+    isPrerelease: boolean;
+  }
+
+  interface AppUpdateState {
+    supported: boolean;
+    packaged: boolean;
+    channel: 'stable' | 'rc';
+    status: 'idle' | 'unsupported' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
+    update: AppUpdateInfo | null;
+    progressPercent: number | null;
+    error: string | null;
+    requiresBackup: boolean;
+    lastCheckedAt: string | null;
+  }
+
   interface Window {
     electron: {
       storeGet: (key: string) => Promise<any>;
@@ -155,6 +175,15 @@ declare global {
           chromeVersion: string;
           nodeVersion: string;
         }>;
+      };
+      updates: {
+        getState: () => Promise<AppUpdateState>;
+        check: () => Promise<AppUpdateState>;
+        download: () => Promise<AppUpdateState>;
+        install: () => Promise<{ success: boolean }>;
+        dismiss: () => Promise<AppUpdateState>;
+        setChannel: (channel: 'stable' | 'rc') => Promise<Pick<AppUpdateState, 'channel'> | AppUpdateState>;
+        onStateChanged: (listener: (payload: AppUpdateState) => void) => () => void;
       };
       attachments: {
         pick: () => Promise<string[]>;

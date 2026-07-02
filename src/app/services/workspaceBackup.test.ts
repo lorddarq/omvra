@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  buildWorkspaceBackupFileName,
   createDefaultWorkspacePreferences,
   getPortableElectronStoreSnapshotFromExport,
   getPortableStorageSnapshotFromEntries,
@@ -82,4 +83,29 @@ test('legacy Plumy electron-store exports normalize under Omvra keys', () => {
     'omvra.tasks.v1': [{ id: 'task-1' }],
     'omvra_viewstate_timeline.scrollLeft': 120,
   });
+});
+
+test('workspace backup preferences preserve rc update channel and filenames use exported date', () => {
+  const repaired = repairWorkspaceBackupPayload(
+    {
+      version: 2,
+      exportedAt: '2026-07-02T12:34:56.000Z',
+      tasks: [],
+      projects: [],
+      people: [],
+      milestones: [],
+      statusColumns: [],
+      preferences: {
+        updateChannel: 'rc',
+      },
+    },
+    {
+      fallbackStatusColumns,
+      fallbackPreferences: createDefaultWorkspacePreferences(fallbackStatusColumns),
+      allowFallbackForMissingArrays: true,
+    }
+  );
+
+  assert.equal(repaired.preferences.updateChannel, 'rc');
+  assert.equal(buildWorkspaceBackupFileName('2026-07-02T12:34:56.000Z'), 'omvra-backup-2026-07-02.json');
 });

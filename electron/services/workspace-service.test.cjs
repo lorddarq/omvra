@@ -58,11 +58,11 @@ test('workspace snapshot contract has expected keys and stable counts', () => {
   );
   assert.match(
     snapshot.meta.fieldSemantics.people.agentInstructions,
-    /user-authored behavioural persona metadata only/i
+    /assignee role\/persona guidance/i
   );
   assert.match(
     snapshot.meta.fieldSemantics.people.agentOperationalInstructions,
-    /user-authored reusable operational workspace guidance only/i
+    /preferred work approach/i
   );
   assert.ok(snapshot.workspace);
   assert.ok(Array.isArray(snapshot.workspace.tasks));

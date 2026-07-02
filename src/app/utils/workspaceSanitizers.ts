@@ -9,6 +9,7 @@ export interface AppPreferencesLike {
   pipelineLoadStatusIds: TaskStatus[];
   executionLoadStatusId?: TaskStatus;
   pipelineLoadStatusId?: TaskStatus;
+  updateChannel: 'stable' | 'rc';
   mcpAgentAccessEnabled: boolean;
   mcpCapabilityProfile: 'read_only' | 'task_write' | 'admin';
   mcpBindHost: string;
@@ -348,6 +349,7 @@ export function sanitizePreferences(
   return {
     executionLoadStatusIds,
     pipelineLoadStatusIds,
+    updateChannel: preferences.updateChannel === 'rc' ? 'rc' : 'stable',
     mcpAgentAccessEnabled: Boolean(preferences.mcpAgentAccessEnabled),
     mcpCapabilityProfile:
       preferences.mcpCapabilityProfile === 'task_write' || preferences.mcpCapabilityProfile === 'admin'

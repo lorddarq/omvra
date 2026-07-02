@@ -15,6 +15,7 @@ import { getAgentWatchPollingInterval, useAgentWatchRuntime } from './useAgentWa
 import { usePeopleActions } from './usePeopleActions.ts';
 import {
   buildWorkspaceBackupPayload,
+  downloadWorkspaceBackupPayload,
   parseWorkspaceBackupJson,
   repairWorkspaceBackupPayload,
   WORKSPACE_BACKUP_SCHEMA_VERSION,
@@ -31,6 +32,7 @@ import type { AppPanelsProps } from '../components/AppPanels.tsx';
 import type { ComponentProps } from 'react';
 import { AppHeader } from '../components/AppHeader.tsx';
 import { DeleteConfirmDialog } from '../components/DeleteConfirmDialog.tsx';
+import { UpdateAvailablePopup } from '../components/UpdateAvailablePopup.tsx';
 import {
   normalizeMcpBindHost,
   normalizeMcpPort,
@@ -64,6 +66,7 @@ export interface AppShellState {
   headerProps: ComponentProps<typeof AppHeader>;
   mainViewsProps: AppMainViewsProps;
   panelsProps: AppPanelsProps;
+  updatePopupProps: ComponentProps<typeof UpdateAvailablePopup>;
   deleteConfirmProps: ComponentProps<typeof DeleteConfirmDialog>;
 }
 
@@ -83,6 +86,7 @@ export function useAppShell(): AppShellState {
     setAgentWatchConfigs,
     preferences,
     setPreferences,
+    setUpdateChannel,
     replaceWorkspaceSnapshot,
     saveMilestone,
     deleteMilestone,
@@ -364,8 +368,7 @@ export function useAppShell(): AppShellState {
     setResetLocalDataConfirmOpen(true);
   }, [setResetLocalDataConfirmOpen]);
 
-  const handleExportTasksAndProjects = useCallback(async () => {
-    if (typeof window === 'undefined') return;
+  const handleExportWorkspaceBackup = useCallback(async () => {
     const payload = buildWorkspaceBackupPayload({
       tasks,
       milestones,
@@ -379,16 +382,8 @@ export function useAppShell(): AppShellState {
       version: WORKSPACE_BACKUP_SCHEMA_VERSION,
       exportedAt: new Date().toISOString(),
     });
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    const dateStamp = new Date().toISOString().slice(0, 10);
-    link.href = url;
-    link.download = `omvra-backup-${dateStamp}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+
+    return downloadWorkspaceBackupPayload(payload);
   }, [
     buildBackupUiState,
     milestones,
@@ -613,6 +608,7 @@ export function useAppShell(): AppShellState {
       preferences: {
         executionLoadStatusIds: preferences.executionLoadStatusIds,
         pipelineLoadStatusIds: preferences.pipelineLoadStatusIds,
+        updateChannel: preferences.updateChannel,
         agentWatchConfigs,
         agentWatchRuntime,
         storageMeter,
@@ -662,10 +658,11 @@ export function useAppShell(): AppShellState {
         onPollAgentWatch: handlePollAgentWatchFromPanel,
         onClosePreferences: closePreferences,
         onNukeLocalData: handleNukeLocalData,
-        onExportTasksAndProjects: handleExportTasksAndProjects,
+        onExportWorkspaceBackup: handleExportWorkspaceBackup,
         onImportTasksAndProjects: handleImportTasksAndProjects,
         onExecutionLoadStatusChange: toggleExecutionLoadStatus,
         onPipelineLoadStatusChange: togglePipelineLoadStatus,
+        onUpdateChannelChange: setUpdateChannel,
         onMcpAgentAccessToggle: setMcpAgentAccessEnabled,
         onMcpAddressChange: (address) => setMcpServerAddress(normalizeMcpServerAddress(address)),
         onMcpBindHostChange: (host) => setMcpBindHost(normalizeMcpBindHost(host)),
@@ -678,6 +675,11 @@ export function useAppShell(): AppShellState {
         onRunMcpHealthCheck: mcpHealth.runHealthCheck,
         onRefreshMcpAuditLog: refreshMcpAuditLog,
       },
+    },
+    updatePopupProps: {
+      updateChannel: preferences.updateChannel,
+      onUpdateChannelChange: setUpdateChannel,
+      onExportWorkspaceBackup: handleExportWorkspaceBackup,
     },
     deleteConfirmProps: {
       isOpen: resetLocalDataConfirmOpen,

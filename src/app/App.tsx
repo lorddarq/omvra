@@ -2,6 +2,7 @@ import { AppHeader } from './components/AppHeader';
 import { AppMainViews } from './components/AppMainViews';
 import { AppPanels } from './components/AppPanels';
 import { DeleteConfirmDialog } from './components/DeleteConfirmDialog';
+import { UpdateAvailablePopup } from './components/UpdateAvailablePopup';
 import { useAppShell } from './hooks/useAppShell.ts';
 import { UiLayoutStoreProvider } from './store/uiLayoutStore.tsx';
 import { WorkspaceStoreProvider, useWorkspaceStore } from './store/workspaceStore.tsx';
@@ -23,6 +24,7 @@ function AppContent() {
         <AppHeader {...appShell.headerProps} />
         <AppMainViews {...appShell.mainViewsProps} />
         <AppPanels {...appShell.panelsProps} />
+        <UpdateAvailablePopup {...appShell.updatePopupProps} />
       </div>
 
       <DeleteConfirmDialog {...appShell.deleteConfirmProps} />

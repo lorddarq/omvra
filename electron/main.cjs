@@ -2,8 +2,19 @@ const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const Store = require('electron-store');
+let autoUpdater = null;
+try {
+  ({ autoUpdater } = require('electron-updater'));
+} catch (error) {
+  console.warn('[updates] electron-updater is unavailable:', error?.message || error);
+}
 const { registerMcpIpcHandlers } = require('./ipc/mcp.cjs');
 const { startMcpHttpServer } = require('./services/mcp-http-server.cjs');
+const {
+  createUpdateController,
+  normalizeUpdateChannel,
+} = require('./services/update-service.cjs');
+const { registerUpdateIpcHandlers } = require('./services/update-ipc.cjs');
 const {
   isMcpAgentAccessEnabled,
   buildMcpListenerStatus,
@@ -14,7 +25,10 @@ const isDev = !app.isPackaged;
 const storeName = isDev ? 'omvra-store-dev' : 'omvra-store';
 const store = new Store({ name: storeName });
 const STORE_DID_CHANGE_CHANNEL = 'store/did-change';
+const UPDATE_STATE_CHANNEL = 'updates/state-changed';
+const PREFERENCES_KEY = 'omvra.preferences.v1';
 let mcpHttpServer = null;
+let updateController = null;
 let mcpRuntimeState = {
   status: 'stopped',
   listening: false,
@@ -76,6 +90,54 @@ function broadcastStoreDidChange() {
       window.webContents.send(STORE_DID_CHANGE_CHANNEL, payload);
     }
   }
+}
+
+function broadcastUpdateState(updateState) {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) {
+      window.webContents.send(UPDATE_STATE_CHANNEL, updateState);
+    }
+  }
+}
+
+function getStoredUpdateChannel() {
+  const storedPreferences = store.get(PREFERENCES_KEY);
+  return normalizeUpdateChannel(storedPreferences?.updateChannel);
+}
+
+function setStoredUpdateChannel(channel) {
+  const normalized = normalizeUpdateChannel(channel);
+  const storedPreferences = store.get(PREFERENCES_KEY);
+  store.set(PREFERENCES_KEY, {
+    ...(storedPreferences && typeof storedPreferences === 'object' ? storedPreferences : {}),
+    updateChannel: normalized,
+  });
+  return normalized;
+}
+
+function syncUpdateChannelFromStore() {
+  if (!updateController) return null;
+  return updateController.setChannel(getStoredUpdateChannel());
+}
+
+function getDebugUpdateFixtureFromEnv() {
+  const status = typeof process.env.OMVRA_DEBUG_UPDATE_STATUS === 'string'
+    ? process.env.OMVRA_DEBUG_UPDATE_STATUS.trim()
+    : '';
+  if (!status) return null;
+
+  return {
+    status,
+    version: process.env.OMVRA_DEBUG_UPDATE_VERSION,
+    releaseName: process.env.OMVRA_DEBUG_UPDATE_NAME,
+    releaseNotes: process.env.OMVRA_DEBUG_UPDATE_NOTES,
+    releaseDate: process.env.OMVRA_DEBUG_UPDATE_DATE,
+    channel: process.env.OMVRA_DEBUG_UPDATE_CHANNEL,
+    progressPercent: process.env.OMVRA_DEBUG_UPDATE_PROGRESS,
+    requiresBackup: process.env.OMVRA_DEBUG_UPDATE_REQUIRES_BACKUP === '1',
+    error: process.env.OMVRA_DEBUG_UPDATE_ERROR,
+    lastCheckedAt: process.env.OMVRA_DEBUG_UPDATE_LAST_CHECKED_AT,
+  };
 }
 
 function sanitizePdfFileName(value) {
@@ -270,9 +332,20 @@ app.whenReady().then(() => {
   // Bind MCP endpoint to localhost only; no external interface exposure.
   store.onDidAnyChange(() => {
     broadcastStoreDidChange();
+    syncUpdateChannelFromStore();
   });
+  updateController = createUpdateController({
+    app,
+    updater: autoUpdater,
+    onStateChange: broadcastUpdateState,
+    debugUpdateFixture: getDebugUpdateFixtureFromEnv(),
+  });
+  syncUpdateChannelFromStore();
   restartMcpServer();
   createWindow();
+  if (updateController && app.isPackaged) {
+    void updateController.checkForUpdates();
+  }
 });
 
 app.on('window-all-closed', () => {
@@ -287,6 +360,10 @@ app.on('before-quit', () => {
   if (mcpHttpServer) {
     mcpHttpServer.close();
     mcpHttpServer = null;
+  }
+  if (updateController) {
+    updateController.dispose();
+    updateController = null;
   }
 });
 
@@ -305,6 +382,12 @@ ipcMain.handle('app/get-runtime-info', () => ({
   chromeVersion: process.versions.chrome || 'unknown',
   nodeVersion: process.versions.node || 'unknown',
 }));
+registerUpdateIpcHandlers({
+  ipcMain,
+  app,
+  getUpdateController: () => updateController,
+  setStoredUpdateChannel,
+});
 ipcMain.handle('tasks/export-pdf', exportHtmlToPdf);
 ipcMain.handle('mcp/restart-server', () => {
   try {

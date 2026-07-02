@@ -23,6 +23,7 @@ export interface WorkspacePreferences {
   pipelineLoadStatusIds: TaskStatus[];
   executionLoadStatusId?: TaskStatus;
   pipelineLoadStatusId?: TaskStatus;
+  updateChannel: 'stable' | 'rc';
   mcpAgentAccessEnabled: boolean;
   mcpCapabilityProfile: 'read_only' | 'task_write' | 'admin';
   mcpBindHost: string;
@@ -409,6 +410,7 @@ export function sanitizePreferences(
   return {
     executionLoadStatusIds,
     pipelineLoadStatusIds,
+    updateChannel: preferences.updateChannel === 'rc' ? 'rc' : 'stable',
     mcpAgentAccessEnabled: Boolean(preferences.mcpAgentAccessEnabled),
     mcpCapabilityProfile:
       preferences.mcpCapabilityProfile === 'task_write' || preferences.mcpCapabilityProfile === 'admin'
@@ -491,6 +493,45 @@ export function buildWorkspaceBackupPayload(input: WorkspaceBackupBuildInput): W
     storage: input.storage,
     electronStore: input.electronStore,
   };
+}
+
+export function buildWorkspaceBackupFileName(
+  exportedAt: string,
+  prefix = 'omvra-backup'
+): string {
+  const parsedDate = new Date(exportedAt);
+  const dateStamp = Number.isNaN(parsedDate.getTime())
+    ? new Date().toISOString().slice(0, 10)
+    : parsedDate.toISOString().slice(0, 10);
+
+  return `${prefix}-${dateStamp}.json`;
+}
+
+export async function downloadWorkspaceBackupPayload(
+  payload: WorkspaceBackupPayload,
+  options: { fileNamePrefix?: string } = {}
+): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+
+  try {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    link.href = url;
+    link.download = buildWorkspaceBackupFileName(
+      payload.exportedAt || new Date().toISOString(),
+      options.fileNamePrefix || 'omvra-backup'
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function repairWorkspaceBackupPayload(
@@ -692,6 +733,7 @@ export function createDefaultWorkspacePreferences(
   return {
     executionLoadStatusIds,
     pipelineLoadStatusIds,
+    updateChannel: overrides.updateChannel === 'rc' ? 'rc' : 'stable',
     mcpAgentAccessEnabled: Boolean(overrides.mcpAgentAccessEnabled),
     mcpCapabilityProfile:
       overrides.mcpCapabilityProfile === 'task_write' || overrides.mcpCapabilityProfile === 'admin'

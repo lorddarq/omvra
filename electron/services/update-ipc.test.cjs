@@ -40,6 +40,8 @@ test('update IPC exposes fallback state when no controller is available', async 
     packaged: false,
     channel: 'stable',
     status: 'unsupported',
+    unsupportedReason: 'unpackaged',
+    unsupportedDetails: null,
     update: null,
     progressPercent: null,
     error: null,

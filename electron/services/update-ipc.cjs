@@ -11,6 +11,7 @@ function registerUpdateIpcHandlers({
       supported: false,
       packaged: Boolean(app?.isPackaged),
       channel: 'stable',
+      unsupportedReason: app?.isPackaged ? 'updater-unavailable' : 'unpackaged',
     });
   }
 

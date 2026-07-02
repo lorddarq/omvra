@@ -40,17 +40,24 @@ function sanitizeUpdateInfo(info) {
 }
 
 function createDefaultUpdateState(options = {}) {
+  const unsupportedReason = normalizeUnsupportedReason(options.unsupportedReason);
   return {
     supported: Boolean(options.supported),
     packaged: Boolean(options.packaged),
     channel: normalizeUpdateChannel(options.channel),
     status: options.supported ? 'idle' : 'unsupported',
+    unsupportedReason,
+    unsupportedDetails: typeof options.unsupportedDetails === 'string' ? options.unsupportedDetails : null,
     update: null,
     progressPercent: null,
     error: null,
     requiresBackup: false,
     lastCheckedAt: null,
   };
+}
+
+function normalizeUnsupportedReason(value) {
+  return value === 'updater-unavailable' ? 'updater-unavailable' : 'unpackaged';
 }
 
 function sanitizeDebugUpdateFixture(fixture) {
@@ -82,7 +89,14 @@ function sanitizeDebugUpdateFixture(fixture) {
   };
 }
 
-function createUpdateController({ app, updater, onStateChange, debugUpdateFixture } = {}) {
+function createUpdateController({
+  app,
+  updater,
+  onStateChange,
+  debugUpdateFixture,
+  unsupportedReason,
+  unsupportedDetails,
+} = {}) {
   const debugFixture = sanitizeDebugUpdateFixture(debugUpdateFixture);
   const packaged = debugFixture ? true : Boolean(app && app.isPackaged);
   const supported = Boolean(debugFixture) || (packaged && Boolean(updater && typeof updater.on === 'function'));
@@ -90,6 +104,8 @@ function createUpdateController({ app, updater, onStateChange, debugUpdateFixtur
     supported,
     packaged,
     channel: 'stable',
+    unsupportedReason,
+    unsupportedDetails,
   });
 
   const listeners = new Set();
@@ -280,6 +296,7 @@ module.exports = {
   createDefaultUpdateState,
   createUpdateController,
   normalizeUpdateChannel,
+  normalizeUnsupportedReason,
   sanitizeDebugUpdateFixture,
   sanitizeUpdateInfo,
 };

@@ -92,6 +92,25 @@ test('createUpdateController reports unsupported state for unpackaged builds', (
     supported: false,
     packaged: false,
     channel: 'stable',
+    unsupportedReason: 'unpackaged',
+    unsupportedDetails: null,
+  }));
+});
+
+test('createUpdateController reports updater-unavailable for packaged builds without electron-updater', () => {
+  const controller = createUpdateController({
+    app: { isPackaged: true },
+    updater: null,
+    unsupportedReason: 'updater-unavailable',
+    unsupportedDetails: 'Cannot find module electron-updater',
+  });
+
+  assert.deepEqual(controller.getState(), createDefaultUpdateState({
+    supported: false,
+    packaged: true,
+    channel: 'stable',
+    unsupportedReason: 'updater-unavailable',
+    unsupportedDetails: 'Cannot find module electron-updater',
   }));
 });
 

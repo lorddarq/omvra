@@ -136,6 +136,7 @@ export function AboutSettingsSection({
   const showDownloadAction = updateState.status === 'available';
   const showInstallAction = updateState.status === 'downloaded';
   const showBackupAction = showDownloadAction || showInstallAction;
+  const isCheckingForUpdates = updateState.status === 'checking';
   const parsedReleaseNotes = parseUpdateReleaseNotes(updateState.update?.releaseNotes, { maxItems: 4 });
 
   return (
@@ -230,12 +231,13 @@ export function AboutSettingsSection({
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
+                disabled={isCheckingForUpdates}
                 onClick={() => {
                   void handleCheckForUpdates();
                 }}
-                className="inline-flex h-8 items-center gap-2 rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-[#67676f] outline-none hover:bg-[#71717a]/5 focus-visible:ring-2 focus-visible:ring-gray-300"
+                className="inline-flex h-8 items-center gap-2 rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-[#67676f] outline-none hover:bg-[#71717a]/5 focus-visible:ring-2 focus-visible:ring-gray-300 disabled:cursor-wait disabled:opacity-80"
               >
-                <RotateCcw className="size-4 shrink-0" />
+                <RotateCcw className={isCheckingForUpdates ? 'size-4 shrink-0 animate-spin' : 'size-4 shrink-0'} />
                 Check now
               </button>
 
@@ -365,7 +367,9 @@ function getUpdateBadge(updateState: AppUpdateState) {
   if (!updateState.supported) {
     return {
       className: 'inline-flex h-7 shrink-0 items-center rounded-full border border-black/10 bg-[#f4f4f5] px-3 text-xs font-semibold text-[#71717a]',
-      label: 'Updater unavailable',
+      label: updateState.unsupportedReason === 'updater-unavailable'
+        ? 'Updater failed to load'
+        : 'Updater unavailable',
       showCheck: false,
     };
   }
@@ -414,6 +418,15 @@ function getUpdateBadge(updateState: AppUpdateState) {
 function getUpdateSummary(updateState: AppUpdateState) {
   if (!updateState.packaged) {
     return 'Auto-update checks run only in packaged Omvra builds.';
+  }
+
+  if (!updateState.supported) {
+    const details = updateState.unsupportedDetails?.trim();
+    return updateState.unsupportedReason === 'updater-unavailable'
+      ? details
+        ? `This packaged Omvra build could not load electron-updater: ${details}`
+        : 'This packaged Omvra build could not load electron-updater.'
+      : 'Auto-update checks are unavailable in this build.';
   }
 
   switch (updateState.status) {

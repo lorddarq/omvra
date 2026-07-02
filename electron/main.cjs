@@ -3,9 +3,11 @@ const path = require('path');
 const fs = require('fs');
 const Store = require('electron-store');
 let autoUpdater = null;
+let autoUpdaterLoadError = null;
 try {
   ({ autoUpdater } = require('electron-updater'));
 } catch (error) {
+  autoUpdaterLoadError = error?.message || String(error);
   console.warn('[updates] electron-updater is unavailable:', error?.message || error);
 }
 const { registerMcpIpcHandlers } = require('./ipc/mcp.cjs');
@@ -13,6 +15,7 @@ const { startMcpHttpServer } = require('./services/mcp-http-server.cjs');
 const {
   createUpdateController,
   normalizeUpdateChannel,
+  normalizeUnsupportedReason,
 } = require('./services/update-service.cjs');
 const { registerUpdateIpcHandlers } = require('./services/update-ipc.cjs');
 const {
@@ -339,6 +342,10 @@ app.whenReady().then(() => {
     updater: autoUpdater,
     onStateChange: broadcastUpdateState,
     debugUpdateFixture: getDebugUpdateFixtureFromEnv(),
+    unsupportedReason: normalizeUnsupportedReason(
+      app.isPackaged && !autoUpdater ? 'updater-unavailable' : 'unpackaged'
+    ),
+    unsupportedDetails: app.isPackaged && !autoUpdater ? autoUpdaterLoadError : null,
   });
   syncUpdateChannelFromStore();
   restartMcpServer();

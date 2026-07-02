@@ -11,6 +11,8 @@ const INITIAL_UPDATE_STATE: AppUpdateState = {
   packaged: false,
   channel: 'stable',
   status: 'idle',
+  unsupportedReason: 'unpackaged',
+  unsupportedDetails: null,
   update: null,
   progressPercent: null,
   error: null,

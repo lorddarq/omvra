@@ -28,6 +28,7 @@ export function useAppUpdateState({
     channel: updateChannel,
   });
   const [backupExportedAt, setBackupExportedAt] = useState<string | null>(null);
+  const [dismissedAvailableUpdateKey, setDismissedAvailableUpdateKey] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,6 +76,12 @@ export function useAppUpdateState({
     setBackupExportedAt(null);
   }, [updateState.update?.version]);
 
+  useEffect(() => {
+    if (updateState.status !== 'available' && dismissedAvailableUpdateKey !== null) {
+      setDismissedAvailableUpdateKey(null);
+    }
+  }, [dismissedAvailableUpdateKey, updateState.status]);
+
   const handleCheckForUpdates = async () => {
     try {
       const nextState = await window.electron?.updates?.check?.();
@@ -116,6 +123,19 @@ export function useAppUpdateState({
     }
   };
 
+  const handleRemindLater = async () => {
+    if (updateState.status === 'available') {
+      setDismissedAvailableUpdateKey(getAvailableUpdateKey(updateState));
+      return;
+    }
+
+    await handleDismissUpdate();
+  };
+
+  const handleCloseUpdate = async () => {
+    await handleRemindLater();
+  };
+
   const handleInstallUpdate = async () => {
     try {
       await window.electron?.updates?.install?.();
@@ -144,11 +164,22 @@ export function useAppUpdateState({
     updateState,
     backupExportedAt,
     installBlocked: updateState.requiresBackup && !backupExportedAt,
+    isAvailableDismissedForSession: updateState.status === 'available'
+      && dismissedAvailableUpdateKey === getAvailableUpdateKey(updateState),
     handleCheckForUpdates,
+    handleCloseUpdate,
     handleDownloadUpdate,
     handleDismissUpdate,
     handleInstallUpdate,
     handleExportBackup,
+    handleRemindLater,
     handleUpdateChannelSelect,
   };
+}
+
+function getAvailableUpdateKey(updateState: AppUpdateState) {
+  return updateState.update?.version
+    || updateState.update?.releaseDate
+    || updateState.update?.releaseName
+    || 'available-update';
 }

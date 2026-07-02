@@ -16,17 +16,19 @@ export function UpdateAvailablePopup({
   const {
     updateState,
     installBlocked,
-    handleDismissUpdate,
+    handleCloseUpdate,
     handleInstallUpdate,
     handleDownloadUpdate,
     handleExportBackup,
+    handleRemindLater,
+    isAvailableDismissedForSession,
   } = useAppUpdateState({
     updateChannel,
     onUpdateChannelChange,
     onExportWorkspaceBackup,
   });
 
-  if (!shouldShowUpdatePopup(updateState)) {
+  if (!shouldShowUpdatePopup(updateState, isAvailableDismissedForSession)) {
     return null;
   }
 
@@ -36,6 +38,7 @@ export function UpdateAvailablePopup({
   const isBusy = updateState.status === 'downloading';
   const progressPercent = Math.max(0, Math.min(100, updateState.progressPercent ?? 20));
   const showPrimaryButton = updateState.status !== 'downloading';
+  const isAvailableDialog = updateState.status === 'available' && !installBlocked;
 
   const handlePrimaryAction = async () => {
     if (installBlocked) {
@@ -54,7 +57,8 @@ export function UpdateAvailablePopup({
   };
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-16 z-40 flex justify-start px-6">
+    <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center px-4 py-10">
+      <div aria-hidden="true" className="absolute inset-0 bg-[#09101d]/12 backdrop-blur-[1px]" />
       <section className="pointer-events-auto relative w-[288px] overflow-hidden rounded-[20px] bg-white shadow-[0px_2px_8px_rgba(0,0,0,0.1),0px_2px_4px_rgba(0,0,0,0.04),0px_1px_2px_rgba(0,0,0,0.06),0px_0px_41px_rgba(0,0,0,0.2)]">
         <div
           aria-hidden="true"
@@ -64,7 +68,7 @@ export function UpdateAvailablePopup({
         <button
           type="button"
           onClick={() => {
-            void handleDismissUpdate();
+            void handleCloseUpdate();
           }}
           aria-label="Dismiss update"
           className="absolute right-2 top-2 flex size-6 items-center justify-center rounded-[12px] text-[#71717a] transition-colors hover:bg-black/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
@@ -80,7 +84,25 @@ export function UpdateAvailablePopup({
             </p>
           </div>
 
-          {installBlocked ? (
+          {isAvailableDialog ? (
+            <div className="rounded-[12px] bg-[linear-gradient(135deg,rgba(100,108,169,0.10)_0%,rgba(185,197,255,0.16)_100%)] p-3 text-[12px] leading-4 text-[#525965]">
+              <p className="font-bold text-[#6a7282]">Changes:</p>
+              <div className="mt-3 space-y-3">
+                {highlights.items.length > 0 ? (
+                  <ul className="ml-[18px] list-disc space-y-0.5">
+                    {highlights.items.map(item => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>{highlights.summary || 'Latest Omvra improvements and update tooling polish.'}</p>
+                )}
+                {highlights.hasMore ? (
+                  <p>...and more</p>
+                ) : null}
+              </div>
+            </div>
+          ) : installBlocked ? (
             <div className="rounded-[12px] bg-[linear-gradient(135deg,rgba(100,108,169,0.10)_0%,rgba(185,197,255,0.16)_100%)] p-3 text-[12px] leading-4 text-[#525965]">
               <p>
                 Your current channel is the {getChannelLabel(updateChannel)} channel.
@@ -102,22 +124,6 @@ export function UpdateAvailablePopup({
                 <span className="text-[24px] leading-none">{progressPercent}%</span>
               </div>
             </div>
-          ) : updateState.status === 'available' ? (
-            <div className="rounded-[12px] bg-[linear-gradient(135deg,rgba(100,108,169,0.10)_0%,rgba(185,197,255,0.16)_100%)] p-3 text-[12px] leading-4 text-[#525965]">
-              <p className="mb-3 font-bold text-[#6a7282]">Changes:</p>
-              {highlights.items.length > 0 ? (
-                <ul className="ml-[18px] list-disc space-y-0.5">
-                  {highlights.items.map(item => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p>{highlights.summary || 'Latest Omvra improvements and update tooling polish.'}</p>
-              )}
-              {highlights.hasMore ? (
-                <p className="mt-3">...and more</p>
-              ) : null}
-            </div>
           ) : null}
 
           {updateState.error ? (
@@ -136,14 +142,26 @@ export function UpdateAvailablePopup({
               {buttonLabel}
             </button>
           ) : null}
+
+          {isAvailableDialog ? (
+            <button
+              type="button"
+              onClick={() => {
+                void handleRemindLater();
+              }}
+              className="-mt-1 text-center text-[14px] font-bold leading-5 text-[#2d66c7] transition-colors hover:text-[#2456aa] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+            >
+              Remind me later
+            </button>
+          ) : null}
         </div>
       </section>
     </div>
   );
 }
 
-function shouldShowUpdatePopup(updateState: AppUpdateState) {
-  return updateState.status === 'available'
+function shouldShowUpdatePopup(updateState: AppUpdateState, isAvailableDismissedForSession: boolean) {
+  return (updateState.status === 'available' && !isAvailableDismissedForSession)
     || updateState.status === 'downloading'
     || updateState.status === 'downloaded';
 }

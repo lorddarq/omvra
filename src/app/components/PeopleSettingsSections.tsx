@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Bot, FileText, Pencil, Trash2, Users } from 'lucide-react';
 import type { Person, PersonKind, StatusColumn, Task, TaskStatus, TimelineSwimlane } from '../types';
-import { getStatusLabel } from '../utils/roadmap';
+import { getStatusLabel, getTaskProjectIds } from '../utils/roadmap';
 import { getLoadPercentageForTasks, getTaskLoadPoints, PERSON_CAPACITY_POINTS } from '../utils/taskLoad';
 import { AnchoredPanelSection } from './AnchoredPanel';
 import { EmptyStateCard } from './EmptyStateCard';
@@ -77,8 +77,7 @@ export function PeopleManagementSections({
 
   function getProjectLabelsForTask(task: Task): string[] {
     const labels = new Set<string>();
-    const projectIds = task.projectIds?.length ? task.projectIds : task.swimlaneId ? [task.swimlaneId] : [];
-    projectIds.forEach(projectId => {
+    getTaskProjectIds(task).forEach(projectId => {
       const projectName = projects.find(project => project.id === projectId)?.name;
       if (projectName) labels.add(projectName);
     });

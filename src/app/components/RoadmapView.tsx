@@ -4,6 +4,7 @@ import { ProjectMilestone, Task, TaskStatus, TimelineSwimlane } from '../types';
 import {
   getStatusVisual,
   getMilestoneProjectIds,
+  getTasksForMilestone,
   summarizeMilestone,
   type MilestoneHealth,
 } from '../utils/roadmap';
@@ -88,9 +89,7 @@ function getDateRange(milestones: ProjectMilestone[], tasks: Task[]): { start: D
     if (start) dates.push(start);
     if (end) dates.push(end);
 
-    const linkedTaskIds = new Set(milestone.linkedTaskIds || []);
-    tasks.forEach(task => {
-      if (task.milestoneId !== milestone.id && !linkedTaskIds.has(task.id)) return;
+    getTasksForMilestone(milestone, tasks).forEach(task => {
       const taskStart = task.startDate ? parseISODateLocal(task.startDate) : null;
       const taskEnd = task.endDate ? parseISODateLocal(task.endDate) : null;
       if (taskStart) dates.push(taskStart);

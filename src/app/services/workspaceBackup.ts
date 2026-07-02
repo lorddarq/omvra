@@ -5,6 +5,7 @@ import {
   normalizeMcpPort,
   normalizeMcpServerAddress,
 } from '../constants/mcp.ts';
+import { getTaskProjectIds } from '../utils/roadmap.ts';
 import { getDefaultStatusId, syncLocalMcpServerAddress } from '../utils/mcpPreferences.ts';
 import { flattenPortableStoreEntries, normalizePortableStorageKey } from '../utils/storage.ts';
 
@@ -166,9 +167,7 @@ function normalizeTaskAttachments(value: unknown): TaskAttachment[] {
 }
 
 function normalizeTask(task: Task, swimlanes: TimelineSwimlane[]): Task {
-  const projectIds = task.projectIds?.length
-    ? task.projectIds
-    : (task.swimlaneId ? [task.swimlaneId] : []);
+  const projectIds = getTaskProjectIds(task);
   const projectName = projectIds
     .map(projectId => swimlanes.find(swimlane => swimlane.id === projectId)?.name)
     .filter(Boolean)

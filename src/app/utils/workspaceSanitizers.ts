@@ -1,5 +1,6 @@
 import type { ProjectMilestone, Task, TaskAttachment, TaskStatus, TimelineSwimlane, Person, StatusColumn } from '../types.ts';
 import { buildLocalMcpAddress, normalizeMcpBindHost, normalizeMcpPort, normalizeMcpServerAddress } from '../constants/mcp.ts';
+import { getTaskProjectIds } from './roadmap.ts';
 
 export type StatusColumnState = StatusColumn;
 
@@ -112,9 +113,7 @@ function normalizeTaskTitle(title: string): string {
 }
 
 export function normalizeTask(task: Task, swimlanes: TimelineSwimlane[]): Task {
-  const projectIds = task.projectIds?.length
-    ? task.projectIds
-    : (task.swimlaneId ? [task.swimlaneId] : []);
+  const projectIds = getTaskProjectIds(task);
   const projectName = projectIds
     .map(projectId => swimlanes.find(s => s.id === projectId)?.name)
     .filter(Boolean)

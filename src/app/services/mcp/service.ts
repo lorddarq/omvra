@@ -1,4 +1,5 @@
 import { McpClient, McpClientDisabledError } from './client.ts';
+import { getTaskProjectIds } from '../../utils/roadmap.ts';
 import type {
   McpCard,
   McpBoardWatchResult,
@@ -424,10 +425,7 @@ export function createMcpReadService(config: McpClientConfig): McpReadService {
       return tasks.filter(task => {
         if (status && task.status !== status) return false;
         if (assigneeId && (task as any).assigneeId !== assigneeId) return false;
-        if (projectId) {
-          const projectIds = Array.isArray((task as any).projectIds) ? (task as any).projectIds : [];
-          if (!projectIds.includes(projectId) && (task as any).swimlaneId !== projectId) return false;
-        }
+        if (projectId && !getTaskProjectIds(task as any).includes(projectId)) return false;
         if (search) {
           const title = String(task.title || '').toLowerCase();
           const notes = String((task as any).notes || '').toLowerCase();

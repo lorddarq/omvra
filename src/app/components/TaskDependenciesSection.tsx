@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Search } from 'lucide-react';
-import type { Task } from '../types';
+import type { StatusColumn, Task } from '../types';
+import { getStatusLabel } from '../utils/roadmap';
 import { EmptyStateCard } from './EmptyStateCard';
 import { taskEditIconFieldClassName, taskEditLabelClassName } from './taskFormStyles';
 import { TaskCheckboxControl } from './TaskCheckboxControl';
@@ -10,6 +11,7 @@ interface TaskDependenciesSectionProps {
   milestoneControl: ReactNode;
   dependencyCandidates: Task[];
   dependencyIds: string[];
+  statusColumns: StatusColumn[];
   taskTitle: string;
   wouldCreateDependencyCycle: (dependencyId: string) => boolean;
   onToggleDependency: (dependencyId: string) => void;
@@ -20,6 +22,7 @@ export function TaskDependenciesSection({
   milestoneControl,
   dependencyCandidates,
   dependencyIds,
+  statusColumns,
   taskTitle,
   wouldCreateDependencyCycle,
   onToggleDependency,
@@ -99,7 +102,7 @@ export function TaskDependenciesSection({
                     {candidate.title}
                   </span>
                   <span className="shrink-0 rounded-full border border-black/10 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-[#71717a]">
-                    {createsCycle ? 'Cycle' : candidate.status}
+                    {createsCycle ? 'Cycle' : getStatusLabel(statusColumns, candidate.status)}
                   </span>
                 </span>
               </label>

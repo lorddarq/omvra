@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { ProjectMilestone, Task } from '../types.ts';
 import {
+  assertNoDependencyCycle,
   getMilestoneHealthVisual,
+  getStatusLabel,
   getStatusVisual,
   resolveStatusColor,
   summarizeMilestone,
@@ -23,6 +25,10 @@ test('getStatusVisual derives label, color, and progress from shared status colu
   assert.equal(visual.color, '#f59e0b');
   assert.equal(visual.backgroundClassName, 'bg-amber-500');
   assert.equal(visual.progressPercent, 80);
+});
+
+test('getStatusLabel falls back to the raw status when the column is missing', () => {
+  assert.equal(getStatusLabel(statusColumns as any, 'blocked'), 'blocked');
 });
 
 test('summarizeMilestone and getMilestoneHealthVisual share milestone health semantics', () => {
@@ -61,6 +67,14 @@ test('wouldCreateDependencyCycle catches loops across linked tasks', () => {
   assert.equal(
     wouldCreateDependencyCycle('task-1', 'task-3', taskId => dependenciesByTaskId[taskId]),
     false
+  );
+  assert.equal(
+    assertNoDependencyCycle('task-3', ['task-1'], taskId => dependenciesByTaskId[taskId]),
+    false
+  );
+  assert.equal(
+    assertNoDependencyCycle('task-1', ['task-3'], taskId => dependenciesByTaskId[taskId]),
+    true
   );
 });
 

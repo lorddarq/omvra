@@ -1349,7 +1349,58 @@ function validateRoadmapDependencyUpdates(store, updates) {
     update.dependencyIds = dependencyValidation.taskIds;
   }
 
+  const cycleValidation = validateDependencyCycles(store, normalizedUpdates);
+  if (!cycleValidation.ok) return cycleValidation;
+
   return { ok: true, updates: normalizedUpdates };
+}
+
+function validateDependencyCycles(store, updatesOrOptions = [], maybeOptions = {}) {
+  const updates = Array.isArray(updatesOrOptions) ? updatesOrOptions : [];
+  const {
+    taskId,
+    dependencyIds,
+    fieldName = 'dependencyIds',
+  } = Array.isArray(updatesOrOptions) ? maybeOptions : (updatesOrOptions || {});
+  const tasks = readArray(store, TASKS_KEY)
+    .map(task => normalizeTaskForMcp(task))
+    .filter(Boolean);
+  const dependencyMap = new Map(tasks.map(task => [task.id, normalizeTaskIdList(task.dependencyIds)]));
+
+  for (const update of updates) {
+    dependencyMap.set(update.taskId, normalizeTaskIdList(update.dependencyIds));
+  }
+  if (taskId) {
+    dependencyMap.set(taskId, normalizeTaskIdList(dependencyIds));
+  }
+
+  const createsCycle = (rootTaskId, nextDependencyId) => {
+    if (rootTaskId === nextDependencyId) return true;
+
+    const visited = new Set();
+    const visit = (currentTaskId) => {
+      if (currentTaskId === rootTaskId) return true;
+      if (visited.has(currentTaskId)) return false;
+      visited.add(currentTaskId);
+      return (dependencyMap.get(currentTaskId) || []).some(visit);
+    };
+
+    return visit(nextDependencyId);
+  };
+
+  for (const [candidateTaskId, candidateDependencyIds] of dependencyMap.entries()) {
+    for (const candidateDependencyId of candidateDependencyIds) {
+      if (createsCycle(candidateTaskId, candidateDependencyId)) {
+        return {
+          ok: false,
+          error: 'DEPENDENCY_CYCLE',
+          message: `${fieldName} creates a dependency cycle for task "${candidateTaskId}".`,
+        };
+      }
+    }
+  }
+
+  return { ok: true };
 }
 
 function resolveMilestoneReference(store, milestoneId) {
@@ -1539,6 +1590,12 @@ function createTask(store, {
 
   const dependencyValidation = validateTaskReferences(store, dependencyIds, { fieldName: 'dependencyIds' });
   if (!dependencyValidation.ok) return dependencyValidation;
+  const dependencyCycleValidation = validateDependencyCycles(store, {
+    taskId: '__new_task__',
+    dependencyIds: dependencyValidation.taskIds,
+    fieldName: 'dependencyIds',
+  });
+  if (!dependencyCycleValidation.ok) return dependencyCycleValidation;
 
   const milestoneValidation = resolveMilestoneReference(store, milestoneId);
   if (!milestoneValidation.ok) return milestoneValidation;
@@ -1775,6 +1832,14 @@ function updateTaskDetails(store, options = {}) {
     ? validateTaskReferences(store, dependencyIds, { fieldName: 'dependencyIds', excludeTaskId: normalizedTaskId })
     : null;
   if (dependencyPatch && !dependencyPatch.ok) return dependencyPatch;
+  const dependencyCyclePatch = dependencyPatch
+    ? validateDependencyCycles(store, {
+        taskId: normalizedTaskId,
+        dependencyIds: dependencyPatch.taskIds,
+        fieldName: 'dependencyIds',
+      })
+    : null;
+  if (dependencyCyclePatch && !dependencyCyclePatch.ok) return dependencyCyclePatch;
 
   const hasMilestonePatch = hasOwn(patch, 'milestoneId');
   const milestonePatch = hasMilestonePatch ? resolveMilestoneReference(store, milestoneId) : null;

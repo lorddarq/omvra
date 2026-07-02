@@ -31,6 +31,7 @@ import {
 import { DraggableSwimlaneRow } from './DraggableSwimlaneRow';
 import { allocateTasksToTracks, calculateSwimlaneHeight } from '../utils/trackAllocation';
 import { getReadableTextClassFor } from '../utils/contrast';
+import { getStatusVisual } from '../utils/roadmap';
 import { parseISODateLocal, toLocalISODate } from '../utils/date';
 import { getJSON, persistRawWithElectronMirror } from '../utils/storage';
 import { applyTimelineTaskDrop } from '../utils/timelineTaskDrop';
@@ -1108,33 +1109,19 @@ export function TimelineView({
     pendingRevealDateRef.current = null;
   }, [dates, dayWidths, getVisibleIndexForDate]);
 
-  // Get task color helper with fallback for orphaned statuses
   const getTaskColor = useCallback(
-    (status: string): { className?: string; style?: React.CSSProperties } => {
-      const col = statusColumns?.find(c => c.id === status);
-      if (col) {
-        const bgColor = col.color || '#e5e7eb';
-        const textClass = getReadableTextClassFor(bgColor);
+    (status: string): { className?: string; style?: React.CSSProperties; textClass?: string } => {
+      if (statusColumns?.some(column => column.id === status)) {
+        const visual = getStatusVisual(statusColumns, status as TaskStatus);
         return {
-          className: textClass,
-          style: { backgroundColor: bgColor },
+          style: visual.backgroundStyle,
+          textClass: visual.textClassName,
         };
       }
-      // Fallback for orphaned statuses (use first available column or gray)
-      if (statusColumns && statusColumns.length > 0) {
-        const fallbackCol = statusColumns[0];
-        const bgColor = fallbackCol.color || '#e5e7eb';
-        const textClass = getReadableTextClassFor(bgColor);
-        return {
-          className: textClass,
-          style: { backgroundColor: bgColor },
-        };
-      }
-      // Last resort fallback
+
       const defaultColor = '#e5e7eb';
-      const textClass = getReadableTextClassFor(defaultColor);
       return {
-        className: textClass,
+        textClass: getReadableTextClassFor(defaultColor, defaultColor),
         style: { backgroundColor: defaultColor },
       };
     },

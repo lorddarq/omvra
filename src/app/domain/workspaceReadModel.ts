@@ -2,6 +2,7 @@ import type { Person, ProjectMilestone, StatusColumn, Task, TimelineSwimlane } f
 import {
   getMilestoneForTask,
   getMilestoneProjectIds,
+  getTaskProjectIds,
   summarizeMilestone,
   type RoadmapMilestoneSummary,
 } from '../utils/roadmap';
@@ -58,13 +59,6 @@ function groupBy<T>(items: T[], getKey: (item: T) => string | undefined): Map<st
     }
     return groups;
   }, new Map());
-}
-
-function getTaskProjectIds(task: Task): string[] {
-  if (Array.isArray(task.projectIds) && task.projectIds.length > 0) {
-    return task.projectIds;
-  }
-  return task.swimlaneId ? [task.swimlaneId] : [];
 }
 
 export function buildWorkspaceReadModel({

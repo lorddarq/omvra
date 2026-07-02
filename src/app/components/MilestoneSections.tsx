@@ -2,6 +2,7 @@ import { CalendarDays, Search, TriangleAlert } from 'lucide-react';
 import {
   getMilestoneHealthVisual,
   getStatusLabel,
+  resolveStatusColor,
   getStatusVisual,
   type RoadmapMilestoneSummary,
 } from '../utils/roadmap';
@@ -241,7 +242,10 @@ export function MilestoneLinkedTasksSection({
                       {isLate && <TriangleAlert className="size-4 text-red-700" />}
                       <DependencyStatusPill
                         label={getStatusLabel(statusColumns, task.status)}
-                        statusColor={statusColumns.find(column => column.id === task.status)?.color}
+                        statusColor={resolveStatusColor(
+                          task.status,
+                          statusColumns.find(column => column.id === task.status)?.color
+                        )}
                       />
                     </span>
                   </button>
@@ -261,6 +265,7 @@ export function MilestoneTaskLinker({
   filteredProjectTasks,
   linkedTaskIds,
   dependencyIdsByTaskId,
+  statusColumns,
   taskSearchQuery,
   onTaskSearchQueryChange,
   onToggleTask,
@@ -270,6 +275,7 @@ export function MilestoneTaskLinker({
   filteredProjectTasks: Task[];
   linkedTaskIds: string[];
   dependencyIdsByTaskId: Record<string, string[]>;
+  statusColumns: MilestoneStatusColumn;
   taskSearchQuery: string;
   onTaskSearchQueryChange: (value: string) => void;
   onToggleTask: (taskId: string) => void;
@@ -333,7 +339,9 @@ export function MilestoneTaskLinker({
                     className="size-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
                   />
                   <span className="min-w-0 flex-1 truncate font-medium text-[#1f2937]">{task.title}</span>
-                  <span className="rounded-full border border-black/6 bg-white px-2 py-0.5 text-xs text-[#6b7280]">{task.status}</span>
+                  <span className="rounded-full border border-black/6 bg-white px-2 py-0.5 text-xs text-[#6b7280]">
+                    {getStatusLabel(statusColumns, task.status)}
+                  </span>
                 </label>
 
                 {isLinked && dependencyOptions.length > 0 && (

@@ -3,7 +3,7 @@ import { AlertTriangle, Briefcase, CalendarDays, ChevronsUpDown, FileText, Info,
 import { Task, TaskStatus, TimelineSwimlane, Person, TaskSize, TaskComplexity, TaskPriority, StatusColumn, ProjectMilestone, TaskAttachment } from '../types';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import { toLocalISODate } from '../utils/date';
-import { getMilestoneForTask, getMilestoneProjectIds, wouldCreateDependencyCycle } from '../utils/roadmap';
+import { getMilestoneForTask, getMilestoneProjectIds, getTaskProjectIds, getTasksForMilestone, wouldCreateDependencyCycle } from '../utils/roadmap';
 import {
   Dialog,
 } from '@/app/components/ui/dialog';
@@ -147,10 +147,7 @@ export function TaskDialog({
     () => selectedMilestone
       ? (
           readModel?.milestonesById.get(selectedMilestone.id)?.summary.linkedTasks
-          ?? tasks.filter(candidate =>
-            candidate.milestoneId === selectedMilestone.id ||
-            (selectedMilestone.linkedTaskIds || []).includes(candidate.id)
-          )
+          ?? getTasksForMilestone(selectedMilestone, tasks)
         ).filter(candidate => candidate.id !== task?.id)
       : [],
     [readModel, selectedMilestone, task?.id, tasks]
@@ -173,9 +170,7 @@ export function TaskDialog({
 
   useEffect(() => {
     if (task) {
-      const initialProjectIds = task.projectIds?.length
-        ? task.projectIds
-        : (task.swimlaneId ? [task.swimlaneId] : []);
+      const initialProjectIds = getTaskProjectIds(task);
       const existingStart = task.startDate || todayISO;
       const existingEnd = task.endDate || existingStart;
       setTitle(task.title);
@@ -726,6 +721,7 @@ export function TaskDialog({
               )}
               dependencyCandidates={dependencyCandidates}
               dependencyIds={dependencyIds}
+              statusColumns={statusColumns || []}
               taskTitle={title}
               wouldCreateDependencyCycle={wouldCreateTaskDependencyCycle}
               onToggleDependency={toggleDependency}

@@ -310,6 +310,24 @@ test('createTask and updateTaskDetails persist dependency, milestone, and time m
   assert.equal(invalidDependency.error, 'TASK_REFERENCE_NOT_FOUND');
 });
 
+test('updateTaskDetails rejects dependency cycles', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const firstUpdate = updateTaskDetails(store, {
+    taskId: 'task-2',
+    dependencyIds: ['task-1'],
+    expectedRevision: getTaskById(store, 'task-2')[MCP_TASK_REV_FIELD],
+  });
+  assert.equal(firstUpdate.ok, true);
+
+  const cyclicUpdate = updateTaskDetails(store, {
+    taskId: 'task-1',
+    dependencyIds: ['task-2'],
+    expectedRevision: getTaskById(store, 'task-1')[MCP_TASK_REV_FIELD],
+  });
+  assert.equal(cyclicUpdate.ok, false);
+  assert.equal(cyclicUpdate.error, 'DEPENDENCY_CYCLE');
+});
+
 test('task_write accepts project names through the MCP write surface', () => {
   const dispatch = createRequestDispatcher(makeStoreFromFixture('workspace-basic'));
   const response = dispatch({
@@ -743,6 +761,30 @@ test('linkMilestoneTasks rejects invalid dependency updates before changing the 
   assert.equal(rejected.error, 'TASK_REFERENCE_NOT_FOUND');
   assert.deepEqual(getMilestoneById(store, created.milestone.id).linkedTaskIds, ['task-1']);
   assert.equal(getTaskById(store, 'task-2').milestoneId, undefined);
+});
+
+test('linkMilestoneTasks rejects dependency cycles before changing the milestone', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const created = createMilestone(store, {
+    title: 'Release Alpha',
+    projectIds: ['Project A'],
+    endDate: '2026-04-01',
+    linkedTaskIds: ['task-1', 'task-2'],
+  });
+
+  const rejected = linkMilestoneTasks(store, {
+    milestoneId: created.milestone.id,
+    dependencyUpdates: [
+      { taskId: 'task-1', dependencyIds: ['task-2'] },
+      { taskId: 'task-2', dependencyIds: ['task-1'] },
+    ],
+    expectedRevision: created.milestone[MCP_TASK_REV_FIELD],
+  });
+
+  assert.equal(rejected.ok, false);
+  assert.equal(rejected.error, 'DEPENDENCY_CYCLE');
+  assert.deepEqual(getTaskById(store, 'task-1').dependencyIds || [], []);
+  assert.deepEqual(getTaskById(store, 'task-2').dependencyIds || [], []);
 });
 
 test('deleteMilestone removes milestone and clears linked task roadmap metadata', () => {

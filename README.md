@@ -102,6 +102,15 @@ This runs `electron/scripts/generate-icons.cjs` and:
 
 Core task/workspace types live in `src/app/types.ts`.
 
+Shared roadmap/status domain helpers live in `src/app/domain/roadmap.ts`. That module is the canonical place for:
+
+- status label/color/progress resolution from `statusColumns`
+- milestone health visuals and milestone rollup summaries
+- roadmap task/milestone linkage helpers
+- dependency-cycle validation used by UI task/milestone editors
+
+UI callers should prefer those helpers over view-local status palettes, label lookups, or dependency-graph checks.
+
 Tasks can include local file attachments. Attachments are stored as references to existing files, not as copied file contents:
 
 - `Task.attachments` contains file metadata (`id`, `name`, absolute `path`, `file://` `uri`, optional `size`, and `addedAt`)

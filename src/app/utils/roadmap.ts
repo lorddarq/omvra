@@ -1,10 +1,12 @@
 export {
+  assertNoDependencyCycle,
   getMilestoneDateRangeLabel,
   getMilestoneForTask,
   getMilestoneHealthVisual,
   getMilestoneProjectIds,
   getStatusLabel,
   getStatusVisual,
+  getTaskProjectIds,
   getTaskProgress,
   getTasksForMilestone,
   isTaskLateForMilestone,
@@ -12,11 +14,11 @@ export {
   resolveStatusColor,
   summarizeMilestone,
   wouldCreateDependencyCycle,
-} from '../domain/roadmap';
+} from '../domain/roadmap.ts';
 export type {
   MilestoneHealth,
   MilestoneHealthVisual,
   MilestoneStatusCounts,
   RoadmapMilestoneSummary,
   StatusVisual,
-} from '../domain/roadmap';
+} from '../domain/roadmap.ts';

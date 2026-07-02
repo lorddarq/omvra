@@ -265,6 +265,7 @@ export function AppPanels({
         onUpdateTaskDependencies={onUpdateRoadmapTaskDependencies}
         milestone={selectedMilestone}
         projects={timelineSwimlanes}
+        statusColumns={statusColumns}
         tasks={tasks}
         readModel={readModel}
       />

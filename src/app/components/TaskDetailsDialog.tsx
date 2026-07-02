@@ -5,7 +5,7 @@ import {
   Dialog,
 } from '@/app/components/ui/dialog';
 import { getTaskLoadContributionPercent, getTaskLoadPoints, PERSON_CAPACITY_POINTS } from '../utils/taskLoad';
-import { getMilestoneForTask } from '../utils/roadmap';
+import { getMilestoneForTask, getStatusLabel, resolveStatusColor } from '../utils/roadmap';
 import { formatTaskDetailsForClipboard } from '../utils/taskClipboard';
 import { buildTaskPdfExportHtml, createTaskPdfFileName } from '../utils/taskPdfExport';
 import { exportPdfDocument } from '../utils/pdfExport';
@@ -88,7 +88,7 @@ export function TaskDetailsDialog({
       : [];
   const assignee = enrichedTask?.assignee ?? (task?.assigneeId ? people.find(p => p.id === task.assigneeId) : null);
   const statusLabel = task
-    ? enrichedTask?.statusColumn?.title ?? statusColumns.find(c => c.id === task.status)?.title ?? task.status
+    ? enrichedTask?.statusColumn?.title ?? getStatusLabel(statusColumns, task.status)
     : '';
   const taskLoadPoints = task ? getTaskLoadPoints(task) : 0;
   const taskLoadContribution = task && task.assigneeId
@@ -203,7 +203,7 @@ export function TaskDetailsDialog({
       ],
       dependencies: dependencyTasks.map(dependencyTask => ({
         title: dependencyTask.title,
-        detail: statusColumns.find(column => column.id === dependencyTask.status)?.title ?? dependencyTask.status,
+        detail: getStatusLabel(statusColumns, dependencyTask.status),
       })),
       attachments: (task.attachments || []).map(attachment => ({
         title: attachment.name,
@@ -358,8 +358,12 @@ export function TaskDetailsDialog({
               dependencies={dependencyTasks.map(dependencyTask => ({
                 id: dependencyTask.id,
                 title: dependencyTask.title,
-                status: statusColumns.find(column => column.id === dependencyTask.status)?.title ?? dependencyTask.status,
-                statusColor: statusColumns.find(column => column.id === dependencyTask.status)?.color,
+                status: getStatusLabel(statusColumns, dependencyTask.status),
+                statusColor: resolveStatusColor(
+                  dependencyTask.status,
+                  enrichedTask?.dependencyTasks.find(item => item.task.id === dependencyTask.id)?.statusColumn?.color
+                    ?? statusColumns.find(column => column.id === dependencyTask.status)?.color
+                ),
               }))}
             />
           </AnchoredPanelSection>

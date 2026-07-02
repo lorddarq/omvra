@@ -1,12 +1,7 @@
 import type { Task } from '../types.ts';
+import { getTaskProjectIds } from './roadmap.ts';
 
-export function getTimelineTaskProjectIds(task: Task): string[] {
-  if (Array.isArray(task.projectIds) && task.projectIds.length > 0) {
-    return task.projectIds;
-  }
-
-  return task.swimlaneId ? [task.swimlaneId] : [];
-}
+export const getTimelineTaskProjectIds = getTaskProjectIds;
 
 export function canDropTimelineTaskInRow(
   task: Task,

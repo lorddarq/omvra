@@ -31,6 +31,7 @@ import { AppMainViews } from './components/AppMainViews';
 import { AppPanels } from './components/AppPanels';
 import { DeleteConfirmDialog } from './components/DeleteConfirmDialog';
 import { buildWorkspaceReadModel } from './domain/workspaceReadModel';
+import { getMilestoneProjectIds, getTasksForMilestone } from './utils/roadmap';
 import { swimlanes as defaultSwimlanes } from './constants/swimlanes';
 import {
   DEFAULT_MCP_BIND_HOST,
@@ -625,7 +626,7 @@ function App() {
     setMilestones(prevMilestones =>
       prevMilestones
         .map(milestone => {
-          const projectIds = (milestone.projectIds || (milestone.projectId ? [milestone.projectId] : []))
+          const projectIds = getMilestoneProjectIds(milestone)
             .filter(projectId => projectId !== swimlaneId);
           return { ...milestone, projectIds, projectId: projectIds[0] };
         })
@@ -842,13 +843,8 @@ function App() {
   }, []);
 
   const handleDeleteMilestone = useCallback((milestoneId: string) => {
-    const milestoneTaskIds = new Set(
-      tasks
-        .filter(task => task.milestoneId === milestoneId)
-        .map(task => task.id)
-    );
     const milestone = milestones.find(item => item.id === milestoneId);
-    (milestone?.linkedTaskIds || []).forEach(taskId => milestoneTaskIds.add(taskId));
+    const milestoneTaskIds = new Set(milestone ? getTasksForMilestone(milestone, tasks).map(task => task.id) : []);
 
     setMilestones(prevMilestones => prevMilestones.filter(milestone => milestone.id !== milestoneId));
     setTasks(prevTasks =>

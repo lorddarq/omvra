@@ -1,4 +1,5 @@
 import type { Person, Task, TaskPriority, TimelineSwimlane } from '../types.ts';
+import { getTaskProjectIds } from './roadmap.ts';
 import {
   persistJSONWithElectronMirror,
   readInitialWorkspaceJSON,
@@ -101,16 +102,8 @@ export function hasActiveKanbanTaskFilters(filters: KanbanTaskFilters): boolean 
 }
 
 export function taskMatchesKanbanFilters(task: Task, filters: KanbanTaskFilters): boolean {
-  if (filters.projectId) {
-    const taskProjectIds = task.projectIds?.length
-      ? task.projectIds
-      : task.swimlaneId
-        ? [task.swimlaneId]
-        : [];
-
-    if (!taskProjectIds.includes(filters.projectId)) {
-      return false;
-    }
+  if (filters.projectId && !getTaskProjectIds(task).includes(filters.projectId)) {
+    return false;
   }
 
   if (filters.priority && (task.priority || 'normal') !== filters.priority) {

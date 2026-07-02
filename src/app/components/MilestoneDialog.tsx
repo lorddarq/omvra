@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
-import { ProjectMilestone, Task, TimelineSwimlane } from '../types';
-import { getMilestoneProjectIds, wouldCreateDependencyCycle } from '../utils/roadmap';
+import { ProjectMilestone, StatusColumn, Task, TimelineSwimlane } from '../types';
+import { getMilestoneProjectIds, getTaskProjectIds, wouldCreateDependencyCycle } from '../utils/roadmap';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import {
   Dialog,
@@ -25,6 +25,7 @@ interface MilestoneDialogProps {
   isOpen: boolean;
   milestone?: ProjectMilestone | null;
   projects: TimelineSwimlane[];
+  statusColumns: StatusColumn[];
   tasks: Task[];
   readModel?: WorkspaceReadModel;
   onClose: () => void;
@@ -37,6 +38,7 @@ export function MilestoneDialog({
   isOpen,
   milestone,
   projects,
+  statusColumns,
   tasks,
   readModel,
   onClose,
@@ -79,8 +81,7 @@ export function MilestoneDialog({
     }
 
     return tasks.filter(task => {
-      const taskProjectIds = task.projectIds?.length ? task.projectIds : task.swimlaneId ? [task.swimlaneId] : [];
-      return taskProjectIds.some(projectId => projectIds.includes(projectId));
+      return getTaskProjectIds(task).some(projectId => projectIds.includes(projectId));
     });
   }, [projectIds, readModel, tasks]);
   const filteredProjectTasks = useMemo(() => {
@@ -88,8 +89,7 @@ export function MilestoneDialog({
     if (!normalizedSearch) return projectTasks;
 
     return projectTasks.filter(task => {
-      const taskProjectIds = task.projectIds?.length ? task.projectIds : task.swimlaneId ? [task.swimlaneId] : [];
-      const projectLabels = taskProjectIds
+      const projectLabels = getTaskProjectIds(task)
         .map(projectId => projects.find(project => project.id === projectId)?.name)
         .filter(Boolean)
         .join(' ');
@@ -115,8 +115,7 @@ export function MilestoneDialog({
         previousTaskIds.filter(taskId => {
           const task = tasks.find(item => item.id === taskId);
           if (!task) return false;
-          const taskProjectIds = task.projectIds?.length ? task.projectIds : task.swimlaneId ? [task.swimlaneId] : [];
-          return taskProjectIds.some(id => nextProjectIdSet.has(id));
+          return getTaskProjectIds(task).some(id => nextProjectIdSet.has(id));
         })
       );
 
@@ -303,6 +302,7 @@ export function MilestoneDialog({
               filteredProjectTasks={filteredProjectTasks}
               linkedTaskIds={linkedTaskIds}
               dependencyIdsByTaskId={dependencyIdsByTaskId}
+              statusColumns={statusColumns}
               taskSearchQuery={taskSearchQuery}
               onTaskSearchQueryChange={setTaskSearchQuery}
               onToggleTask={toggleTask}

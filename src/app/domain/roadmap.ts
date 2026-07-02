@@ -170,6 +170,13 @@ export function getMilestoneProjectIds(milestone: ProjectMilestone): string[] {
   return milestone.projectId ? [milestone.projectId] : [];
 }
 
+export function getTaskProjectIds(task: Task): string[] {
+  if (Array.isArray(task.projectIds) && task.projectIds.length > 0) {
+    return task.projectIds;
+  }
+  return task.swimlaneId ? [task.swimlaneId] : [];
+}
+
 export function getTasksForMilestone(milestone: ProjectMilestone, tasks: Task[]): Task[] {
   const linkedTaskIds = new Set(milestone.linkedTaskIds || []);
   return tasks.filter(task => task.milestoneId === milestone.id || linkedTaskIds.has(task.id));
@@ -248,4 +255,12 @@ export function wouldCreateDependencyCycle(
   };
 
   return visit(dependencyId);
+}
+
+export function assertNoDependencyCycle(
+  taskId: string,
+  dependencyIds: string[],
+  getDependencyIds: (currentTaskId: string) => string[] | undefined
+): boolean {
+  return dependencyIds.every(dependencyId => !wouldCreateDependencyCycle(taskId, dependencyId, getDependencyIds));
 }

@@ -445,6 +445,12 @@ function getUpdateSummary(updateState: AppUpdateState) {
     case 'not-available':
       return 'This Omvra build is up to date for the selected channel.';
     case 'error':
+      if (/code signature|did not pass validation|code requirement/i.test(updateState.error || '')) {
+        return 'The downloaded macOS build failed code-signature validation. Rebuild and republish the signed release artifact before retrying this update.';
+      }
+      if (updateState.update) {
+        return 'The downloaded update could not be installed. You can retry the install after the release artifact or installer issue is fixed.';
+      }
       return 'The update check hit an error. You can retry from here.';
     default:
       return 'Choose stable releases or release candidates, then check for updates when needed.';

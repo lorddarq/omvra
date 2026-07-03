@@ -30,6 +30,7 @@ export function useAppUpdateState({
     channel: updateChannel,
   });
   const [backupExportedAt, setBackupExportedAt] = useState<string | null>(null);
+  const [backupPromptOpen, setBackupPromptOpen] = useState(false);
   const [dismissedAvailableUpdateKey, setDismissedAvailableUpdateKey] = useState<string | null>(null);
 
   useEffect(() => {
@@ -76,6 +77,7 @@ export function useAppUpdateState({
 
   useEffect(() => {
     setBackupExportedAt(null);
+    setBackupPromptOpen(false);
   }, [updateState.update?.version]);
 
   useEffect(() => {
@@ -115,6 +117,7 @@ export function useAppUpdateState({
   };
 
   const handleDismissUpdate = async () => {
+    setBackupPromptOpen(false);
     try {
       const nextState = await window.electron?.updates?.dismiss?.();
       if (nextState) {
@@ -135,12 +138,30 @@ export function useAppUpdateState({
   };
 
   const handleCloseUpdate = async () => {
+    if (backupPromptOpen) {
+      setBackupPromptOpen(false);
+      if (updateState.status === 'available') {
+        setDismissedAvailableUpdateKey(getAvailableUpdateKey(updateState));
+        return;
+      }
+
+      await handleDismissUpdate();
+      return;
+    }
+
     await handleRemindLater();
   };
 
   const handleInstallUpdate = async () => {
     try {
-      await window.electron?.updates?.install?.();
+      const result = await window.electron?.updates?.install?.();
+      if (result && result.success === false) {
+        setUpdateState(previous => ({
+          ...previous,
+          status: 'error',
+          error: result.error || 'Could not start the installer.',
+        }));
+      }
     } catch {
       setUpdateState(previous => ({
         ...previous,
@@ -150,10 +171,27 @@ export function useAppUpdateState({
     }
   };
 
+  const handleUpdatePrimaryAction = async () => {
+    if (updateState.requiresBackup && !backupExportedAt) {
+      setBackupPromptOpen(true);
+      return;
+    }
+
+    if (updateState.status === 'downloaded') {
+      await handleInstallUpdate();
+      return;
+    }
+
+    if (updateState.status === 'available') {
+      await handleDownloadUpdate();
+    }
+  };
+
   const handleExportBackup = async () => {
     const didExport = await onExportWorkspaceBackup();
     if (didExport) {
       setBackupExportedAt(new Date().toISOString());
+      setBackupPromptOpen(false);
     }
     return didExport;
   };
@@ -165,7 +203,7 @@ export function useAppUpdateState({
   return {
     updateState,
     backupExportedAt,
-    installBlocked: updateState.requiresBackup && !backupExportedAt,
+    installBlocked: backupPromptOpen && updateState.requiresBackup && !backupExportedAt,
     isAvailableDismissedForSession: updateState.status === 'available'
       && dismissedAvailableUpdateKey === getAvailableUpdateKey(updateState),
     handleCheckForUpdates,
@@ -173,6 +211,7 @@ export function useAppUpdateState({
     handleDownloadUpdate,
     handleDismissUpdate,
     handleInstallUpdate,
+    handleUpdatePrimaryAction,
     handleExportBackup,
     handleRemindLater,
     handleUpdateChannelSelect,

@@ -154,3 +154,77 @@ test('useAppUpdateState keeps available-update reminder as a session-only dismis
     await harness.unmount();
   }
 });
+
+test('useAppUpdateState opens the backup gate only after the update action is requested', async () => {
+  const harness: AppUpdateStateHarness = await renderUpdateHook();
+
+  try {
+    await harness.emitState({
+      supported: true,
+      packaged: true,
+      channel: 'rc',
+      status: 'available',
+      update: {
+        version: '0.3.33-rc.1',
+        releaseDate: '2026-07-03T00:00:00.000Z',
+        releaseName: '0.3.33 RC 1',
+        releaseNotes: 'Preview build',
+        isPrerelease: true,
+      },
+      progressPercent: null,
+      error: null,
+      requiresBackup: true,
+      lastCheckedAt: '2026-07-03T00:00:00.000Z',
+    });
+
+    assert.equal(harness.result().installBlocked, false);
+
+    await act(async () => {
+      await harness.result().handleUpdatePrimaryAction();
+    });
+
+    assert.equal(harness.result().installBlocked, true);
+  } finally {
+    await harness.unmount();
+  }
+});
+
+test('useAppUpdateState closes the backup gate when dismissing an available prerelease update', async () => {
+  const harness: AppUpdateStateHarness = await renderUpdateHook();
+
+  try {
+    await harness.emitState({
+      supported: true,
+      packaged: true,
+      channel: 'rc',
+      status: 'available',
+      update: {
+        version: '0.3.33-rc.1',
+        releaseDate: '2026-07-03T00:00:00.000Z',
+        releaseName: '0.3.33 RC 1',
+        releaseNotes: 'Preview build',
+        isPrerelease: true,
+      },
+      progressPercent: null,
+      error: null,
+      requiresBackup: true,
+      lastCheckedAt: '2026-07-03T00:00:00.000Z',
+    });
+
+    await act(async () => {
+      await harness.result().handleUpdatePrimaryAction();
+    });
+
+    assert.equal(harness.result().installBlocked, true);
+
+    await act(async () => {
+      await harness.result().handleCloseUpdate();
+    });
+
+    assert.equal(harness.result().installBlocked, false);
+    assert.equal(harness.result().isAvailableDismissedForSession, true);
+    assert.equal(harness.dismissCalls(), 0);
+  } finally {
+    await harness.unmount();
+  }
+});

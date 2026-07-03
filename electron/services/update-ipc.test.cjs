@@ -50,7 +50,7 @@ test('update IPC exposes fallback state when no controller is available', async 
   });
   assert.deepEqual(await check(), getState());
   assert.deepEqual(await download(), getState());
-  assert.deepEqual(install(), { success: false });
+  assert.deepEqual(install(), { success: false, error: 'Could not start the installer.' });
   assert.deepEqual(dismiss(), getState());
   assert.deepEqual(setChannel(null, 'rc'), { channel: 'rc' });
   assert.equal(storedChannel, 'rc');
@@ -96,7 +96,7 @@ test('update IPC delegates to the active update controller', async () => {
   assert.deepEqual(handlers.get('updates/get-state')(), { status: 'idle' });
   assert.deepEqual(await handlers.get('updates/check')(), { status: 'checking' });
   assert.deepEqual(await handlers.get('updates/download')(), { status: 'downloading' });
-  assert.deepEqual(handlers.get('updates/install')(), { success: true });
+  assert.deepEqual(handlers.get('updates/install')(), { success: true, error: null });
   assert.deepEqual(handlers.get('updates/dismiss')(), { status: 'idle' });
   assert.deepEqual(handlers.get('updates/set-channel')(null, 'rc'), { channel: 'rc' });
 
@@ -105,6 +105,7 @@ test('update IPC delegates to the active update controller', async () => {
     'checkForUpdates',
     'downloadUpdate',
     'quitAndInstall',
+    'getState',
     'dismiss',
     'setChannel:rc',
   ]);

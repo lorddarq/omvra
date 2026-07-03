@@ -54,6 +54,15 @@ function hasExplicitMacSigningConfiguration(env) {
   return signingKeys.some(key => Boolean(env[key]));
 }
 
+function isTaggedReleaseBuild(env) {
+  if (env.GITHUB_REF_TYPE === 'tag' && env.GITHUB_REF_NAME) {
+    return true;
+  }
+
+  const tagFromRef = typeof env.GITHUB_REF === 'string' ? env.GITHUB_REF : '';
+  return /^refs\/tags\/v/.test(tagFromRef);
+}
+
 function pipeFilteredStream(stream, writer, onFilteredLine) {
   let buffer = '';
 
@@ -95,6 +104,14 @@ function run() {
   const args = ['--config.extraMetadata.version=' + resolvedVersion, '--publish=never'];
   const buildEnv = { ...process.env };
   const isWindows = process.platform === 'win32';
+  const hasMacSigning = hasExplicitMacSigningConfiguration(buildEnv);
+
+  if (process.platform === 'darwin' && isTaggedReleaseBuild(buildEnv) && !hasMacSigning) {
+    console.error(
+      '[build-electron] refusing to package tagged macOS release without explicit signing credentials; unsigned or mismatched signatures will break auto-update installation'
+    );
+    process.exit(1);
+  }
 
   // On macOS, electron-builder may auto-discover a locally installed signing
   // identity. Disable that unless signing was configured explicitly so local
@@ -102,7 +119,7 @@ function run() {
   if (
     process.platform === 'darwin'
     && !buildEnv.CSC_IDENTITY_AUTO_DISCOVERY
-    && !hasExplicitMacSigningConfiguration(buildEnv)
+    && !hasMacSigning
   ) {
     buildEnv.CSC_IDENTITY_AUTO_DISCOVERY = 'false';
     console.log('[build-electron] mac signing auto-discovery disabled (no explicit signing credentials configured)');

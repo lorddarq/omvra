@@ -182,7 +182,7 @@ declare global {
         getState: () => Promise<AppUpdateState>;
         check: () => Promise<AppUpdateState>;
         download: () => Promise<AppUpdateState>;
-        install: () => Promise<{ success: boolean }>;
+        install: () => Promise<{ success: boolean; error?: string | null }>;
         dismiss: () => Promise<AppUpdateState>;
         setChannel: (channel: 'stable' | 'rc') => Promise<Pick<AppUpdateState, 'channel'> | AppUpdateState>;
         onStateChanged: (listener: (payload: AppUpdateState) => void) => () => void;

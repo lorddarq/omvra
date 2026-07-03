@@ -18,8 +18,7 @@ export function UpdateAvailablePopup({
     updateState,
     installBlocked,
     handleCloseUpdate,
-    handleInstallUpdate,
-    handleDownloadUpdate,
+    handleUpdatePrimaryAction,
     handleExportBackup,
     handleRemindLater,
     isAvailableDismissedForSession,
@@ -48,14 +47,7 @@ export function UpdateAvailablePopup({
       return;
     }
 
-    if (updateState.status === 'downloaded') {
-      await handleInstallUpdate();
-      return;
-    }
-
-    if (updateState.status === 'available') {
-      await handleDownloadUpdate();
-    }
+    await handleUpdatePrimaryAction();
   };
 
   return (

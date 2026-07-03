@@ -32,8 +32,11 @@ function registerUpdateIpcHandlers({
 
   ipcMain.handle('updates/install', () => {
     const updateController = getUpdateController();
+    const success = Boolean(updateController?.quitAndInstall());
+    const state = updateController?.getState?.();
     return {
-      success: Boolean(updateController?.quitAndInstall()),
+      success,
+      error: success ? null : (state?.error || 'Could not start the installer.'),
     };
   });
 

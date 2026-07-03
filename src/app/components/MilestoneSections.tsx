@@ -11,11 +11,11 @@ import type { Task, TaskStatus, TimelineSwimlane } from '../types';
 import { EmptyStateCard } from './EmptyStateCard';
 import { DependencyStatusPill } from './TaskSummarySection';
 import { DialogSurfaceSection } from './DialogSurface';
+import { TaskCheckboxControl } from './TaskCheckboxControl';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-
-const milestoneDialogSearchInputClassName = 'h-10 rounded-2xl border border-black/8 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]';
+import { taskEditIconFieldClassName } from './taskFormStyles';
 
 type MilestoneStatusColumn = Array<{ id: TaskStatus; title: string; color?: string }>;
 
@@ -261,6 +261,7 @@ export function MilestoneTaskLinker({
   onTaskSearchQueryChange,
   onToggleTask,
   onToggleDependency,
+  wouldCreateDependencyCycle,
 }: {
   projectTasks: Task[];
   filteredProjectTasks: Task[];
@@ -271,27 +272,23 @@ export function MilestoneTaskLinker({
   onTaskSearchQueryChange: (value: string) => void;
   onToggleTask: (taskId: string) => void;
   onToggleDependency: (taskId: string, dependencyId: string) => void;
+  wouldCreateDependencyCycle: (taskId: string, dependencyId: string) => boolean;
 }) {
   return (
-    <DialogSurfaceSection>
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-semibold text-[#111827]">Linked tasks</h3>
-          <p className="text-sm text-[#6b7280]">These tasks drive the milestone rollup and deadline flags.</p>
+    <section className="space-y-6">
+      <h3 className="text-[14px] font-semibold text-[#71717a]">Tasks</h3>
+      <div className="max-w-[300px] space-y-1">
+        <Label htmlFor="milestone-task-search" className="text-[12px] font-medium text-[#71717a]">Search task:</Label>
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#b5b5ba]" />
+          <Input
+            id="milestone-task-search"
+            value={taskSearchQuery}
+            onChange={(event) => onTaskSearchQueryChange(event.target.value)}
+            placeholder="Task name"
+            className={taskEditIconFieldClassName}
+          />
         </div>
-        <span className="rounded-full border border-black/6 bg-white px-2.5 py-1 text-xs font-medium text-[#6b7280]">
-          {linkedTaskIds.length} selected
-        </span>
-      </div>
-      <div className="mb-3">
-        <Label htmlFor="milestone-task-search" className="sr-only">Search milestone tasks</Label>
-        <Input
-          id="milestone-task-search"
-          value={taskSearchQuery}
-          onChange={(event) => onTaskSearchQueryChange(event.target.value)}
-          placeholder="Search tasks by title, notes, status, or project..."
-          className={milestoneDialogSearchInputClassName}
-        />
       </div>
       {projectTasks.length === 0 ? (
         <EmptyStateCard
@@ -306,7 +303,7 @@ export function MilestoneTaskLinker({
           description="Try a different task title, status, note, or project keyword to find the right milestone work."
         />
       ) : (
-        <div className="grid gap-2">
+        <DialogSurfaceSection className="overflow-hidden rounded-[24px] border border-black/6 bg-white p-3 shadow-[0_0_1px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.06),0_2px_4px_rgba(0,0,0,0.04)]">
           {filteredProjectTasks.map(task => {
             const isLinked = linkedTaskIds.includes(task.id);
             const dependencyOptions = projectTasks.filter(
@@ -315,21 +312,17 @@ export function MilestoneTaskLinker({
             return (
               <div
                 key={task.id}
-                className={`rounded-2xl border p-3 text-sm transition-colors ${
-                  isLinked
-                    ? 'border-[#1a60cb]/15 bg-[#edf3ff]'
-                    : 'border-black/6 bg-white hover:bg-[#f8fafc]'
-                }`}
+                className="border-b border-black/[0.06] px-2 py-3 last:border-b-0"
               >
-                <label className="flex cursor-pointer items-center gap-3">
-                  <input
-                    type="checkbox"
+                <label className="flex cursor-pointer items-start gap-3">
+                  <TaskCheckboxControl
                     checked={isLinked}
-                    onChange={() => onToggleTask(task.id)}
-                    aria-label={`Link ${task.title} to this milestone`}
-                    className="size-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+                    ariaLabel={`Link ${task.title} to this milestone`}
+                    onCheckedChange={() => onToggleTask(task.id)}
                   />
-                  <span className="min-w-0 flex-1 truncate font-medium text-[#1f2937]">{task.title}</span>
+                  <span className="min-w-0 flex-1 text-sm font-medium leading-6 text-[#4a4a4f] [overflow-wrap:anywhere]">
+                    {task.title}
+                  </span>
                   <span className="rounded-full border border-black/6 bg-white px-2 py-0.5 text-xs text-[#6b7280]">
                     {getStatusLabel(statusColumns, task.status)}
                   </span>
@@ -341,14 +334,15 @@ export function MilestoneTaskLinker({
                     dependencyOptions={dependencyOptions}
                     selectedDependencyIds={dependencyIdsByTaskId[task.id] || []}
                     onToggleDependency={onToggleDependency}
+                    wouldCreateDependencyCycle={wouldCreateDependencyCycle}
                   />
                 )}
               </div>
             );
           })}
-        </div>
+        </DialogSurfaceSection>
       )}
-    </DialogSurfaceSection>
+    </section>
   );
 }
 
@@ -357,11 +351,13 @@ export function MilestoneDependencyEditor({
   dependencyOptions,
   selectedDependencyIds,
   onToggleDependency,
+  wouldCreateDependencyCycle,
 }: {
   task: Task;
   dependencyOptions: Task[];
   selectedDependencyIds: string[];
   onToggleDependency: (taskId: string, dependencyId: string) => void;
+  wouldCreateDependencyCycle: (taskId: string, dependencyId: string) => boolean;
 }) {
   return (
     <div className="mt-3 border-l border-[#dbe4f1] pl-7">
@@ -369,18 +365,44 @@ export function MilestoneDependencyEditor({
         Depends on
       </div>
       <div className="grid gap-1.5">
-        {dependencyOptions.map(option => (
-          <label key={option.id} className="flex cursor-pointer items-center gap-2 text-xs text-[#4b5563]">
-            <input
-              type="checkbox"
-              checked={selectedDependencyIds.includes(option.id)}
-              onChange={() => onToggleDependency(task.id, option.id)}
-              aria-label={`${task.title} depends on ${option.title}`}
-              className="size-3.5 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
-            />
-            <span className="min-w-0 truncate">{option.title}</span>
-          </label>
-        ))}
+        {dependencyOptions.map(option => {
+          const isSelected = selectedDependencyIds.includes(option.id);
+          const createsCycle = !isSelected && wouldCreateDependencyCycle(task.id, option.id);
+
+          return (
+            <label
+              key={option.id}
+              className={`flex items-center gap-2 text-xs text-[#4b5563] ${
+                createsCycle ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+              }`}
+            >
+              <TaskCheckboxControl
+                checked={isSelected}
+                disabled={createsCycle}
+                aria-label={`${task.title} depends on ${option.title}`}
+                onCheckedChange={() => onToggleDependency(task.id, option.id)}
+              />
+              <span className="min-w-0 flex-1 truncate">{option.title}</span>
+              {createsCycle && (
+                <span className="group relative shrink-0">
+                  <span
+                    tabIndex={0}
+                    aria-label="Why this dependency is blocked"
+                    className="inline-flex min-h-5 items-center rounded-full border border-black/10 bg-white px-2 py-0.5 text-[11px] font-semibold leading-none text-[#71717a] outline-none transition-colors hover:bg-[#f5f5f5] focus-visible:ring-2 focus-visible:ring-gray-300"
+                  >
+                    Blocked
+                  </span>
+                  <span
+                    role="tooltip"
+                    className="pointer-events-none absolute bottom-full right-0 z-50 mb-2 hidden w-max max-w-[260px] rounded-xl bg-[#303038] px-3 py-2 text-[11px] leading-4 text-white shadow-lg group-hover:block group-focus-within:block"
+                  >
+                    This dependency cannot be added because it would create a circular dependency chain where these tasks end up blocking each other.
+                  </span>
+                </span>
+              )}
+            </label>
+          );
+        })}
       </div>
     </div>
   );

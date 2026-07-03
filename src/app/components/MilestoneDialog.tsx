@@ -1,26 +1,33 @@
-import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { Briefcase, CalendarDays, ChevronsUpDown, Search, Trash2 } from 'lucide-react';
+import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { ProjectMilestone, StatusColumn, Task, TimelineSwimlane } from '../types';
 import { resolveProjectColor } from '../utils/projectVisual';
 import { getMilestoneProjectIds, getTaskProjectIds, wouldCreateDependencyCycle } from '../utils/roadmap';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import {
   Dialog,
-  DialogFooter,
+  DialogDescription,
+  DialogTitle,
 } from './ui/dialog';
+import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import { DialogSurface, DialogSurfaceHeader, DialogSurfaceSection } from './DialogSurface';
+import { DialogSurface, DialogSurfaceFooter } from './DialogSurface';
 import { DeleteConfirmDialog } from './DeleteConfirmDialog';
+import { EmptyStateCard } from './EmptyStateCard';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { MilestoneTaskLinker } from './MilestoneSections';
+import { ProjectBadge } from './ProjectBadge';
+import { TaskCheckboxControl } from './TaskCheckboxControl';
 import { Textarea } from './ui/textarea';
 import {
   taskEditFieldClassName,
+  taskEditIconFieldClassName,
+  taskEditIconSelectClassName,
   taskEditLabelClassName,
-  taskEditTextAreaClassName,
 } from './taskFormStyles';
 
-const milestoneDialogCheckboxCardClassName = 'flex cursor-pointer items-center gap-3 rounded-2xl border border-black/6 bg-white px-3 py-3 text-sm transition-colors hover:bg-[#f7f7f8]';
+const milestoneDialogProjectListClassName = 'max-h-36 overflow-y-auto rounded-[18px] border border-black/[0.06] bg-white p-3 shadow-[0_0_1px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.06),0_2px_4px_rgba(0,0,0,0.04)]';
 
 interface MilestoneDialogProps {
   isOpen: boolean;
@@ -57,6 +64,7 @@ export function MilestoneDialog({
   const [linkedTaskIds, setLinkedTaskIds] = useState<string[]>([]);
   const [dependencyIdsByTaskId, setDependencyIdsByTaskId] = useState<Record<string, string[]>>({});
   const [taskSearchQuery, setTaskSearchQuery] = useState('');
+  const [projectSearchQuery, setProjectSearchQuery] = useState('');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   useEffect(() => {
@@ -72,6 +80,7 @@ export function MilestoneDialog({
       Object.fromEntries(tasks.map(task => [task.id, Array.isArray(task.dependencyIds) ? task.dependencyIds : []]))
     );
     setTaskSearchQuery('');
+    setProjectSearchQuery('');
   }, [defaultProjectId, milestone, projects, tasks]);
 
   const projectTasks = useMemo(() => {
@@ -104,6 +113,22 @@ export function MilestoneDialog({
       return haystack.includes(normalizedSearch);
     });
   }, [projectTasks, projects, taskSearchQuery]);
+
+  const normalizedProjectSearchQuery = projectSearchQuery.trim().toLowerCase();
+  const filteredProjects = useMemo(
+    () => normalizedProjectSearchQuery
+      ? projects.filter(project => project.name.toLowerCase().includes(normalizedProjectSearchQuery))
+      : projects,
+    [normalizedProjectSearchQuery, projects]
+  );
+  const selectedProjects = useMemo(
+    () => projectIds
+      .map(projectId => projects.find(project => project.id === projectId))
+      .filter((project): project is TimelineSwimlane => Boolean(project)),
+    [projectIds, projects]
+  );
+  const selectedProjectChips = selectedProjects.slice(0, 2);
+  const remainingSelectedProjectCount = selectedProjects.length - selectedProjectChips.length;
 
   const toggleProject = (projectId: string) => {
     setProjectIds(prev => {
@@ -167,6 +192,17 @@ export function MilestoneDialog({
     });
   };
 
+  const wouldCreateTaskDependencyCycle = (taskId: string, dependencyId: string): boolean =>
+    wouldCreateDependencyCycle(taskId, dependencyId, currentTaskId => {
+      if (currentTaskId === taskId) {
+        const currentDependencyIds = dependencyIdsByTaskId[taskId] || [];
+        return currentDependencyIds.includes(dependencyId)
+          ? currentDependencyIds
+          : [...currentDependencyIds, dependencyId];
+      }
+      return dependencyIdsByTaskId[currentTaskId] || [];
+    });
+
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (!title.trim() || projectIds.length === 0 || !endDate) return;
@@ -196,139 +232,203 @@ export function MilestoneDialog({
       color,
       linkedTaskIds: sanitizedLinkedTaskIds,
     });
+    onClose();
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogSurface className="sm:max-w-[760px]">
-        <form onSubmit={handleSubmit}>
-          <DialogSurfaceHeader
-            title={milestone ? 'Edit roadmap milestone' : 'Create roadmap milestone'}
-            description="Milestones can be scoped to one product or span multiple projects under a shared release frame."
-          />
-
-          <div className="grid gap-5 px-6 py-5">
-            <div className="grid gap-2">
-              <Label htmlFor="milestone-title" className={taskEditLabelClassName}>Title</Label>
-              <Input
-                id="milestone-title"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder="e.g., Launch readiness review"
-                className={taskEditFieldClassName}
-                required
-              />
+      <DialogSurface
+        showClose={false}
+        overlayClassName="omvra-settings-overlay"
+        className="h-[min(920px,calc(100vh-2rem))] w-[min(837px,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] gap-0 overflow-hidden rounded-[28px] border border-black/5 bg-white p-0 shadow-[0_14px_28px_rgba(0,0,0,0.10),0_-6px_12px_rgba(0,0,0,0.10),0_2px_8px_rgba(0,0,0,0.10)] sm:max-w-none"
+      >
+        <form onSubmit={handleSubmit} className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="sr-only">
+            <DialogTitle>{milestone ? 'Edit Milestone' : 'Create Milestone'}</DialogTitle>
+            <DialogDescription>
+              Milestones can be scoped to one product or span multiple projects under a shared release frame.
+            </DialogDescription>
+          </div>
+          <div className="flex items-start border-b border-black/6 px-8 py-5">
+            <div className="min-w-0">
+              <h2 className="break-words text-[18px] font-normal tracking-[-0.02em] text-[#71717a] [overflow-wrap:anywhere]">
+                {milestone ? 'Edit Milestone' : 'Create Milestone'}
+              </h2>
             </div>
-
-            <div className="grid gap-2">
-              <Label className={taskEditLabelClassName}>Projects</Label>
-              <DialogSurfaceSection className="grid gap-2 sm:grid-cols-2">
-                {projects.map(project => {
-                  const isChecked = projectIds.includes(project.id);
-                  return (
-                    <label
-                      key={project.id}
-                      className={`${milestoneDialogCheckboxCardClassName} ${isChecked ? 'border-[#1a60cb]/15 bg-[#edf3ff]' : ''}`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => toggleProject(project.id)}
-                        className="size-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
-                      />
-                      <span
-                        className="size-2.5 rounded-full"
-                        style={{ backgroundColor: resolveProjectColor(project) }}
-                        aria-hidden="true"
-                      />
-                      <span className="min-w-0 truncate font-medium text-[#1f2937]">{project.name}</span>
-                    </label>
-                  );
-                })}
-              </DialogSurfaceSection>
-              <p className="text-xs leading-5 text-[#7b8190]">
-                Select one project for product-specific milestones, or multiple projects for release-frame milestones.
-              </p>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="milestone-start" className={taskEditLabelClassName}>Start date</Label>
-                <Input
-                  id="milestone-start"
-                  type="date"
-                  value={startDate}
-                  onChange={(event) => setStartDate(event.target.value)}
-                  className={taskEditFieldClassName}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="milestone-end" className={taskEditLabelClassName}>End date</Label>
-                <Input
-                  id="milestone-end"
-                  type="date"
-                  value={endDate}
-                  onChange={(event) => setEndDate(event.target.value)}
-                  className={taskEditFieldClassName}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="milestone-color" className={taskEditLabelClassName}>Color</Label>
-              <Input
-                id="milestone-color"
-                type="color"
-                value={color}
-                onChange={(event) => setColor(event.target.value)}
-                className="h-11 w-24 rounded-2xl border border-black/8 bg-white p-1 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="milestone-notes" className={taskEditLabelClassName}>Notes</Label>
-              <Textarea
-                id="milestone-notes"
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                placeholder="Goal details, launch criteria, or manager notes."
-                rows={4}
-                className={taskEditTextAreaClassName}
-              />
-            </div>
-
-            <MilestoneTaskLinker
-              projectTasks={projectTasks}
-              filteredProjectTasks={filteredProjectTasks}
-              linkedTaskIds={linkedTaskIds}
-              dependencyIdsByTaskId={dependencyIdsByTaskId}
-              statusColumns={statusColumns}
-              taskSearchQuery={taskSearchQuery}
-              onTaskSearchQueryChange={setTaskSearchQuery}
-              onToggleTask={toggleTask}
-              onToggleDependency={toggleDependency}
-            />
           </div>
 
-          <DialogFooter className="gap-2 border-t border-black/6 px-6 py-5">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-white px-8 py-8">
+            <section className="space-y-6">
+              <h3 className="text-[14px] font-semibold text-[#71717a]">Basic Information</h3>
+
+              <div className="grid grid-cols-1 gap-x-5 gap-y-5 md:grid-cols-[88px_minmax(0,1.1fr)_minmax(0,0.85fr)_minmax(0,0.85fr)]">
+                <div className="space-y-1 md:w-[88px]">
+                  <Label htmlFor="milestone-color" className={taskEditLabelClassName}>Color</Label>
+                  <Input
+                    id="milestone-color"
+                    type="color"
+                    value={color}
+                    onChange={(event) => setColor(event.target.value)}
+                    className="h-8 w-full rounded-[14px] border border-black/10 bg-white p-1 shadow-[0_0_1px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.06),0_2px_4px_rgba(0,0,0,0.04)] md:min-w-[88px]"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="milestone-title" className={taskEditLabelClassName}>Milestone Name</Label>
+                  <Input
+                    id="milestone-title"
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    placeholder="Name"
+                    className={taskEditFieldClassName}
+                    required
+                  />
+                </div>
+
+                <MilestoneDateSelectField
+                  id="milestone-start"
+                  label="Start Date:"
+                  value={startDate}
+                  onChange={setStartDate}
+                />
+
+                <MilestoneDateSelectField
+                  id="milestone-end"
+                  label="End Date:"
+                  value={endDate}
+                  onChange={setEndDate}
+                />
+              </div>
+
+              <div className="max-w-[300px] space-y-1">
+                <Label htmlFor="project-search" className={taskEditLabelClassName}>Search Project:</Label>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#71717a]" />
+                  <Input
+                    id="project-search"
+                    value={projectSearchQuery}
+                    onChange={(event) => setProjectSearchQuery(event.target.value)}
+                    placeholder="Search projects..."
+                    className={taskEditIconFieldClassName}
+                  />
+                </div>
+              </div>
+
+              <div className={milestoneDialogProjectListClassName}>
+                {filteredProjects.length > 0 ? (
+                  filteredProjects.map(project => {
+                    const isChecked = projectIds.includes(project.id);
+
+                    return (
+                      <label
+                        key={project.id}
+                        className="flex h-10 cursor-pointer items-center gap-2 border-b border-black/[0.06] px-2 last:border-b-0 hover:bg-[#71717a]/5"
+                      >
+                        <TaskCheckboxControl
+                          checked={isChecked}
+                          ariaLabel={`Select ${project.name}`}
+                          onCheckedChange={() => toggleProject(project.id)}
+                        />
+                        <Briefcase className="size-4 shrink-0 text-[#f59e0b]" />
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#3f3f46]">
+                          {project.name}
+                        </span>
+                      </label>
+                    );
+                  })
+                ) : (
+                  <EmptyStateCard
+                    compact
+                    icon={<Briefcase className="size-4" />}
+                    title={`No projects match "${projectSearchQuery}"`}
+                    description="Try a different project name or clear the search to see all available projects."
+                  />
+                )}
+              </div>
+
+              <div className="flex min-h-6 flex-wrap items-center gap-1.5 text-sm font-medium text-[#71717a]">
+                <span>Projects:</span>
+                {selectedProjectChips.length > 0 ? (
+                  <>
+                    {selectedProjectChips.map(project => (
+                      <Badge
+                        key={project.id}
+                        variant="outline"
+                        className="max-w-[180px] rounded-full border-black/10 bg-[#71717a]/10 px-2 py-0.5 text-[11px] font-semibold text-[#71717a]"
+                        title={project.name}
+                      >
+                        <span className="truncate">{project.name}</span>
+                      </Badge>
+                    ))}
+                    {remainingSelectedProjectCount > 0 ? (
+                      <Badge
+                        variant="outline"
+                        className="rounded-full border-black/10 bg-[#71717a]/10 px-2 py-0.5 text-[11px] font-semibold text-[#71717a]"
+                      >
+                        {remainingSelectedProjectCount} More
+                      </Badge>
+                    ) : null}
+                  </>
+                ) : (
+                  <span className="text-[#a1a1aa]">None</span>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="milestone-notes" className="text-[14px] font-semibold text-[#71717a]">Goals:</Label>
+                <Textarea
+                  id="milestone-notes"
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  placeholder="Add description..."
+                  rows={5}
+                  className="min-h-[190px] rounded-[24px] border-black/10 bg-white p-5 text-base font-medium leading-relaxed text-[#67676f] shadow-[0_0_1px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.06),0_2px_4px_rgba(0,0,0,0.04)] placeholder:text-[#b5b5ba] focus-visible:ring-[#71717a]/15"
+                />
+              </div>
+            </section>
+
+            <div className="mt-10">
+                <MilestoneTaskLinker
+                  projectTasks={projectTasks}
+                  filteredProjectTasks={filteredProjectTasks}
+                  linkedTaskIds={linkedTaskIds}
+                  dependencyIdsByTaskId={dependencyIdsByTaskId}
+                  statusColumns={statusColumns}
+                  taskSearchQuery={taskSearchQuery}
+                  onTaskSearchQueryChange={setTaskSearchQuery}
+                  onToggleTask={toggleTask}
+                  onToggleDependency={toggleDependency}
+                  wouldCreateDependencyCycle={wouldCreateTaskDependencyCycle}
+                />
+            </div>
+          </div>
+
+          <DialogSurfaceFooter className="border-t border-black/6 bg-white px-8 pb-6 pt-3">
             {milestone && onDelete && (
               <Button
                 type="button"
-                variant="destructive"
                 onClick={() => setDeleteConfirmOpen(true)}
-                className="mr-auto h-10 rounded-2xl"
+                className="mr-auto h-8 rounded-[12px] border border-[#f0c8c8] bg-[#fbeaea] px-4 text-[14px] font-normal text-[#ff0000] shadow-none hover:bg-[#f7dddd] hover:text-[#ff0000]"
               >
                 Delete
               </Button>
             )}
-            <Button type="button" variant="outline" onClick={onClose} className="h-10 rounded-2xl">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="h-8 rounded-[12px] border-black/10 bg-white px-4 text-[14px] font-normal text-[#67676f] shadow-none hover:bg-[#f3f3f3] hover:text-[#67676f]"
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={!title.trim() || projectIds.length === 0 || !endDate} className="h-10 rounded-2xl">
-              Save milestone
+            <Button
+              type="submit"
+              disabled={!title.trim() || projectIds.length === 0 || !endDate}
+              className="h-8 rounded-[12px] border border-black/10 bg-white px-4 text-[14px] font-normal text-[#67676f] shadow-none hover:bg-[#f3f3f3] hover:text-[#67676f] disabled:opacity-50"
+            >
+              {milestone ? 'Update' : 'Create'}
             </Button>
-          </DialogFooter>
+          </DialogSurfaceFooter>
         </form>
       </DialogSurface>
 
@@ -347,5 +447,65 @@ export function MilestoneDialog({
         }}
       />
     </Dialog>
+  );
+}
+
+interface MilestoneDateSelectFieldProps {
+  id: string;
+  label: string;
+  value: string;
+  min?: string;
+  onChange: (value: string) => void;
+}
+
+function MilestoneDateSelectField({ id, label, value, min, onChange }: MilestoneDateSelectFieldProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const openDatePicker = () => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    if (typeof input.showPicker === 'function') {
+      input.showPicker();
+      return;
+    }
+
+    input.focus();
+    input.click();
+  };
+
+  return (
+    <div className="space-y-1">
+      <Label htmlFor={id} className={taskEditLabelClassName}>{label}</Label>
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={label.replace(':', '')}
+        className={`${taskEditIconSelectClassName} cursor-pointer`}
+        onClick={openDatePicker}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          openDatePicker();
+        }}
+      >
+        <CalendarDays className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-[#71717a]" />
+        <span className="min-w-0 flex-1 truncate text-[#67676f]">
+          {value || 'Select date'}
+        </span>
+        <ChevronsUpDown className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-[#71717a]" />
+        <input
+          ref={inputRef}
+          id={id}
+          type="date"
+          value={value}
+          min={min}
+          onChange={(event) => onChange(event.target.value)}
+          tabIndex={-1}
+          className="pointer-events-none absolute inset-0 opacity-0"
+          aria-label={label.replace(':', '')}
+        />
+      </div>
+    </div>
   );
 }

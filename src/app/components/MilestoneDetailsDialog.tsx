@@ -10,6 +10,8 @@ import {
 import { formatDateRangeLabel } from '../utils/dateRange';
 import {
   Dialog,
+  DialogDescription,
+  DialogTitle,
 } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -180,6 +182,10 @@ export function MilestoneDetailsDialog({
           overlayClassName="omvra-settings-overlay"
           className="h-[min(1600px,calc(100vh-2rem))] w-[min(837px,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] gap-0 overflow-hidden rounded-[28px] border border-black/5 bg-white p-0 shadow-[0_14px_28px_rgba(0,0,0,0.1),0_-6px_12px_rgba(0,0,0,0.1),0_2px_8px_rgba(0,0,0,0.1)] sm:max-w-none"
         >
+          <div className="sr-only">
+            <DialogTitle>{milestone?.title || 'Roadmap milestone'}</DialogTitle>
+            <DialogDescription>Review milestone details, linked tasks, and dependency context.</DialogDescription>
+          </div>
           <div className="flex items-start justify-between border-b border-black/6 px-8 py-5">
             <div className="min-w-0">
               <h2 className="break-words text-[18px] font-normal tracking-[-0.02em] text-[#71717a] [overflow-wrap:anywhere]">

@@ -3,6 +3,7 @@ import type { ProjectMilestone, TaskStatus, TimelineSwimlane } from '../types';
 import { getProjectVisual } from '../utils/projectVisual';
 import { getMilestoneHealthVisual, getStatusVisual, type MilestoneHealth } from '../utils/roadmap';
 import { ProjectBadge } from './ProjectBadge';
+import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 
 interface RoadmapMilestoneSummary {

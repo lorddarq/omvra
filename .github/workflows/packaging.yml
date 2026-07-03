@@ -220,13 +220,16 @@ jobs:
           name: ${{ needs.prepare_release.outputs.release_tag }}
           files: |
             ./artifacts/macos/*.dmg
+            ./artifacts/macos/*.dmg.blockmap
             ./artifacts/macos/*.pkg
             ./artifacts/macos/*.zip
-            ./artifacts/macos/latest-mac.yml
+            ./artifacts/macos/*.zip.blockmap
+            ./artifacts/macos/*.yml
             ./artifacts/windows/*.exe
-            ./artifacts/windows/latest.yml
+            ./artifacts/windows/*.blockmap
+            ./artifacts/windows/*.yml
             ./artifacts/linux/*.AppImage
-            ./artifacts/linux/latest-linux.yml
+            ./artifacts/linux/*.yml
           draft: false
           prerelease: ${{ needs.prepare_release.outputs.is_prerelease == 'true' }}
           fail_on_unmatched_files: true

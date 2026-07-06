@@ -44,6 +44,8 @@ export function useFixedTimeSurfaceNavigation({
   const scrubStartXRef = useRef(0);
   const scrubStartScrollLeftRef = useRef(0);
   const autoScrolledKeyRef = useRef<string | null>(null);
+  const startupAutoScrollRafRef = useRef<number | null>(null);
+  const startupAutoScrollTimersRef = useRef<number[]>([]);
   const [isHeaderScrubbing, setIsHeaderScrubbing] = useState(false);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [scrollTop, setScrollTop] = useState(0);
@@ -137,15 +139,48 @@ export function useFixedTimeSurfaceNavigation({
       ?? `${rangeStart.toISOString()}:${dayCount}:${dayWidth}:${todayMarker.center}`;
     if (autoScrolledKeyRef.current === nextKey) return;
 
-    autoScrolledKeyRef.current = nextKey;
-    const animationFrame = window.requestAnimationFrame(() => {
-      scrollToDate(today, 'auto');
-    });
+    let cancelled = false;
+    let attempts = 0;
+    let stableHits = 0;
+    const MAX_ATTEMPTS = 40;
+
+    const applyTodayUntilStable = () => {
+      if (cancelled || !scrollRef.current) return;
+
+      attempts += 1;
+      const target = scrollToDate(today, 'auto');
+      const actual = scrollRef.current.scrollLeft;
+      const widthSettled = scrollRef.current.scrollWidth > scrollRef.current.clientWidth + 1;
+      const aligned = target !== null && Math.abs(actual - target) <= 1;
+      const canFinishAtZero = target !== null && (target <= 1 || !widthSettled);
+
+      if (aligned && (canFinishAtZero || actual > 1)) {
+        stableHits += 1;
+      } else {
+        stableHits = 0;
+      }
+
+      if (stableHits >= 2 || attempts >= MAX_ATTEMPTS) {
+        autoScrolledKeyRef.current = nextKey;
+        return;
+      }
+
+      const timeoutId = window.setTimeout(applyTodayUntilStable, 100);
+      startupAutoScrollTimersRef.current.push(timeoutId);
+    };
+
+    startupAutoScrollRafRef.current = window.requestAnimationFrame(applyTodayUntilStable);
 
     return () => {
-      window.cancelAnimationFrame(animationFrame);
+      cancelled = true;
+      if (startupAutoScrollRafRef.current != null) {
+        window.cancelAnimationFrame(startupAutoScrollRafRef.current);
+        startupAutoScrollRafRef.current = null;
+      }
+      startupAutoScrollTimersRef.current.forEach(id => window.clearTimeout(id));
+      startupAutoScrollTimersRef.current = [];
     };
-  }, [autoScrollKey, dayCount, dayWidth, rangeStart, scrollToDate, today, todayMarker]);
+  }, [autoScrollKey, dayCount, dayWidth, rangeStart, scrollRef, scrollToDate, today, todayMarker]);
 
   return {
     isHeaderScrubbing,

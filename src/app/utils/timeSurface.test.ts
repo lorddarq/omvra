@@ -122,4 +122,5 @@ test('getVariableDaySurfaceMarker returns left and center for variable-width sur
 test('getCenteredScrollLeftForMarker centers and clamps to zero', () => {
   assert.equal(getCenteredScrollLeftForMarker(260, 400), 60);
   assert.equal(getCenteredScrollLeftForMarker(100, 400), 0);
+  assert.equal(getCenteredScrollLeftForMarker(520, 400, 80), 80);
 });

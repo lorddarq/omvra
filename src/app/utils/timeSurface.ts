@@ -133,7 +133,8 @@ export function getVariableDaySurfaceMarker(
 
 export function getCenteredScrollLeftForMarker(
   markerCenter: number,
-  viewportWidth: number
+  viewportWidth: number,
+  maxScrollLeft = Number.POSITIVE_INFINITY
 ): number {
-  return Math.max(0, markerCenter - (viewportWidth / 2));
+  return Math.max(0, Math.min(markerCenter - (viewportWidth / 2), maxScrollLeft));
 }

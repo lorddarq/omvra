@@ -101,11 +101,20 @@ export function useFixedTimeSurfaceNavigation({
     const marker = getFixedDaySurfaceMarker(rangeStart, dayCount, dayWidth, date);
     if (!marker) return null;
 
-    const targetLeft = getCenteredScrollLeftForMarker(marker.center, scrollRef.current.clientWidth);
+    const maxScrollLeft = Math.max(0, scrollRef.current.scrollWidth - scrollRef.current.clientWidth);
+    const targetLeft = getCenteredScrollLeftForMarker(
+      marker.center,
+      scrollRef.current.clientWidth,
+      maxScrollLeft
+    );
     scrollRef.current.scrollTo({
       left: targetLeft,
       behavior,
     });
+    if (behavior !== 'smooth') {
+      setScrollLeft(targetLeft);
+      setScrollTop(scrollRef.current.scrollTop);
+    }
     return targetLeft;
   }, [dayCount, dayWidth, rangeStart, scrollRef]);
 

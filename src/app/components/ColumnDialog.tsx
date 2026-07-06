@@ -6,11 +6,12 @@ import { Button } from '../components/ui/button';
 import { DialogSurface } from './DialogSurface';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { Textarea } from '../components/ui/textarea';
 
 interface ColumnDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (title: string, color: string) => void;
+  onSave: (title: string, color: string, description?: string) => void;
   onDelete?: () => void;
   column?: StatusColumn | null;
 }
@@ -43,14 +44,17 @@ export function ColumnDialog({
 }: ColumnDialogProps) {
   const [title, setTitle] = useState('');
   const [color, setColor] = useState(FALLBACK_COLUMN_COLOR);
+  const [description, setDescription] = useState('');
 
   useEffect(() => {
     if (column) {
       setTitle(column.title || '');
       setColor(column.color || FALLBACK_COLUMN_COLOR);
+      setDescription(column.description || '');
     } else {
       setTitle('');
       setColor(FALLBACK_COLUMN_COLOR);
+      setDescription('');
     }
   }, [column, isOpen]);
 
@@ -58,7 +62,8 @@ export function ColumnDialog({
 
   const handleSave = () => {
     if (!title.trim()) return;
-    onSave(title.trim(), normalizedColor);
+    const normalizedDescription = description.trim();
+    onSave(title.trim(), normalizedColor, normalizedDescription || undefined);
     onClose();
   };
 
@@ -73,6 +78,7 @@ export function ColumnDialog({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogSurface
         showClose={false}
+        aria-describedby={undefined}
         overlayClassName="omvra-settings-overlay"
         className="w-[min(429px,calc(100vw-2rem))] gap-0 overflow-hidden rounded-[28px] border border-black/5 bg-white p-0 shadow-[0_24px_70px_rgba(15,23,42,0.24)] sm:max-w-none"
       >
@@ -128,6 +134,22 @@ export function ColumnDialog({
             </div>
             <p className="max-w-[365px] text-[13px] leading-4 text-[#71717a]">
               Assign a default color for the column to help you identify tasks associated faster.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="column-description" className="text-[15px] font-medium text-[#67676f]">
+              Description
+            </Label>
+            <Textarea
+              id="column-description"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="What kind of work belongs here?"
+              className="min-h-[96px] rounded-[16px] border-[#d9d9df] bg-white px-3 py-2 text-[14px] text-[#3d3d45] shadow-none placeholder:text-[#b7b7c0] focus-visible:border-[#d0d0d7] focus-visible:ring-2 focus-visible:ring-black/5"
+            />
+            <p className="max-w-[365px] text-[13px] leading-4 text-[#71717a]">
+              Give agents and collaborators a short note about the purpose of this board.
             </p>
           </div>
 

@@ -43,6 +43,7 @@ interface KanbanViewProps {
   onReorderColumns: (fromIndex: number, toIndex: number) => void;
   onRenameColumn?: (colId: string, newTitle: string) => void;
   onChangeColumnColor?: (colId: string, newColor: string) => void;
+  onChangeColumnDescription?: (colId: string, newDescription?: string) => void;
   onAddColumn?: (col: any) => void;
   onDeleteColumn?: (colId: string) => void;
 }
@@ -64,6 +65,7 @@ export function KanbanView({
   onReorderColumns,
   onRenameColumn,
   onChangeColumnColor,
+  onChangeColumnDescription,
   onAddColumn,
   onDeleteColumn,
 }: KanbanViewProps) {
@@ -364,6 +366,7 @@ export function KanbanView({
           onReorderColumns={onReorderColumns}
           onRenameColumn={onRenameColumn}
           onChangeColumnColor={onChangeColumnColor}
+          onChangeColumnDescription={onChangeColumnDescription}
           onAddColumn={onAddColumn}
           onDeleteColumn={onDeleteColumn}
           onColumnDragHover={handleColumnDragHover}

@@ -134,6 +134,12 @@ function getFileNameFromPath(filePath: string): string {
   return normalized.split('/').filter(Boolean).pop() || filePath;
 }
 
+function normalizeOptionalText(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed || undefined;
+}
+
 function toFileUri(filePath: string): string {
   const normalized = filePath.replace(/\\/g, '/');
   const prefixed = normalized.match(/^[A-Za-z]:\//) ? `/${normalized}` : normalized;
@@ -261,7 +267,8 @@ export function sanitizeTimelineSwimlanes(
       return {
         id: candidate.id,
         name: candidate.name,
-        subtitle: typeof candidate.subtitle === 'string' ? candidate.subtitle : undefined,
+        description: normalizeOptionalText(candidate.description) ?? normalizeOptionalText(candidate.subtitle),
+        subtitle: normalizeOptionalText(candidate.subtitle),
         color: typeof candidate.color === 'string' ? candidate.color : '#3b82f6',
       };
     })
@@ -343,6 +350,7 @@ export function sanitizeStatusColumns(
         id: candidate.id,
         title: candidate.title,
         color: typeof candidate.color === 'string' ? candidate.color : '#9ca3af',
+        description: normalizeOptionalText(candidate.description),
       };
     })
     .filter((column): column is NonNullable<typeof column> => column !== null);

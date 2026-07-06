@@ -39,6 +39,12 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
+function normalizeOptionalText(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed || undefined;
+}
+
 function getDefaultStatusId(
   columns: StatusColumn[],
   preferred: TaskStatus
@@ -205,6 +211,7 @@ export function sanitizeStatusColumns(
         id: column.id,
         title: column.title,
         color: typeof column.color === 'string' ? column.color : '#9ca3af',
+        description: normalizeOptionalText(column.description),
       };
     })
     .filter((column): column is StatusColumnState & { color: string } => Boolean(column));
@@ -251,7 +258,8 @@ export function sanitizeTimelineSwimlanes(
       return {
         id: item.id,
         name: item.name,
-        subtitle: typeof item.subtitle === 'string' ? item.subtitle : undefined,
+        description: normalizeOptionalText(item.description) ?? normalizeOptionalText(item.subtitle),
+        subtitle: normalizeOptionalText(item.subtitle),
         color: typeof item.color === 'string' ? item.color : '#3b82f6',
       };
     })

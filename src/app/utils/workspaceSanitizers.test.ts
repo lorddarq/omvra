@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sanitizePeople, sanitizePreferences } from './workspaceSanitizers.ts';
+import {
+  sanitizePeople,
+  sanitizePreferences,
+  sanitizeStatusColumns,
+  sanitizeTimelineSwimlanes,
+} from './workspaceSanitizers.ts';
 
 test('sanitizePeople preserves trimmed instructions for agentic people', () => {
   const [person] = sanitizePeople([
@@ -74,4 +79,30 @@ test('sanitizePreferences preserves rc update channel and falls back to stable',
 
   assert.equal(rcPreferences.updateChannel, 'rc');
   assert.equal(stablePreferences.updateChannel, 'stable');
+});
+
+test('sanitizeStatusColumns preserves trimmed descriptions', () => {
+  const [column] = sanitizeStatusColumns([
+    {
+      id: 'open',
+      title: 'Open',
+      color: '#9ca3af',
+      description: '  Incoming work that is ready to be picked up.  ',
+    },
+  ], []);
+
+  assert.equal(column.description, 'Incoming work that is ready to be picked up.');
+});
+
+test('sanitizeTimelineSwimlanes promotes legacy subtitle to description', () => {
+  const [swimlane] = sanitizeTimelineSwimlanes([
+    {
+      id: 'project-1',
+      name: 'Omvra Web',
+      subtitle: '  Marketing and website delivery work.  ',
+    },
+  ], []);
+
+  assert.equal(swimlane.description, 'Marketing and website delivery work.');
+  assert.equal(swimlane.subtitle, 'Marketing and website delivery work.');
 });

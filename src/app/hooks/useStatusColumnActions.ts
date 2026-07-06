@@ -22,6 +22,10 @@ export function useStatusColumnActions({
     setStatusColumns(cols => cols.map(c => c.id === colId ? { ...c, color: newColorClass } : c));
   }, [setStatusColumns]);
 
+  const changeStatusColumnDescription = useCallback((colId: string, newDescription?: string) => {
+    setStatusColumns(cols => cols.map(c => c.id === colId ? { ...c, description: newDescription } : c));
+  }, [setStatusColumns]);
+
   const reorderStatusColumns = useCallback((fromIndex: number, toIndex: number) => {
     setStatusColumns(cols => {
       const copy = [...cols];
@@ -31,11 +35,12 @@ export function useStatusColumnActions({
     });
   }, [setStatusColumns]);
 
-  const addStatusColumn = useCallback((col: { id?: string; title: string; color?: string }) => {
+  const addStatusColumn = useCallback((col: { id?: string; title: string; color?: string; description?: string }) => {
     const newCol: StatusColumn = {
       id: col.id || Date.now().toString(),
       title: col.title,
       color: col.color || '#9ca3af',
+      description: col.description,
     };
     setStatusColumns(cols => [...cols, newCol]);
   }, [setStatusColumns]);
@@ -58,6 +63,7 @@ export function useStatusColumnActions({
   return {
     renameStatusColumn,
     changeStatusColumnColor,
+    changeStatusColumnDescription,
     reorderStatusColumns,
     addStatusColumn,
     deleteStatusColumn,

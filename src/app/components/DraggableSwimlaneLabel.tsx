@@ -139,9 +139,6 @@ export function DraggableSwimlaneLabel({
               </div>
               <div className="min-w-0">
                 <div className="text-sm font-semibold text-gray-700 truncate">{swimlane.name}</div>
-                {swimlane.subtitle && (
-                  <div className="text-xs text-gray-500 truncate">{swimlane.subtitle}</div>
-                )}
               </div>
             </div>
             <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0">{taskCount} {taskCount === 1 ? 'task' : 'tasks'}</span>

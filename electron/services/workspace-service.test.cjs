@@ -46,6 +46,15 @@ const {
 
 test('workspace snapshot contract has expected keys and stable counts', () => {
   const store = makeStoreFromFixture('workspace-basic');
+  store.set(STATUS_COLUMNS_KEY, [
+    { id: 'open', title: 'Open', color: '#9ca3af', description: 'New work that is ready for an agent to inspect.' },
+    { id: 'in-progress', title: 'In Progress', color: '#3b82f6' },
+    { id: 'done', title: 'Done', color: '#10b981' },
+  ]);
+  store.set('omvra.swimlanes.v1', [
+    { id: 'lane-1', name: 'Project A', description: 'Timeline work for the desktop client.', color: '#3b82f6' },
+    { id: 'lane-2', name: 'Project B', color: '#8b5cf6' },
+  ]);
   const snapshot = getWorkspaceSnapshot(store);
 
   assert.equal(snapshot.schemaVersion, '1');
@@ -78,11 +87,40 @@ test('workspace snapshot contract has expected keys and stable counts', () => {
     snapshot.workspace.people.find(person => person.id === 'agent-1')?.agentOperationalInstructions,
     'Read the assigned task, inspect relevant roadmap links, and validate changes before handoff.'
   );
+  assert.equal(
+    snapshot.workspace.statusColumns.find(column => column.id === 'open')?.description,
+    'New work that is ready for an agent to inspect.'
+  );
+  assert.equal(
+    snapshot.workspace.projects.find(project => project.id === 'lane-1')?.description,
+    'Timeline work for the desktop client.'
+  );
   assert.equal(snapshot.meta.counts.tasks, snapshot.workspace.tasks.length);
   assert.equal(snapshot.meta.counts.milestones, snapshot.workspace.milestones.length);
   assert.equal(snapshot.meta.counts.people, snapshot.workspace.people.length);
   assert.equal(snapshot.meta.counts.projects, snapshot.workspace.projects.length);
   assert.equal(snapshot.meta.counts.statusColumns, snapshot.workspace.statusColumns.length);
+});
+
+test('kanban and timeline card projections include board and swimlane descriptions', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  store.set(STATUS_COLUMNS_KEY, [
+    { id: 'open', title: 'Open', description: 'Ready to be planned or picked up.' },
+    { id: 'in-progress', title: 'In Progress' },
+    { id: 'done', title: 'Done' },
+  ]);
+  store.set('omvra.swimlanes.v1', [
+    { id: 'lane-1', name: 'Project A', description: 'Desktop product delivery lane.' },
+    { id: 'lane-2', name: 'Project B' },
+  ]);
+
+  const [kanbanCard] = listKanbanCards(store, { status: 'open' });
+  const [timelineCard] = listTimelineCards(store, { laneId: 'lane-1' });
+
+  assert.equal(kanbanCard.statusTitle, 'Open');
+  assert.equal(kanbanCard.statusDescription, 'Ready to be planned or picked up.');
+  assert.equal(timelineCard.swimlaneName, 'Project A');
+  assert.equal(timelineCard.swimlaneDescription, 'Desktop product delivery lane.');
 });
 
 test('listener status reflects runtime state and token expiry details', () => {

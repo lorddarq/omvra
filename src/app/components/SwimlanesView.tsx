@@ -67,6 +67,7 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
   onDropTask,
   onRenameColumn,
   onChangeColumnColor,
+  onChangeColumnDescription,
   onDeleteColumn,
   onReorderColumns,
   onColumnDragHover,
@@ -85,6 +86,7 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
   onDropTask: (draggedTask: Task, targetStatus: TaskStatus, targetIndex: number) => void;
   onRenameColumn?: (colId: string, newTitle: string) => void;
   onChangeColumnColor?: (colId: string, newColor: string) => void;
+  onChangeColumnDescription?: (colId: string, newDescription?: string) => void;
   onDeleteColumn?: (colId: string) => void;
   onReorderColumns?: (fromIndex: number, toIndex: number) => void;
   onColumnDragHover?: (clientX: number) => void;
@@ -183,6 +185,7 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
         onDropTask={onDropTask}
         onRenameColumn={onRenameColumn}
         onChangeColumnColor={onChangeColumnColor}
+        onChangeColumnDescription={onChangeColumnDescription}
         onDeleteColumn={onDeleteColumn}
       />
     </div>
@@ -201,6 +204,7 @@ interface SwimlanesViewProps {
   onReorderColumns?: (fromIndex: number, toIndex: number) => void;
   onRenameColumn?: (colId: string, newTitle: string) => void;
   onChangeColumnColor?: (colId: string, newColor: string) => void;
+  onChangeColumnDescription?: (colId: string, newDescription?: string) => void;
   onAddColumn?: (col: { id?: string; title: string; color?: string }) => void;
   onDeleteColumn?: (colId: string) => void;
   onColumnDragHover?: (clientX: number) => void;
@@ -217,6 +221,7 @@ export function SwimlanesView({
   onReorderColumns,
   onRenameColumn,
   onChangeColumnColor,
+  onChangeColumnDescription,
   onAddColumn,
   onDeleteColumn,
   onColumnDragHover,
@@ -311,6 +316,7 @@ export function SwimlanesView({
                   onDropTask={handleDropTask}
                   onRenameColumn={onRenameColumn}
                   onChangeColumnColor={onChangeColumnColor}
+                  onChangeColumnDescription={onChangeColumnDescription}
                   onDeleteColumn={onDeleteColumn}
                   onReorderColumns={onReorderColumns}
                   onColumnDragHover={onColumnDragHover}

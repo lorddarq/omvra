@@ -60,6 +60,7 @@ export interface KanbanViewController {
   onKanbanReorderColumns: (fromIndex: number, toIndex: number) => void;
   onKanbanRenameColumn: (colId: string, newTitle: string) => void;
   onKanbanChangeColumnColor: (colId: string, newColor: string) => void;
+  onKanbanChangeColumnDescription: (colId: string, newDescription?: string) => void;
   onKanbanAddColumn: (col: any) => void;
   onKanbanDeleteColumn: (colId: string) => void;
 }
@@ -138,6 +139,7 @@ export function AppMainViews({
               onReorderColumns={kanban.onKanbanReorderColumns}
               onRenameColumn={kanban.onKanbanRenameColumn}
               onChangeColumnColor={kanban.onKanbanChangeColumnColor}
+              onChangeColumnDescription={kanban.onKanbanChangeColumnDescription}
               onAddColumn={kanban.onKanbanAddColumn}
               onDeleteColumn={kanban.onKanbanDeleteColumn}
             />

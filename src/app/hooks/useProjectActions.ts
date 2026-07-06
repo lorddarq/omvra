@@ -23,6 +23,7 @@ export function useProjectActions({
     const newSwimlane: TimelineSwimlane = {
       id: Date.now().toString(),
       name: swimlaneData.name!,
+      description: swimlaneData.description,
       color: swimlaneData.color,
     };
     setTimelineSwimlanes(previousSwimlanes => [...previousSwimlanes, newSwimlane]);

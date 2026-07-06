@@ -675,14 +675,36 @@ function normalizePersonForMcp(person) {
   };
 }
 
+function normalizeStatusColumnForMcp(column) {
+  if (!column || typeof column !== 'object') return column;
+  const description = normalizeString(column.description).trim();
+
+  return {
+    ...column,
+    description: description || undefined,
+  };
+}
+
+function normalizeProjectForMcp(project) {
+  if (!project || typeof project !== 'object') return project;
+  const description = normalizeString(project.description || project.subtitle).trim();
+  const subtitle = normalizeString(project.subtitle).trim();
+
+  return {
+    ...project,
+    description: description || undefined,
+    subtitle: subtitle || undefined,
+  };
+}
+
 function getWorkspaceSnapshot(store) {
   // TODO(next-phase): unify storage source of truth. The renderer currently persists
   // most workspace state in localStorage; MCP should read from a canonical backend store.
   const tasks = readArray(store, TASKS_KEY).map(normalizeTaskForMcp);
   const milestones = listMilestones(store);
   const people = readArray(store, PEOPLE_KEY).map(normalizePersonForMcp);
-  const projects = readArray(store, SWIMLANES_KEY);
-  const statusColumns = readArray(store, STATUS_COLUMNS_KEY);
+  const projects = readArray(store, SWIMLANES_KEY).map(normalizeProjectForMcp);
+  const statusColumns = readArray(store, STATUS_COLUMNS_KEY).map(normalizeStatusColumnForMcp);
 
   return {
     schemaVersion: '1',
@@ -845,10 +867,14 @@ function listAssignedWorkForAgent(store, {
 
 function listKanbanCards(store, filters = {}) {
   const tasks = listTasks(store, filters);
+  const statusColumns = readArray(store, STATUS_COLUMNS_KEY).map(normalizeStatusColumnForMcp);
+  const statusById = new Map(statusColumns.map(column => [normalizeString(column.id), column]));
 
   return tasks.map(task => ({
     id: task.id,
     status: task.status,
+    statusTitle: statusById.get(normalizeString(task.status))?.title,
+    statusDescription: statusById.get(normalizeString(task.status))?.description,
     title: task.title,
     assigneeId: task.assigneeId,
     notes: task.notes,
@@ -858,6 +884,8 @@ function listKanbanCards(store, filters = {}) {
 
 function listTimelineCards(store, filters = {}) {
   const tasks = readArray(store, TASKS_KEY).map(normalizeTaskForMcp);
+  const projects = readArray(store, SWIMLANES_KEY).map(normalizeProjectForMcp);
+  const projectById = new Map(projects.map(project => [normalizeString(project.id), project]));
   const laneId = normalizeString(filters.laneId);
   const startDate = normalizeString(filters.startDate);
   const endDate = normalizeString(filters.endDate);
@@ -877,6 +905,8 @@ function listTimelineCards(store, filters = {}) {
       id: task.id,
       title: task.title,
       swimlaneId: task.swimlaneId,
+      swimlaneName: projectById.get(normalizeString(task.swimlaneId))?.name,
+      swimlaneDescription: projectById.get(normalizeString(task.swimlaneId))?.description,
       startDate: task.startDate,
       endDate: task.endDate,
       assigneeId: task.assigneeId,

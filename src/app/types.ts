@@ -8,6 +8,7 @@ export interface StatusColumn {
   id: string;
   title: string;
   color?: string;
+  description?: string;
 }
 
 export interface TaskComment {
@@ -91,6 +92,7 @@ export type Swimlane = StatusColumn;
 export interface TimelineSwimlane {
   id: string;
   name: string;
+  description?: string;
   subtitle?: string;
   color?: string;
 }

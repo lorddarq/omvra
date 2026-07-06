@@ -54,6 +54,7 @@ export function UpdateAvailablePopup({
     <Dialog open>
       <DialogContent
         showClose={false}
+        aria-describedby={undefined}
         overlayClassName="bg-transparent"
         onEscapeKeyDown={(event) => event.preventDefault()}
         onInteractOutside={(event) => event.preventDefault()}

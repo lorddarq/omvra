@@ -227,6 +227,7 @@ export function useAppShell(): AppShellState {
   const {
     renameStatusColumn: handleRenameStatusColumn,
     changeStatusColumnColor: handleChangeStatusColumnColor,
+    changeStatusColumnDescription: handleChangeStatusColumnDescription,
     reorderStatusColumns: handleReorderStatusColumns,
     addStatusColumn: handleAddStatusColumn,
     deleteStatusColumn: handleDeleteStatusColumn,
@@ -569,6 +570,7 @@ export function useAppShell(): AppShellState {
         onKanbanReorderColumns: handleReorderStatusColumns,
         onKanbanRenameColumn: handleRenameStatusColumn,
         onKanbanChangeColumnColor: handleChangeStatusColumnColor,
+        onKanbanChangeColumnDescription: handleChangeStatusColumnDescription,
         onKanbanAddColumn: handleAddStatusColumn,
         onKanbanDeleteColumn: handleDeleteStatusColumn,
       },

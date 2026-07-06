@@ -186,10 +186,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
   });
   const [timelineSwimlanes, setTimelineSwimlanes] = useState<TimelineSwimlane[]>(() => {
     const stored = readInitialWorkspaceJSON<TimelineSwimlane[]>(SWIMLANES_KEY, DEFAULT_SWIMLANES_SEED);
-    return stored.map(swimlane => ({
-      ...swimlane,
-      color: swimlane.color || '#3b82f6',
-    }));
+    return sanitizeTimelineSwimlanes(stored, DEFAULT_SWIMLANES_SEED);
   });
   const [people, setPeople] = useState<Person[]>(() => {
     const stored = readInitialWorkspaceJSON<Person[]>(PEOPLE_KEY, DEFAULT_PEOPLE_SEED);
@@ -201,7 +198,10 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     return sanitizeMilestones(stored, projects, DEFAULT_MILESTONES_SEED);
   });
   const [statusColumns, setStatusColumns] = useState<StatusColumnState[]>(() =>
-    readInitialWorkspaceJSON<StatusColumnState[]>(STATUS_COLUMNS_KEY, defaultSwimlanes)
+    sanitizeStatusColumns(
+      readInitialWorkspaceJSON<StatusColumnState[]>(STATUS_COLUMNS_KEY, defaultSwimlanes),
+      defaultSwimlanes
+    )
   );
   const [agentWatchConfigs, setAgentWatchConfigs] = useState<AgentWatchConfig[]>(() =>
     readInitialWorkspaceJSON<AgentWatchConfig[]>(MCP_AGENT_WATCH_CONFIGS_KEY, [])

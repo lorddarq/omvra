@@ -7,6 +7,7 @@ import { DialogSurface } from './DialogSurface';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { DeleteConfirmDialog } from './DeleteConfirmDialog';
+import { Textarea } from '../components/ui/textarea';
 
 interface SwimlaneDialogProps {
   isOpen: boolean;
@@ -44,15 +45,18 @@ export function SwimlaneDialog({
 }: SwimlaneDialogProps) {
   const [name, setName] = useState('');
   const [color, setColor] = useState(FALLBACK_SWIMLANE_COLOR);
+  const [description, setDescription] = useState('');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (swimlane) {
       setName(swimlane.name);
       setColor(swimlane.color || FALLBACK_SWIMLANE_COLOR);
+      setDescription(swimlane.description || swimlane.subtitle || '');
     } else {
       setName('');
       setColor(FALLBACK_SWIMLANE_COLOR);
+      setDescription('');
     }
   }, [swimlane, isOpen]);
 
@@ -64,6 +68,7 @@ export function SwimlaneDialog({
     const swimlaneData: Partial<TimelineSwimlane> = {
       ...(swimlane && { id: swimlane.id }),
       name: name.trim(),
+      description: description.trim() || undefined,
       color: normalizedColor,
     };
 
@@ -83,6 +88,7 @@ export function SwimlaneDialog({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogSurface
         showClose={false}
+        aria-describedby={undefined}
         overlayClassName="omvra-settings-overlay"
         className="w-[min(429px,calc(100vw-2rem))] gap-0 overflow-hidden rounded-[28px] border border-black/5 bg-white p-0 shadow-[0_24px_70px_rgba(15,23,42,0.24)] sm:max-w-none"
       >
@@ -138,6 +144,22 @@ export function SwimlaneDialog({
             </div>
             <p className="max-w-[365px] text-[13px] leading-4 text-[#71717a]">
               Assign a default color for the swimlane to help you identify timeline rows faster.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="swimlane-description" className="text-[15px] font-medium text-[#67676f]">
+              Description
+            </Label>
+            <Textarea
+              id="swimlane-description"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="What kind of work or context lives in this swimlane?"
+              className="min-h-[96px] rounded-[16px] border-[#d9d9df] bg-white px-3 py-2 text-[14px] text-[#3d3d45] shadow-none placeholder:text-[#b7b7c0] focus-visible:border-[#d0d0d7] focus-visible:ring-2 focus-visible:ring-black/5"
+            />
+            <p className="max-w-[365px] text-[13px] leading-4 text-[#71717a]">
+              Add a short note so agents can understand the purpose of this swimlane at a glance.
             </p>
           </div>
 

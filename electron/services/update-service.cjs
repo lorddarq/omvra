@@ -57,7 +57,10 @@ function createDefaultUpdateState(options = {}) {
 }
 
 function normalizeUnsupportedReason(value) {
-  return value === 'updater-unavailable' ? 'updater-unavailable' : 'unpackaged';
+  if (value === 'updater-unavailable' || value === 'signature-invalid') {
+    return value;
+  }
+  return 'unpackaged';
 }
 
 function sanitizeDebugUpdateFixture(fixture) {
@@ -99,7 +102,13 @@ function createUpdateController({
 } = {}) {
   const debugFixture = sanitizeDebugUpdateFixture(debugUpdateFixture);
   const packaged = debugFixture ? true : Boolean(app && app.isPackaged);
-  const supported = Boolean(debugFixture) || (packaged && Boolean(updater && typeof updater.on === 'function'));
+  const normalizedUnsupportedReason = normalizeUnsupportedReason(unsupportedReason);
+  const hasCustomUnsupportedState = normalizedUnsupportedReason !== 'unpackaged';
+  const supported = Boolean(debugFixture) || (
+    packaged
+    && !hasCustomUnsupportedState
+    && Boolean(updater && typeof updater.on === 'function')
+  );
   let state = debugFixture || createDefaultUpdateState({
     supported,
     packaged,

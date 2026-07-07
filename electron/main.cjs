@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { spawnSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const Store = require('electron-store');
@@ -151,6 +152,66 @@ function sanitizePdfFileName(value) {
     .slice(0, 120);
 
   return safeName.toLowerCase().endsWith('.pdf') ? safeName : `${safeName}.pdf`;
+}
+
+function getAppBundlePath() {
+  const marker = '.app/Contents/MacOS/';
+  const executablePath = typeof process.execPath === 'string' ? process.execPath : '';
+  const markerIndex = executablePath.indexOf(marker);
+  return markerIndex === -1 ? null : executablePath.slice(0, markerIndex + 4);
+}
+
+function readCurrentMacCodeSignature() {
+  if (process.platform !== 'darwin' || !app.isPackaged) {
+    return {
+      status: 'unchecked',
+      signature: null,
+      teamIdentifier: null,
+      details: null,
+    };
+  }
+
+  const appBundlePath = getAppBundlePath();
+  if (!appBundlePath) {
+    return {
+      status: 'unknown',
+      signature: null,
+      teamIdentifier: null,
+      details: 'Could not resolve the installed Omvra app bundle.',
+    };
+  }
+
+  const result = spawnSync('codesign', ['-dv', '--verbose=4', appBundlePath], { encoding: 'utf8' });
+  const output = [result.stdout, result.stderr].filter(Boolean).join('\n');
+  if (result.status !== 0) {
+    return {
+      status: 'unknown',
+      signature: null,
+      teamIdentifier: null,
+      details: output || 'codesign inspection failed.',
+    };
+  }
+
+  let signature = null;
+  let teamIdentifier = null;
+  for (const rawLine of output.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (line.startsWith('Signature=')) {
+      signature = line.slice('Signature='.length).trim();
+      continue;
+    }
+    if (line.startsWith('TeamIdentifier=')) {
+      teamIdentifier = line.slice('TeamIdentifier='.length).trim();
+    }
+  }
+
+  const isAdhoc = !signature || signature === 'adhoc' || !teamIdentifier || teamIdentifier === 'not set';
+  return {
+    status: isAdhoc ? 'adhoc' : 'signed',
+    signature,
+    teamIdentifier,
+    details: null,
+  };
 }
 
 async function exportHtmlToPdf(event, { html, defaultFileName } = {}) {
@@ -337,15 +398,20 @@ app.whenReady().then(() => {
     broadcastStoreDidChange();
     syncUpdateChannelFromStore();
   });
+  const macCodeSignature = readCurrentMacCodeSignature();
+  const unsupportedReason = macCodeSignature.status === 'adhoc'
+    ? 'signature-invalid'
+    : (app.isPackaged && !autoUpdater ? 'updater-unavailable' : 'unpackaged');
+  const unsupportedDetails = macCodeSignature.status === 'adhoc'
+    ? 'This installed Omvra build is ad-hoc signed, so macOS cannot replace it through auto-update. Install a signed Omvra app manually once, then future updates can install normally.'
+    : (app.isPackaged && !autoUpdater ? autoUpdaterLoadError : null);
   updateController = createUpdateController({
     app,
     updater: autoUpdater,
     onStateChange: broadcastUpdateState,
     debugUpdateFixture: getDebugUpdateFixtureFromEnv(),
-    unsupportedReason: normalizeUnsupportedReason(
-      app.isPackaged && !autoUpdater ? 'updater-unavailable' : 'unpackaged'
-    ),
-    unsupportedDetails: app.isPackaged && !autoUpdater ? autoUpdaterLoadError : null,
+    unsupportedReason: normalizeUnsupportedReason(unsupportedReason),
+    unsupportedDetails,
   });
   syncUpdateChannelFromStore();
   restartMcpServer();
@@ -388,6 +454,7 @@ ipcMain.handle('app/get-runtime-info', () => ({
   electronVersion: process.versions.electron || 'unknown',
   chromeVersion: process.versions.chrome || 'unknown',
   nodeVersion: process.versions.node || 'unknown',
+  codeSignature: readCurrentMacCodeSignature(),
 }));
 registerUpdateIpcHandlers({
   ipcMain,

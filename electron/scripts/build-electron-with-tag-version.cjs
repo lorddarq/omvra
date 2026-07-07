@@ -63,6 +63,117 @@ function isTaggedReleaseBuild(env) {
   return /^refs\/tags\/v/.test(tagFromRef);
 }
 
+function getReleaseDirectory() {
+  return path.resolve(process.cwd(), 'release');
+}
+
+function listBuiltMacAppBundles(releaseDir = getReleaseDirectory()) {
+  if (!fs.existsSync(releaseDir)) {
+    return [];
+  }
+
+  return fs.readdirSync(releaseDir, { withFileTypes: true })
+    .filter(entry => entry.isDirectory() && entry.name.startsWith('mac'))
+    .flatMap(entry => {
+      const dirPath = path.join(releaseDir, entry.name);
+      return fs.readdirSync(dirPath, { withFileTypes: true })
+        .filter(child => child.isDirectory() && child.name.endsWith('.app'))
+        .map(child => path.join(dirPath, child.name));
+    });
+}
+
+function inspectCodesign(appPath) {
+  const result = spawnSync('codesign', ['-dv', '--verbose=4', appPath], { encoding: 'utf8' });
+  const output = [result.stdout, result.stderr].filter(Boolean).join('\n');
+
+  if (result.status !== 0) {
+    throw new Error(`codesign inspection failed for ${appPath}\n${output}`.trim());
+  }
+
+  return output;
+}
+
+function verifyCodesign(appPath) {
+  const result = spawnSync('codesign', ['--verify', '--deep', '--strict', '--verbose=2', appPath], { encoding: 'utf8' });
+  const output = [result.stdout, result.stderr].filter(Boolean).join('\n');
+
+  if (result.status !== 0) {
+    throw new Error(`codesign verification failed for ${appPath}\n${output}`.trim());
+  }
+
+  return output;
+}
+
+function parseCodesignDetails(output) {
+  const details = {
+    signature: null,
+    teamIdentifier: null,
+    authorities: [],
+  };
+
+  for (const rawLine of String(output).split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    if (line.startsWith('Signature=')) {
+      details.signature = line.slice('Signature='.length).trim();
+      continue;
+    }
+
+    if (line.startsWith('TeamIdentifier=')) {
+      details.teamIdentifier = line.slice('TeamIdentifier='.length).trim();
+      continue;
+    }
+
+    if (line.startsWith('Authority=')) {
+      details.authorities.push(line.slice('Authority='.length).trim());
+    }
+  }
+
+  return details;
+}
+
+function validateMacReleaseSignature(details) {
+  if (!details || typeof details !== 'object') {
+    return { ok: false, reason: 'Missing codesign metadata.' };
+  }
+
+  if (!details.signature || details.signature === 'adhoc') {
+    return { ok: false, reason: 'App bundle is ad-hoc signed.' };
+  }
+
+  if (!details.teamIdentifier || details.teamIdentifier === 'not set') {
+    return { ok: false, reason: 'App bundle has no TeamIdentifier.' };
+  }
+
+  if (!details.authorities.some(authority => authority.includes('Developer ID Application:'))) {
+    return { ok: false, reason: 'App bundle is not signed with a Developer ID Application certificate.' };
+  }
+
+  return { ok: true, reason: null };
+}
+
+function assertTaggedMacReleaseArtifactsAreSigned() {
+  const appBundles = listBuiltMacAppBundles();
+  if (appBundles.length === 0) {
+    throw new Error('No built macOS app bundle was found under release/mac* for signature verification.');
+  }
+
+  for (const appPath of appBundles) {
+    verifyCodesign(appPath);
+    const details = parseCodesignDetails(inspectCodesign(appPath));
+    const validation = validateMacReleaseSignature(details);
+
+    if (!validation.ok) {
+      throw new Error(`${validation.reason} (${appPath})`);
+    }
+
+    console.log(
+      `[build-electron] verified macOS release signature for ${path.basename(appPath)} using team ${details.teamIdentifier}`
+    );
+  }
+}
+
 function pipeFilteredStream(stream, writer, onFilteredLine) {
   let buffer = '';
 
@@ -156,8 +267,29 @@ function run() {
   pipeFilteredStream(builder.stderr, process.stderr, filterDuplicateDependencyLine);
 
   builder.on('close', code => {
+    if (code === 0 && process.platform === 'darwin' && isTaggedReleaseBuild(buildEnv)) {
+      try {
+        assertTaggedMacReleaseArtifactsAreSigned();
+      } catch (error) {
+        console.error(`[build-electron] ${error.message}`);
+        process.exit(1);
+      }
+    }
+
     process.exit(code || 0);
   });
 }
 
-run();
+if (require.main === module) {
+  run();
+}
+
+module.exports = {
+  hasExplicitMacSigningConfiguration,
+  inspectCodesign,
+  isTaggedReleaseBuild,
+  listBuiltMacAppBundles,
+  parseCodesignDetails,
+  validateMacReleaseSignature,
+  verifyCodesign,
+};

@@ -152,7 +152,7 @@ declare global {
     packaged: boolean;
     channel: 'stable' | 'rc';
     status: 'idle' | 'unsupported' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
-    unsupportedReason: 'unpackaged' | 'updater-unavailable';
+    unsupportedReason: 'unpackaged' | 'updater-unavailable' | 'signature-invalid';
     unsupportedDetails: string | null;
     update: AppUpdateInfo | null;
     progressPercent: number | null;
@@ -176,6 +176,12 @@ declare global {
           electronVersion: string;
           chromeVersion: string;
           nodeVersion: string;
+          codeSignature?: {
+            status: 'unchecked' | 'unknown' | 'adhoc' | 'signed';
+            signature: string | null;
+            teamIdentifier: string | null;
+            details: string | null;
+          };
         }>;
       };
       updates: {

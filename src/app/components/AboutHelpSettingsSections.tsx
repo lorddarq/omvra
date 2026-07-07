@@ -422,6 +422,11 @@ function getUpdateSummary(updateState: AppUpdateState) {
 
   if (!updateState.supported) {
     const details = updateState.unsupportedDetails?.trim();
+    if (updateState.unsupportedReason === 'signature-invalid') {
+      return details
+        ? details
+        : 'This installed Omvra build must be replaced with a signed app manually once before auto-updates can install.';
+    }
     return updateState.unsupportedReason === 'updater-unavailable'
       ? details
         ? `This packaged Omvra build could not load electron-updater: ${details}`

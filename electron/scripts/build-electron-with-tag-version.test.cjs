@@ -81,3 +81,29 @@ test('validateMacReleaseSignature rejects ad-hoc and accepts Developer ID signin
     }
   );
 });
+
+test('validateMacReleaseSignature accepts signed apps when codesign omits Signature= but includes authority and team id', () => {
+  const details = parseCodesignDetails(`
+Executable=/Applications/Omvra.app/Contents/MacOS/Omvra
+Authority=Developer ID Application: Example Dev (ABCDE12345)
+Authority=Developer ID Certification Authority
+Authority=Apple Root CA
+TeamIdentifier=ABCDE12345
+Signature size=9044
+  `);
+
+  assert.deepEqual(details, {
+    signature: null,
+    teamIdentifier: 'ABCDE12345',
+    authorities: [
+      'Developer ID Application: Example Dev (ABCDE12345)',
+      'Developer ID Certification Authority',
+      'Apple Root CA',
+    ],
+  });
+
+  assert.deepEqual(validateMacReleaseSignature(details), {
+    ok: true,
+    reason: null,
+  });
+});

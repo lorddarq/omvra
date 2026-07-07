@@ -144,7 +144,7 @@ function validateMacReleaseSignature(details) {
     return { ok: false, reason: 'Missing codesign metadata.' };
   }
 
-  if (!details.signature || details.signature === 'adhoc') {
+  if (details.signature === 'adhoc') {
     return { ok: false, reason: 'App bundle is ad-hoc signed.' };
   }
 

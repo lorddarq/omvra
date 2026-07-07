@@ -84,8 +84,7 @@
       "entitlementsInherit": "electron/entitlements.mac.inherit.plist",
       "target": [
         "dmg",
-        "zip",
-        "pkg"
+        "zip"
       ]
     },
     "dmg": {

@@ -323,7 +323,6 @@ jobs:
           assets=(
             ./artifacts/macos/*.dmg
             ./artifacts/macos/*.dmg.blockmap
-            ./artifacts/macos/*.pkg
             ./artifacts/macos/*.zip
             ./artifacts/macos/*.zip.blockmap
             ./artifacts/macos/*.yml

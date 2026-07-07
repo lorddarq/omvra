@@ -292,29 +292,31 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.prepare_release.outputs.release_tag }}
           IS_PRERELEASE: ${{ needs.prepare_release.outputs.is_prerelease }}
         run: |
           set -euo pipefail
 
-          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+          if gh release view "${RELEASE_TAG}" --repo "${GH_REPO}" >/dev/null 2>&1; then
             if [[ "${IS_PRERELEASE}" == "true" ]]; then
-              gh release edit "${RELEASE_TAG}" --title "${RELEASE_TAG}" --prerelease
+              gh release edit "${RELEASE_TAG}" --repo "${GH_REPO}" --title "${RELEASE_TAG}" --prerelease
             else
-              gh release edit "${RELEASE_TAG}" --title "${RELEASE_TAG}"
+              gh release edit "${RELEASE_TAG}" --repo "${GH_REPO}" --title "${RELEASE_TAG}"
             fi
           else
             create_args=(release create "${RELEASE_TAG}" --title "${RELEASE_TAG}" --verify-tag)
             if [[ "${IS_PRERELEASE}" == "true" ]]; then
               create_args+=(--prerelease)
             fi
-            gh "${create_args[@]}"
+            gh "${create_args[@]}" --repo "${GH_REPO}"
           fi
 
       - name: Upload release assets
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.prepare_release.outputs.release_tag }}
         run: |
           set -euo pipefail
@@ -338,4 +340,4 @@ jobs:
             exit 1
           fi
 
-          gh release upload "${RELEASE_TAG}" "${assets[@]}" --clobber
+          gh release upload "${RELEASE_TAG}" "${assets[@]}" --clobber --repo "${GH_REPO}"

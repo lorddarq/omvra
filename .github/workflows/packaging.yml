@@ -208,7 +208,13 @@ jobs:
           security unlock-keychain -p "${keychain_password}" "${keychain_file}"
           security import "${resolved_csc_link}" -k "${keychain_file}" -P "${RAW_CSC_KEY_PASSWORD}" -T /usr/bin/codesign -T /usr/bin/security
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${keychain_password}" "${keychain_file}"
-          mapfile -t existing_keychains < <(security list-keychains -d user | sed 's/^[[:space:]]*//; s/"//g')
+          existing_keychains=()
+          while IFS= read -r line; do
+            cleaned_line="$(printf '%s' "${line}" | sed 's/^[[:space:]]*//; s/"//g')"
+            if [[ -n "${cleaned_line}" ]]; then
+              existing_keychains+=("${cleaned_line}")
+            fi
+          done < <(security list-keychains -d user)
           security list-keychains -d user -s "${keychain_file}" "${existing_keychains[@]}"
 
           echo "CSC_LINK=${resolved_csc_link}" >> "${GITHUB_ENV}"

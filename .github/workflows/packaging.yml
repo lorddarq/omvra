@@ -327,12 +327,12 @@ jobs:
             ./artifacts/macos/*.dmg.blockmap
             ./artifacts/macos/*.zip
             ./artifacts/macos/*.zip.blockmap
-            ./artifacts/macos/*.yml
+            ./artifacts/macos/latest*.yml
             ./artifacts/windows/*.exe
             ./artifacts/windows/*.blockmap
-            ./artifacts/windows/*.yml
+            ./artifacts/windows/latest*.yml
             ./artifacts/linux/*.AppImage
-            ./artifacts/linux/*.yml
+            ./artifacts/linux/latest*.yml
           )
 
           if [[ ${#assets[@]} -eq 0 ]]; then

@@ -288,12 +288,39 @@ jobs:
           name: electron-artifacts-ubuntu-latest
           path: ./artifacts/linux
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ needs.prepare_release.outputs.release_tag }}
-          name: ${{ needs.prepare_release.outputs.release_tag }}
-          files: |
+      - name: Create or update release metadata
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.prepare_release.outputs.release_tag }}
+          IS_PRERELEASE: ${{ needs.prepare_release.outputs.is_prerelease }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            if [[ "${IS_PRERELEASE}" == "true" ]]; then
+              gh release edit "${RELEASE_TAG}" --title "${RELEASE_TAG}" --prerelease
+            else
+              gh release edit "${RELEASE_TAG}" --title "${RELEASE_TAG}"
+            fi
+          else
+            create_args=(release create "${RELEASE_TAG}" --title "${RELEASE_TAG}" --verify-tag)
+            if [[ "${IS_PRERELEASE}" == "true" ]]; then
+              create_args+=(--prerelease)
+            fi
+            gh "${create_args[@]}"
+          fi
+
+      - name: Upload release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.prepare_release.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          assets=(
             ./artifacts/macos/*.dmg
             ./artifacts/macos/*.dmg.blockmap
             ./artifacts/macos/*.pkg
@@ -305,8 +332,11 @@ jobs:
             ./artifacts/windows/*.yml
             ./artifacts/linux/*.AppImage
             ./artifacts/linux/*.yml
-          draft: false
-          prerelease: ${{ needs.prepare_release.outputs.is_prerelease == 'true' }}
-          fail_on_unmatched_files: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          )
+
+          if [[ ${#assets[@]} -eq 0 ]]; then
+            echo "No release assets found to upload." >&2
+            exit 1
+          fi
+
+          gh release upload "${RELEASE_TAG}" "${assets[@]}" --clobber

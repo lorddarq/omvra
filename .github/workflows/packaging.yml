@@ -171,11 +171,49 @@ jobs:
       - name: Build renderer
         run: npm run build:renderer
 
+      - name: Prepare mac signing certificate
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        env:
+          RAW_CSC_LINK: ${{ secrets.CSC_LINK }}
+          RAW_CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${RAW_CSC_LINK:-}" || -z "${RAW_CSC_KEY_PASSWORD:-}" ]]; then
+            echo "Missing CSC_LINK or CSC_KEY_PASSWORD secret for macOS signing." >&2
+            exit 1
+          fi
+
+          case "${RAW_CSC_LINK}" in
+            http://*|https://*|file://*|/*|~/*)
+              resolved_csc_link="${RAW_CSC_LINK}"
+              ;;
+            *)
+              signing_dir="${RUNNER_TEMP}/omvra-signing"
+              cert_payload="${signing_dir}/certificate.b64"
+              cert_file="${signing_dir}/certificate.p12"
+
+              mkdir -p "${signing_dir}"
+              printf '%s' "${RAW_CSC_LINK}" > "${cert_payload}"
+              base64 -D -i "${cert_payload}" -o "${cert_file}"
+              openssl pkcs12 -legacy -in "${cert_file}" -nokeys -clcerts -passin env:RAW_CSC_KEY_PASSWORD >/dev/null
+              resolved_csc_link="${cert_file}"
+              ;;
+          esac
+
+          echo "CSC_LINK=${resolved_csc_link}" >> "${GITHUB_ENV}"
+          echo "CSC_KEY_PASSWORD=${RAW_CSC_KEY_PASSWORD}" >> "${GITHUB_ENV}"
+
+      - name: Inspect mac signing identities
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          security find-identity -v -p codesigning || true
+
       - name: Package app
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -185,6 +223,14 @@ jobs:
           GITHUB_REF_TYPE: tag
           GITHUB_REF_NAME: ${{ needs.prepare_release.outputs.release_tag }}
         run: npm run build:electron
+
+      - name: Inspect packaged mac app signature
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          set -euo pipefail
+          codesign -dv --verbose=4 release/mac-arm64/Omvra.app 2>&1
+          spctl -a -vvv -t exec release/mac-arm64/Omvra.app || true
 
       - name: Upload artifacts
         if: success()

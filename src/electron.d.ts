@@ -152,7 +152,7 @@ declare global {
     packaged: boolean;
     channel: 'stable' | 'rc';
     status: 'idle' | 'unsupported' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
-    unsupportedReason: 'unpackaged' | 'updater-unavailable' | 'signature-invalid';
+    unsupportedReason: 'unpackaged' | 'updater-unavailable';
     unsupportedDetails: string | null;
     update: AppUpdateInfo | null;
     progressPercent: number | null;

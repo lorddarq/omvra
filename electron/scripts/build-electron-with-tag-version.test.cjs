@@ -2,9 +2,38 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  hasExplicitMacNotarizationConfiguration,
   parseCodesignDetails,
   validateMacReleaseSignature,
 } = require('./build-electron-with-tag-version.cjs');
+
+test('hasExplicitMacNotarizationConfiguration recognizes complete Apple notarization credentials only', () => {
+  assert.equal(
+    hasExplicitMacNotarizationConfiguration({
+      APPLE_ID: 'user@example.com',
+      APPLE_APP_SPECIFIC_PASSWORD: 'abcd-efgh-ijkl-mnop',
+      APPLE_TEAM_ID: 'ABCDE12345',
+    }),
+    true
+  );
+
+  assert.equal(
+    hasExplicitMacNotarizationConfiguration({
+      APPLE_ID: 'user@example.com',
+      APPLE_APP_SPECIFIC_PASSWORD: 'abcd-efgh-ijkl-mnop',
+    }),
+    false
+  );
+
+  assert.equal(
+    hasExplicitMacNotarizationConfiguration({
+      APPLE_API_KEY: '-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----',
+      APPLE_API_KEY_ID: 'ABC123DEF4',
+      APPLE_API_ISSUER: '12345678-1234-1234-1234-123456789abc',
+    }),
+    true
+  );
+});
 
 test('parseCodesignDetails extracts signature, team, and authorities', () => {
   const details = parseCodesignDetails(`

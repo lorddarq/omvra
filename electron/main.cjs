@@ -398,20 +398,13 @@ app.whenReady().then(() => {
     broadcastStoreDidChange();
     syncUpdateChannelFromStore();
   });
-  const macCodeSignature = readCurrentMacCodeSignature();
-  const unsupportedReason = macCodeSignature.status === 'adhoc'
-    ? 'signature-invalid'
-    : (app.isPackaged && !autoUpdater ? 'updater-unavailable' : 'unpackaged');
-  const unsupportedDetails = macCodeSignature.status === 'adhoc'
-    ? 'This installed Omvra build is ad-hoc signed, so macOS cannot replace it through auto-update. Install a signed Omvra app manually once, then future updates can install normally.'
-    : (app.isPackaged && !autoUpdater ? autoUpdaterLoadError : null);
   updateController = createUpdateController({
     app,
     updater: autoUpdater,
     onStateChange: broadcastUpdateState,
     debugUpdateFixture: getDebugUpdateFixtureFromEnv(),
-    unsupportedReason: normalizeUnsupportedReason(unsupportedReason),
-    unsupportedDetails,
+    unsupportedReason: normalizeUnsupportedReason(app.isPackaged && !autoUpdater ? 'updater-unavailable' : 'unpackaged'),
+    unsupportedDetails: app.isPackaged && !autoUpdater ? autoUpdaterLoadError : null,
   });
   syncUpdateChannelFromStore();
   restartMcpServer();

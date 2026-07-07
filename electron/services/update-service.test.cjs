@@ -114,23 +114,6 @@ test('createUpdateController reports updater-unavailable for packaged builds wit
   }));
 });
 
-test('createUpdateController reports signature-invalid when the installed app cannot auto-update safely', () => {
-  const controller = createUpdateController({
-    app: { isPackaged: true },
-    updater: new FakeUpdater(),
-    unsupportedReason: 'signature-invalid',
-    unsupportedDetails: 'This installed Omvra build is ad-hoc signed and must be replaced manually once before auto-updates can install.',
-  });
-
-  assert.deepEqual(controller.getState(), createDefaultUpdateState({
-    supported: false,
-    packaged: true,
-    channel: 'stable',
-    unsupportedReason: 'signature-invalid',
-    unsupportedDetails: 'This installed Omvra build is ad-hoc signed and must be replaced manually once before auto-updates can install.',
-  }));
-});
-
 test('createUpdateController tracks packaged update flow and backup requirement', async () => {
   const updater = new FakeUpdater();
   const snapshots = [];

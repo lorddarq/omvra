@@ -57,7 +57,7 @@ function createDefaultUpdateState(options = {}) {
 }
 
 function normalizeUnsupportedReason(value) {
-  if (value === 'updater-unavailable' || value === 'signature-invalid') {
+  if (value === 'updater-unavailable') {
     return value;
   }
   return 'unpackaged';

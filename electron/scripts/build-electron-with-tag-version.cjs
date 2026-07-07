@@ -54,6 +54,12 @@ function hasExplicitMacSigningConfiguration(env) {
   return signingKeys.some(key => Boolean(env[key]));
 }
 
+function hasExplicitMacNotarizationConfiguration(env) {
+  const hasAppleIdFlow = Boolean(env.APPLE_ID && env.APPLE_APP_SPECIFIC_PASSWORD && env.APPLE_TEAM_ID);
+  const hasApiKeyFlow = Boolean(env.APPLE_API_KEY && env.APPLE_API_KEY_ID && env.APPLE_API_ISSUER);
+  return hasAppleIdFlow || hasApiKeyFlow;
+}
+
 function isTaggedReleaseBuild(env) {
   if (env.GITHUB_REF_TYPE === 'tag' && env.GITHUB_REF_NAME) {
     return true;
@@ -216,10 +222,18 @@ function run() {
   const buildEnv = { ...process.env };
   const isWindows = process.platform === 'win32';
   const hasMacSigning = hasExplicitMacSigningConfiguration(buildEnv);
+  const hasMacNotarization = hasExplicitMacNotarizationConfiguration(buildEnv);
 
   if (process.platform === 'darwin' && isTaggedReleaseBuild(buildEnv) && !hasMacSigning) {
     console.error(
       '[build-electron] refusing to package tagged macOS release without explicit signing credentials; unsigned or mismatched signatures will break auto-update installation'
+    );
+    process.exit(1);
+  }
+
+  if (process.platform === 'darwin' && isTaggedReleaseBuild(buildEnv) && !hasMacNotarization) {
+    console.error(
+      '[build-electron] refusing to package tagged macOS release without notarization credentials; signed-but-unnotarized builds will not pass Gatekeeper cleanly'
     );
     process.exit(1);
   }
@@ -285,6 +299,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  hasExplicitMacNotarizationConfiguration,
   hasExplicitMacSigningConfiguration,
   inspectCodesign,
   isTaggedReleaseBuild,

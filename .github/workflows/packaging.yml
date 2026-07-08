@@ -300,14 +300,16 @@ jobs:
 
           if gh release view "${RELEASE_TAG}" --repo "${GH_REPO}" >/dev/null 2>&1; then
             if [[ "${IS_PRERELEASE}" == "true" ]]; then
-              gh release edit "${RELEASE_TAG}" --repo "${GH_REPO}" --title "${RELEASE_TAG}" --prerelease
+              gh release edit "${RELEASE_TAG}" --repo "${GH_REPO}" --title "${RELEASE_TAG}" --prerelease --latest=false
             else
-              gh release edit "${RELEASE_TAG}" --repo "${GH_REPO}" --title "${RELEASE_TAG}"
+              gh release edit "${RELEASE_TAG}" --repo "${GH_REPO}" --title "${RELEASE_TAG}" --prerelease=false --latest
             fi
           else
             create_args=(release create "${RELEASE_TAG}" --title "${RELEASE_TAG}" --verify-tag)
             if [[ "${IS_PRERELEASE}" == "true" ]]; then
-              create_args+=(--prerelease)
+              create_args+=(--prerelease --latest=false)
+            else
+              create_args+=(--latest)
             fi
             gh "${create_args[@]}" --repo "${GH_REPO}"
           fi

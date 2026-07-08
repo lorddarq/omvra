@@ -31,6 +31,7 @@ import {
 import { DraggableSwimlaneRow } from './DraggableSwimlaneRow';
 import { allocateTasksToTracks, calculateSwimlaneHeight } from '../utils/trackAllocation';
 import { getStatusVisual } from '../utils/roadmap';
+import { getReadableOutlineColorFor } from '../utils/contrast';
 import { parseISODateLocal, toLocalISODate } from '../utils/date';
 import { applyTimelineTaskDrop } from '../utils/timelineTaskDrop';
 import { resolveReorderDropIndex } from '../utils/swimlaneReorder';
@@ -261,8 +262,8 @@ export function TimelineView({
     width: number;
   } | null>(null);
 
-  // State for click suppression after resize
-  const [ignoreAddTaskUntil, setIgnoreAddTaskUntil] = useState<number | null>(null);
+  // Ref for synchronously suppressing slot-add interactions around resize pointer cycles.
+  const ignoreAddTaskUntilRef = useRef<number>(0);
 
   // Calculate full date range from tasks
   const allDates = useMemo(() => {
@@ -580,6 +581,12 @@ export function TimelineView({
     }
   }, []);
 
+  const suppressAddTaskInteractions = useCallback((durationMs = 300) => {
+    ignoreAddTaskUntilRef.current = Date.now() + durationMs;
+  }, []);
+
+  const shouldIgnoreAddTask = useCallback(() => Date.now() < ignoreAddTaskUntilRef.current, []);
+
   // Handle left column resize
   const handleLeftResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -713,15 +720,8 @@ export function TimelineView({
       };
     };
 
-    const handleMouseMove = (e: MouseEvent) => {
-      const geometry = buildResizeGeometry(e.clientX);
-      if (!geometry) return;
-      queueTaskResizePreview(geometry.preview);
-      e.preventDefault();
-    };
-
-    const handleMouseUp = (e: MouseEvent) => {
-      const geometry = buildResizeGeometry(e.clientX);
+    const finishResize = (clientX: number) => {
+      const geometry = buildResizeGeometry(clientX);
 
       if (resizeUpdateRafRef.current != null) {
         cancelAnimationFrame(resizeUpdateRafRef.current);
@@ -748,7 +748,23 @@ export function TimelineView({
       pendingResizePreviewRef.current = null;
       setTaskResizePreview(null);
       setResizingTask(null);
-      setIgnoreAddTaskUntil(Date.now() + 300);
+      suppressAddTaskInteractions();
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (e.buttons === 0) {
+        finishResize(e.clientX);
+        return;
+      }
+
+      const geometry = buildResizeGeometry(e.clientX);
+      if (!geometry) return;
+      queueTaskResizePreview(geometry.preview);
+      e.preventDefault();
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      finishResize(e.clientX);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -758,7 +774,7 @@ export function TimelineView({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [resizingTask, tasks, dates, dayWidths, onUpdateTaskDates, getVisibleIndexForDate, queueTaskResizePreview]);
+  }, [resizingTask, tasks, dates, dayWidths, onUpdateTaskDates, getVisibleIndexForDate, queueTaskResizePreview, suppressAddTaskInteractions]);
 
   // Scroll to today
   const scrollToToday = useCallback((opts?: { smooth?: boolean }) => {
@@ -1046,13 +1062,14 @@ export function TimelineView({
   }, [dates, dayWidths, getVisibleIndexForDate]);
 
   const getTaskColor = useCallback(
-    (status: string): { className?: string; style?: React.CSSProperties; textClass?: string } => {
+    (status: string): { className?: string; style?: React.CSSProperties; textClass?: string; bulletOutlineColor?: string } => {
       if (statusColumns?.some(column => column.id === status)) {
         const visual = getStatusVisual(statusColumns, status as TaskStatus);
         return {
           className: visual.backgroundClassName,
           style: visual.backgroundStyle,
           textClass: visual.textClassName,
+          bulletOutlineColor: getReadableOutlineColorFor(visual.color),
         };
       }
 
@@ -1060,6 +1077,7 @@ export function TimelineView({
       return {
         textClass: 'text-black',
         style: { backgroundColor: defaultColor },
+        bulletOutlineColor: getReadableOutlineColorFor(defaultColor),
       };
     },
     [statusColumns]
@@ -1335,6 +1353,7 @@ export function TimelineView({
                         }}
                         getTaskColor={getTaskColor}
                         handleResizeStart={(e, task, edge) => {
+                          suppressAddTaskInteractions();
                           setResizingTask({
                             taskId: task.id,
                             edge,
@@ -1345,7 +1364,7 @@ export function TimelineView({
                         }}
                         resizingTaskId={resizingTask?.taskId ?? null}
                         taskResizePreview={taskResizePreview}
-                        ignoreAddTaskUntil={ignoreAddTaskUntil}
+                        shouldIgnoreAddTask={shouldIgnoreAddTask}
                         scrollContainerRef={rowsContainerRef}
                       />
                     </div>

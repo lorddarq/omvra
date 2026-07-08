@@ -27,12 +27,12 @@ interface DraggableSwimlaneRowProps {
   scrollContainerRef?: React.RefObject<HTMLDivElement>; // Reference to the scrollable container for accurate drop calculations
   onTaskClick: (task: Task) => void;
   onAddTask: (date: Date, swimlaneId: string, endDate?: Date, mode?: 'projects' | 'people') => void;
-  ignoreAddTaskUntil?: number | null;
+  shouldIgnoreAddTask?: () => boolean;
   onEditSwimlane: (swimlane: TimelineSwimlane) => void;
   onMoveSwimlane: (dragIndex: number, hoverIndex: number) => void;
   onMoveTaskToSwimlane: (taskId: string, swimlaneId: string, newStartDate?: string, newEndDate?: string) => void;
   onRevealDate?: (dateISO: string) => void;
-  getTaskColor: (status: string) => { className?: string; style?: React.CSSProperties };
+  getTaskColor: (status: string) => { className?: string; style?: React.CSSProperties; textClass?: string; bulletOutlineColor?: string };
   handleResizeStart: (e: React.MouseEvent, task: Task, edge: 'start' | 'end') => void;
   resizingTaskId: string | null;
   taskResizePreview?: TaskResizePreview | null;
@@ -86,7 +86,7 @@ export function DraggableSwimlaneRow({
   resizingTaskId,
   taskResizePreview,
   rowHeight,
-  ignoreAddTaskUntil,
+  shouldIgnoreAddTask,
   scrollContainerRef,
 }: DraggableSwimlaneRowProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -261,6 +261,13 @@ export function DraggableSwimlaneRow({
   }, [isSelecting, selectionStart]);
 
   const handleSelectionEnd = useCallback(() => {
+    if (shouldIgnoreAddTask?.()) {
+      setIsSelecting(false);
+      setSelectionStart(null);
+      setSelectionEnd(null);
+      return;
+    }
+
     if (isSelecting && selectionStart !== null && selectionEnd !== null && dates.length > 0) {
       const startIdx = Math.min(selectionStart, selectionEnd);
       const endIdx = Math.max(selectionStart, selectionEnd);
@@ -274,7 +281,7 @@ export function DraggableSwimlaneRow({
     setIsSelecting(false);
     setSelectionStart(null);
     setSelectionEnd(null);
-  }, [isSelecting, selectionStart, selectionEnd, dates, swimlane.id, onAddTask, mode]);
+  }, [isSelecting, selectionStart, selectionEnd, dates, swimlane.id, onAddTask, mode, shouldIgnoreAddTask]);
 
   // Global mouse up listener to end selection
   useEffect(() => {
@@ -519,7 +526,10 @@ export function DraggableSwimlaneRow({
                             title={isWeekend ? 'Weekend (unavailable)' : `Add task for ${d.toDateString()}`}
                             onMouseDown={(e) => {
                               e.preventDefault();
-                              if (isWeekend || (ignoreAddTaskUntil && Date.now() < ignoreAddTaskUntil)) {
+                              if (isWeekend) {
+                                return;
+                              }
+                              if (shouldIgnoreAddTask?.()) {
                                 return;
                               }
                               handleSelectionStart(globalIdx);

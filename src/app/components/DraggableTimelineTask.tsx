@@ -13,7 +13,7 @@ const PRIORITY_STYLES: Record<string, { className: string }> = {
 interface DraggableTimelineTaskProps {
   task: Task;
   position: { left: number; width: number };
-  getTaskColor: (status: string) => { className?: string; style?: React.CSSProperties; textClass?: string };
+  getTaskColor: (status: string) => { className?: string; style?: React.CSSProperties; textClass?: string; bulletOutlineColor?: string };
   handleResizeStart: (e: React.MouseEvent, task: Task, edge: 'start' | 'end') => void;
   onTaskClick: (task: Task) => void;
   resizingTaskId: string | null;
@@ -28,6 +28,7 @@ export function DraggableTimelineTask({
   resizingTaskId,
 }: DraggableTimelineTaskProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const dragHandleRef = useRef<HTMLDivElement>(null);
   const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
   const dragOffsetXRef = useRef(0);
 
@@ -44,11 +45,12 @@ export function DraggableTimelineTask({
     }),
   });
 
-  drag(ref);
+  drag(dragHandleRef);
 
   const color = getTaskColor(task.status);
   const backgroundClass = color.className ?? '';
   const textClass = color.textClass ?? 'text-white';
+  const bulletOutlineColor = color.bulletOutlineColor ?? 'rgba(255,255,255,0.28)';
 
   function handleMouseDown(e: React.MouseEvent) {
     mouseDownPos.current = { x: e.clientX, y: e.clientY };
@@ -108,12 +110,15 @@ export function DraggableTimelineTask({
         <div className="timeline-task-resize-grip-indicator w-0.5 h-4 bg-white/50 rounded"></div>
       </div>
 
-      <span
-        className={`timeline-task-priority shrink-0 rounded-xl outline-3 outline-white/25 w-3 h-3 ${
-          PRIORITY_STYLES[task.priority || 'normal']?.className || PRIORITY_STYLES.normal.className
-        }`}
-      />
-      <span className="truncate flex-1 text-left">{task.title}</span>
+      <div ref={dragHandleRef} className="flex min-w-0 flex-1 items-center gap-2 h-full">
+        <span
+          className={`timeline-task-priority shrink-0 rounded-xl w-3 h-3 ${
+            PRIORITY_STYLES[task.priority || 'normal']?.className || PRIORITY_STYLES.normal.className
+          }`}
+          style={{ boxShadow: `0 0 0 2px ${bulletOutlineColor}` }}
+        />
+        <span className="truncate flex-1 text-left">{task.title}</span>
+      </div>
 
       {/* Right resize handle */}
       <div

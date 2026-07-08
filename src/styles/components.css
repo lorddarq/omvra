@@ -423,6 +423,36 @@
   background-color: #f9fafb;
 }
 
+.omvra-markdown-content {
+  --omvra-markdown-list-indent: 0rem;
+  --omvra-markdown-task-indent: 1rem;
+}
+
+.omvra-markdown-content-list {
+  margin: 0.5rem 0;
+  padding-left: var(--omvra-markdown-list-indent);
+}
+
+.omvra-markdown-content-list-unordered {
+  list-style: disc;
+}
+
+.omvra-markdown-content-list-ordered {
+  list-style: decimal;
+}
+
+.omvra-markdown-task-list-item {
+  padding-left: 0;
+}
+
+.omvra-markdown-task-list-row {
+  margin: 0;
+}
+
+.omvra-markdown-task-list-children {
+  padding-left: var(--omvra-markdown-task-indent);
+}
+
 .omvra-markdown-editor-content ul,
 .omvra-markdown-editor .mdxeditor-rich-text-editor ul {
   list-style: disc;

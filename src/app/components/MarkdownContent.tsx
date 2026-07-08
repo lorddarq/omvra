@@ -1,6 +1,8 @@
 import ReactMarkdown, { Components } from 'react-markdown';
-import type { ComponentPropsWithoutRef } from 'react';
+import { Children, isValidElement } from 'react';
+import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import remarkGfm from 'remark-gfm';
+import { TaskCheckboxIndicator } from './TaskCheckboxControl';
 
 interface MarkdownContentProps {
   content: string;
@@ -14,6 +16,16 @@ type CodeComponentProps = ComponentPropsWithoutRef<'code'> & {
     };
   };
 };
+
+function isNestedListNode(node: ReactNode) {
+  if (!isValidElement(node)) return false;
+  if (node.type === 'ul' || node.type === 'ol') return true;
+
+  const tagName = typeof node.props === 'object' && node.props !== null
+    ? node.props.node?.tagName
+    : undefined;
+  return tagName === 'ul' || tagName === 'ol';
+}
 
 function openExternalLink(url: string) {
   if (typeof window === 'undefined') return;
@@ -34,30 +46,37 @@ export const markdownComponents: Components = {
   h5: ({ children }) => <h5 className="break-words text-sm font-semibold text-gray-900 [overflow-wrap:anywhere]">{children}</h5>,
   h6: ({ children }) => <h6 className="break-words text-sm font-semibold text-gray-900 [overflow-wrap:anywhere]">{children}</h6>,
   p: ({ children }) => <p className="break-words text-sm leading-relaxed text-gray-800 [overflow-wrap:anywhere]">{children}</p>,
-  ul: ({ children }) => <ul className="min-w-0 list-disc space-y-1 pl-5">{children}</ul>,
-  ol: ({ children }) => <ol className="min-w-0 list-decimal space-y-1 pl-5">{children}</ol>,
+  ul: ({ children }) => <ul className="omvra-markdown-content-list omvra-markdown-content-list-unordered min-w-0">{children}</ul>,
+  ol: ({ children }) => <ol className="omvra-markdown-content-list omvra-markdown-content-list-ordered min-w-0">{children}</ol>,
   li: ({ children, className }) => {
     const isTaskItem = className?.includes('task-list-item');
+    if (!isTaskItem) {
+      return <li className="min-w-0 break-words text-sm text-gray-800 [overflow-wrap:anywhere]">{children}</li>;
+    }
+
+    const childNodes = Children.toArray(children);
+    const nestedLists = childNodes.filter(isNestedListNode);
+    const rowNodes = childNodes.filter((child) => !isNestedListNode(child));
+
     return (
-      <li
-        className={`min-w-0 break-words text-sm text-gray-800 [overflow-wrap:anywhere] ${
-          isTaskItem ? 'flex items-start gap-2 list-none pl-0' : ''
-        }`.trim()}
-      >
-        {children}
+      <li className="omvra-markdown-task-list-item min-w-0 list-none text-sm text-gray-800 [overflow-wrap:anywhere]">
+        <span className="omvra-markdown-task-list-row flex min-w-0 items-start gap-2">
+          {rowNodes}
+        </span>
+        {nestedLists.length > 0 ? (
+          <div className="omvra-markdown-task-list-children min-w-0">
+            {nestedLists}
+          </div>
+        ) : null}
       </li>
     );
   },
   input: ({ type, checked, disabled }) => {
     if (type !== 'checkbox') return null;
     return (
-      <input
-        type="checkbox"
-        checked={Boolean(checked)}
-        disabled={disabled ?? true}
-        readOnly
-        className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300"
-      />
+      <span className="mt-0.5">
+        <TaskCheckboxIndicator checked={Boolean(checked)} disabled={disabled ?? true} />
+      </span>
     );
   },
   blockquote: ({ children }) => (
@@ -120,7 +139,7 @@ export const markdownComponents: Components = {
 
 export function MarkdownContent({ content }: MarkdownContentProps) {
   return (
-    <div className="min-w-0 max-w-full space-y-3 overflow-hidden">
+    <div className="omvra-markdown-content min-w-0 max-w-full space-y-3 overflow-hidden">
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
         {content}
       </ReactMarkdown>

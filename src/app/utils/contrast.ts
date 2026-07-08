@@ -14,24 +14,49 @@ const parseRGBString = (rgb: string) => {
   return [parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3], 10)];
 };
 
+const parseHexColor = (color: string) => {
+  if (!color.startsWith('#')) return null;
+  const hex = color.replace('#', '');
+  const normalized = hex.length === 3 ? hex.split('').map(c => c + c).join('') : hex;
+  if (normalized.length !== 6) return null;
+  const bigint = parseInt(normalized, 16);
+  return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
+};
+
+const getColorLuminance = (color?: string): number | null => {
+  if (!color) return null;
+  const rgb = color.startsWith('#') ? parseHexColor(color) : parseRGBString(color);
+  if (!rgb) return null;
+  return computeLuminance(rgb[0], rgb[1], rgb[2]);
+};
+
+const getPreferredReadableTone = (color?: string): 'black' | 'white' => {
+  const luminance = getColorLuminance(color);
+  if (luminance === null) return 'white';
+
+  const whiteContrast = 1.05 / (luminance + 0.05);
+  const blackContrast = (luminance + 0.05) / 0.05;
+  return blackContrast >= whiteContrast ? 'black' : 'white';
+};
+
+export function getReadableOutlineColorFor(backgroundColor?: string): string {
+  return getPreferredReadableTone(backgroundColor) === 'black'
+    ? 'rgba(0,0,0,0.18)'
+    : 'rgba(255,255,255,0.28)';
+}
+
 export function getReadableTextClassFor(key: string, fallbackColor?: string): string {
   if (contrastCache[key]) return contrastCache[key];
+
+  if (fallbackColor) {
+    const cls = getPreferredReadableTone(fallbackColor) === 'black' ? 'text-black' : 'text-white';
+    contrastCache[key] = cls;
+    return cls;
+  }
 
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     contrastCache[key] = 'text-white';
     return 'text-white';
-  }
-
-  if (fallbackColor && fallbackColor.startsWith('#')) {
-    const hex = fallbackColor.replace('#', '');
-    const bigint = parseInt(hex.length === 3 ? hex.split('').map(c => c + c).join('') : hex, 16);
-    const r = (bigint >> 16) & 255;
-    const g = (bigint >> 8) & 255;
-    const b = bigint & 255;
-    const lum = computeLuminance(r, g, b);
-    const cls = lum > 0.6 ? 'text-black' : 'text-white';
-    contrastCache[key] = cls;
-    return cls;
   }
 
   try {
@@ -47,8 +72,7 @@ export function getReadableTextClassFor(key: string, fallbackColor?: string): st
     document.body.removeChild(el);
     const rgb = parseRGBString(bg);
     if (rgb) {
-      const lum = computeLuminance(rgb[0], rgb[1], rgb[2]);
-      const cls = lum > 0.6 ? 'text-black' : 'text-white';
+      const cls = getPreferredReadableTone(`rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`) === 'black' ? 'text-black' : 'text-white';
       contrastCache[key] = cls;
       return cls;
     }

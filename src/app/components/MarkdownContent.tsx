@@ -2,6 +2,8 @@ import ReactMarkdown, { Components } from 'react-markdown';
 import { Children, isValidElement } from 'react';
 import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import remarkGfm from 'remark-gfm';
+import { useWorkspaceStore } from '../store/workspaceStore.tsx';
+import { getMarkdownAppearanceCssVariables } from '../utils/markdownAppearance.ts';
 import { TaskCheckboxIndicator } from './TaskCheckboxControl';
 
 interface MarkdownContentProps {
@@ -27,6 +29,14 @@ function isNestedListNode(node: ReactNode) {
   return tagName === 'ul' || tagName === 'ol';
 }
 
+function flattenMarkdownText(node: ReactNode): string {
+  if (node === null || node === undefined || typeof node === 'boolean') return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(flattenMarkdownText).join('');
+  if (!isValidElement(node)) return '';
+  return flattenMarkdownText(node.props?.children);
+}
+
 function openExternalLink(url: string) {
   if (typeof window === 'undefined') return;
 
@@ -39,29 +49,33 @@ function openExternalLink(url: string) {
 }
 
 export const markdownComponents: Components = {
-  h1: ({ children }) => <h1 className="break-words text-xl font-semibold text-gray-900 [overflow-wrap:anywhere]">{children}</h1>,
-  h2: ({ children }) => <h2 className="break-words text-lg font-semibold text-gray-900 [overflow-wrap:anywhere]">{children}</h2>,
-  h3: ({ children }) => <h3 className="break-words text-base font-semibold text-gray-900 [overflow-wrap:anywhere]">{children}</h3>,
-  h4: ({ children }) => <h4 className="break-words text-sm font-semibold text-gray-900 [overflow-wrap:anywhere]">{children}</h4>,
-  h5: ({ children }) => <h5 className="break-words text-sm font-semibold text-gray-900 [overflow-wrap:anywhere]">{children}</h5>,
-  h6: ({ children }) => <h6 className="break-words text-sm font-semibold text-gray-900 [overflow-wrap:anywhere]">{children}</h6>,
-  p: ({ children }) => <p className="break-words text-sm leading-relaxed text-gray-800 [overflow-wrap:anywhere]">{children}</p>,
+  h1: ({ children }) => <h1 className="omvra-markdown-block break-words text-xl font-semibold text-gray-900 [overflow-wrap:anywhere]">{children}</h1>,
+  h2: ({ children }) => <h2 className="omvra-markdown-block break-words text-lg font-semibold text-gray-900 [overflow-wrap:anywhere]">{children}</h2>,
+  h3: ({ children }) => <h3 className="omvra-markdown-block break-words text-base font-semibold text-gray-900 [overflow-wrap:anywhere]">{children}</h3>,
+  h4: ({ children }) => <h4 className="omvra-markdown-block break-words text-sm font-semibold text-gray-900 [overflow-wrap:anywhere]">{children}</h4>,
+  h5: ({ children }) => <h5 className="omvra-markdown-block break-words text-sm font-semibold text-gray-900 [overflow-wrap:anywhere]">{children}</h5>,
+  h6: ({ children }) => <h6 className="omvra-markdown-block break-words text-sm font-semibold text-gray-900 [overflow-wrap:anywhere]">{children}</h6>,
+  p: ({ children }) => <p className="omvra-markdown-block break-words text-sm leading-relaxed text-gray-800 [overflow-wrap:anywhere]">{children}</p>,
   ul: ({ children }) => <ul className="omvra-markdown-content-list omvra-markdown-content-list-unordered min-w-0">{children}</ul>,
   ol: ({ children }) => <ol className="omvra-markdown-content-list omvra-markdown-content-list-ordered min-w-0">{children}</ol>,
   li: ({ children, className }) => {
     const isTaskItem = className?.includes('task-list-item');
     if (!isTaskItem) {
-      return <li className="min-w-0 break-words text-sm text-gray-800 [overflow-wrap:anywhere]">{children}</li>;
+      return <li className="omvra-markdown-list-item min-w-0 break-words text-sm text-gray-800 [overflow-wrap:anywhere]">{children}</li>;
     }
 
     const childNodes = Children.toArray(children);
     const nestedLists = childNodes.filter(isNestedListNode);
     const rowNodes = childNodes.filter((child) => !isNestedListNode(child));
+    const [checkboxNode, ...contentNodes] = rowNodes;
 
     return (
-      <li className="omvra-markdown-task-list-item min-w-0 list-none text-sm text-gray-800 [overflow-wrap:anywhere]">
+      <li className="omvra-markdown-list-item omvra-markdown-task-list-item min-w-0 list-none text-sm text-gray-800 [overflow-wrap:anywhere]">
         <span className="omvra-markdown-task-list-row flex min-w-0 items-start gap-2">
-          {rowNodes}
+          {checkboxNode}
+          <span className="omvra-markdown-task-list-content min-w-0 flex-1 break-words [overflow-wrap:anywhere]">
+            {contentNodes}
+          </span>
         </span>
         {nestedLists.length > 0 ? (
           <div className="omvra-markdown-task-list-children min-w-0">
@@ -80,13 +94,16 @@ export const markdownComponents: Components = {
     );
   },
   blockquote: ({ children }) => (
-    <blockquote className="min-w-0 break-words border-l-2 border-gray-300 pl-3 text-sm text-gray-700 [overflow-wrap:anywhere]">{children}</blockquote>
+    <blockquote className="omvra-markdown-block min-w-0 break-words border-l-2 border-gray-300 pl-3 text-sm text-gray-700 [overflow-wrap:anywhere]">{children}</blockquote>
   ),
-  pre: ({ children }) => (
-    <pre className="max-w-full overflow-x-auto rounded-md bg-gray-100 p-3 text-xs text-gray-900">
-      {children}
-    </pre>
-  ),
+  pre: ({ children }) => {
+    const textContent = flattenMarkdownText(children).replace(/\n$/, '');
+    return (
+      <div className="omvra-markdown-block omvra-markdown-preformatted-text max-w-full whitespace-pre-wrap break-words text-sm leading-relaxed [overflow-wrap:anywhere]">
+        {textContent}
+      </div>
+    );
+  },
   code: ({ inline, className, children, node }: CodeComponentProps) => {
     const nodeClassName = node?.properties?.className;
     const normalizedClassName = Array.isArray(nodeClassName)
@@ -97,7 +114,7 @@ export const markdownComponents: Components = {
 
     if (!isBlockCode) {
       return (
-        <code className="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs text-gray-800 [overflow-wrap:anywhere]">
+        <code className="omvra-markdown-inline-code font-mono text-xs [overflow-wrap:anywhere]">
           {children}
         </code>
       );
@@ -128,18 +145,23 @@ export const markdownComponents: Components = {
     );
   },
   table: ({ children }) => (
-    <div className="max-w-full overflow-x-auto">
+    <div className="omvra-markdown-block max-w-full overflow-x-auto">
       <table className="w-full border-collapse text-sm">{children}</table>
     </div>
   ),
   th: ({ children }) => <th className="break-words border border-gray-200 bg-gray-50 px-2 py-1 text-left font-medium [overflow-wrap:anywhere]">{children}</th>,
   td: ({ children }) => <td className="break-words border border-gray-200 px-2 py-1 [overflow-wrap:anywhere]">{children}</td>,
-  hr: () => <hr className="border-gray-200" />,
+  hr: () => <hr className="omvra-markdown-block border-gray-200" />,
 };
 
 export function MarkdownContent({ content }: MarkdownContentProps) {
+  const { preferences } = useWorkspaceStore();
+
   return (
-    <div className="omvra-markdown-content min-w-0 max-w-full space-y-3 overflow-hidden">
+    <div
+      className="omvra-markdown-content min-w-0 max-w-full overflow-hidden"
+      style={getMarkdownAppearanceCssVariables(preferences.markdownAppearance)}
+    >
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
         {content}
       </ReactMarkdown>

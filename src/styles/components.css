@@ -423,13 +423,47 @@
   background-color: #f9fafb;
 }
 
+/* Needs to be moved to a Settings item*/
 .omvra-markdown-content {
+  @apply antialiased;
   --omvra-markdown-list-indent: 0rem;
   --omvra-markdown-task-indent: 1rem;
+  --omvra-markdown-block-spacing: 1rem;
+  --omvra-markdown-list-block-spacing: 1rem;
+  --omvra-markdown-list-item-spacing: 1rem;
+  --omvra-markdown-code-block-spacing: var(--omvra-markdown-block-spacing);
+  --omvra-markdown-inline-code-padding-x: 0.25rem;
+  --omvra-markdown-inline-code-padding-y: 0.125rem;
+  --omvra-markdown-inline-code-bg: #000000;
+  --omvra-markdown-inline-code-color: #9feec8;
+  --omvra-markdown-inline-code-radius: 0.25rem;
+  --omvra-markdown-inline-code-margin-x: 0.125rem;
+  --omvra-markdown-inline-code-margin-y: 0;
+  --omvra-markdown-preformatted-padding-x: 0;
+  --omvra-markdown-preformatted-padding-y: 0;
+  --omvra-markdown-preformatted-bg: transparent;
+  --omvra-markdown-preformatted-color: #1f2937;
+  --omvra-markdown-preformatted-radius: 0;
+}
+
+.omvra-markdown-content > :where(.omvra-markdown-block, .omvra-markdown-content-list) {
+  margin: 0;
+}
+
+.omvra-markdown-content > :where(.omvra-markdown-block, .omvra-markdown-content-list)
+  + :where(.omvra-markdown-block, .omvra-markdown-content-list) {
+  margin-top: var(--omvra-markdown-block-spacing);
+}
+
+.omvra-markdown-content > :where(.omvra-markdown-block, .omvra-markdown-content-list)
+  + .omvra-markdown-preformatted-text,
+.omvra-markdown-content > .omvra-markdown-preformatted-text
+  + :where(.omvra-markdown-block, .omvra-markdown-content-list) {
+  margin-top: var(--omvra-markdown-code-block-spacing);
 }
 
 .omvra-markdown-content-list {
-  margin: 0.5rem 0;
+  margin: var(--omvra-markdown-list-block-spacing) 0;
   padding-left: var(--omvra-markdown-list-indent);
 }
 
@@ -445,12 +479,44 @@
   padding-left: 0;
 }
 
+.omvra-markdown-content-list > .omvra-markdown-list-item + .omvra-markdown-list-item {
+  margin-top: var(--omvra-markdown-list-item-spacing);
+}
+
 .omvra-markdown-task-list-row {
   margin: 0;
 }
 
+.omvra-markdown-task-list-content {
+  display: block;
+}
+
 .omvra-markdown-task-list-children {
+  margin-top: var(--omvra-markdown-list-block-spacing);
   padding-left: var(--omvra-markdown-task-indent);
+}
+
+.omvra-markdown-preformatted-text {
+  padding: var(--omvra-markdown-preformatted-padding-y) var(--omvra-markdown-preformatted-padding-x);
+  color: var(--omvra-markdown-preformatted-color);
+  background: var(--omvra-markdown-preformatted-bg);
+  border-radius: var(--omvra-markdown-preformatted-radius);
+}
+
+.omvra-markdown-inline-code {
+  display: inline;
+  padding: var(--omvra-markdown-inline-code-padding-y) var(--omvra-markdown-inline-code-padding-x);
+  margin: var(--omvra-markdown-inline-code-margin-y) var(--omvra-markdown-inline-code-margin-x);
+  color: var(--omvra-markdown-inline-code-color);
+  background: var(--omvra-markdown-inline-code-bg);
+  border-radius: var(--omvra-markdown-inline-code-radius);
+  line-height: inherit;
+  vertical-align: baseline;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 .omvra-markdown-editor-content ul,

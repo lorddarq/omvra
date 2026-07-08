@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { DEFAULT_MARKDOWN_APPEARANCE } from './markdownAppearance.ts';
 import {
   sanitizePeople,
   sanitizePreferences,
@@ -44,6 +45,7 @@ test('sanitizePreferences preserves rc update channel and falls back to stable',
     executionLoadStatusIds: ['in-progress'] as const,
     pipelineLoadStatusIds: ['open'] as const,
     updateChannel: 'stable' as const,
+    markdownAppearance: DEFAULT_MARKDOWN_APPEARANCE,
     mcpAgentAccessEnabled: false,
     mcpCapabilityProfile: 'read_only' as const,
     mcpBindHost: '127.0.0.1',

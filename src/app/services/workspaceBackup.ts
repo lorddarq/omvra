@@ -12,6 +12,11 @@ import {
   normalizeMcpPort,
   normalizeMcpServerAddress,
 } from '../constants/mcp.ts';
+import {
+  DEFAULT_MARKDOWN_APPEARANCE,
+  type MarkdownAppearance,
+  sanitizeMarkdownAppearance,
+} from '../utils/markdownAppearance.ts';
 import { getTaskProjectIds } from '../utils/roadmap.ts';
 import { getDefaultStatusId, syncLocalMcpServerAddress } from '../utils/mcpPreferences.ts';
 import { flattenPortableStoreEntries, normalizePortableStorageKey } from '../utils/storage.ts';
@@ -24,6 +29,7 @@ export interface WorkspacePreferences {
   executionLoadStatusId?: TaskStatus;
   pipelineLoadStatusId?: TaskStatus;
   updateChannel: 'stable' | 'rc';
+  markdownAppearance: MarkdownAppearance;
   mcpAgentAccessEnabled: boolean;
   mcpCapabilityProfile: 'read_only' | 'task_write' | 'admin';
   mcpBindHost: string;
@@ -419,6 +425,7 @@ export function sanitizePreferences(
     executionLoadStatusIds,
     pipelineLoadStatusIds,
     updateChannel: preferences.updateChannel === 'rc' ? 'rc' : 'stable',
+    markdownAppearance: sanitizeMarkdownAppearance(preferences.markdownAppearance, fallback.markdownAppearance || DEFAULT_MARKDOWN_APPEARANCE),
     mcpAgentAccessEnabled: Boolean(preferences.mcpAgentAccessEnabled),
     mcpCapabilityProfile:
       preferences.mcpCapabilityProfile === 'task_write' || preferences.mcpCapabilityProfile === 'admin'
@@ -742,6 +749,7 @@ export function createDefaultWorkspacePreferences(
     executionLoadStatusIds,
     pipelineLoadStatusIds,
     updateChannel: overrides.updateChannel === 'rc' ? 'rc' : 'stable',
+    markdownAppearance: sanitizeMarkdownAppearance(overrides.markdownAppearance, DEFAULT_MARKDOWN_APPEARANCE),
     mcpAgentAccessEnabled: Boolean(overrides.mcpAgentAccessEnabled),
     mcpCapabilityProfile:
       overrides.mcpCapabilityProfile === 'task_write' || overrides.mcpCapabilityProfile === 'admin'

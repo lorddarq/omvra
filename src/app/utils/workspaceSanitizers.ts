@@ -1,6 +1,11 @@
 import type { ProjectMilestone, Task, TaskAttachment, TaskStatus, TimelineSwimlane, Person, StatusColumn } from '../types.ts';
 import { buildLocalMcpAddress, normalizeMcpBindHost, normalizeMcpPort, normalizeMcpServerAddress } from '../constants/mcp.ts';
 import { getTaskProjectIds } from './roadmap.ts';
+import {
+  DEFAULT_MARKDOWN_APPEARANCE,
+  type MarkdownAppearance,
+  sanitizeMarkdownAppearance,
+} from './markdownAppearance.ts';
 
 export type StatusColumnState = StatusColumn;
 
@@ -10,6 +15,7 @@ export interface AppPreferencesLike {
   executionLoadStatusId?: TaskStatus;
   pipelineLoadStatusId?: TaskStatus;
   updateChannel: 'stable' | 'rc';
+  markdownAppearance: MarkdownAppearance;
   mcpAgentAccessEnabled: boolean;
   mcpCapabilityProfile: 'read_only' | 'task_write' | 'admin';
   mcpBindHost: string;
@@ -358,6 +364,7 @@ export function sanitizePreferences(
     executionLoadStatusIds,
     pipelineLoadStatusIds,
     updateChannel: preferences.updateChannel === 'rc' ? 'rc' : 'stable',
+    markdownAppearance: sanitizeMarkdownAppearance(preferences.markdownAppearance, fallback.markdownAppearance || DEFAULT_MARKDOWN_APPEARANCE),
     mcpAgentAccessEnabled: Boolean(preferences.mcpAgentAccessEnabled),
     mcpCapabilityProfile:
       preferences.mcpCapabilityProfile === 'task_write' || preferences.mcpCapabilityProfile === 'admin'

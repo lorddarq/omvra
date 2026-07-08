@@ -21,6 +21,11 @@ import {
   DEFAULT_MCP_PORT,
 } from '../constants/mcp.ts';
 import { shouldBootstrapFromLocalStorage } from '../utils/canonicalHydration.js';
+import {
+  DEFAULT_MARKDOWN_APPEARANCE,
+  type MarkdownAppearance,
+  sanitizeMarkdownAppearance,
+} from '../utils/markdownAppearance.ts';
 import { getDefaultStatusId } from '../utils/mcpPreferences.ts';
 import {
   getPortableStoreValue,
@@ -68,6 +73,7 @@ export interface AppPreferences {
   executionLoadStatusIds: TaskStatus[];
   pipelineLoadStatusIds: TaskStatus[];
   updateChannel: 'stable' | 'rc';
+  markdownAppearance: MarkdownAppearance;
   mcpAgentAccessEnabled: boolean;
   mcpCapabilityProfile: 'read_only' | 'task_write' | 'admin';
   mcpBindHost: string;
@@ -110,6 +116,7 @@ interface WorkspaceStoreValue {
   toggleExecutionLoadStatus: (statusId: TaskStatus) => void;
   togglePipelineLoadStatus: (statusId: TaskStatus) => void;
   setUpdateChannel: (channel: AppPreferences['updateChannel']) => void;
+  setMarkdownAppearance: (updates: Partial<MarkdownAppearance>) => void;
   setMcpAgentAccessEnabled: (enabled: boolean) => void;
   setMcpServerAddress: (address: string) => void;
   setMcpBindHost: (host: string) => void;
@@ -167,6 +174,7 @@ export function createDefaultAppPreferences(
     executionLoadStatusIds: [getDefaultStatusId(statusColumns, 'in-progress')],
     pipelineLoadStatusIds: [getDefaultStatusId(statusColumns, 'open')],
     updateChannel: 'stable',
+    markdownAppearance: { ...DEFAULT_MARKDOWN_APPEARANCE },
     mcpAgentAccessEnabled: false,
     mcpCapabilityProfile: 'read_only',
     mcpBindHost: DEFAULT_MCP_BIND_HOST,
@@ -226,6 +234,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
         defaultSwimlanes
       ),
       updateChannel: stored.updateChannel === 'rc' ? 'rc' : 'stable',
+      markdownAppearance: sanitizeMarkdownAppearance(stored.markdownAppearance, DEFAULT_MARKDOWN_APPEARANCE),
       mcpAgentAccessEnabled: Boolean(stored.mcpAgentAccessEnabled),
       mcpCapabilityProfile:
         stored.mcpCapabilityProfile === 'task_write' || stored.mcpCapabilityProfile === 'admin'
@@ -518,6 +527,16 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     }));
   }, []);
 
+  const setMarkdownAppearance = useCallback((updates: Partial<MarkdownAppearance>) => {
+    setPreferences(previous => ({
+      ...previous,
+      markdownAppearance: sanitizeMarkdownAppearance(
+        { ...previous.markdownAppearance, ...updates },
+        previous.markdownAppearance
+      ),
+    }));
+  }, []);
+
   const setMcpAgentAccessEnabled = useCallback((enabled: boolean) => {
     setPreferences(previous => ({ ...previous, mcpAgentAccessEnabled: enabled }));
   }, []);
@@ -596,6 +615,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     toggleExecutionLoadStatus,
     togglePipelineLoadStatus,
     setUpdateChannel,
+    setMarkdownAppearance,
     setMcpAgentAccessEnabled,
     setMcpServerAddress,
     setMcpBindHost,
@@ -626,6 +646,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     setMcpPort,
     setMcpServerAddress,
     setUpdateChannel,
+    setMarkdownAppearance,
     statusColumns,
     tasks,
     timelineSwimlanes,

@@ -3,8 +3,10 @@ import { Person, StorageMeter, Task, TaskStatus, StatusColumn, TimelineSwimlane 
 import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import { McpHealthCheckResult } from '../services/mcp/types';
+import type { MarkdownAppearance } from '../utils/markdownAppearance';
 import {
   DataSettingsSection,
+  GeneralSettingsSection,
   McpActivitySettingsSection,
   McpSettingsSection,
   McpTestingSettingsSection,
@@ -25,6 +27,7 @@ interface PreferencesPanelProps {
   executionLoadStatusIds: TaskStatus[];
   pipelineLoadStatusIds: TaskStatus[];
   updateChannel: 'stable' | 'rc';
+  markdownAppearance: MarkdownAppearance;
   people: Person[];
   tasks: Task[];
   timelineSwimlanes: TimelineSwimlane[];
@@ -32,6 +35,7 @@ interface PreferencesPanelProps {
   agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
   onExecutionLoadStatusChange: (statusId: TaskStatus) => void;
   onPipelineLoadStatusChange: (statusId: TaskStatus) => void;
+  onMarkdownAppearanceChange: (updates: Partial<MarkdownAppearance>) => void;
   onAddPerson: (person: Omit<Person, 'id'>) => void;
   onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions' | 'agentOperationalInstructions'>) => void;
   onDeletePerson: (personId: string) => void;
@@ -81,6 +85,7 @@ export function PreferencesPanel({
   executionLoadStatusIds,
   pipelineLoadStatusIds,
   updateChannel,
+  markdownAppearance,
   people,
   tasks,
   timelineSwimlanes,
@@ -88,6 +93,7 @@ export function PreferencesPanel({
   agentWatchRuntime,
   onExecutionLoadStatusChange,
   onPipelineLoadStatusChange,
+  onMarkdownAppearanceChange,
   onAddPerson,
   onUpdatePerson,
   onDeletePerson,
@@ -279,6 +285,13 @@ export function PreferencesPanel({
 
   return (
     <SettingsPanel isOpen={isOpen} onClose={onClose} initialAnchor={initialAnchor}>
+      <GeneralSettingsSection>
+        <MarkdownAppearanceSettings
+          value={markdownAppearance}
+          onChange={onMarkdownAppearanceChange}
+        />
+      </GeneralSettingsSection>
+
       <TasksSettingsSection
         statusColumns={statusColumns}
         executionLoadStatusIds={executionLoadStatusIds}
@@ -386,4 +399,138 @@ export function PreferencesPanel({
       <HelpSettingsSection />
     </SettingsPanel>
   );
+}
+
+const MARKDOWN_SIZE_FIELDS: Array<{ key: keyof MarkdownAppearance; label: string; description: string }> = [
+  { key: 'blockSpacing', label: 'Block spacing', description: 'Gap between paragraphs and other markdown blocks.' },
+  { key: 'listBlockSpacing', label: 'List block spacing', description: 'Top and bottom spacing around lists and nested list groups.' },
+  { key: 'listItemSpacing', label: 'List item spacing', description: 'Vertical spacing between list items.' },
+  { key: 'listIndent', label: 'List indent', description: 'Left indent for non-checklist markdown lists.' },
+  { key: 'taskIndent', label: 'Checklist indent', description: 'Indent applied to nested checklist children.' },
+  { key: 'codeBlockSpacing', label: 'Code spacing', description: 'Gap between code snippets and nearby paragraph content.' },
+  { key: 'inlineCodePaddingX', label: 'Inline code padding X', description: 'Horizontal padding for inline code.' },
+  { key: 'inlineCodePaddingY', label: 'Inline code padding Y', description: 'Vertical padding for inline code.' },
+  { key: 'inlineCodeRadius', label: 'Inline code radius', description: 'Corner radius for inline code chips.' },
+  { key: 'inlineCodeMarginX', label: 'Inline code margin X', description: 'Horizontal spacing around inline code inside paragraphs.' },
+  { key: 'inlineCodeMarginY', label: 'Inline code margin Y', description: 'Vertical spacing around inline code inside paragraphs.' },
+  { key: 'preformattedPaddingX', label: 'Code block padding X', description: 'Horizontal padding for wrapped code/preformatted text.' },
+  { key: 'preformattedPaddingY', label: 'Code block padding Y', description: 'Vertical padding for wrapped code/preformatted text.' },
+  { key: 'preformattedRadius', label: 'Code block radius', description: 'Corner radius for wrapped code/preformatted text.' },
+];
+
+const MARKDOWN_COLOR_FIELDS: Array<{ key: keyof MarkdownAppearance; label: string; description: string }> = [
+  { key: 'inlineCodeBg', label: 'Inline code background', description: 'Background color for inline code.' },
+  { key: 'inlineCodeColor', label: 'Inline code text', description: 'Text color for inline code.' },
+  { key: 'preformattedBg', label: 'Code block background', description: 'Background color for wrapped code/preformatted text.' },
+  { key: 'preformattedColor', label: 'Code block text', description: 'Text color for wrapped code/preformatted text.' },
+];
+
+function MarkdownAppearanceSettings({
+  value,
+  onChange,
+}: {
+  value: MarkdownAppearance;
+  onChange: (updates: Partial<MarkdownAppearance>) => void;
+}) {
+  return (
+    <div className="min-w-0 space-y-8">
+      <div className="space-y-1">
+        <div className="text-sm font-semibold leading-5 text-[#71717a]">Markdown appearance</div>
+        <p className="break-words text-xs leading-4 text-[#6a7282] [overflow-wrap:anywhere]">
+          Control how markdown content renders in task descriptions. These settings persist with your workspace backup.
+        </p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        {MARKDOWN_SIZE_FIELDS.map((field) => (
+          <PreferenceTextField
+            key={field.key}
+            label={field.label}
+            description={field.description}
+            value={value[field.key]}
+            onChange={(nextValue) => onChange({ [field.key]: nextValue })}
+          />
+        ))}
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        {MARKDOWN_COLOR_FIELDS.map((field) => (
+          <PreferenceColorField
+            key={field.key}
+            label={field.label}
+            description={field.description}
+            value={value[field.key]}
+            onChange={(nextValue) => onChange({ [field.key]: nextValue })}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PreferenceTextField({
+  label,
+  description,
+  value,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="space-y-1">
+      <div className="text-sm font-semibold leading-5 text-[#71717a]">{label}</div>
+      <input
+        type="text"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-9 w-full rounded-xl border border-black/10 bg-white px-3 text-sm text-[#4a4a4f] outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
+      />
+      <p className="break-words text-xs leading-4 text-[#6a7282] [overflow-wrap:anywhere]">{description}</p>
+    </label>
+  );
+}
+
+function PreferenceColorField({
+  label,
+  description,
+  value,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const pickerValue = normalizeColorPickerValue(value);
+
+  return (
+    <label className="space-y-1">
+      <div className="text-sm font-semibold leading-5 text-[#71717a]">{label}</div>
+      <div className="flex items-center gap-3">
+        <input
+          type="color"
+          value={pickerValue}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-9 w-12 rounded-xl border border-black/10 bg-white p-1"
+        />
+        <input
+          type="text"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-9 min-w-0 flex-1 rounded-xl border border-black/10 bg-white px-3 text-sm text-[#4a4a4f] outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
+        />
+      </div>
+      <p className="break-words text-xs leading-4 text-[#6a7282] [overflow-wrap:anywhere]">{description}</p>
+    </label>
+  );
+}
+
+function normalizeColorPickerValue(value: string): string {
+  const trimmed = value.trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(trimmed)) return trimmed;
+  if (/^#[0-9a-fA-F]{8}$/.test(trimmed)) return trimmed.slice(0, 7);
+  return '#000000';
 }

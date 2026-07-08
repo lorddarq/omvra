@@ -11,6 +11,7 @@ import {
 import { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
+import type { MarkdownAppearance } from '../utils/markdownAppearance';
 import { MilestoneDialog } from './MilestoneDialog';
 import { MilestoneDetailsDialog } from './MilestoneDetailsDialog';
 import { SwimlaneDialog } from './SwimlaneDialog';
@@ -52,6 +53,7 @@ export interface PreferencesPanelState {
   executionLoadStatusIds: TaskStatus[];
   pipelineLoadStatusIds: TaskStatus[];
   updateChannel: 'stable' | 'rc';
+  markdownAppearance: MarkdownAppearance;
   agentWatchConfigs: AgentWatchConfig[];
   agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
   storageMeter: StorageMeter;
@@ -112,6 +114,7 @@ export interface WorkspaceAdminActions {
   onExecutionLoadStatusChange: (statusId: TaskStatus) => void;
   onPipelineLoadStatusChange: (statusId: TaskStatus) => void;
   onUpdateChannelChange: (channel: 'stable' | 'rc') => void;
+  onMarkdownAppearanceChange: (updates: Partial<MarkdownAppearance>) => void;
   onMcpAgentAccessToggle: (enabled: boolean) => void;
   onMcpAddressChange: (address: string) => void;
   onMcpBindHostChange: (host: string) => void;
@@ -244,6 +247,7 @@ export function AppPanels({
         executionLoadStatusIds={preferences.executionLoadStatusIds}
         pipelineLoadStatusIds={preferences.pipelineLoadStatusIds}
         updateChannel={preferences.updateChannel}
+        markdownAppearance={preferences.markdownAppearance}
         people={workspace.people}
         tasks={workspace.tasks}
         timelineSwimlanes={workspace.timelineSwimlanes}
@@ -257,6 +261,7 @@ export function AppPanels({
         onExecutionLoadStatusChange={adminActions.onExecutionLoadStatusChange}
         onPipelineLoadStatusChange={adminActions.onPipelineLoadStatusChange}
         onUpdateChannelChange={adminActions.onUpdateChannelChange}
+        onMarkdownAppearanceChange={adminActions.onMarkdownAppearanceChange}
         onAddPerson={adminActions.onAddPerson}
         onUpdatePerson={adminActions.onUpdatePerson}
         onDeletePerson={adminActions.onDeletePerson}

@@ -93,8 +93,6 @@
   transform: translateZ(0);
   transform-origin: center;
   backface-visibility: hidden;
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
   will-change: opacity;
 }
 
@@ -205,7 +203,6 @@
 
   .omvra-settings-nav-item:hover svg {
     opacity: 1;
-    filter: blur(0);
   }
 }
 
@@ -266,12 +263,10 @@
   from {
     opacity: 0;
     transform: translate3d(0, 8px, 0) scale(0.995);
-    filter: blur(4px);
   }
   to {
     opacity: 1;
     transform: translate3d(0, 0, 0) scale(1);
-    filter: blur(0);
   }
 }
 
@@ -279,12 +274,10 @@
   from {
     opacity: 0;
     transform: scale(0.25);
-    filter: blur(4px);
   }
   to {
     opacity: 1;
     transform: scale(1);
-    filter: blur(0);
   }
 }
 
@@ -292,12 +285,10 @@
   from {
     opacity: 0;
     transform: translate3d(-8px, 0, 0);
-    filter: blur(3px);
   }
   to {
     opacity: 1;
     transform: translate3d(0, 0, 0);
-    filter: blur(0);
   }
 }
 
@@ -314,12 +305,10 @@
   from {
     opacity: 0;
     transform: translate3d(0, 10px, 0);
-    filter: blur(4px);
   }
   to {
     opacity: 1;
     transform: translate3d(0, 0, 0);
-    filter: blur(0);
   }
 }
 

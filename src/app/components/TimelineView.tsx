@@ -33,6 +33,12 @@ import { allocateTasksToTracks, calculateSwimlaneHeight } from '../utils/trackAl
 import { getStatusVisual } from '../utils/roadmap';
 import { getReadableOutlineColorFor } from '../utils/contrast';
 import { parseISODateLocal, toLocalISODate } from '../utils/date';
+import {
+  createInitialTimelineWindow,
+  extendTimelineWindow,
+  getTimelineWindowAddedDayCount,
+  getTimelineWindowDates,
+} from '../utils/timelineWindow';
 import { applyTimelineTaskDrop } from '../utils/timelineTaskDrop';
 import { resolveReorderDropIndex } from '../utils/swimlaneReorder';
 import {
@@ -43,7 +49,6 @@ import {
 import type { TimelineLayoutState } from '../services/uiState';
 import { persistTimelineLayoutState } from '../services/uiState';
 
-const PAD_DAYS = 7;
 const DEFAULT_ROW_HEIGHT = 48;
 const HEADER_HEIGHT = 89;
 const DEFAULT_DAY_WIDTH = 60;
@@ -51,7 +56,7 @@ const DEFAULT_LEFT_COL_WIDTH = 282;
 const MIN_LEFT_COL_WIDTH = 260;
 const MAX_LEFT_COL_WIDTH = 420;
 const HORIZONTAL_RENDER_BUFFER_PX = 1200;
-const MIN_TOTAL_MONTHS = 12;
+const WINDOW_EXTENSION_BUFFER_PX = 1200;
 
 function TimelineSwimlaneInsertionMarker({
   height,
@@ -237,6 +242,7 @@ export function TimelineView({
   const fixedBtnRef = useRef<HTMLDivElement>(null);
   const hasInitializedScrollRef = useRef<boolean>(false);
   const scrollNotifyRafRef = useRef<number | null>(null);
+  const windowExtensionPendingRef = useRef(false);
   const resizeUpdateRafRef = useRef<number | null>(null);
   const pendingResizePreviewRef = useRef<{ taskId: string; left: number; width: number } | null>(null);
   const pendingRevealDateRef = useRef<string | null>(null);
@@ -265,76 +271,13 @@ export function TimelineView({
   // Ref for synchronously suppressing slot-add interactions around resize pointer cycles.
   const ignoreAddTaskUntilRef = useRef<number>(0);
 
-  // Calculate full date range from tasks
-  const allDates = useMemo(() => {
-    const now = new Date();
-    const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-    const taskDates = tasks
-      .flatMap(t => {
-        const dates: Date[] = [];
-        if (t.startDate) {
-          const d = parseISODateLocal(t.startDate);
-          if (d) dates.push(new Date(d.getFullYear(), d.getMonth(), d.getDate()));
-        }
-        if (t.endDate) {
-          const d = parseISODateLocal(t.endDate);
-          if (d) dates.push(new Date(d.getFullYear(), d.getMonth(), d.getDate()));
-        }
-        return dates;
-      })
-      .filter(d => !isNaN(d.getTime()));
-
-    if (taskDates.length === 0) {
-      const horizonMonth = new Date(todayDate.getFullYear(), todayDate.getMonth() + (MIN_TOTAL_MONTHS - 1), 1);
-      const start = new Date(todayDate.getFullYear(), todayDate.getMonth(), 1);
-      const end = new Date(horizonMonth.getFullYear(), horizonMonth.getMonth() + 1, 0);
-      const arr: Date[] = [];
-      const d = new Date(start);
-      while (d <= end) {
-        const dayOfWeek = d.getDay();
-        if (showWeekends || (dayOfWeek !== 0 && dayOfWeek !== 6)) {
-          arr.push(new Date(d));
-        }
-        d.setDate(d.getDate() + 1);
-      }
-      return arr;
-    }
-
-    const minDate = new Date(Math.min(...taskDates.map(d => d.getTime())));
-    let maxDate = new Date(Math.max(...taskDates.map(d => d.getTime())));
-
-    maxDate.setDate(maxDate.getDate() + PAD_DAYS);
-
-    // Align to month boundaries
-    let start = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
-    let end = new Date(maxDate.getFullYear(), maxDate.getMonth() + 1, 0);
-
-    // Ensure today is included
-    const currentDate = new Date();
-    const todayNoTime = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
-    if (todayNoTime < start) start = new Date(todayNoTime.getFullYear(), todayNoTime.getMonth(), 1);
-    if (todayNoTime > end) end = new Date(todayNoTime.getFullYear(), todayNoTime.getMonth() + 1, 0);
-
-    // Ensure at least a 12-month planning horizon (current month + next 11 months).
-    const minForwardEnd = new Date(todayNoTime.getFullYear(), todayNoTime.getMonth() + MIN_TOTAL_MONTHS, 0);
-    if (end < minForwardEnd) {
-      end = minForwardEnd;
-    }
-
-    const arr: Date[] = [];
-    const d = new Date(start);
-    while (d <= end) {
-      // Filter weekends if toggle is off (0 = Sunday, 6 = Saturday)
-      const dayOfWeek = d.getDay();
-      if (showWeekends || (dayOfWeek !== 0 && dayOfWeek !== 6)) {
-        arr.push(new Date(d));
-      }
-      d.setDate(d.getDate() + 1);
-    }
-
-    return arr;
-  }, [tasks, showWeekends]);
+  // The date window exists independently from the current task set. Rendering still
+  // virtualizes a slice of it below; later extensions only update this single state.
+  const [timelineWindow, setTimelineWindow] = useState(() => createInitialTimelineWindow(tasks));
+  const allDates = useMemo(
+    () => getTimelineWindowDates(timelineWindow, showWeekends),
+    [timelineWindow, showWeekends]
+  );
 
   // Group dates by month
   const allDatesByMonth = useMemo(() => {
@@ -992,7 +935,26 @@ export function TimelineView({
 
   const handleRowsVerticalScroll = useCallback(() => {
     if (!leftListRef.current || !rowsContainerRef.current) return;
-    leftListRef.current.scrollTop = rowsContainerRef.current.scrollTop;
+    const rowsContainer = rowsContainerRef.current;
+    leftListRef.current.scrollTop = rowsContainer.scrollTop;
+
+    if (!windowExtensionPendingRef.current) {
+      const remainingRight = rowsContainer.scrollWidth - rowsContainer.clientWidth - rowsContainer.scrollLeft;
+      const direction = rowsContainer.scrollLeft <= WINDOW_EXTENSION_BUFFER_PX
+        ? 'past'
+        : remainingRight <= WINDOW_EXTENSION_BUFFER_PX
+          ? 'future'
+          : null;
+
+      if (direction) {
+        windowExtensionPendingRef.current = true;
+        if (direction === 'past') {
+          rowsContainer.scrollLeft += getTimelineWindowAddedDayCount(timelineWindow, direction, showWeekends) * DEFAULT_DAY_WIDTH;
+        }
+        setTimelineWindow(window => extendTimelineWindow(window, direction));
+      }
+    }
+
     if (scrollNotifyRafRef.current == null) {
       scrollNotifyRafRef.current = requestAnimationFrame(() => {
         if (rowsContainerRef.current) {
@@ -1009,7 +971,11 @@ export function TimelineView({
         scrollNotifyRafRef.current = null;
       });
     }
-  }, [onTimelineScroll]);
+  }, [onTimelineScroll, showWeekends, timelineWindow]);
+
+  useEffect(() => {
+    windowExtensionPendingRef.current = false;
+  }, [timelineWindow]);
 
   // Attach vertical scroll listener
   useEffect(() => {

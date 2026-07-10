@@ -139,8 +139,6 @@ export function AppStatusBar({
         value={mcpValue}
         tone={mcp.tone}
         title={recentMcpActivity.title ? `${mcp.label} • ${recentMcpActivity.title}` : mcp.label}
-        isPulsing={isMcpActivityPulsing}
-        pulseTone={recentMcpActivity.provenance?.dotColor}
       />
     </div>
   );
@@ -158,7 +156,6 @@ interface StatusPillProps {
   tone?: AgentStatusTone;
   title?: string;
   isPulsing?: boolean;
-  pulseTone?: string;
 }
 
 function StatusPill({
@@ -168,11 +165,10 @@ function StatusPill({
   tone = 'muted',
   title,
   isPulsing = false,
-  pulseTone,
 }: StatusPillProps) {
   const showsSteadyGlow = tone === 'success';
-  const ledColor = isPulsing && pulseTone
-    ? pulseTone
+  const ledColor = isPulsing
+    ? '#2ea147'
     : tone === 'success'
       ? '#2ea147'
       : tone === 'warning'
@@ -191,14 +187,14 @@ function StatusPill({
         <span className="relative flex size-2 shrink-0 items-center justify-center" aria-hidden="true">
           {showsSteadyGlow ? (
             <span
-              className="absolute inline-flex size-3.5 animate-pulse rounded-full blur-[4px] opacity-[0.1]"
+              className="absolute inline-flex size-3.5 rounded-full blur-[4px] opacity-[0.1]"
               style={{ backgroundColor: ledColor }}
             />
           ) : null}
           {isPulsing ? (
             <span
               className="absolute inline-flex size-4 animate-ping rounded-full blur-[3px] opacity-[0.2]"
-              style={{ backgroundColor: pulseTone || '#2ea147' }}
+              style={{ backgroundColor: '#2ea147' }}
             />
           ) : null}
           <span

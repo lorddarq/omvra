@@ -310,8 +310,6 @@ export function RoadmapView({
         dateWindow={dateWindow}
         hasActiveFilters={hasActiveFilters}
         projects={projects}
-        rangeStart={toLocalISODate(range.start)}
-        rangeEnd={toLocalISODate(range.end)}
         showTimelineNavigation={todayLeft !== null}
         onSearchQueryChange={setSearchQuery}
         onProjectFilterChange={setProjectFilter}

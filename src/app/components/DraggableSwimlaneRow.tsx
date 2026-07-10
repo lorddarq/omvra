@@ -96,6 +96,11 @@ export function DraggableSwimlaneRow({
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionStart, setSelectionStart] = useState<number | null>(null);
   const [selectionEnd, setSelectionEnd] = useState<number | null>(null);
+  const selectionRef = useRef<{ active: boolean; start: number | null; end: number | null }>({
+    active: false,
+    start: null,
+    end: null,
+  });
 
   // Compute track assignments for tasks in this swimlane (memoized)
   const trackAssignments = useMemo(
@@ -249,18 +254,23 @@ export function DraggableSwimlaneRow({
 
   // Handle date range selection via click-drag
   const handleSelectionStart = useCallback((dayIdx: number) => {
+    selectionRef.current = { active: true, start: dayIdx, end: dayIdx };
     setIsSelecting(true);
     setSelectionStart(dayIdx);
     setSelectionEnd(dayIdx);
   }, []);
 
   const handleSelectionMove = useCallback((dayIdx: number) => {
-    if (isSelecting && selectionStart !== null) {
+    if (selectionRef.current.active && selectionRef.current.start !== null) {
+      selectionRef.current.end = dayIdx;
       setSelectionEnd(dayIdx);
     }
-  }, [isSelecting, selectionStart]);
+  }, []);
 
   const handleSelectionEnd = useCallback(() => {
+    const { active, start, end } = selectionRef.current;
+    selectionRef.current = { active: false, start: null, end: null };
+
     if (shouldIgnoreAddTask?.()) {
       setIsSelecting(false);
       setSelectionStart(null);
@@ -268,9 +278,9 @@ export function DraggableSwimlaneRow({
       return;
     }
 
-    if (isSelecting && selectionStart !== null && selectionEnd !== null && dates.length > 0) {
-      const startIdx = Math.min(selectionStart, selectionEnd);
-      const endIdx = Math.max(selectionStart, selectionEnd);
+    if (active && start !== null && end !== null && dates.length > 0) {
+      const startIdx = Math.min(start, end);
+      const endIdx = Math.max(start, end);
       
       if (startIdx >= 0 && startIdx < dates.length && endIdx >= 0 && endIdx < dates.length) {
         const startDate = dates[startIdx];
@@ -281,7 +291,7 @@ export function DraggableSwimlaneRow({
     setIsSelecting(false);
     setSelectionStart(null);
     setSelectionEnd(null);
-  }, [isSelecting, selectionStart, selectionEnd, dates, swimlane.id, onAddTask, mode, shouldIgnoreAddTask]);
+  }, [dates, swimlane.id, onAddTask, mode, shouldIgnoreAddTask]);
 
   // Global mouse up listener to end selection
   useEffect(() => {
@@ -534,8 +544,8 @@ export function DraggableSwimlaneRow({
                               }
                               handleSelectionStart(globalIdx);
                             }}
-                            onMouseEnter={() => {
-                              if (isSelecting && !isWeekend) {
+                            onMouseMove={() => {
+                              if (!isWeekend) {
                                 handleSelectionMove(globalIdx);
                               }
                             }}

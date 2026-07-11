@@ -54,6 +54,7 @@ export interface PreferencesPanelState {
   pipelineLoadStatusIds: TaskStatus[];
   updateChannel: 'stable' | 'rc';
   markdownAppearance: MarkdownAppearance;
+  showCompletedTimelineTasks: boolean;
   agentWatchConfigs: AgentWatchConfig[];
   agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
   storageMeter: StorageMeter;
@@ -113,6 +114,8 @@ export interface WorkspaceAdminActions {
   onImportTasksAndProjects: (file: File) => void;
   onUpdateChannelChange: (channel: 'stable' | 'rc') => void;
   onMarkdownAppearanceChange: (updates: Partial<MarkdownAppearance>) => void;
+  onShowCompletedTimelineTasksChange: (show: boolean) => void;
+  onUpdateStatusColumn: (columnId: string, updates: Partial<Omit<StatusColumn, 'id'>>) => void;
   onMcpAgentAccessToggle: (enabled: boolean) => void;
   onMcpAddressChange: (address: string) => void;
   onMcpBindHostChange: (host: string) => void;
@@ -246,6 +249,7 @@ export function AppPanels({
         pipelineLoadStatusIds={preferences.pipelineLoadStatusIds}
         updateChannel={preferences.updateChannel}
         markdownAppearance={preferences.markdownAppearance}
+        showCompletedTimelineTasks={preferences.showCompletedTimelineTasks}
         people={workspace.people}
         tasks={workspace.tasks}
         timelineSwimlanes={workspace.timelineSwimlanes}
@@ -258,6 +262,8 @@ export function AppPanels({
         onImportTasksAndProjects={adminActions.onImportTasksAndProjects}
         onUpdateChannelChange={adminActions.onUpdateChannelChange}
         onMarkdownAppearanceChange={adminActions.onMarkdownAppearanceChange}
+        onShowCompletedTimelineTasksChange={adminActions.onShowCompletedTimelineTasksChange}
+        onUpdateStatusColumn={adminActions.onUpdateStatusColumn}
         onAddPerson={adminActions.onAddPerson}
         onUpdatePerson={adminActions.onUpdatePerson}
         onDeletePerson={adminActions.onDeletePerson}

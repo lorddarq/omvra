@@ -207,7 +207,7 @@ export function TimelineView({
 
   // Weekend visibility toggle
   const [showWeekends, setShowWeekends] = useState<boolean>(true);
-  const [showCompleted, setShowCompleted] = useState<boolean>(() => initialLayoutState?.showCompleted ?? false);
+  const showCompleted = initialLayoutState?.showCompleted ?? false;
   const timelineTasks = useMemo(
     () => filterTimelineTasks(tasks, statusColumns, showCompleted),
     [showCompleted, statusColumns, tasks]
@@ -1080,10 +1080,8 @@ export function TimelineView({
         <TimelineToolbar
           mode={mode}
           showWeekends={showWeekends}
-          showCompleted={showCompleted}
           onModeChange={setMode}
           onShowWeekendsChange={setShowWeekends}
-          onShowCompletedChange={setShowCompleted}
           onScrollLeft={handleScrollLeft}
           onScrollRight={handleScrollRight}
           onScrollToToday={() => scrollToToday({ smooth: false })}

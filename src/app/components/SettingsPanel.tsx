@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Activity, AlertTriangle, Bot, CheckCircle2, Download, HelpCircle, Info, Terminal, Upload, Users } from 'lucide-react';
-import { Person, StorageMeter } from '../types';
+import { Person, RoadmapStage, StatusColumn, StorageMeter } from '../types';
 import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import { AnchoredPanel, AnchoredPanelSection } from './AnchoredPanel';
 import { AgentBoardWatchSettings } from './AgentBoardWatchSettings';
 import { EmptyStateCard } from './EmptyStateCard';
+import { Switch } from './ui/switch';
+import { getDefaultColumnSemantics } from '../utils/statusColumnSemantics';
 import {
   Sheet,
   SheetContent,
@@ -163,20 +165,28 @@ export function McpActivitySettingsSection({ children }: McpSettingsSectionProps
 
 interface TasksSettingsSectionProps {
   people: Person[];
+  statusColumns: StatusColumn[];
+  showCompletedTimelineTasks: boolean;
   agentWatchConfigs: AgentWatchConfig[];
   agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
   onSaveAgentWatchConfig: (config: AgentWatchConfig) => void;
   onRemoveAgentWatchConfig: (personId: string) => void;
   onPollAgentWatch: (personId: string) => void;
+  onShowCompletedTimelineTasksChange: (show: boolean) => void;
+  onUpdateStatusColumn: (columnId: string, updates: Partial<Omit<StatusColumn, 'id'>>) => void;
 }
 
 export function TasksSettingsSection({
   people,
+  statusColumns,
+  showCompletedTimelineTasks,
   agentWatchConfigs,
   agentWatchRuntime,
   onSaveAgentWatchConfig,
   onRemoveAgentWatchConfig,
   onPollAgentWatch,
+  onShowCompletedTimelineTasksChange,
+  onUpdateStatusColumn,
 }: TasksSettingsSectionProps) {
   const agenticPeople = people.filter(person => person.kind === 'agentic');
   const [selectedAgentId, setSelectedAgentId] = useState(agenticPeople[0]?.id ?? '');
@@ -207,7 +217,47 @@ export function TasksSettingsSection({
       title="Tasks"
       description="Configure agent polling here. Workload, roadmap, and AI watch behavior now belong to each Kanban column."
     >
-      <div className="space-y-3">
+      <div className="space-y-6">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold leading-5 text-[#71717a]">Completed tasks on Timeline</div>
+              <p className="mt-1 break-words text-xs leading-4 text-[#6a7282] [overflow-wrap:anywhere]">
+                Show tasks from Kanban columns classified as Done.
+              </p>
+            </div>
+            <Switch
+              aria-label="Show completed tasks on Timeline"
+              checked={showCompletedTimelineTasks}
+              onCheckedChange={onShowCompletedTimelineTasksChange}
+            />
+          </div>
+          <div className="space-y-2 border-t border-black/5 pt-4">
+            <div className="text-sm font-semibold leading-5 text-[#71717a]">Kanban workflow categories</div>
+            <p className="break-words text-xs leading-4 text-[#6a7282] [overflow-wrap:anywhere]">
+              Define what each column means. Names can stay completely custom.
+            </p>
+            {statusColumns.map(column => (
+              <label key={column.id} className="flex items-center justify-between gap-4 rounded-xl border border-black/10 px-3 py-2">
+                <span className="min-w-0 truncate text-sm text-[#52525b]">{column.title}</span>
+                <select
+                  value={column.roadmapStage ?? getDefaultColumnSemantics(column.id).roadmapStage}
+                  onChange={event => onUpdateStatusColumn(column.id, { roadmapStage: event.target.value as RoadmapStage })}
+                  className="h-8 rounded-lg border border-black/10 bg-white px-2 text-sm text-[#52525b]"
+                  aria-label={`${column.title} workflow category`}
+                >
+                  <option value="not-started">Backlog</option>
+                  <option value="in-progress">In progress</option>
+                  <option value="in-review">In review</option>
+                  <option value="complete">Done</option>
+                  <option value="excluded">Excluded</option>
+                </select>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-3 border-t border-black/5 pt-5">
         <div className="space-y-1">
           <div className="text-sm font-semibold leading-5 text-[#71717a]">Agent watch runtime</div>
           <p className="break-words text-xs leading-4 text-[#6a7282] [overflow-wrap:anywhere]">
@@ -232,6 +282,7 @@ export function TasksSettingsSection({
             Add an agentic person to configure board watching.
           </p>
         )}
+        </div>
       </div>
     </AnchoredPanelSection>
   );

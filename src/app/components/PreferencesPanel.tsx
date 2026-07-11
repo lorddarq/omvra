@@ -24,6 +24,7 @@ interface PreferencesPanelProps {
   onClose: () => void;
   initialAnchor?: string;
   statusColumns: StatusColumn[];
+  showCompletedTimelineTasks: boolean;
   executionLoadStatusIds: TaskStatus[];
   pipelineLoadStatusIds: TaskStatus[];
   updateChannel: 'stable' | 'rc';
@@ -34,6 +35,8 @@ interface PreferencesPanelProps {
   agentWatchConfigs: AgentWatchConfig[];
   agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
   onMarkdownAppearanceChange: (updates: Partial<MarkdownAppearance>) => void;
+  onShowCompletedTimelineTasksChange: (show: boolean) => void;
+  onUpdateStatusColumn: (columnId: string, updates: Partial<Omit<StatusColumn, 'id'>>) => void;
   onAddPerson: (person: Omit<Person, 'id'>) => void;
   onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions' | 'agentOperationalInstructions'>) => void;
   onDeletePerson: (personId: string) => void;
@@ -80,6 +83,7 @@ export function PreferencesPanel({
   onClose,
   initialAnchor,
   statusColumns,
+  showCompletedTimelineTasks,
   executionLoadStatusIds,
   pipelineLoadStatusIds,
   updateChannel,
@@ -90,6 +94,8 @@ export function PreferencesPanel({
   agentWatchConfigs,
   agentWatchRuntime,
   onMarkdownAppearanceChange,
+  onShowCompletedTimelineTasksChange,
+  onUpdateStatusColumn,
   onAddPerson,
   onUpdatePerson,
   onDeletePerson,
@@ -290,11 +296,15 @@ export function PreferencesPanel({
 
       <TasksSettingsSection
         people={people}
+        statusColumns={statusColumns}
+        showCompletedTimelineTasks={showCompletedTimelineTasks}
         agentWatchConfigs={agentWatchConfigs}
         agentWatchRuntime={agentWatchRuntime}
         onSaveAgentWatchConfig={onSaveAgentWatchConfig}
         onRemoveAgentWatchConfig={onRemoveAgentWatchConfig}
         onPollAgentWatch={onPollAgentWatch}
+        onShowCompletedTimelineTasksChange={onShowCompletedTimelineTasksChange}
+        onUpdateStatusColumn={onUpdateStatusColumn}
       />
 
       <PeopleManagementSections

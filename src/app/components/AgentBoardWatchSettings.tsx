@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import type { Person, StatusColumn } from '../types';
-import type { AgentWatchConfig, AgentWatchAction } from '../utils/workspaceSanitizers';
+import type { Person } from '../types';
+import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import { EmptyStateCard } from './EmptyStateCard';
 import { Input } from './ui/input';
@@ -12,7 +12,6 @@ interface AgentBoardWatchSettingsProps {
   agents: Person[];
   selectedAgentId: string;
   onAgentChange: (personId: string) => void;
-  statusColumns: StatusColumn[];
   watchConfig: AgentWatchConfig;
   watchRuntime?: AgentWatchRuntimeState;
   onSave: (config: AgentWatchConfig) => void;
@@ -25,7 +24,6 @@ export function AgentBoardWatchSettings({
   agents,
   selectedAgentId,
   onAgentChange,
-  statusColumns,
   watchConfig,
   watchRuntime,
   onSave,
@@ -51,53 +49,6 @@ export function AgentBoardWatchSettings({
           </SelectContent>
         </Select>
       </FieldBlock>
-
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <FieldBlock label="Watched Board">
-          <Select
-            value={watchConfig.statusId}
-            onValueChange={(value) =>
-              onSave({
-                ...watchConfig,
-                personId: agent.id,
-                statusId: value,
-              })
-            }
-          >
-            <SelectTrigger className={watchSelectClassName}>
-              <SelectValue placeholder="Select board" />
-            </SelectTrigger>
-            <SelectContent>
-              {statusColumns.map(col => (
-                <SelectItem key={col.id} value={col.id}>
-                  {col.title}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </FieldBlock>
-        <FieldBlock label="Action">
-          <Select
-            value={watchConfig.action}
-            onValueChange={(value) =>
-              onSave({
-                ...watchConfig,
-                personId: agent.id,
-                action: value as AgentWatchAction,
-              })
-            }
-          >
-            <SelectTrigger className={watchSelectClassName}>
-              <SelectValue placeholder="Select action" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="inspect_only">Inspect only</SelectItem>
-              <SelectItem value="inspect_and_work">Inspect and work</SelectItem>
-              <SelectItem value="move_to_ready_for_human_review">Ready for human review</SelectItem>
-            </SelectContent>
-          </Select>
-        </FieldBlock>
-      </div>
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <FieldBlock label="Project filter">
@@ -209,11 +160,6 @@ export function AgentBoardWatchSettings({
         </button>
       </div>
 
-      <div className="sr-only">
-        <div>
-          <div>{describeAgentAction(watchConfig.action)}</div>
-        </div>
-      </div>
     </div>
   );
 }
@@ -235,10 +181,4 @@ function formatWatchTime(value?: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString();
-}
-
-function describeAgentAction(action: AgentWatchAction) {
-  if (action === 'inspect_only') return 'Inspect only';
-  if (action === 'move_to_ready_for_human_review') return 'Move done tasks to Ready for human review';
-  return 'Inspect and work the task';
 }

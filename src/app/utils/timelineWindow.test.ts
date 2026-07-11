@@ -4,8 +4,10 @@ import type { Task } from '../types.ts';
 import {
   createInitialTimelineWindow,
   extendTimelineWindow,
+  extendTimelineWindowToDate,
   getTimelineWindowAddedDayCount,
   getTimelineWindowDates,
+  getTimelineWindowScrollCompensation,
 } from './timelineWindow.ts';
 
 test('timeline window is stable after creation and includes the planning horizon', () => {
@@ -31,4 +33,19 @@ test('timeline window extension prepends and appends whole months', () => {
     endDate: new Date(2026, 10, 30),
   });
   assert.equal(getTimelineWindowAddedDayCount(window, 'past', true), 91);
+  assert.equal(getTimelineWindowScrollCompensation(window, 'past', true, 60), 5460);
+});
+
+test('timeline window expands to contain reveal dates without moving the opposite edge', () => {
+  const window = { startDate: new Date(2026, 6, 1), endDate: new Date(2026, 7, 31) };
+
+  assert.deepEqual(extendTimelineWindowToDate(window, new Date(2026, 1, 14)), {
+    startDate: new Date(2026, 1, 1),
+    endDate: new Date(2026, 7, 31),
+  });
+  assert.deepEqual(extendTimelineWindowToDate(window, new Date(2027, 0, 14)), {
+    startDate: new Date(2026, 6, 1),
+    endDate: new Date(2027, 0, 31),
+  });
+  assert.equal(extendTimelineWindowToDate(window, new Date(2026, 6, 14)), window);
 });

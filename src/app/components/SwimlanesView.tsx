@@ -65,9 +65,7 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
   onAddTask,
   onMoveTask,
   onDropTask,
-  onRenameColumn,
-  onChangeColumnColor,
-  onChangeColumnDescription,
+  onUpdateColumn,
   onDeleteColumn,
   onReorderColumns,
   onColumnDragHover,
@@ -84,9 +82,7 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
   onAddTask: (status: TaskStatus) => void;
   onMoveTask: (taskId: string, newStatus: TaskStatus) => void;
   onDropTask: (draggedTask: Task, targetStatus: TaskStatus, targetIndex: number) => void;
-  onRenameColumn?: (colId: string, newTitle: string) => void;
-  onChangeColumnColor?: (colId: string, newColor: string) => void;
-  onChangeColumnDescription?: (colId: string, newDescription?: string) => void;
+  onUpdateColumn?: (colId: string, updates: Partial<Omit<StatusColumn, 'id'>>) => void;
   onDeleteColumn?: (colId: string) => void;
   onReorderColumns?: (fromIndex: number, toIndex: number) => void;
   onColumnDragHover?: (clientX: number) => void;
@@ -183,9 +179,7 @@ function ColumnDraggable<T extends { id: string; title?: string; color?: string 
         onAddTask={onAddTask}
         onMoveTask={onMoveTask}
         onDropTask={onDropTask}
-        onRenameColumn={onRenameColumn}
-        onChangeColumnColor={onChangeColumnColor}
-        onChangeColumnDescription={onChangeColumnDescription}
+        onUpdateColumn={onUpdateColumn}
         onDeleteColumn={onDeleteColumn}
       />
     </div>
@@ -202,9 +196,7 @@ interface SwimlanesViewProps {
   onMoveTask: (taskId: string, newStatus: TaskStatus) => void;
   onReorderTasks: (tasks: Task[]) => void;
   onReorderColumns?: (fromIndex: number, toIndex: number) => void;
-  onRenameColumn?: (colId: string, newTitle: string) => void;
-  onChangeColumnColor?: (colId: string, newColor: string) => void;
-  onChangeColumnDescription?: (colId: string, newDescription?: string) => void;
+  onUpdateColumn?: (colId: string, updates: Partial<Omit<StatusColumn, 'id'>>) => void;
   onAddColumn?: (col: { id?: string; title: string; color?: string }) => void;
   onDeleteColumn?: (colId: string) => void;
   onColumnDragHover?: (clientX: number) => void;
@@ -219,9 +211,7 @@ export function SwimlanesView({
   onMoveTask,
   onReorderTasks,
   onReorderColumns,
-  onRenameColumn,
-  onChangeColumnColor,
-  onChangeColumnDescription,
+  onUpdateColumn,
   onAddColumn,
   onDeleteColumn,
   onColumnDragHover,
@@ -314,9 +304,7 @@ export function SwimlanesView({
                   onAddTask={onAddTask}
                   onMoveTask={onMoveTask}
                   onDropTask={handleDropTask}
-                  onRenameColumn={onRenameColumn}
-                  onChangeColumnColor={onChangeColumnColor}
-                  onChangeColumnDescription={onChangeColumnDescription}
+                  onUpdateColumn={onUpdateColumn}
                   onDeleteColumn={onDeleteColumn}
                   onReorderColumns={onReorderColumns}
                   onColumnDragHover={onColumnDragHover}

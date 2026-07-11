@@ -12,6 +12,7 @@ import { createMcpReadService } from '../services/mcp/service.ts';
 import { useMcpHealthValidation } from './useMcpHealthValidation.ts';
 import { useMcpPanelState } from './useMcpPanelState.ts';
 import { getAgentWatchPollingInterval, useAgentWatchRuntime } from './useAgentWatchRuntime.ts';
+import { getStatusIdsForLoad } from '../utils/statusColumnSemantics.ts';
 import { usePeopleActions } from './usePeopleActions.ts';
 import {
   buildWorkspaceBackupPayload,
@@ -94,8 +95,6 @@ export function useAppShell(): AppShellState {
     linkTaskMilestone,
     removeTaskMilestoneLinks,
     applyRoadmapTaskDependencies,
-    toggleExecutionLoadStatus,
-    togglePipelineLoadStatus,
     setMcpAgentAccessEnabled,
     setMcpServerAddress,
     setMcpBindHost,
@@ -106,6 +105,14 @@ export function useAppShell(): AppShellState {
     hasHydratedCanonicalWorkspace,
     resetWorkspaceData,
   } = useWorkspaceStore();
+  const executionLoadStatusIds = useMemo(() => [
+    ...getStatusIdsForLoad(statusColumns, 'in-progress'),
+    ...getStatusIdsForLoad(statusColumns, 'in-review'),
+  ] as TaskStatus[], [statusColumns]);
+  const pipelineLoadStatusIds = useMemo(
+    () => getStatusIdsForLoad(statusColumns, 'open-tasks') as TaskStatus[],
+    [statusColumns]
+  );
   const {
     hasHydratedUiState,
     timelineLayoutState,
@@ -226,9 +233,7 @@ export function useAppShell(): AppShellState {
     );
   }, [deleteSwimlaneBase, setMilestones]);
   const {
-    renameStatusColumn: handleRenameStatusColumn,
-    changeStatusColumnColor: handleChangeStatusColumnColor,
-    changeStatusColumnDescription: handleChangeStatusColumnDescription,
+    updateStatusColumn: handleUpdateStatusColumn,
     reorderStatusColumns: handleReorderStatusColumns,
     addStatusColumn: handleAddStatusColumn,
     deleteStatusColumn: handleDeleteStatusColumn,
@@ -288,6 +293,7 @@ export function useAppShell(): AppShellState {
     enabled: preferences.mcpAgentAccessEnabled,
     agentWatchConfigs,
     setAgentWatchConfigs,
+    statusColumns,
   });
 
   useEffect(() => {
@@ -332,12 +338,10 @@ export function useAppShell(): AppShellState {
     const config = agentWatchConfigs.find(item => item.personId === personId) || {
       personId,
       enabled: true,
-      statusId: statusColumns[0]?.id || 'open',
-      action: 'inspect_and_work' as const,
       intervalSeconds: 60,
     };
     void pollAgentWatcher(config);
-  }, [agentWatchConfigs, pollAgentWatcher, statusColumns]);
+  }, [agentWatchConfigs, pollAgentWatcher]);
   const {
     addPerson: handleAddPerson,
     deletePerson: handleDeletePerson,
@@ -494,9 +498,7 @@ export function useAppShell(): AppShellState {
 
   useEffect(() => {
     const validPeople = new Set(people.filter(person => person.kind === 'agentic').map(person => person.id));
-    const validStatuses = new Set<string>(statusColumns.map(column => column.id));
-
-    setAgentWatchConfigs(prev => prev.filter(config => validPeople.has(config.personId) && validStatuses.has(config.statusId)));
+    setAgentWatchConfigs(prev => prev.filter(config => validPeople.has(config.personId)));
   }, [people, setAgentWatchConfigs, statusColumns]);
 
   useEffect(() => {
@@ -569,9 +571,7 @@ export function useAppShell(): AppShellState {
         onKanbanMoveTask: handleMoveTask,
         onKanbanReorderTasks: handleReorderTasks,
         onKanbanReorderColumns: handleReorderStatusColumns,
-        onKanbanRenameColumn: handleRenameStatusColumn,
-        onKanbanChangeColumnColor: handleChangeStatusColumnColor,
-        onKanbanChangeColumnDescription: handleChangeStatusColumnDescription,
+        onKanbanUpdateColumn: handleUpdateStatusColumn,
         onKanbanAddColumn: handleAddStatusColumn,
         onKanbanDeleteColumn: handleDeleteStatusColumn,
       },
@@ -609,8 +609,8 @@ export function useAppShell(): AppShellState {
         readModel: workspaceReadModel,
       },
       preferences: {
-        executionLoadStatusIds: preferences.executionLoadStatusIds,
-        pipelineLoadStatusIds: preferences.pipelineLoadStatusIds,
+        executionLoadStatusIds,
+        pipelineLoadStatusIds,
         updateChannel: preferences.updateChannel,
         markdownAppearance: preferences.markdownAppearance,
         agentWatchConfigs,
@@ -664,8 +664,6 @@ export function useAppShell(): AppShellState {
         onNukeLocalData: handleNukeLocalData,
         onExportWorkspaceBackup: handleExportWorkspaceBackup,
         onImportTasksAndProjects: handleImportTasksAndProjects,
-        onExecutionLoadStatusChange: toggleExecutionLoadStatus,
-        onPipelineLoadStatusChange: togglePipelineLoadStatus,
         onUpdateChannelChange: setUpdateChannel,
         onMarkdownAppearanceChange: setMarkdownAppearance,
         onMcpAgentAccessToggle: setMcpAgentAccessEnabled,

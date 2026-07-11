@@ -68,6 +68,21 @@ export function extendTimelineWindow(
   };
 }
 
+export function extendTimelineWindowToDate(
+  window: TimelineWindow,
+  date: Date
+): TimelineWindow {
+  if (date < window.startDate) {
+    return { startDate: atStartOfMonth(date), endDate: window.endDate };
+  }
+
+  if (date > window.endDate) {
+    return { startDate: window.startDate, endDate: atEndOfMonth(date) };
+  }
+
+  return window;
+}
+
 export function getTimelineWindowAddedDayCount(
   window: TimelineWindow,
   direction: TimelineWindowDirection,
@@ -80,4 +95,14 @@ export function getTimelineWindowAddedDayCount(
     : { startDate: new Date(window.endDate.getFullYear(), window.endDate.getMonth() + 1, 1), endDate: extendedWindow.endDate };
 
   return getTimelineWindowDates(addedRange, showWeekends).length;
+}
+
+export function getTimelineWindowScrollCompensation(
+  window: TimelineWindow,
+  direction: TimelineWindowDirection,
+  showWeekends: boolean,
+  dayWidth: number,
+  months = 3
+): number {
+  return getTimelineWindowAddedDayCount(window, direction, showWeekends, months) * dayWidth;
 }

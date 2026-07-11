@@ -1,17 +1,20 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
-import { StatusColumn } from '../types';
+import { AgentWatchAction, LoadClassification, RoadmapStage, StatusColumn } from '../types';
+import { AI_ACTIONS, LOAD_CLASSIFICATIONS, ROADMAP_STAGES, getDefaultColumnSemantics } from '../utils/statusColumnSemantics';
 import { Dialog, DialogTitle } from '../components/ui/dialog';
 import { Button } from '../components/ui/button';
 import { DialogSurface } from './DialogSurface';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Switch } from '../components/ui/switch';
 
 interface ColumnDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (title: string, color: string, description?: string) => void;
+  onSave: (column: Omit<StatusColumn, 'id'>) => void;
   onDelete?: () => void;
   column?: StatusColumn | null;
 }
@@ -45,16 +48,30 @@ export function ColumnDialog({
   const [title, setTitle] = useState('');
   const [color, setColor] = useState(FALLBACK_COLUMN_COLOR);
   const [description, setDescription] = useState('');
+  const [loadClassification, setLoadClassification] = useState<LoadClassification>('none');
+  const [roadmapStage, setRoadmapStage] = useState<RoadmapStage>('excluded');
+  const [aiWatchEnabled, setAiWatchEnabled] = useState(false);
+  const [aiAction, setAiAction] = useState<AgentWatchAction>('inspect_and_work');
 
   useEffect(() => {
     if (column) {
       setTitle(column.title || '');
       setColor(column.color || FALLBACK_COLUMN_COLOR);
       setDescription(column.description || '');
+      const defaults = getDefaultColumnSemantics(column.id);
+      setLoadClassification(column.loadClassification ?? defaults.loadClassification);
+      setRoadmapStage(column.roadmapStage ?? defaults.roadmapStage);
+      setAiWatchEnabled(column.aiWatchEnabled ?? defaults.aiWatchEnabled);
+      setAiAction(column.aiAction ?? defaults.aiAction);
     } else {
+      const defaults = getDefaultColumnSemantics('custom');
       setTitle('');
       setColor(FALLBACK_COLUMN_COLOR);
       setDescription('');
+      setLoadClassification(defaults.loadClassification);
+      setRoadmapStage(defaults.roadmapStage);
+      setAiWatchEnabled(defaults.aiWatchEnabled);
+      setAiAction(defaults.aiAction);
     }
   }, [column, isOpen]);
 
@@ -63,7 +80,15 @@ export function ColumnDialog({
   const handleSave = () => {
     if (!title.trim()) return;
     const normalizedDescription = description.trim();
-    onSave(title.trim(), normalizedColor, normalizedDescription || undefined);
+    onSave({
+      title: title.trim(),
+      color: normalizedColor,
+      description: normalizedDescription || undefined,
+      loadClassification,
+      roadmapStage,
+      aiWatchEnabled,
+      aiAction,
+    });
     onClose();
   };
 
@@ -80,7 +105,7 @@ export function ColumnDialog({
         showClose={false}
         aria-describedby={undefined}
         overlayClassName="omvra-settings-overlay"
-        className="w-[min(429px,calc(100vw-2rem))] gap-0 overflow-hidden rounded-[28px] border border-black/5 bg-white p-0 shadow-[0_24px_70px_rgba(15,23,42,0.24)] sm:max-w-none"
+        className="max-h-[calc(100vh-2rem)] w-[min(520px,calc(100vw-2rem))] gap-0 overflow-y-auto rounded-[28px] border border-black/5 bg-white p-0 shadow-[0_24px_70px_rgba(15,23,42,0.24)] sm:max-w-none"
       >
         <div className="flex items-start justify-between px-8 pb-0 pt-8">
           <DialogTitle className="text-[15px] font-medium tracking-[-0.02em] text-[#67676f]">
@@ -99,7 +124,7 @@ export function ColumnDialog({
         <div className="space-y-5 px-8 pb-8 pt-7">
           <div className="space-y-2">
             <Label htmlFor="title" className="text-[15px] font-medium text-[#67676f]">
-              Task name
+              Column name
             </Label>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_128px]">
               <Input
@@ -135,6 +160,48 @@ export function ColumnDialog({
             <p className="max-w-[365px] text-[13px] leading-4 text-[#71717a]">
               Assign a default color for the column to help you identify tasks associated faster.
             </p>
+          </div>
+
+          <div className="space-y-4 border-t border-black/5 pt-5">
+            <div>
+              <h3 className="text-[15px] font-medium text-[#67676f]">Workflow semantics</h3>
+              <p className="mt-1 text-[13px] leading-4 text-[#71717a]">Roadmap and workload views derive their state from this column.</p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="column-load">Workload classification</Label>
+                <Select value={loadClassification} onValueChange={value => setLoadClassification(value as LoadClassification)}>
+                  <SelectTrigger id="column-load"><SelectValue /></SelectTrigger>
+                  <SelectContent>{LOAD_CLASSIFICATIONS.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="column-roadmap">Roadmap stage</Label>
+                <Select value={roadmapStage} onValueChange={value => setRoadmapStage(value as RoadmapStage)}>
+                  <SelectTrigger id="column-roadmap"><SelectValue /></SelectTrigger>
+                  <SelectContent>{ROADMAP_STAGES.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4 border-t border-black/5 pt-5">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label htmlFor="column-ai-watch">AI watch</Label>
+                <p className="mt-1 text-[13px] leading-4 text-[#71717a]">Allow configured agents to watch tasks entering this column.</p>
+              </div>
+              <Switch id="column-ai-watch" checked={aiWatchEnabled} onCheckedChange={setAiWatchEnabled} />
+            </div>
+            {aiWatchEnabled && (
+              <div className="space-y-2">
+                <Label htmlFor="column-ai-action">Agent action</Label>
+                <Select value={aiAction} onValueChange={value => setAiAction(value as AgentWatchAction)}>
+                  <SelectTrigger id="column-ai-action"><SelectValue /></SelectTrigger>
+                  <SelectContent>{AI_ACTIONS.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">

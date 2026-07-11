@@ -21,9 +21,7 @@ interface DroppableColumnProps {
   onAddTask: (status: TaskStatus) => void;
   onMoveTask: (taskId: string, newStatus: TaskStatus) => void;
   onDropTask: (draggedTask: Task, targetStatus: TaskStatus, targetIndex: number) => void;
-  onRenameColumn?: (colId: string, newTitle: string) => void;
-  onChangeColumnColor?: (colId: string, newColor: string) => void;
-  onChangeColumnDescription?: (colId: string, newDescription?: string) => void;
+  onUpdateColumn?: (colId: string, updates: Partial<Omit<StatusColumn, 'id'>>) => void;
   onDeleteColumn?: (colId: string) => void;
 }
 
@@ -131,9 +129,7 @@ export function DroppableColumn({
   onAddTask,
   onMoveTask,
   onDropTask,
-  onRenameColumn,
-  onChangeColumnColor,
-  onChangeColumnDescription,
+  onUpdateColumn,
   onDeleteColumn,
 }: DroppableColumnProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -179,11 +175,7 @@ export function DroppableColumn({
   // Column dialog state
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const handleSaveColumn = (title: string, color: string, description?: string) => {
-    if (onRenameColumn && title.trim()) onRenameColumn(swimlane.id, title.trim());
-    if (onChangeColumnColor && color) onChangeColumnColor(swimlane.id, color);
-    if (onChangeColumnDescription) onChangeColumnDescription(swimlane.id, description);
-  };
+  const handleSaveColumn = (updates: Omit<StatusColumn, 'id'>) => onUpdateColumn?.(swimlane.id, updates);
 
   const handleDeleteColumn = () => {
     if (onDeleteColumn) onDeleteColumn(swimlane.id);

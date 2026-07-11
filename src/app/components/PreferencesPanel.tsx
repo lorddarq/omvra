@@ -33,8 +33,6 @@ interface PreferencesPanelProps {
   timelineSwimlanes: TimelineSwimlane[];
   agentWatchConfigs: AgentWatchConfig[];
   agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
-  onExecutionLoadStatusChange: (statusId: TaskStatus) => void;
-  onPipelineLoadStatusChange: (statusId: TaskStatus) => void;
   onMarkdownAppearanceChange: (updates: Partial<MarkdownAppearance>) => void;
   onAddPerson: (person: Omit<Person, 'id'>) => void;
   onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions' | 'agentOperationalInstructions'>) => void;
@@ -91,8 +89,6 @@ export function PreferencesPanel({
   timelineSwimlanes,
   agentWatchConfigs,
   agentWatchRuntime,
-  onExecutionLoadStatusChange,
-  onPipelineLoadStatusChange,
   onMarkdownAppearanceChange,
   onAddPerson,
   onUpdatePerson,
@@ -293,14 +289,9 @@ export function PreferencesPanel({
       </GeneralSettingsSection>
 
       <TasksSettingsSection
-        statusColumns={statusColumns}
-        executionLoadStatusIds={executionLoadStatusIds}
-        pipelineLoadStatusIds={pipelineLoadStatusIds}
         people={people}
         agentWatchConfigs={agentWatchConfigs}
         agentWatchRuntime={agentWatchRuntime}
-        onExecutionLoadStatusChange={onExecutionLoadStatusChange}
-        onPipelineLoadStatusChange={onPipelineLoadStatusChange}
         onSaveAgentWatchConfig={onSaveAgentWatchConfig}
         onRemoveAgentWatchConfig={onRemoveAgentWatchConfig}
         onPollAgentWatch={onPollAgentWatch}

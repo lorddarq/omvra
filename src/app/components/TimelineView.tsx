@@ -36,8 +36,9 @@ import { parseISODateLocal, toLocalISODate } from '../utils/date';
 import {
   createInitialTimelineWindow,
   extendTimelineWindow,
-  getTimelineWindowAddedDayCount,
+  extendTimelineWindowToDate,
   getTimelineWindowDates,
+  getTimelineWindowScrollCompensation,
 } from '../utils/timelineWindow';
 import { applyTimelineTaskDrop } from '../utils/timelineTaskDrop';
 import { resolveReorderDropIndex } from '../utils/swimlaneReorder';
@@ -48,6 +49,7 @@ import {
 } from '../utils/timeSurface';
 import type { TimelineLayoutState } from '../services/uiState';
 import { persistTimelineLayoutState } from '../services/uiState';
+import { isPointerReleased } from '../utils/pointerInteraction';
 
 const DEFAULT_ROW_HEIGHT = 48;
 const HEADER_HEIGHT = 89;
@@ -695,7 +697,7 @@ export function TimelineView({
     };
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (e.buttons === 0) {
+      if (isPointerReleased(e.buttons)) {
         finishResize(e.clientX);
         return;
       }
@@ -866,6 +868,11 @@ export function TimelineView({
   useEffect(() => {
     const handleMove = (e: MouseEvent) => {
       if (!isHeaderScrubbingRef.current || !rowsContainerRef.current) return;
+      if (e.buttons === 0) {
+        isHeaderScrubbingRef.current = false;
+        setIsHeaderScrubbing(false);
+        return;
+      }
       const dx = e.clientX - scrubStartXRef.current;
       rowsContainerRef.current.scrollLeft = scrubStartScrollLeftRef.current - dx;
       setHorizontalMetrics({
@@ -883,9 +890,15 @@ export function TimelineView({
 
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
+    window.addEventListener('pointerup', handleUp);
+    window.addEventListener('pointercancel', handleUp);
+    window.addEventListener('blur', handleUp);
     return () => {
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
+      window.removeEventListener('pointerup', handleUp);
+      window.removeEventListener('pointercancel', handleUp);
+      window.removeEventListener('blur', handleUp);
     };
   }, []);
 
@@ -949,7 +962,12 @@ export function TimelineView({
       if (direction) {
         windowExtensionPendingRef.current = true;
         if (direction === 'past') {
-          rowsContainer.scrollLeft += getTimelineWindowAddedDayCount(timelineWindow, direction, showWeekends) * DEFAULT_DAY_WIDTH;
+          rowsContainer.scrollLeft += getTimelineWindowScrollCompensation(
+            timelineWindow,
+            direction,
+            showWeekends,
+            DEFAULT_DAY_WIDTH
+          );
         }
         setTimelineWindow(window => extendTimelineWindow(window, direction));
       }
@@ -1315,6 +1333,10 @@ export function TimelineView({
                           }
                         }}
                         onRevealDate={(dateISO) => {
+                          const revealDate = parseISODateLocal(dateISO);
+                          if (revealDate) {
+                            setTimelineWindow(window => extendTimelineWindowToDate(window, revealDate));
+                          }
                           pendingRevealDateRef.current = dateISO;
                         }}
                         getTaskColor={getTaskColor}

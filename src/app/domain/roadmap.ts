@@ -1,16 +1,19 @@
 import { parseISODateLocal } from '../utils/date.ts';
 import { formatDateRangeLabel } from '../utils/dateRange.ts';
 import type { StatusVisual } from '../utils/statusVisual.ts';
-import type { ProjectMilestone, Task, TaskStatus } from '../types.ts';
+import type { ProjectMilestone, RoadmapStage, StatusColumn, Task, TaskStatus } from '../types.ts';
+import { getRoadmapStage } from '../utils/statusColumnSemantics.ts';
 
 export type MilestoneHealth = 'complete' | 'at-risk' | 'in-progress' | 'planned' | 'empty';
 
-export type MilestoneStatusCounts = Record<TaskStatus, number>;
+export type MilestoneStatusCounts = Record<TaskStatus, number> & Record<string, number>;
 
 export interface RoadmapMilestoneSummary {
   linkedTasks: Task[];
+  includedTasks: Task[];
   lateTasks: Task[];
   counts: MilestoneStatusCounts;
+  stageCounts: Record<Exclude<RoadmapStage, 'excluded'>, number>;
   totalTasks: number;
   completedTasks: number;
   completionPercent: number;
@@ -92,15 +95,21 @@ export function isTaskLateForMilestone(task: Task, milestone: ProjectMilestone):
   return taskEnd.getTime() > milestoneEnd.getTime();
 }
 
-export function summarizeMilestone(milestone: ProjectMilestone, tasks: Task[]): RoadmapMilestoneSummary {
+export function summarizeMilestone(milestone: ProjectMilestone, tasks: Task[], statusColumns: StatusColumn[] = []): RoadmapMilestoneSummary {
   const linkedTasks = getTasksForMilestone(milestone, tasks);
-  const counts = linkedTasks.reduce<MilestoneStatusCounts>((nextCounts, task) => {
+  const includedTasks = linkedTasks.filter(task => getRoadmapStage(statusColumns, task.status) !== 'excluded');
+  const counts = includedTasks.reduce<MilestoneStatusCounts>((nextCounts, task) => {
     nextCounts[task.status] = (nextCounts[task.status] || 0) + 1;
     return nextCounts;
   }, { ...EMPTY_COUNTS });
-  const lateTasks = linkedTasks.filter(task => isTaskLateForMilestone(task, milestone));
-  const totalTasks = linkedTasks.length;
-  const completedTasks = counts.done;
+  const stageCounts = includedTasks.reduce<RoadmapMilestoneSummary['stageCounts']>((nextCounts, task) => {
+    const stage = getRoadmapStage(statusColumns, task.status);
+    if (stage !== 'excluded') nextCounts[stage] += 1;
+    return nextCounts;
+  }, { 'not-started': 0, 'in-progress': 0, 'in-review': 0, complete: 0 });
+  const lateTasks = includedTasks.filter(task => isTaskLateForMilestone(task, milestone));
+  const totalTasks = includedTasks.length;
+  const completedTasks = stageCounts.complete;
   const completionPercent = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
 
   let health: MilestoneHealth = 'empty';
@@ -108,7 +117,7 @@ export function summarizeMilestone(milestone: ProjectMilestone, tasks: Task[]): 
     health = 'at-risk';
   } else if (totalTasks > 0 && completedTasks === totalTasks) {
     health = 'complete';
-  } else if (counts['in-progress'] > 0 || counts['under-review'] > 0) {
+  } else if (stageCounts['in-progress'] > 0 || stageCounts['in-review'] > 0) {
     health = 'in-progress';
   } else if (totalTasks > 0) {
     health = 'planned';
@@ -116,8 +125,10 @@ export function summarizeMilestone(milestone: ProjectMilestone, tasks: Task[]): 
 
   return {
     linkedTasks,
+    includedTasks,
     lateTasks,
     counts,
+    stageCounts,
     totalTasks,
     completedTasks,
     completionPercent,

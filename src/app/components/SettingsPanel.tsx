@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Activity, AlertTriangle, Bot, CheckCircle2, Download, HelpCircle, Info, Terminal, Upload, Users } from 'lucide-react';
-import { Person, StorageMeter, StatusColumn, TaskStatus } from '../types';
+import { Person, StorageMeter } from '../types';
 import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import { AnchoredPanel, AnchoredPanelSection } from './AnchoredPanel';
 import { AgentBoardWatchSettings } from './AgentBoardWatchSettings';
 import { EmptyStateCard } from './EmptyStateCard';
-import { TaskCheckboxIndicator } from './TaskCheckboxControl';
 import {
   Sheet,
   SheetContent,
@@ -163,28 +162,18 @@ export function McpActivitySettingsSection({ children }: McpSettingsSectionProps
 }
 
 interface TasksSettingsSectionProps {
-  statusColumns: StatusColumn[];
-  executionLoadStatusIds: TaskStatus[];
-  pipelineLoadStatusIds: TaskStatus[];
   people: Person[];
   agentWatchConfigs: AgentWatchConfig[];
   agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
-  onExecutionLoadStatusChange: (statusId: TaskStatus) => void;
-  onPipelineLoadStatusChange: (statusId: TaskStatus) => void;
   onSaveAgentWatchConfig: (config: AgentWatchConfig) => void;
   onRemoveAgentWatchConfig: (personId: string) => void;
   onPollAgentWatch: (personId: string) => void;
 }
 
 export function TasksSettingsSection({
-  statusColumns,
-  executionLoadStatusIds,
-  pipelineLoadStatusIds,
   people,
   agentWatchConfigs,
   agentWatchRuntime,
-  onExecutionLoadStatusChange,
-  onPipelineLoadStatusChange,
   onSaveAgentWatchConfig,
   onRemoveAgentWatchConfig,
   onPollAgentWatch,
@@ -208,8 +197,6 @@ export function TasksSettingsSection({
     return agentWatchConfigs.find(config => config.personId === personId) || {
       personId,
       enabled: false,
-      statusId: statusColumns[0]?.id || 'open',
-      action: 'inspect_and_work',
       intervalSeconds: 60,
     };
   }
@@ -218,29 +205,13 @@ export function TasksSettingsSection({
     <AnchoredPanelSection
       id="task-load"
       title="Tasks"
-      description="Settings that control task-related settings like load calculation and kanban board observability by agents"
+      description="Configure agent polling here. Workload, roadmap, and AI watch behavior now belong to each Kanban column."
     >
-      <TaskStatusChoiceGroup
-        title="Execution Load"
-        description="Tasks in these columns count toward execution load."
-        statusColumns={statusColumns}
-        value={executionLoadStatusIds}
-        onChange={onExecutionLoadStatusChange}
-      />
-
-      <TaskStatusChoiceGroup
-        title="Pipeline Load"
-        description="Tasks in these columns count toward pipeline pressure."
-        statusColumns={statusColumns}
-        value={pipelineLoadStatusIds}
-        onChange={onPipelineLoadStatusChange}
-      />
-
       <div className="space-y-3">
         <div className="space-y-1">
-          <div className="text-sm font-semibold leading-5 text-[#71717a]">Agent Board watch</div>
+          <div className="text-sm font-semibold leading-5 text-[#71717a]">Agent watch runtime</div>
           <p className="break-words text-xs leading-4 text-[#6a7282] [overflow-wrap:anywhere]">
-            Configure which task boards agentic people monitor through MCP.
+            Choose an agent and polling cadence here. Edit a Kanban column to choose what is watched and what action agents take.
           </p>
         </div>
 
@@ -250,7 +221,6 @@ export function TasksSettingsSection({
             agents={agenticPeople}
             selectedAgentId={selectedAgent.id}
             onAgentChange={setSelectedAgentId}
-            statusColumns={statusColumns}
             watchConfig={getAgentWatchConfig(selectedAgent.id)}
             watchRuntime={agentWatchRuntime[selectedAgent.id]}
             onSave={onSaveAgentWatchConfig}
@@ -264,49 +234,6 @@ export function TasksSettingsSection({
         )}
       </div>
     </AnchoredPanelSection>
-  );
-}
-
-interface TaskStatusChoiceGroupProps {
-  title: string;
-  description: string;
-  statusColumns: StatusColumn[];
-  value: TaskStatus[];
-  onChange: (statusId: TaskStatus) => void;
-}
-
-function TaskStatusChoiceGroup({
-  title,
-  description,
-  statusColumns,
-  value,
-  onChange,
-}: TaskStatusChoiceGroupProps) {
-  return (
-    <div className="space-y-6">
-      <div className="space-y-1">
-        <div className="text-sm font-semibold leading-5 text-[#71717a]">{title}</div>
-        <p className="break-words text-xs leading-4 text-[#6a7282] [overflow-wrap:anywhere]">{description}</p>
-      </div>
-      <div className="space-y-1" role="group" aria-label={title}>
-        {statusColumns.map(col => {
-          const isSelected = value.includes(col.id as TaskStatus);
-          return (
-            <button
-              key={col.id}
-              type="button"
-              role="checkbox"
-              aria-checked={isSelected}
-              onClick={() => onChange(col.id as TaskStatus)}
-              className="flex min-h-6 w-full items-center gap-3 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
-            >
-              <TaskCheckboxIndicator checked={isSelected} />
-              <span className="min-w-0 truncate text-xs font-medium leading-5 text-[#4a4a4f]">{col.title}</span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
   );
 }
 

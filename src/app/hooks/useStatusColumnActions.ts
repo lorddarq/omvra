@@ -14,16 +14,8 @@ export function useStatusColumnActions({
   setStatusColumns,
   setTasks,
 }: UseStatusColumnActionsOptions) {
-  const renameStatusColumn = useCallback((colId: string, newTitle: string) => {
-    setStatusColumns(cols => cols.map(c => c.id === colId ? { ...c, title: newTitle } : c));
-  }, [setStatusColumns]);
-
-  const changeStatusColumnColor = useCallback((colId: string, newColorClass: string) => {
-    setStatusColumns(cols => cols.map(c => c.id === colId ? { ...c, color: newColorClass } : c));
-  }, [setStatusColumns]);
-
-  const changeStatusColumnDescription = useCallback((colId: string, newDescription?: string) => {
-    setStatusColumns(cols => cols.map(c => c.id === colId ? { ...c, description: newDescription } : c));
+  const updateStatusColumn = useCallback((colId: string, updates: Partial<Omit<StatusColumn, 'id'>>) => {
+    setStatusColumns(cols => cols.map(c => c.id === colId ? { ...c, ...updates } : c));
   }, [setStatusColumns]);
 
   const reorderStatusColumns = useCallback((fromIndex: number, toIndex: number) => {
@@ -41,6 +33,10 @@ export function useStatusColumnActions({
       title: col.title,
       color: col.color || '#9ca3af',
       description: col.description,
+      loadClassification: 'none',
+      roadmapStage: 'excluded',
+      aiWatchEnabled: false,
+      aiAction: 'inspect_and_work',
     };
     setStatusColumns(cols => [...cols, newCol]);
   }, [setStatusColumns]);
@@ -61,9 +57,7 @@ export function useStatusColumnActions({
   }, [setStatusColumns, setTasks, statusColumns, tasks]);
 
   return {
-    renameStatusColumn,
-    changeStatusColumnColor,
-    changeStatusColumnDescription,
+    updateStatusColumn,
     reorderStatusColumns,
     addStatusColumn,
     deleteStatusColumn,

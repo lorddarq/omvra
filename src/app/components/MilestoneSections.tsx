@@ -7,7 +7,7 @@ import {
 } from '../utils/roadmap';
 import { DateRangeLabel } from './DateRangeLabel';
 import { ProjectBadge } from './ProjectBadge';
-import type { Task, TaskStatus, TimelineSwimlane } from '../types';
+import type { StatusColumn, Task, TimelineSwimlane } from '../types';
 import { EmptyStateCard } from './EmptyStateCard';
 import { DependencyStatusPill } from './TaskSummarySection';
 import { DialogSurfaceSection } from './DialogSurface';
@@ -17,14 +17,14 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { taskEditIconFieldClassName } from './taskFormStyles';
 
-type MilestoneStatusColumn = Array<{ id: TaskStatus; title: string; color?: string }>;
+type MilestoneStatusColumn = StatusColumn[];
 
 export function MilestoneStatusComposition({
   counts,
   totalTasks,
   statusColumns,
 }: {
-  counts: Record<TaskStatus, number>;
+  counts: Record<string, number>;
   totalTasks: number;
   statusColumns: MilestoneStatusColumn;
 }) {

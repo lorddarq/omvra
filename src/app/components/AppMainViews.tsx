@@ -58,9 +58,7 @@ export interface KanbanViewController {
   onKanbanMoveTask: (taskId: string, newStatus: TaskStatus) => void;
   onKanbanReorderTasks: (tasks: Task[]) => void;
   onKanbanReorderColumns: (fromIndex: number, toIndex: number) => void;
-  onKanbanRenameColumn: (colId: string, newTitle: string) => void;
-  onKanbanChangeColumnColor: (colId: string, newColor: string) => void;
-  onKanbanChangeColumnDescription: (colId: string, newDescription?: string) => void;
+  onKanbanUpdateColumn: (colId: string, updates: Partial<Omit<StatusColumn, 'id'>>) => void;
   onKanbanAddColumn: (col: any) => void;
   onKanbanDeleteColumn: (colId: string) => void;
 }
@@ -137,9 +135,7 @@ export function AppMainViews({
               onMoveTask={kanban.onKanbanMoveTask}
               onReorderTasks={kanban.onKanbanReorderTasks}
               onReorderColumns={kanban.onKanbanReorderColumns}
-              onRenameColumn={kanban.onKanbanRenameColumn}
-              onChangeColumnColor={kanban.onKanbanChangeColumnColor}
-              onChangeColumnDescription={kanban.onKanbanChangeColumnDescription}
+              onUpdateColumn={kanban.onKanbanUpdateColumn}
               onAddColumn={kanban.onKanbanAddColumn}
               onDeleteColumn={kanban.onKanbanDeleteColumn}
             />
@@ -153,7 +149,7 @@ export function AppMainViews({
             milestones={data.milestones}
             tasks={data.tasks}
             projects={data.timelineSwimlanes}
-            statusColumns={data.statusColumns as Array<{ id: TaskStatus; title: string; color?: string }>}
+            statusColumns={data.statusColumns}
             readModel={data.readModel}
             onAddMilestone={roadmap.onRoadmapAddMilestone}
             onMilestoneClick={roadmap.onRoadmapMilestoneClick}

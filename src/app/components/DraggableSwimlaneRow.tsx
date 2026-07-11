@@ -7,6 +7,7 @@ import { DraggableTimelineTask, TIMELINE_TASK_TYPE } from '../components/Draggab
 import { allocateTasksToTracks } from '../utils/trackAllocation';
 import { parseISODateLocal, toLocalISODate } from '../utils/date';
 import { canDropTimelineTaskInRow } from '../utils/timelineTaskDrop';
+import { isPointerReleased } from '../utils/pointerInteraction';
 
 const ITEM_TYPE = 'SWIMLANE_ROW';
 
@@ -300,10 +301,25 @@ export function DraggableSwimlaneRow({
         handleSelectionEnd();
       }
     };
+    const handleGlobalMouseMove = (event: MouseEvent) => {
+      // If the button was released outside the originating day cell, React may
+      // not deliver that cell's mouseup. Never leave the selection latched.
+      if (isSelecting && isPointerReleased(event.buttons)) {
+        handleSelectionEnd();
+      }
+    };
 
     document.addEventListener('mouseup', handleGlobalMouseUp);
+    document.addEventListener('pointerup', handleGlobalMouseUp);
+    document.addEventListener('pointercancel', handleGlobalMouseUp);
+    document.addEventListener('mousemove', handleGlobalMouseMove);
+    window.addEventListener('blur', handleGlobalMouseUp);
     return () => {
       document.removeEventListener('mouseup', handleGlobalMouseUp);
+      document.removeEventListener('pointerup', handleGlobalMouseUp);
+      document.removeEventListener('pointercancel', handleGlobalMouseUp);
+      document.removeEventListener('mousemove', handleGlobalMouseMove);
+      window.removeEventListener('blur', handleGlobalMouseUp);
     };
   }, [isSelecting, handleSelectionEnd]);
 

@@ -103,7 +103,7 @@ export function buildWorkspaceReadModel({
 
   const milestonesById = new Map<string, EnrichedMilestone>();
   const enrichedMilestones = milestones.map(milestone => {
-    const summary = summarizeMilestone(milestone, tasks);
+    const summary = summarizeMilestone(milestone, tasks, statusColumns);
     const linkedTaskIds = new Set(summary.linkedTasks.map(task => task.id));
     const enrichedMilestone: EnrichedMilestone = {
       milestone,

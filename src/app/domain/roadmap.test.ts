@@ -12,6 +12,7 @@ import {
   getStatusVisual,
   resolveStatusColor,
 } from '../utils/statusVisual.ts';
+import { getRoadmapStageProgress } from '../utils/statusColumnSemantics.ts';
 
 const statusColumns = [
   { id: 'open', title: 'Open', color: '#d1d5db' },
@@ -53,6 +54,36 @@ test('summarizeMilestone and getMilestoneHealthVisual share milestone health sem
   assert.equal(summary.completionPercent, 50);
   assert.equal(health.label, 'In progress');
   assert.match(health.className, /blue/);
+});
+
+test('summarizeMilestone derives progress from column roadmap stages and excludes non-roadmap work', () => {
+  const milestone: ProjectMilestone = {
+    id: 'milestone-semantic',
+    title: 'Semantic roadmap',
+    projectIds: ['project-1'],
+    endDate: '2026-07-10',
+    linkedTaskIds: ['task-open', 'task-complete', 'task-excluded'],
+  };
+  const tasks: Task[] = [
+    { id: 'task-open', title: 'Queued', status: 'open' },
+    { id: 'task-complete', title: 'Shipped', status: 'in-progress' },
+    { id: 'task-excluded', title: 'Parking lot', status: 'under-review' },
+  ];
+  const columns = [
+    { id: 'open', title: 'Open', roadmapStage: 'not-started' as const },
+    { id: 'in-progress', title: 'Doing', roadmapStage: 'complete' as const },
+    { id: 'under-review', title: 'Parking lot', roadmapStage: 'excluded' as const },
+  ];
+
+  const summary = summarizeMilestone(milestone, tasks, columns);
+
+  assert.equal(summary.linkedTasks.length, 3);
+  assert.equal(summary.includedTasks.length, 2);
+  assert.equal(summary.totalTasks, 2);
+  assert.equal(summary.completionPercent, 50);
+  assert.equal(summary.stageCounts.complete, 1);
+  assert.equal(getRoadmapStageProgress('complete'), 100);
+  assert.equal(getRoadmapStageProgress('excluded'), 0);
 });
 
 test('wouldCreateDependencyCycle catches loops across linked tasks', () => {

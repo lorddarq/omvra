@@ -81,26 +81,33 @@ Derived from that window:
 
 ## Acceptance Criteria
 
-- [ ] Users can scroll backward past the current oldest rendered month without the timeline hard-stopping.
-- [ ] When older months are prepended, the viewport remains visually stable.
-- [ ] Users can create a new task in a historical month that was not previously loaded.
-- [ ] Existing tasks keep correct drag and resize behavior after window extension.
-- [ ] `scrollToToday` still lands correctly after past/future window extensions.
-- [ ] Reveal-date scrolling still works for out-of-range target dates.
-- [ ] Month resizing remains consistent after the window grows.
-- [ ] DOM remains bounded by render-window virtualization, not total time span.
+- [x] Users can scroll backward past the current oldest rendered month without the timeline hard-stopping.
+- [x] When older months are prepended, the viewport remains visually stable.
+- [x] Users can create a new task in a historical month that was not previously loaded.
+- [x] Existing tasks keep correct drag and resize behavior after window extension.
+- [x] `scrollToToday` still lands correctly after past/future window extensions.
+- [x] Reveal-date scrolling still works for out-of-range target dates.
+- [x] Month resizing remains consistent after the window grows.
+- [x] DOM remains bounded by render-window virtualization, not total time span.
 
 ## Implementation Plan
 
-- [ ] Introduce a persistent timeline window model separate from the visible render slice.
-- [ ] Derive timeline dates/months from the persistent window rather than directly from task min/max dates.
-- [ ] Add left-edge detection and prepend earlier time chunks.
-- [ ] Add `scrollLeft` compensation when prepending earlier chunks.
-- [ ] Keep right-edge extension behavior aligned with the same window model.
-- [ ] Rewire visible month calculation to operate on the persistent window.
-- [ ] Verify empty-slot add-task behavior for newly prepended past time.
-- [ ] Verify drag, resize, reveal-date, and today-centering after window extension.
-- [ ] Add targeted tests for window extension math and scroll compensation.
+- [x] Introduce a persistent timeline window model separate from the visible render slice.
+- [x] Derive timeline dates/months from the persistent window rather than directly from task min/max dates.
+- [x] Add left-edge detection and prepend earlier time chunks.
+- [x] Add `scrollLeft` compensation when prepending earlier chunks.
+- [x] Keep right-edge extension behavior aligned with the same window model.
+- [x] Rewire visible month calculation to operate on the persistent window.
+- [x] Verify empty-slot add-task behavior for newly prepended past time.
+- [x] Verify drag, resize, reveal-date, and today-centering after window extension.
+- [x] Add targeted tests for window extension math and scroll compensation.
+
+## Rollout Notes
+
+- Past and future growth remain month-chunk extensions of the existing custom Timeline; no second virtualization system was introduced.
+- Newly prepended months use the default day width, so their exact added width is deterministic and covered by the scroll-compensation test. Existing user-resized month widths remain unchanged.
+- Out-of-range reveal targets expand the persistent window to the target month before the reveal scroll runs.
+- Focused timeline tests and `npm run build:renderer` pass. Browser QA verified historical creation, drag/resize date commits, Today recentering, bounded mounted months, and a clean console after repeated prepends.
 
 ## Risks
 

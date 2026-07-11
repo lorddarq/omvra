@@ -205,12 +205,19 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     const projects = readInitialWorkspaceJSON<TimelineSwimlane[]>(SWIMLANES_KEY, DEFAULT_SWIMLANES_SEED);
     return sanitizeMilestones(stored, projects, DEFAULT_MILESTONES_SEED);
   });
-  const [statusColumns, setStatusColumns] = useState<StatusColumnState[]>(() =>
-    sanitizeStatusColumns(
+  const [statusColumns, setStatusColumns] = useState<StatusColumnState[]>(() => {
+    const legacyPreferences = readInitialWorkspaceJSON<Partial<AppPreferences>>(PREFERENCES_KEY, {});
+    const legacyWatchConfigs = readInitialWorkspaceJSON<AgentWatchConfig[]>(MCP_AGENT_WATCH_CONFIGS_KEY, []);
+    return sanitizeStatusColumns(
       readInitialWorkspaceJSON<StatusColumnState[]>(STATUS_COLUMNS_KEY, defaultSwimlanes),
-      defaultSwimlanes
-    )
-  );
+      defaultSwimlanes,
+      {
+        executionLoadStatusIds: legacyPreferences.executionLoadStatusIds,
+        pipelineLoadStatusIds: legacyPreferences.pipelineLoadStatusIds,
+        agentWatchConfigs: legacyWatchConfigs,
+      }
+    );
+  });
   const [agentWatchConfigs, setAgentWatchConfigs] = useState<AgentWatchConfig[]>(() =>
     readInitialWorkspaceJSON<AgentWatchConfig[]>(MCP_AGENT_WATCH_CONFIGS_KEY, [])
   );
@@ -330,7 +337,11 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     }
 
     if (exportedStatusColumns !== undefined) {
-      nextStatusColumns = sanitizeStatusColumns(exportedStatusColumns, defaultSwimlanes);
+      nextStatusColumns = sanitizeStatusColumns(exportedStatusColumns, defaultSwimlanes, {
+        executionLoadStatusIds: exportedPreferences?.executionLoadStatusIds,
+        pipelineLoadStatusIds: exportedPreferences?.pipelineLoadStatusIds,
+        agentWatchConfigs: exportedAgentWatchConfigs,
+      });
       mirrorCanonicalJsonToLocalStorage(STATUS_COLUMNS_KEY, nextStatusColumns);
       setStatusColumns(previous => areSerializedValuesEqual(previous, nextStatusColumns) ? previous : nextStatusColumns);
     }
@@ -390,17 +401,24 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
               safeReadLocalStorageJSON<Person[]>(PEOPLE_KEY, DEFAULT_PEOPLE_SEED),
               DEFAULT_PEOPLE_SEED
             );
+            const storedPreferences = safeReadLocalStorageJSON<Partial<AppPreferences>>(PREFERENCES_KEY, {});
+            const storedAgentWatchConfigs = safeReadLocalStorageJSON<AgentWatchConfig[]>(MCP_AGENT_WATCH_CONFIGS_KEY, []);
             const migratedStatusColumns = sanitizeStatusColumns(
               safeReadLocalStorageJSON<StatusColumnState[]>(STATUS_COLUMNS_KEY, defaultSwimlanes),
-              defaultSwimlanes
+              defaultSwimlanes,
+              {
+                executionLoadStatusIds: storedPreferences.executionLoadStatusIds,
+                pipelineLoadStatusIds: storedPreferences.pipelineLoadStatusIds,
+                agentWatchConfigs: storedAgentWatchConfigs,
+              }
             );
             const migratedPreferences = sanitizePreferences(
-              safeReadLocalStorageJSON<Partial<AppPreferences>>(PREFERENCES_KEY, {}),
+              storedPreferences,
               migratedStatusColumns,
               preferencesRef.current
             );
             const migratedAgentWatchConfigs = sanitizeAgentWatchConfigs(
-              safeReadLocalStorageJSON<AgentWatchConfig[]>(MCP_AGENT_WATCH_CONFIGS_KEY, []),
+              storedAgentWatchConfigs,
               []
             );
             const migratedTasks = sanitizeTasks(

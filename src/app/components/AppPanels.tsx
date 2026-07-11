@@ -111,8 +111,6 @@ export interface WorkspaceAdminActions {
   onNukeLocalData: () => void;
   onExportWorkspaceBackup: () => Promise<boolean>;
   onImportTasksAndProjects: (file: File) => void;
-  onExecutionLoadStatusChange: (statusId: TaskStatus) => void;
-  onPipelineLoadStatusChange: (statusId: TaskStatus) => void;
   onUpdateChannelChange: (channel: 'stable' | 'rc') => void;
   onMarkdownAppearanceChange: (updates: Partial<MarkdownAppearance>) => void;
   onMcpAgentAccessToggle: (enabled: boolean) => void;
@@ -214,7 +212,7 @@ export function AppPanels({
         milestone={dialogs.detailsMilestone}
         projects={workspace.timelineSwimlanes}
         tasks={workspace.tasks}
-        statusColumns={workspace.statusColumns as Array<{ id: TaskStatus; title: string; color?: string }>}
+        statusColumns={workspace.statusColumns}
         readModel={workspace.readModel}
       />
 
@@ -258,8 +256,6 @@ export function AppPanels({
         onNukeLocalData={adminActions.onNukeLocalData}
         onExportWorkspaceBackup={adminActions.onExportWorkspaceBackup}
         onImportTasksAndProjects={adminActions.onImportTasksAndProjects}
-        onExecutionLoadStatusChange={adminActions.onExecutionLoadStatusChange}
-        onPipelineLoadStatusChange={adminActions.onPipelineLoadStatusChange}
         onUpdateChannelChange={adminActions.onUpdateChannelChange}
         onMarkdownAppearanceChange={adminActions.onMarkdownAppearanceChange}
         onAddPerson={adminActions.onAddPerson}

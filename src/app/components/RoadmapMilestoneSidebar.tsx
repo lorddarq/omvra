@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { ProjectMilestone, TaskStatus, TimelineSwimlane } from '../types';
+import type { ProjectMilestone, StatusColumn, TaskStatus, TimelineSwimlane } from '../types';
 import { getProjectVisual } from '../utils/projectVisual';
 import { getMilestoneHealthVisual, getStatusVisual, type MilestoneHealth } from '../utils/roadmap';
 import { ProjectBadge } from './ProjectBadge';
@@ -27,7 +27,7 @@ interface RoadmapMilestoneSidebarProps {
   headerHeight: number;
   chartHeight: number;
   chartScrollTop: number;
-  statusColumns: Array<{ id: TaskStatus; title: string; color?: string }>;
+  statusColumns: StatusColumn[];
   onAddMilestone: () => void;
   onMilestoneClick: (milestone: ProjectMilestone) => void;
   renderRollupBar: (summary: RoadmapMilestoneSummary) => ReactNode;

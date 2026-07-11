@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ProjectMilestone, Task, TaskStatus, TimelineSwimlane } from '../types';
+import type { ProjectMilestone, StatusColumn, Task, TimelineSwimlane } from '../types';
 import {
   getMilestoneDateRangeLabel,
   getMilestoneHealthVisual,
@@ -32,7 +32,7 @@ interface MilestoneDetailsDialogProps {
   milestone?: ProjectMilestone | null;
   projects: TimelineSwimlane[];
   tasks: Task[];
-  statusColumns: Array<{ id: TaskStatus; title: string; color?: string }>;
+  statusColumns: StatusColumn[];
   readModel?: WorkspaceReadModel;
   onClose: () => void;
   onEdit: (milestone: ProjectMilestone) => void;
@@ -60,7 +60,7 @@ export function MilestoneDetailsDialog({
   const milestoneProjects = enrichedMilestone?.projects ?? (milestone
     ? projects.filter(item => getMilestoneProjectIds(milestone).includes(item.id))
     : []);
-  const summary = enrichedMilestone?.summary ?? (milestone ? summarizeMilestone(milestone, tasks) : null);
+  const summary = enrichedMilestone?.summary ?? (milestone ? summarizeMilestone(milestone, tasks, statusColumns) : null);
   const lateTaskIds = new Set(summary?.lateTasks.map(task => task.id) || []);
   const healthVisual = summary ? getMilestoneHealthVisual(summary.health) : null;
   const sortedTasks = summary

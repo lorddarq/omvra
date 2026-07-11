@@ -3,6 +3,7 @@ import type { McpReadService } from '../services/mcp/service.ts';
 import type { McpBoardWatchResult } from '../services/mcp/types.ts';
 import { sanitizeAgentWatchConfigs } from '../utils/workspaceSanitizers.ts';
 import type { AgentWatchConfig } from '../utils/workspaceSanitizers.ts';
+import type { StatusColumn } from '../types.ts';
 
 export interface AgentWatchRuntimeState {
   personId: string;
@@ -20,7 +21,10 @@ interface UseAgentWatchRuntimeOptions {
   enabled: boolean;
   agentWatchConfigs: AgentWatchConfig[];
   setAgentWatchConfigs: React.Dispatch<React.SetStateAction<AgentWatchConfig[]>>;
+  statusColumns?: StatusColumn[];
 }
+
+const EMPTY_STATUS_COLUMNS: StatusColumn[] = [];
 
 export function getAgentWatchPollingInterval(agentWatchConfigs: AgentWatchConfig[]): number {
   const enabledConfigs = agentWatchConfigs.filter(config => config.enabled);
@@ -39,27 +43,35 @@ export function useAgentWatchRuntime({
   enabled,
   agentWatchConfigs,
   setAgentWatchConfigs,
+  statusColumns = EMPTY_STATUS_COLUMNS,
 }: UseAgentWatchRuntimeOptions) {
   const [agentWatchRuntime, setAgentWatchRuntime] = useState<Record<string, AgentWatchRuntimeState>>({});
 
   const pollAgentWatcher = useCallback(async (config: AgentWatchConfig) => {
     try {
-      const result = await mcpReadService.pollBoardWatcher({
-        watcherId: `agent:${config.personId}`,
-        statusId: config.statusId,
+      const watchedColumns = statusColumns.length > 0
+        ? statusColumns.filter(column => column.aiWatchEnabled)
+        : config.statusId ? [{ id: config.statusId }] : [];
+      const results = await Promise.all(watchedColumns.map(column => mcpReadService.pollBoardWatcher({
+        watcherId: statusColumns.length > 0 ? `agent:${config.personId}:column:${column.id}` : `agent:${config.personId}`,
+        statusId: column.id,
         assigneeId: config.personId,
         projectId: config.projectId,
         search: config.search,
         persist: true,
-      });
-      const watchResult = result as McpBoardWatchResult;
-      const changes = watchResult.changes || { newTasks: [], updatedTasks: [], removedTaskIds: [] };
+      }) as Promise<McpBoardWatchResult>));
+      const changes = results.reduce((all, result) => ({
+        newTasks: [...all.newTasks, ...(result.changes?.newTasks || [])],
+        updatedTasks: [...all.updatedTasks, ...(result.changes?.updatedTasks || [])],
+        removedTaskIds: [...all.removedTaskIds, ...(result.changes?.removedTaskIds || [])],
+      }), { newTasks: [], updatedTasks: [], removedTaskIds: [] } as NonNullable<McpBoardWatchResult['changes']>);
+      const latestResult = results.at(-1);
       setAgentWatchRuntime(prev => ({
         ...prev,
         [config.personId]: {
           personId: config.personId,
-          watcherId: watchResult.watcherState?.watcherId,
-          lastCheckedAt: watchResult.watcherState?.lastProcessedAt || new Date().toISOString(),
+          watcherId: latestResult?.watcherState?.watcherId,
+          lastCheckedAt: latestResult?.watcherState?.lastProcessedAt || new Date().toISOString(),
           newTaskCount: Array.isArray(changes.newTasks) ? changes.newTasks.length : 0,
           updatedTaskCount: Array.isArray(changes.updatedTasks) ? changes.updatedTasks.length : 0,
           removedTaskCount: Array.isArray(changes.removedTaskIds) ? changes.removedTaskIds.length : 0,
@@ -72,7 +84,7 @@ export function useAgentWatchRuntime({
             .slice(0, 4),
         },
       }));
-      return watchResult;
+      return latestResult ?? null;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setAgentWatchRuntime(prev => ({
@@ -89,7 +101,7 @@ export function useAgentWatchRuntime({
       }));
       return null;
     }
-  }, [mcpReadService]);
+  }, [mcpReadService, statusColumns]);
 
   const upsertAgentWatchConfig = useCallback((nextConfig: AgentWatchConfig) => {
     setAgentWatchConfigs(prev => {

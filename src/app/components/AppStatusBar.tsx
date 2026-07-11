@@ -1,5 +1,4 @@
 import { Bot, Server } from 'lucide-react';
-import { useEffect, useState } from 'react';
 import type React from 'react';
 import { cn } from './ui/utils';
 import {
@@ -42,25 +41,6 @@ export function AppStatusBar({
   const mcp = getMcpStatusSummary({ mcpAgentAccessEnabled, mcpListenerStatus, mcpRestartPending });
   const recentMcpActivity = getRecentMcpActivitySignal({ mcpAuditLog, tasks });
   const mcpValue = getMcpBadgeValue(mcp.label);
-  const [isMcpActivityPulsing, setIsMcpActivityPulsing] = useState(recentMcpActivity.isActive);
-
-  useEffect(() => {
-    if (!recentMcpActivity.isActive || !recentMcpActivity.timestamp) {
-      setIsMcpActivityPulsing(false);
-      return;
-    }
-
-    setIsMcpActivityPulsing(true);
-    const activityAgeMs = Math.max(0, Date.now() - Date.parse(recentMcpActivity.timestamp));
-    const remainingMs = Math.max(0, 1_500 - activityAgeMs);
-    const timeoutId = window.setTimeout(() => {
-      setIsMcpActivityPulsing(false);
-    }, remainingMs);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [recentMcpActivity.isActive, recentMcpActivity.timestamp]);
 
   const statusPills = [
     {
@@ -155,7 +135,6 @@ interface StatusPillProps {
   value: string;
   tone?: AgentStatusTone;
   title?: string;
-  isPulsing?: boolean;
 }
 
 function StatusPill({
@@ -164,20 +143,16 @@ function StatusPill({
   value,
   tone = 'muted',
   title,
-  isPulsing = false,
 }: StatusPillProps) {
-  const showsSteadyGlow = tone === 'success';
-  const ledColor = isPulsing
+  const ledColor = tone === 'success'
     ? '#2ea147'
-    : tone === 'success'
-      ? '#2ea147'
-      : tone === 'warning'
-        ? '#f59e0b'
-        : tone === 'danger'
-          ? '#da0004'
-          : tone === 'unknown'
-            ? '#94a3b8'
-            : '#d1d5db';
+    : tone === 'warning'
+      ? '#f59e0b'
+      : tone === 'danger'
+        ? '#da0004'
+        : tone === 'unknown'
+          ? '#94a3b8'
+          : '#d1d5db';
 
   return (
     <div className="flex min-w-0 shrink-0 items-center gap-1" title={title}>
@@ -185,18 +160,6 @@ function StatusPill({
       <span className="whitespace-nowrap text-center text-xs font-medium text-[#828282]">{label}</span>
       <span className="flex min-h-[17px] shrink-0 items-center justify-center gap-1 rounded-full border border-black/10 px-1.5 py-0.5">
         <span className="relative flex size-2 shrink-0 items-center justify-center" aria-hidden="true">
-          {showsSteadyGlow ? (
-            <span
-              className="absolute inline-flex size-3.5 rounded-full blur-[4px] opacity-[0.1]"
-              style={{ backgroundColor: ledColor }}
-            />
-          ) : null}
-          {isPulsing ? (
-            <span
-              className="absolute inline-flex size-4 animate-ping rounded-full blur-[3px] opacity-[0.2]"
-              style={{ backgroundColor: '#2ea147' }}
-            />
-          ) : null}
           <span
             className={cn(
               'relative size-2 rounded-full',
@@ -206,10 +169,7 @@ function StatusPill({
               tone === 'unknown' && 'bg-slate-400',
               tone === 'muted' && 'bg-gray-300'
             )}
-            style={{
-              backgroundColor: ledColor,
-              boxShadow: showsSteadyGlow || isPulsing ? `0 0 8px ${ledColor}` : undefined,
-            }}
+            style={{ backgroundColor: ledColor }}
           />
         </span>
         <span className="whitespace-nowrap text-[11px] font-semibold leading-none text-[#a8a8a8]">{value}</span>

@@ -20,6 +20,7 @@ import {
 import { getTaskProjectIds } from '../utils/roadmap.ts';
 import { getDefaultStatusId, syncLocalMcpServerAddress } from '../utils/mcpPreferences.ts';
 import { flattenPortableStoreEntries, normalizePortableStorageKey } from '../utils/storage.ts';
+import { AI_ACTIONS, LOAD_CLASSIFICATIONS, ROADMAP_STAGES, getDefaultColumnSemantics } from '../utils/statusColumnSemantics.ts';
 
 export const WORKSPACE_BACKUP_SCHEMA_VERSION = 2;
 
@@ -351,12 +352,23 @@ export function sanitizeStatusColumns(
       if (typeof candidate.id !== 'string' || typeof candidate.title !== 'string') {
         return null;
       }
+      const defaults = getDefaultColumnSemantics(candidate.id);
 
       return {
         id: candidate.id,
         title: candidate.title,
         color: typeof candidate.color === 'string' ? candidate.color : '#9ca3af',
         description: normalizeOptionalText(candidate.description),
+        loadClassification: LOAD_CLASSIFICATIONS.some(option => option.value === candidate.loadClassification)
+          ? candidate.loadClassification as StatusColumn['loadClassification']
+          : defaults.loadClassification,
+        roadmapStage: ROADMAP_STAGES.some(option => option.value === candidate.roadmapStage)
+          ? candidate.roadmapStage as StatusColumn['roadmapStage']
+          : defaults.roadmapStage,
+        aiWatchEnabled: candidate.aiWatchEnabled === true,
+        aiAction: AI_ACTIONS.some(option => option.value === candidate.aiAction)
+          ? candidate.aiAction as StatusColumn['aiAction']
+          : defaults.aiAction,
       };
     })
     .filter((column): column is NonNullable<typeof column> => column !== null);
@@ -381,6 +393,7 @@ export function deriveStatusColumnsFromTasks(
       id: task.status as TaskStatus,
       title: `Imported column ${columns.length + 1}`,
       color: '#9ca3af',
+      ...getDefaultColumnSemantics(task.status),
     });
   });
 

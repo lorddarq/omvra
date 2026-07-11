@@ -41,9 +41,7 @@ interface KanbanViewProps {
   onMoveTask: (taskId: string, newStatus: TaskStatus) => void;
   onReorderTasks: (tasks: Task[]) => void;
   onReorderColumns: (fromIndex: number, toIndex: number) => void;
-  onRenameColumn?: (colId: string, newTitle: string) => void;
-  onChangeColumnColor?: (colId: string, newColor: string) => void;
-  onChangeColumnDescription?: (colId: string, newDescription?: string) => void;
+  onUpdateColumn?: (colId: string, updates: Partial<Omit<StatusColumn, 'id'>>) => void;
   onAddColumn?: (col: any) => void;
   onDeleteColumn?: (colId: string) => void;
 }
@@ -63,9 +61,7 @@ export function KanbanView({
   onMoveTask,
   onReorderTasks,
   onReorderColumns,
-  onRenameColumn,
-  onChangeColumnColor,
-  onChangeColumnDescription,
+  onUpdateColumn,
   onAddColumn,
   onDeleteColumn,
 }: KanbanViewProps) {
@@ -364,9 +360,7 @@ export function KanbanView({
           onMoveTask={onMoveTask}
           onReorderTasks={onReorderTasks}
           onReorderColumns={onReorderColumns}
-          onRenameColumn={onRenameColumn}
-          onChangeColumnColor={onChangeColumnColor}
-          onChangeColumnDescription={onChangeColumnDescription}
+          onUpdateColumn={onUpdateColumn}
           onAddColumn={onAddColumn}
           onDeleteColumn={onDeleteColumn}
           onColumnDragHover={handleColumnDragHover}

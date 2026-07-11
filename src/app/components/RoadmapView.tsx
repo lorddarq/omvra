@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Filter, Flag, TriangleAlert } from 'lucide-react';
-import { ProjectMilestone, Task, TaskStatus, TimelineSwimlane } from '../types';
+import { ProjectMilestone, StatusColumn, Task, TimelineSwimlane } from '../types';
 import { getProjectVisual } from '../utils/projectVisual';
 import {
   getStatusVisual,
@@ -19,6 +19,7 @@ import {
   startOfLocalDay,
 } from '../utils/timeSurface';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
+import { getRoadmapStage, getRoadmapStageProgress } from '../utils/statusColumnSemantics';
 import { useFixedTimeSurfaceNavigation } from '../hooks/useFixedTimeSurfaceNavigation.ts';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -33,7 +34,7 @@ interface RoadmapViewProps {
   milestones: ProjectMilestone[];
   tasks: Task[];
   projects: TimelineSwimlane[];
-  statusColumns: Array<{ id: TaskStatus; title: string; color?: string }>;
+  statusColumns: StatusColumn[];
   readModel?: WorkspaceReadModel;
   onAddMilestone: () => void;
   onMilestoneClick: (milestone: ProjectMilestone) => void;
@@ -180,7 +181,7 @@ export function RoadmapView({
         const enrichedMilestone = enrichedMilestoneById?.get(milestone.id);
         const milestoneProjects = enrichedMilestone?.projects
           ?? projects.filter(project => getMilestoneProjectIds(milestone).includes(project.id));
-        const summary = enrichedMilestone?.summary ?? summarizeMilestone(milestone, tasks);
+        const summary = enrichedMilestone?.summary ?? summarizeMilestone(milestone, tasks, statusColumns);
         const searchableText = [
           milestone.title,
           milestone.notes,
@@ -197,12 +198,12 @@ export function RoadmapView({
           : getMilestoneProjectIds(milestone).includes(projectFilter);
       })
       .filter(milestone => {
-        const summary = enrichedMilestoneById?.get(milestone.id)?.summary ?? summarizeMilestone(milestone, tasks);
+        const summary = enrichedMilestoneById?.get(milestone.id)?.summary ?? summarizeMilestone(milestone, tasks, statusColumns);
         return healthFilter === 'all' || summary.health === healthFilter;
       })
       .filter(milestone => isMilestoneInDateWindow(milestone, dateWindow))
       .sort((a, b) => a.endDate.localeCompare(b.endDate));
-  }, [dateWindow, enrichedMilestoneById, healthFilter, milestones, projectFilter, projects, searchQuery, tasks]);
+  }, [dateWindow, enrichedMilestoneById, healthFilter, milestones, projectFilter, projects, searchQuery, statusColumns, tasks]);
 
   const hasActiveFilters = searchQuery.trim() !== '' || projectFilter !== 'all' || healthFilter !== 'all' || dateWindow !== 'all';
   const range = useMemo(() => getDateRange(filteredMilestones, tasks), [filteredMilestones, tasks]);
@@ -228,7 +229,7 @@ export function RoadmapView({
   const rowSummaries = useMemo(() => {
     return filteredMilestones.map(milestone => {
       const enrichedMilestone = enrichedMilestoneById?.get(milestone.id);
-      const summary = enrichedMilestone?.summary ?? summarizeMilestone(milestone, tasks);
+      const summary = enrichedMilestone?.summary ?? summarizeMilestone(milestone, tasks, statusColumns);
       return {
         milestone,
         projects: enrichedMilestone?.projects
@@ -236,7 +237,7 @@ export function RoadmapView({
         summary,
       };
     });
-  }, [enrichedMilestoneById, filteredMilestones, projects, tasks]);
+  }, [enrichedMilestoneById, filteredMilestones, projects, statusColumns, tasks]);
   const rows = useMemo<RoadmapRow[]>(() => {
     const availableRowsHeight = Math.max(0, chartViewportHeight - HEADER_HEIGHT);
     const baseHeights = rowSummaries.map(row => getRoadmapRowHeight(row.summary.linkedTasks.length));
@@ -512,6 +513,7 @@ export function RoadmapView({
                           const width = getTaskWidth(task);
                           const isLate = lateTaskIds.has(task.id);
                           const statusVisual = getStatusVisual(statusColumns, task.status);
+                          const roadmapProgress = getRoadmapStageProgress(getRoadmapStage(statusColumns, task.status));
                           return (
                             <button
                               key={task.id}
@@ -531,7 +533,7 @@ export function RoadmapView({
                                 className={`absolute inset-y-0 left-0 opacity-45 ${statusVisual.backgroundClassName || ''}`}
                                 style={{
                                   ...statusVisual.backgroundStyle,
-                                  width: `${statusVisual.progressPercent}%`,
+                                  width: `${roadmapProgress}%`,
                                 }}
                                 aria-hidden="true"
                               />

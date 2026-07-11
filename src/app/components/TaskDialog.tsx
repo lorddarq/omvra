@@ -35,6 +35,7 @@ import {
 } from './taskFormStyles';
 import { TASK_PRIORITY_ICONS } from './taskPriorityIcons';
 import { TaskCheckboxControl } from './TaskCheckboxControl';
+import { LOAD_CLASSIFICATIONS, ROADMAP_STAGES, getDefaultColumnSemantics } from '../utils/statusColumnSemantics';
 
 function getFileNameFromPath(filePath: string): string {
   const normalized = filePath.replace(/\\/g, '/');
@@ -733,6 +734,19 @@ export function TaskDialog({
               wouldCreateDependencyCycle={wouldCreateTaskDependencyCycle}
               onToggleDependency={toggleDependency}
             />
+            {(() => {
+              const column = statusColumns?.find(item => item.id === status);
+              const defaults = getDefaultColumnSemantics(status);
+              const roadmapStage = column?.roadmapStage ?? defaults.roadmapStage;
+              const loadClassification = column?.loadClassification ?? defaults.loadClassification;
+              return (
+                <div className="mt-3 rounded-xl border border-black/5 bg-[#f7f7f8] px-3 py-2 text-xs leading-5 text-[#71717a]">
+                  <div className="font-medium text-[#52525b]">Derived from “{column?.title ?? status}”</div>
+                  <div>Roadmap: {ROADMAP_STAGES.find(item => item.value === roadmapStage)?.label}</div>
+                  <div>Workload: {LOAD_CLASSIFICATIONS.find(item => item.value === loadClassification)?.label}</div>
+                </div>
+              );
+            })()}
           </AnchoredPanelSection>
 
           <AnchoredPanelSection

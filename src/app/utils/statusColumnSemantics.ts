@@ -1,4 +1,4 @@
-import type { AgentWatchAction, LoadClassification, RoadmapStage, StatusColumn } from '../types.ts';
+import type { AgentWatchAction, LoadClassification, RoadmapStage, StatusColumn, Task } from '../types.ts';
 
 export const DEFAULT_AI_ACTION: AgentWatchAction = 'inspect_and_work';
 
@@ -23,6 +23,12 @@ export function getStatusIdsForLoad(columns: StatusColumn[], classification: Loa
 
 export function getRoadmapStage(columns: StatusColumn[], statusId: string): RoadmapStage {
   return columns.find(column => column.id === statusId)?.roadmapStage ?? getDefaultColumnSemantics(statusId).roadmapStage;
+}
+
+export function filterTimelineTasks(tasks: Task[], columns: StatusColumn[], showCompleted: boolean): Task[] {
+  return showCompleted
+    ? tasks
+    : tasks.filter(task => getRoadmapStage(columns, task.status) !== 'complete');
 }
 
 export function getRoadmapStageProgress(stage: RoadmapStage): number {

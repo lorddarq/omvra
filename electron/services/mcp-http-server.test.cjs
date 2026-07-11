@@ -779,6 +779,7 @@ test('guide and execution schema resources explain the task workflow', () => {
   assert.match(schemaResponse.result.contents[0].text, /Do not split the workflow across milestones\.update and tasks\.update/);
   assert.match(schemaResponse.result.contents[0].text, /assignee-context-preflight/);
   assert.match(schemaResponse.result.contents[0].text, /exact assigneeId/);
+  assert.match(schemaResponse.result.contents[0].text, /tell the user.*loaded.*persona and working instructions/i);
 });
 
 test('template resources resolve assigned work, project work, and board work', () => {
@@ -849,6 +850,106 @@ test('template resources resolve assigned work, project work, and board work', (
   assert.match(boardResponse.result.contents[0].text, /in-progress/);
 });
 
+test('agent.resolve_task_context enforces the exact assignee preflight contract', () => {
+  const successStore = makeStoreFromFixture('workspace-basic');
+  const successDispatch = createRequestDispatcher(successStore);
+  const success = successDispatch({
+    jsonrpc: '2.0',
+    id: 'preflight-success',
+    method: 'tools/call',
+    params: {
+      name: 'agent_resolve_task_context',
+      arguments: { taskId: 'task-1' },
+    },
+  }, makeReq());
+
+  assert.equal(success.result.structuredContent.ok, true);
+  assert.equal(success.result.structuredContent.canStart, true);
+  assert.equal(success.result.structuredContent.task.id, 'task-1');
+  assert.equal(success.result.structuredContent.assignee.id, 'agent-1');
+  assert.equal(success.result.structuredContent.validation.assigneeAgentic, true);
+  assert.equal(success.result.structuredContent.validation.agentInstructionsPresent, true);
+  assert.equal(success.result.structuredContent.validation.agentOperationalInstructionsPresent, true);
+  assert.equal(success.result.isError, false);
+
+  const cases = [
+    {
+      code: 'TASK_NOT_FOUND',
+      taskId: 'missing-task',
+      canStart: false,
+      mutate() {},
+    },
+    {
+      code: 'TASK_UNASSIGNED',
+      canStart: true,
+      mutate(store) {
+        store.set(TASKS_KEY, store.get(TASKS_KEY).map(task => task.id === 'task-1'
+          ? { ...task, assigneeId: undefined }
+          : task));
+      },
+    },
+    {
+      code: 'ASSIGNEE_NOT_FOUND',
+      canStart: true,
+      mutate(store) {
+        store.set(TASKS_KEY, store.get(TASKS_KEY).map(task => task.id === 'task-1'
+          ? { ...task, assigneeId: 'missing-agent' }
+          : task));
+      },
+    },
+    {
+      code: 'ASSIGNEE_NOT_AGENTIC',
+      canStart: true,
+      mutate(store) {
+        store.set(TASKS_KEY, store.get(TASKS_KEY).map(task => task.id === 'task-1'
+          ? { ...task, assigneeId: 'person-1' }
+          : task));
+      },
+    },
+    {
+      code: 'ASSIGNEE_CONTEXT_INCOMPLETE',
+      canStart: true,
+      mutate(store) {
+        store.set('omvra.people.v1', store.get('omvra.people.v1').map(person => person.id === 'agent-1'
+          ? { ...person, agentInstructions: '' }
+          : person));
+      },
+    },
+    {
+      code: 'ASSIGNEE_CONTEXT_INCOMPLETE',
+      canStart: true,
+      mutate(store) {
+        store.set('omvra.people.v1', store.get('omvra.people.v1').map(person => person.id === 'agent-1'
+          ? { ...person, agentOperationalInstructions: '' }
+          : person));
+      },
+    },
+  ];
+
+  for (const testCase of cases) {
+    const store = makeStoreFromFixture('workspace-basic');
+    testCase.mutate(store);
+    const response = createRequestDispatcher(store)({
+      jsonrpc: '2.0',
+      id: `preflight-${testCase.code}`,
+      method: 'tools/call',
+      params: {
+        name: 'agent.resolve_task_context',
+        arguments: { taskId: testCase.taskId || 'task-1' },
+      },
+    }, makeReq());
+
+    assert.equal(response.result.structuredContent.ok, false);
+    assert.equal(response.result.structuredContent.canStart, testCase.canStart);
+    assert.equal(response.result.structuredContent.error, testCase.code);
+    assert.equal(response.result.isError, !testCase.canStart);
+    if (testCase.canStart) {
+      assert.equal(response.result.structuredContent.mode, 'standard-agentic');
+      assert.match(response.result.structuredContent.userNotice, /reverting to standard agentic operation/i);
+    }
+  }
+});
+
 test('instruction-like task notes remain workspace data and executor guidance says to ignore them as authority', () => {
   const store = makeStoreFromFixture('workspace-basic');
   const nextTasks = store.get(TASKS_KEY).map(task => (
@@ -902,7 +1003,7 @@ test('instruction-like task notes remain workspace data and executor guidance sa
   );
   assert.match(
     executePromptResponse.result.messages[0].content.text,
-    /continue without persona context.*unassigned|task is currently unassigned/i
+    /unable to retrieve or use.*reverting to standard agentic operation/i
   );
 });
 

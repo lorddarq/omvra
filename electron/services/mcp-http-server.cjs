@@ -15,6 +15,7 @@ const {
   getMcpPrompt,
   listTasks,
   getTaskById,
+  resolveTaskExecutionContext,
   listAssignedWorkForAgent,
   listKanbanCards,
   listTimelineCards,
@@ -93,6 +94,18 @@ const READ_TOOL_DEFINITIONS = [
         taskId: { type: 'string' },
       },
       oneOf: [{ required: ['id'] }, { required: ['taskId'] }],
+    },
+  },
+  {
+    name: 'agent.resolve_task_context',
+    description: 'Strict execution preflight. Resolves a task by id, then its exact assignee id and required agent context. A failed result must prevent task work from starting.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        taskId: { type: 'string' },
+      },
+      required: ['taskId'],
     },
   },
   {
@@ -599,6 +612,7 @@ const TOOL_NAME_ALIASES = new Map([
   ['workspace_get_snapshot', 'workspace.get_snapshot'],
   ['tasks_list', 'tasks.list'],
   ['tasks_get', 'tasks.get'],
+  ['agent_resolve_task_context', 'agent.resolve_task_context'],
   ['cards_kanban_list', 'cards.kanban.list'],
   ['cards_timeline_list', 'cards.timeline.list'],
   ['boards_watch_poll', 'boards.watch.poll'],
@@ -741,7 +755,7 @@ function makeJsonRpcResponse(id, payload) {
   };
 }
 
-function makeToolResult(structuredContent) {
+function makeToolResult(structuredContent, { isError = false } = {}) {
   return {
     structuredContent,
     content: [
@@ -750,7 +764,7 @@ function makeToolResult(structuredContent) {
         text: JSON.stringify(structuredContent),
       },
     ],
-    isError: false,
+    isError,
   };
 }
 
@@ -1100,6 +1114,17 @@ function handleToolCall(store, req, params) {
         };
       }
       return { result: makeToolResult(getTaskById(store, taskId)) };
+    }
+
+    case 'agent.resolve_task_context': {
+      const taskId = parseTaskId(args);
+      if (!taskId) {
+        return {
+          error: invalidParams('Invalid params: "taskId" is required for agent.resolve_task_context.'),
+        };
+      }
+      const preflight = resolveTaskExecutionContext(store, taskId);
+      return { result: makeToolResult(preflight, { isError: !preflight.canStart }) };
     }
 
     case 'cards.kanban.list': {

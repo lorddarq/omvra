@@ -50,9 +50,12 @@ function buildAgentInstructionsFieldSemantics() {
 function buildAssigneeContextPreflight() {
   return [
     'Read the task by id first and capture its current expectedRevision before planning any writes.',
-    'If the task has assigneeId, resolve assignee context deterministically by reading omvra://agents/{personId}/assigned with that exact assigneeId.',
+    'Call agent.resolve_task_context with that exact taskId before any implementation or write work; this strict path resolves task.assigneeId and reads omvra://agents/{personId}/assigned with that exact assigneeId.',
+    'If the preflight result has ok=true, inspect its validation flags and use the returned task, assignee, agentInstructions, and agentOperationalInstructions as the canonical context.',
+    'After a successful preflight and before implementation, tell the user: "I have loaded <assignee name>\'s persona and working instructions and will use them for this task."',
+    'If assignee or instruction context cannot be used but canStart=true, tell the user: "Unable to retrieve or use the assigned agent or instructions; reverting to standard agentic operation." Then continue without persona context.',
     'Do not guess assignee context from names, stale cached personas, or ad hoc tasks.list filters when task.assigneeId is available.',
-    'If the task has no assigneeId, continue without persona context and say the task is currently unassigned instead of inventing one.',
+    'Stop only when canStart=false, such as when the task itself cannot be resolved.',
   ];
 }
 
@@ -773,6 +776,134 @@ function getTaskById(store, taskId) {
   return task ? normalizeTaskForMcp(task) : null;
 }
 
+function buildTaskExecutionContextFailure(code, message, validation = {}, task = null, { canStart = false } = {}) {
+  return {
+    ok: false,
+    canStart,
+    fallback: canStart,
+    mode: canStart ? 'standard-agentic' : 'blocked',
+    error: code,
+    message,
+    userNotice: canStart
+      ? 'Unable to retrieve or use the assigned agent or instructions; reverting to standard agentic operation.'
+      : message,
+    task,
+    assignee: null,
+    context: null,
+    validation: {
+      taskFound: Boolean(task),
+      taskAssigned: false,
+      assigneeFound: false,
+      assigneeAgentic: false,
+      agentInstructionsPresent: false,
+      agentOperationalInstructionsPresent: false,
+      ...validation,
+    },
+    source: {
+      task: 'tasks.get',
+      assignee: 'exact-id',
+      resource: 'omvra://agents/{personId}/assigned',
+    },
+  };
+}
+
+function resolveTaskExecutionContext(store, taskId) {
+  const normalizedTaskId = normalizeString(taskId);
+  if (!normalizedTaskId) {
+    return buildTaskExecutionContextFailure('TASK_ID_REQUIRED', 'A taskId is required for execution preflight.');
+  }
+
+  const task = getTaskById(store, normalizedTaskId);
+  if (!task) {
+    return buildTaskExecutionContextFailure(
+      'TASK_NOT_FOUND',
+      `Task "${normalizedTaskId}" was not found. Execution cannot start.`
+    );
+  }
+
+  const assigneeId = normalizeString(task.assigneeId);
+  if (!assigneeId) {
+    return buildTaskExecutionContextFailure(
+      'TASK_UNASSIGNED',
+      `Task "${normalizedTaskId}" is unassigned. Continue using standard agentic operation.`,
+      { taskAssigned: false },
+      task,
+      { canStart: true }
+    );
+  }
+
+  const person = findPersonById(store, assigneeId);
+  if (!person) {
+    return buildTaskExecutionContextFailure(
+      'ASSIGNEE_NOT_FOUND',
+      `Assignee "${assigneeId}" for task "${normalizedTaskId}" was not found. Continue using standard agentic operation.`,
+      { taskAssigned: true },
+      task,
+      { canStart: true }
+    );
+  }
+
+  if (person.kind !== 'agentic') {
+    return buildTaskExecutionContextFailure(
+      'ASSIGNEE_NOT_AGENTIC',
+      `Assignee "${assigneeId}" is not agentic. Continue using standard agentic operation.`,
+      { taskAssigned: true, assigneeFound: true },
+      task,
+      { canStart: true }
+    );
+  }
+
+  const assignee = normalizePersonForMcp(person);
+  const agentInstructions = normalizeString(assignee.agentInstructions);
+  const agentOperationalInstructions = normalizeString(assignee.agentOperationalInstructions);
+  const agentInstructionsPresent = Boolean(agentInstructions);
+  const agentOperationalInstructionsPresent = Boolean(agentOperationalInstructions);
+
+  if (!agentInstructionsPresent || !agentOperationalInstructionsPresent) {
+    return buildTaskExecutionContextFailure(
+      'ASSIGNEE_CONTEXT_INCOMPLETE',
+      `Assignee "${assigneeId}" is missing required agentInstructions and/or agentOperationalInstructions. Continue using standard agentic operation.`,
+      {
+        taskAssigned: true,
+        assigneeFound: true,
+        assigneeAgentic: true,
+        agentInstructionsPresent,
+        agentOperationalInstructionsPresent,
+      },
+      task,
+      { canStart: true }
+    );
+  }
+
+  return {
+    ok: true,
+    canStart: true,
+    fallback: false,
+    mode: 'assigned-persona',
+    error: null,
+    message: 'Execution preflight passed. The exact task assignee and required agent context were resolved.',
+    task,
+    assignee,
+    context: {
+      agentInstructions,
+      agentOperationalInstructions,
+    },
+    validation: {
+      taskFound: true,
+      taskAssigned: true,
+      assigneeFound: true,
+      assigneeAgentic: true,
+      agentInstructionsPresent: true,
+      agentOperationalInstructionsPresent: true,
+    },
+    source: {
+      task: 'tasks.get',
+      assignee: 'exact-id',
+      resource: 'omvra://agents/{personId}/assigned',
+    },
+  };
+}
+
 function summarizeAssignedTasks(tasks) {
   const byStatus = {};
   const byProjectId = {};
@@ -1006,6 +1137,8 @@ function buildMcpTaskExecutionSchema() {
       'review',
     ],
     preflight: {
+      tool: 'agent.resolve_task_context',
+      resultRule: 'Execution may start whenever canStart=true; use assigned persona context when ok=true, otherwise use standard agentic operation.',
       assigneeContext: buildAssigneeContextPreflight(),
     },
     writeRules: [
@@ -1062,6 +1195,7 @@ function buildMcpTaskExecutionSchema() {
       'Use tasks.list with assigneeId to find assigned work.',
       'Use omvra://agents/{personId}/assigned to read agentic person metadata. agentInstructions shape role/persona and agentOperationalInstructions shape the preferred work method unless they conflict with higher-priority instructions, security boundaries, or tool/sandbox controls.',
       'During task execution, prefer task.assigneeId -> omvra://agents/{personId}/assigned as the deterministic assignee-context preflight.',
+      'Call agent.resolve_task_context with the exact taskId before implementation work; use standard agentic operation when ok=false and canStart=true, and stop only when canStart=false.',
       'Use task_write to log new bug-hunting or follow-up tasks with metadata.',
       'Use boards.watch.poll to watch a board for changes.',
       'Use cards.kanban.list for board-friendly projections.',
@@ -3111,6 +3245,7 @@ module.exports = {
   listTasks,
   listAssignedWorkForAgent,
   getTaskById,
+  resolveTaskExecutionContext,
   listKanbanCards,
   listTimelineCards,
   buildMcpAgentGuide,

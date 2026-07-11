@@ -18,6 +18,7 @@ export const KANBAN_VIEW_STATE_KEY = 'omvra_viewstate_kanban';
 export const ROADMAP_VIEW_STATE_KEY = 'omvra_viewstate_roadmap';
 export const TIMELINE_MONTH_WIDTHS_KEY = 'omvra.monthWidths.v1';
 export const TIMELINE_LEFT_COL_WIDTH_KEY = 'omvra.leftColWidth.v1';
+export const TIMELINE_SHOW_COMPLETED_KEY = 'omvra.timelineShowCompleted.v1';
 
 const DEFAULT_TIMELINE_LEFT_COL_WIDTH = 282;
 const MIN_TIMELINE_LEFT_COL_WIDTH = 260;
@@ -26,6 +27,7 @@ const MAX_TIMELINE_LEFT_COL_WIDTH = 420;
 export interface TimelineLayoutState {
   leftColWidth: number;
   monthWidths: Record<string, number>;
+  showCompleted: boolean;
 }
 
 export interface UiStateSnapshot {
@@ -37,6 +39,7 @@ export interface UiStateSnapshot {
 export const DEFAULT_TIMELINE_LAYOUT_STATE: TimelineLayoutState = {
   leftColWidth: DEFAULT_TIMELINE_LEFT_COL_WIDTH,
   monthWidths: {},
+  showCompleted: false,
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -105,6 +108,7 @@ export function sanitizeTimelineLayoutState(value: unknown): TimelineLayoutState
   return {
     leftColWidth,
     monthWidths,
+    showCompleted: value.showCompleted === true,
   };
 }
 
@@ -112,12 +116,13 @@ export async function loadUiStateSnapshot(
   projects: TimelineSwimlane[],
   people: Person[]
 ): Promise<UiStateSnapshot> {
-  const [timelineState, kanbanState, roadmapState, leftColWidth, monthWidths, kanbanFilters] = await Promise.all([
+  const [timelineState, kanbanState, roadmapState, leftColWidth, monthWidths, showCompleted, kanbanFilters] = await Promise.all([
     getJSON<Record<string, unknown>>(TIMELINE_VIEW_STATE_KEY, null),
     getJSON<Record<string, unknown>>(KANBAN_VIEW_STATE_KEY, null),
     getJSON<Record<string, unknown>>(ROADMAP_VIEW_STATE_KEY, null),
     getJSON<number>(TIMELINE_LEFT_COL_WIDTH_KEY, null),
     getJSON<Record<string, number>>(TIMELINE_MONTH_WIDTHS_KEY, null),
+    getJSON<boolean>(TIMELINE_SHOW_COMPLETED_KEY, null),
     getJSON<unknown>('omvra.filters.v1', null),
   ]);
 
@@ -130,6 +135,7 @@ export async function loadUiStateSnapshot(
     timelineLayout: sanitizeTimelineLayoutState({
       leftColWidth,
       monthWidths,
+      showCompleted,
     }),
     kanbanFilters: sanitizeKanbanTaskFilters(kanbanFilters, projects, people),
   };
@@ -138,4 +144,5 @@ export async function loadUiStateSnapshot(
 export function persistTimelineLayoutState(layout: TimelineLayoutState): void {
   persistJSONWithElectronMirror(TIMELINE_LEFT_COL_WIDTH_KEY, layout.leftColWidth);
   persistJSONWithElectronMirror(TIMELINE_MONTH_WIDTHS_KEY, layout.monthWidths);
+  persistJSONWithElectronMirror(TIMELINE_SHOW_COMPLETED_KEY, layout.showCompleted);
 }

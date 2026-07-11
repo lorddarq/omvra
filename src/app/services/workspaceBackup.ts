@@ -697,6 +697,7 @@ export function repairWorkspaceBackupPayload(
                     }, [])
                   )
                 : undefined,
+              showCompleted: payload.ui.timeline.showCompleted === true,
             }
           : undefined,
       }

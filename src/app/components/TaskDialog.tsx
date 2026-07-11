@@ -366,13 +366,14 @@ export function TaskDialog({
         showClose={false}
         aria-describedby={undefined}
         overlayClassName="omvra-settings-overlay"
-        className="h-[min(920px,calc(100vh-2rem))] w-[min(837px,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] gap-0 overflow-hidden rounded-[24px] border-0 bg-white p-2 shadow-[0_2px_8px_rgba(0,0,0,0.10),0_-6px_12px_rgba(0,0,0,0.10),0_14px_28px_rgba(0,0,0,0.10)] sm:max-w-none"
+        className="flex h-[min(920px,calc(100vh-2rem))] min-h-0 w-[min(837px,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] flex-col gap-0 overflow-hidden rounded-[24px] border-0 bg-white p-2 shadow-[0_2px_8px_rgba(0,0,0,0.10),0_-6px_12px_rgba(0,0,0,0.10),0_14px_28px_rgba(0,0,0,0.10)] sm:max-w-none"
       >
         <DialogTitle className="sr-only">{task ? 'Edit Task' : 'Create Task'}</DialogTitle>
         <DialogDescription className="sr-only">
           {task ? 'Edit the task details below.' : 'Enter the task details below.'}
         </DialogDescription>
         <AnchoredPanel
+          className="h-auto min-h-0 flex-1"
           title={task ? 'Edit Task' : 'Create Task'}
           description={task ? 'Edit the task details below.' : 'Enter the task details below.'}
           navGroups={editNavGroups}

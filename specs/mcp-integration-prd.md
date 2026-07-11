@@ -40,6 +40,7 @@ Users:
 Use cases:
 - Agent lists assigned tasks and pulls enough context to start work.
 - Agent executes a task only after a deterministic assignee-context preflight based on the task's current `assigneeId`.
+- The preflight uses `agent.resolve_task_context` and returns an atomic task, assignee, instruction context, validation, and `canStart` result; unavailable assignee context falls back gently to standard agentic operation, while an unresolved task prevents execution.
 - Agent reads “Kanban card view” grouped by status.
 - Agent reads “Timeline card view” grouped by lane/date window.
 - Human reviews agent updates in Omvra after task transitions to under-review.
@@ -150,7 +151,7 @@ Kanban and Timeline resources must derive from the same canonical task entities 
 ## 12. Risks and Mitigations
 
 - Risk: schema drift between UI and MCP payloads.  
-  Mitigation: shared schema package + contract tests.
+  Mitigation: shared contract tests compare canonical UI and MCP task fields and verify backup/import preservation via `npm run test:workspace-contracts`.
 
 - Risk: conflicting writes between UI and MCP clients.  
   Mitigation: single-writer broker + optimistic revision checks.

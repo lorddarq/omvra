@@ -15,6 +15,9 @@ test('sanitizeTimelineLayoutState clamps width and preserves numeric month width
   assert.deepEqual(result.monthWidths, {
     '2026-6': 320,
   });
+  assert.equal(result.showCompleted, false);
+
+  assert.equal(sanitizeTimelineLayoutState({ showCompleted: true }).showCompleted, true);
 });
 
 test('sanitizeViewStates falls back to defaults for invalid payloads', () => {

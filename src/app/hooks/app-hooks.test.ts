@@ -14,6 +14,11 @@ import {
 } from './useAgentWatchRuntime.ts';
 import type { McpPreferencesShape } from '../utils/mcpPreferences.ts';
 import type { AgentWatchConfig } from '../utils/workspaceSanitizers.ts';
+import mcpHttpServer from '../../../electron/services/mcp-http-server.cjs';
+import testFixtures from '../../../electron/services/test-fixtures.cjs';
+
+const { createRequestDispatcher } = mcpHttpServer;
+const { makeStoreFromFixture } = testFixtures;
 
 const { act, create } = TestRenderer as any;
 
@@ -141,6 +146,61 @@ test('useTaskActions saves, comments, and promotes agentic tasks to review', asy
 
   assert.equal(tasks[0].status, 'under-review');
   assert.equal(tasks[1].status, 'in-progress');
+
+  await harness.unmount();
+});
+
+test('UI and MCP task creation agree on canonical workspace fields', async () => {
+  let tasks: Task[] = [];
+  const setTasks = (updater: React.SetStateAction<Task[]>) => {
+    tasks = typeof updater === 'function'
+      ? (updater as (prev: Task[]) => Task[])(tasks)
+      : updater;
+  };
+  const people: Person[] = [
+    { id: 'agent-1', name: 'Codex', role: 'Agent', kind: 'agentic', color: '#f97316' },
+  ];
+  const taskInput = {
+    title: 'Shared contract task',
+    notes: 'Created through either workspace surface.',
+    status: 'in-progress' as const,
+    assigneeId: 'agent-1',
+    projectIds: ['lane-1'],
+    swimlaneId: 'lane-1',
+    startDate: '2026-08-12',
+    endDate: '2026-08-14',
+    size: 's' as const,
+    complexity: 'routine' as const,
+    priority: 'moderate' as const,
+    blocked: false,
+    swimlaneOnly: false,
+  };
+
+  const harness = await renderHook(
+    () => useTaskActions({ people, setTasks }),
+    undefined
+  );
+  harness.result().saveTask(taskInput);
+
+  const mcpResponse = createRequestDispatcher(makeStoreFromFixture('workspace-basic'))({
+    jsonrpc: '2.0',
+    id: 'shared-contract-create',
+    method: 'tools/call',
+    params: {
+      name: 'task_write',
+      arguments: { ...taskInput, statusId: taskInput.status },
+    },
+  }, { headers: {}, transport: 'stdio' });
+  const mcpTask = mcpResponse.result.structuredContent.task as Task;
+  const fields: Array<keyof Task> = [
+    'title', 'notes', 'status', 'assigneeId', 'projectIds', 'swimlaneId',
+    'startDate', 'endDate', 'size', 'complexity', 'priority', 'blocked', 'swimlaneOnly',
+  ];
+
+  assert.deepEqual(
+    Object.fromEntries(fields.map(field => [field, mcpTask[field]])),
+    Object.fromEntries(fields.map(field => [field, tasks[0][field]]))
+  );
 
   await harness.unmount();
 });

@@ -17,6 +17,7 @@
     "build:pages": "vite build --config pages/vite.config.ts",
     "test:hooks": "node --experimental-strip-types --experimental-specifier-resolution=node --test src/app/hooks/*.test.ts",
     "test:mcp": "node --test electron/services/workspace-service.test.cjs electron/services/mcp-http-server.test.cjs electron/services/mcp-fixtures.test.cjs electron/services/mcp-ipc.test.cjs electron/services/canonical-hydration.test.cjs electron/services/update-service.test.cjs electron/services/preload-update-bridge.test.cjs electron/services/update-ipc.test.cjs",
+    "test:workspace-contracts": "npm run test:mcp && node --experimental-strip-types --experimental-specifier-resolution=node --test src/app/store/workspaceMutations.test.ts src/app/services/workspaceBackup.test.ts src/app/hooks/app-hooks.test.ts",
     "mcp:smoke": "node scripts/mcp-smoke-test.mjs",
     "mcp:stdio": "node electron/scripts/mcp-stdio.cjs",
     "predist": "npm run generate:icons",

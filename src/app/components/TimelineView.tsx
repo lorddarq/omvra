@@ -20,6 +20,7 @@ import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import { TimelineHeader } from './TimelineHeader';
 import { TimelineToolbar } from './TimelineToolbar';
+import { filterTimelineTasks } from '../utils/statusColumnSemantics';
 import { AppStatusBar } from './AppStatusBar';
 import { EmptyStateCard } from './EmptyStateCard';
 import {
@@ -206,6 +207,11 @@ export function TimelineView({
 
   // Weekend visibility toggle
   const [showWeekends, setShowWeekends] = useState<boolean>(true);
+  const [showCompleted, setShowCompleted] = useState<boolean>(() => initialLayoutState?.showCompleted ?? false);
+  const timelineTasks = useMemo(
+    () => filterTimelineTasks(tasks, statusColumns, showCompleted),
+    [showCompleted, statusColumns, tasks]
+  );
   const [horizontalMetrics, setHorizontalMetrics] = useState<{ scrollLeft: number; viewportWidth: number }>({
     scrollLeft: 0,
     viewportWidth: 0,
@@ -228,12 +234,12 @@ export function TimelineView({
   }, [mode, people, swimlanes]);
   const visibleTaskCount = useMemo(() => {
     const visibleSwimlaneIds = new Set(displaySwimlanes.map(swimlane => swimlane.id));
-    return tasks.filter(task => (
+    return timelineTasks.filter(task => (
       mode === 'people'
         ? Boolean(task.assigneeId && visibleSwimlaneIds.has(task.assigneeId))
         : Boolean(task.swimlaneId && visibleSwimlaneIds.has(task.swimlaneId))
     )).length;
-  }, [displaySwimlanes, mode, tasks]);
+  }, [displaySwimlanes, mode, timelineTasks]);
   const lastDisplaySwimlaneId = displaySwimlanes[displaySwimlanes.length - 1]?.id;
 
   // Refs
@@ -275,7 +281,7 @@ export function TimelineView({
 
   // The date window exists independently from the current task set. Rendering still
   // virtualizes a slice of it below; later extensions only update this single state.
-  const [timelineWindow, setTimelineWindow] = useState(() => createInitialTimelineWindow(tasks));
+  const [timelineWindow, setTimelineWindow] = useState(() => createInitialTimelineWindow(timelineTasks));
   const allDates = useMemo(
     () => getTimelineWindowDates(timelineWindow, showWeekends),
     [timelineWindow, showWeekends]
@@ -338,10 +344,11 @@ export function TimelineView({
     const nextLayoutState = {
       leftColWidth,
       monthWidths,
+      showCompleted,
     };
     persistTimelineLayoutState(nextLayoutState);
     onLayoutStateChange?.(nextLayoutState);
-  }, [leftColWidth, monthWidths, onLayoutStateChange]);
+  }, [leftColWidth, monthWidths, onLayoutStateChange, showCompleted]);
 
   useEffect(() => {
     const arr: number[] = [];
@@ -424,20 +431,20 @@ export function TimelineView({
     const assignments: Record<string, Record<string, number>> = {};
     displaySwimlanes.forEach(swimlane => {
       const swimlaneTasks = mode === 'people'
-        ? tasks.filter(t => t.assigneeId === swimlane.id)
-        : tasks.filter(t => t.swimlaneId === swimlane.id);
+        ? timelineTasks.filter(t => t.assigneeId === swimlane.id)
+        : timelineTasks.filter(t => t.swimlaneId === swimlane.id);
       assignments[swimlane.id] = allocateTasksToTracks(swimlaneTasks);
     });
     return assignments;
-  }, [tasks, displaySwimlanes, mode]);
+  }, [timelineTasks, displaySwimlanes, mode]);
 
   // Compute dynamic heights for swimlanes
   const swimlaneHeights = useMemo(() => {
     const heights: Record<string, number> = {};
     displaySwimlanes.forEach(swimlane => {
       const swimlaneTasks = mode === 'people'
-        ? tasks.filter(t => t.assigneeId === swimlane.id)
-        : tasks.filter(t => t.swimlaneId === swimlane.id);
+        ? timelineTasks.filter(t => t.assigneeId === swimlane.id)
+        : timelineTasks.filter(t => t.swimlaneId === swimlane.id);
       // Each track is 40px (task render height 32px + gap 8px), with at least DEFAULT_ROW_HEIGHT
       const TRACK_HEIGHT = 40;
       const trackAssignments = allocateTasksToTracks(swimlaneTasks);
@@ -445,7 +452,7 @@ export function TimelineView({
       heights[swimlane.id] = Math.max(DEFAULT_ROW_HEIGHT, trackCount * TRACK_HEIGHT);
     });
     return heights;
-  }, [tasks, displaySwimlanes, mode]);
+  }, [timelineTasks, displaySwimlanes, mode]);
 
   const draggedSwimlaneHeight = draggingSwimlaneId
     ? swimlaneHeights[draggingSwimlaneId] || DEFAULT_ROW_HEIGHT
@@ -1073,8 +1080,10 @@ export function TimelineView({
         <TimelineToolbar
           mode={mode}
           showWeekends={showWeekends}
+          showCompleted={showCompleted}
           onModeChange={setMode}
           onShowWeekendsChange={setShowWeekends}
+          onShowCompletedChange={setShowCompleted}
           onScrollLeft={handleScrollLeft}
           onScrollRight={handleScrollRight}
           onScrollToToday={() => scrollToToday({ smooth: false })}
@@ -1128,8 +1137,8 @@ export function TimelineView({
                   visibleSwimlaneDropIndicator && draggingSwimlaneId === swimlane.id
                 );
                 const taskCount = mode === 'people'
-                  ? tasks.filter(t => t.assigneeId === swimlane.id).length
-                  : tasks.filter(t => t.swimlaneId === swimlane.id).length;
+                  ? timelineTasks.filter(t => t.assigneeId === swimlane.id).length
+                  : timelineTasks.filter(t => t.swimlaneId === swimlane.id).length;
                 
                 return (
                   <React.Fragment key={swimlane.id}>
@@ -1269,8 +1278,8 @@ export function TimelineView({
             <div className="timeline-rows-container">
               {displaySwimlanes.map((swimlane, idx) => {
                 const swimlaneTasks = mode === 'people'
-                  ? tasks.filter(t => t.assigneeId === swimlane.id)
-                  : tasks.filter(t => t.swimlaneId === swimlane.id);
+                  ? timelineTasks.filter(t => t.assigneeId === swimlane.id)
+                  : timelineTasks.filter(t => t.swimlaneId === swimlane.id);
                 const height = swimlaneHeights[swimlane.id] || DEFAULT_ROW_HEIGHT;
                 const isDraggedRowCollapsed = Boolean(
                   visibleSwimlaneDropIndicator && draggingSwimlaneId === swimlane.id

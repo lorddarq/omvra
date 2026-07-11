@@ -4,8 +4,10 @@ import { TodayButton } from './TodayButton';
 interface TimelineToolbarProps {
   mode: 'projects' | 'people';
   showWeekends: boolean;
+  showCompleted: boolean;
   onModeChange: (mode: 'projects' | 'people') => void;
   onShowWeekendsChange: (showWeekends: boolean) => void;
+  onShowCompletedChange: (showCompleted: boolean) => void;
   onScrollLeft: () => void;
   onScrollRight: () => void;
   onScrollToToday: () => void;
@@ -14,8 +16,10 @@ interface TimelineToolbarProps {
 export function TimelineToolbar({
   mode,
   showWeekends,
+  showCompleted,
   onModeChange,
   onShowWeekendsChange,
+  onShowCompletedChange,
   onScrollLeft,
   onScrollRight,
   onScrollToToday,
@@ -23,6 +27,16 @@ export function TimelineToolbar({
   return (
     <div className="timeline-toolbar">
       <div className="timeline-mode-toggle" role="tablist" aria-label="Timeline mode">
+        <button
+          type="button"
+          onClick={() => onShowCompletedChange(!showCompleted)}
+          className={`timeline-week-toggle ${showCompleted ? 'is-seven-day' : 'is-five-day'}`}
+          title={showCompleted ? 'Hide completed tasks' : 'Show completed tasks'}
+          aria-pressed={showCompleted}
+        >
+          {showCompleted ? 'Hide completed' : 'Show completed'}
+        </button>
+
         <button
           type="button"
           onClick={() => onModeChange('projects')}

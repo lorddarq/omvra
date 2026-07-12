@@ -375,12 +375,15 @@ export function MilestoneDialog({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="milestone-notes" className="text-[14px] font-semibold text-[#71717a]">Goals:</Label>
+                <div className="flex items-baseline justify-between gap-3">
+                  <Label htmlFor="milestone-notes" className="text-[14px] font-semibold text-[#71717a]">Goals:</Label>
+                  <span className="text-xs text-[#8a8a92]">Supports Markdown</span>
+                </div>
                 <Textarea
                   id="milestone-notes"
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
-                  placeholder="Add description..."
+                  placeholder="Write a description in markdown..."
                   rows={5}
                   className="min-h-[190px] rounded-[24px] border-black/10 bg-white p-5 text-base font-medium leading-relaxed text-[#67676f] shadow-[0_0_1px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.06),0_2px_4px_rgba(0,0,0,0.04)] placeholder:text-[#b5b5ba] focus-visible:ring-[#71717a]/15"
                 />

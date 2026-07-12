@@ -26,6 +26,7 @@ import { TaskDetailsActionMenu } from './TaskDetailsActionMenu';
 import { buildMilestonePdfExportHtml, createMilestonePdfFileName } from '../utils/milestonePdfExport';
 import { formatMilestoneDetailsForClipboard } from '../utils/milestoneClipboard';
 import { exportPdfDocument } from '../utils/pdfExport';
+import { MarkdownContent } from './MarkdownContent';
 
 interface MilestoneDetailsDialogProps {
   isOpen: boolean;
@@ -220,11 +221,11 @@ export function MilestoneDetailsDialog({
               <section className="space-y-4">
                 <h3 className="text-[14px] font-semibold text-[#71717a]">Description</h3>
                 <DialogSurfaceSection className="relative overflow-hidden rounded-[12px] border border-black/10 bg-white px-4 py-4 shadow-none">
-                  <div className="text-[12px] leading-6 text-[#6a7282]">
-                    <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-                      {milestone.notes?.trim() || 'No description provided.'}
-                    </div>
-                  </div>
+                  {milestone.notes?.trim() ? (
+                    <MarkdownContent content={milestone.notes.trim()} />
+                  ) : (
+                    <div className="text-[12px] leading-6 text-[#6a7282]">No description provided.</div>
+                  )}
                 </DialogSurfaceSection>
               </section>
 

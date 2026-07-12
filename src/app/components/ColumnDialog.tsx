@@ -205,14 +205,17 @@ export function ColumnDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="column-description" className="text-[15px] font-medium text-[#67676f]">
-              Description
-            </Label>
+            <div className="flex items-baseline justify-between gap-3">
+              <Label htmlFor="column-description" className="text-[15px] font-medium text-[#67676f]">
+                Description
+              </Label>
+              <span className="text-xs text-[#8a8a92]">Supports Markdown</span>
+            </div>
             <Textarea
               id="column-description"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              placeholder="What kind of work belongs here?"
+              placeholder="Describe this board in markdown..."
               className="min-h-[96px] rounded-[16px] border-[#d9d9df] bg-white px-3 py-2 text-[14px] text-[#3d3d45] shadow-none placeholder:text-[#b7b7c0] focus-visible:border-[#d0d0d7] focus-visible:ring-2 focus-visible:ring-black/5"
             />
             <p className="max-w-[365px] text-[13px] leading-4 text-[#71717a]">

@@ -6,6 +6,7 @@ import BestFor from './components/BestFor'
 import PrivacyProof from './components/PrivacyProof'
 import AgentPrompts from './components/AgentPrompts'
 import Download from './components/Download'
+import Faq from './components/Faq'
 import Footer from './components/Footer'
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
       <PrivacyProof />
       <AgentPrompts />
       <Download />
+      <Faq />
       <Footer />
     </div>
   )

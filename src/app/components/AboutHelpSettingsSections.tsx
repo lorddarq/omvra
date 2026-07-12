@@ -24,9 +24,104 @@ const tutorials = [
 ];
 
 const faqs = [
-  'How is my workspace data stored?',
-  'How do agents access Omvra?',
-  'Can I back up or restore my workspace?',
+  {
+    question: 'How is my workspace data stored?',
+    answer: [
+      'Your workspace is stored locally on your computer, so Omvra works without an account or cloud connection.',
+      'Tasks, projects, people, boards, roadmap data, and preferences stay in Omvra’s local app storage. File attachments remain linked to their original files, so moving or deleting a file can break its link.',
+    ],
+  },
+  {
+    question: 'Does Omvra work offline?',
+    answer: [
+      'Yes. You can plan, edit tasks, and manage your workspace without an internet connection.',
+      'Some optional actions still need a connection, including checking for updates, opening online links, or using an agent that runs outside your computer.',
+    ],
+  },
+  {
+    question: 'Does Omvra send my workspace data anywhere?',
+    answer: [
+      'Omvra does not send your workspace to a cloud service as part of normal planning and task management.',
+      'Network access can still happen when you check for updates, open an external link, or deliberately connect an MCP client. You control MCP access and can turn it off at any time.',
+    ],
+  },
+  {
+    question: 'How do agents access Omvra?',
+    answer: [
+      'Agents connect through Omvra’s local MCP server, and only when you enable agent access in Settings.',
+      'Omvra supports local HTTP and stdio connections, with an optional token for extra protection. You can stop the server or disable access at any time.',
+    ],
+  },
+  {
+    question: 'What can an agent read or change?',
+    answer: [
+      'You choose the access level in Settings → MCP. Read Only lets agents inspect workspace data without changing it. Task Write adds safe task and roadmap actions. Admin provides the broadest available access.',
+      'Start with Read Only and increase access only when the agent needs to make changes. Restart the MCP listener after changing the access level.',
+    ],
+  },
+  {
+    question: 'Can I back up or restore my workspace?',
+    answer: [
+      'Yes. Open Settings → Data, then choose Backup to save your full workspace as a JSON file.',
+      'The backup includes tasks, people, projects, boards, roadmap data, preferences, and MCP settings. Choose Restore in the same section to import a backup. Create a fresh backup before restoring another file or installing a release candidate.',
+    ],
+  },
+  {
+    question: 'Can I move my workspace to another computer?',
+    answer: [
+      'Yes. Create a backup on the first computer, copy the JSON file to the new computer, then choose Settings → Data → Restore.',
+      'Attachments are links to files on your computer, not copies stored inside the backup. Move those files separately if you want their links to keep working.',
+    ],
+  },
+  {
+    question: 'What happens to attached files?',
+    answer: [
+      'Omvra stores a reference to each attached file rather than copying the file into your workspace.',
+      'Attachment details survive backup and restore, but the original file must still exist at the saved location. If you move or delete it, Omvra keeps the reference but can no longer find the file.',
+    ],
+  },
+  {
+    question: 'What is the difference between Kanban and Timeline?',
+    answer: [
+      'Kanban shows where work stands. Timeline shows when scheduled work happens. Both views use the same tasks, so a change in one view is reflected in the other.',
+      'Use Kanban to move work through statuses. Use Timeline to plan dates, duration, projects, and ownership over time.',
+    ],
+  },
+  {
+    question: 'Why is my task missing from the Timeline?',
+    answer: [
+      'First, check that the task has a Timeline Project. Tasks set to “No timeline project” do not have a project row where they can appear.',
+      'If the task is complete, turn on completed work in the Timeline. You can also switch between Projects and People: People mode only shows a task when it has an assignee.',
+    ],
+  },
+  {
+    question: 'How do I update Omvra?',
+    answer: [
+      'Open Settings → About, choose Stable releases or Release candidates, then check for updates.',
+      'Stable releases are the safer default. Omvra requires a fresh backup before installing a release candidate so you have a recovery point if the preview build changes workspace data.',
+    ],
+  },
+  {
+    question: 'Why can’t my agent connect to MCP?',
+    answer: [
+      'Check that agent access is enabled and the MCP listener is running. Confirm that your client uses the current address, port, and token shown in Settings → MCP.',
+      'Restart the listener after changing the host, port, token, or access level. If the connection still fails, run the MCP health check and review the diagnostics before changing anything else.',
+    ],
+  },
+  {
+    question: 'Why are MCP write tools missing?',
+    answer: [
+      'The MCP listener is probably using Read Only access, which intentionally hides write tools.',
+      'Choose Task Write or Admin in Settings → MCP, restart the listener, then reconnect your agent. Use Task Write unless the workflow specifically requires broader access.',
+    ],
+  },
+  {
+    question: 'Where can I ask for help or report a problem?',
+    answer: [
+      'Open Settings → About and use the contact action under Suggestions & feedback.',
+      'Include your Omvra version, operating system, what you expected, and what happened. Remove access tokens, private task content, and sensitive file paths before sharing screenshots or logs.',
+    ],
+  },
 ];
 
 interface AboutVersionInfo {
@@ -75,7 +170,7 @@ export function HelpSettingsSection() {
 
         <ResourceList title="FAQs">
           {faqs.map(item => (
-            <ResourceRow key={item} label={item} />
+            <FaqRow key={item.question} question={item.question} answers={item.answer} />
           ))}
         </ResourceList>
       </div>
@@ -534,6 +629,20 @@ function ResourceRow({ icon, label }: { icon?: ReactNode; label: string }) {
       <span className="min-w-0 flex-1 truncate text-sm font-medium leading-5 text-[#71717a]">{label}</span>
       <ChevronRight className="size-4 shrink-0 text-[#8a8a92]" />
     </button>
+  );
+}
+
+function FaqRow({ question, answers }: { question: string; answers: string[] }) {
+  return (
+    <details className="group border-b border-black/[0.04] last:border-b-0">
+      <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-4 py-3 text-left outline-none hover:bg-[#f4f4f5] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gray-300 [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0 flex-1 text-sm font-medium leading-5 text-[#71717a]">{question}</span>
+        <ChevronRight className="size-4 shrink-0 text-[#8a8a92] transition-transform group-open:rotate-90" />
+      </summary>
+      <div className="space-y-2 px-4 pb-4 pr-10 text-xs leading-5 text-[#6a7282] [overflow-wrap:anywhere]">
+        {answers.map(answer => <p key={answer}>{answer}</p>)}
+      </div>
+    </details>
   );
 }
 

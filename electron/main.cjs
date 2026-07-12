@@ -24,9 +24,18 @@ const {
   buildMcpListenerStatus,
 } = require('./services/workspace-service.cjs');
 
+const APP_NAME = 'Omvra';
 // Consider the app to be in dev mode when it's not packaged. This avoids trying to load a dev server in packaged builds.
 const isDev = !app.isPackaged;
 const storeName = isDev ? 'omvra-store-dev' : 'omvra-store';
+// Keep existing development workspaces on their original path after the package rename.
+const appDataPath = app.getPath('appData');
+const legacyDevUserDataPath = path.join(appDataPath, '@figma', 'my-make-file');
+const userDataPath = isDev && fs.existsSync(legacyDevUserDataPath)
+  ? legacyDevUserDataPath
+  : (isDev ? path.join(appDataPath, APP_NAME) : app.getPath('userData'));
+app.setName(APP_NAME);
+app.setPath('userData', userDataPath);
 const store = new Store({ name: storeName });
 const STORE_DID_CHANGE_CHANNEL = 'store/did-change';
 const UPDATE_STATE_CHANNEL = 'updates/state-changed';

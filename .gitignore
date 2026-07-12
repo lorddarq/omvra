@@ -70,3 +70,4 @@ dist-docs/
 dist-types/
 dist-*.log
 prototypes/*
+videoscripts/*

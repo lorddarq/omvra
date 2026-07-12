@@ -69,3 +69,4 @@ dist-reports/
 dist-docs/
 dist-types/
 dist-*.log
+prototypes/*

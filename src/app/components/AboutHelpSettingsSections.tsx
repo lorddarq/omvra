@@ -19,8 +19,16 @@ const LINKEDIN_URL = 'https://www.linkedin.com/in/sorinjurcut/';
 
 const tutorials = [
   'Getting started with Omvra',
+  'Creating and assigning your first task',
+  'Backing up your workspace and replaying onboarding',
   'Planning work on the timeline',
+  'Moving and resizing timeline tasks',
+  'Understanding timeline projects and visibility',
+  'Fixing a task that is missing from the timeline',
   'Using MCP with coding agents',
+  'Assigning work to an agent',
+  'Completing agent work and requesting human review',
+  'Securing and troubleshooting MCP access',
 ];
 
 const faqs = [

@@ -12,9 +12,9 @@ const Download = () => {
             </div>
 
             <p className="mx-auto mt-8 max-w-[31rem] text-pretty text-lg leading-9 text-[#6d6a73] sm:text-[1.35rem]">
-              Get a calmer way to plan and ship work.
+              Get a local workspace for planning and shipping work with AI agents.
               <br />
-              Free to download, open source, local-first, and ready to use, without accounts.
+              Free to download, open source, local-first, and ready to use without an account.
             </p>
 
             <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -30,7 +30,7 @@ const Download = () => {
                     d="M12 4v11m0 0l-4-4m4 4l4-4M4 18v1a2 2 0 002 2h12a2 2 0 002-2v-1"
                   />
                 </svg>
-                Download
+                Download Omvra
               </a>
 
               <a

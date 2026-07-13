@@ -1,18 +1,18 @@
 const interfaces = [
   {
-    title: 'Coordinate and\norchestrate work',
+    title: 'Coordinate the\nworkflow',
     description:
-      'Direct and instruct agents on preferred workflows and solutions at agent setup and manage a whole team at once.',
+      'Define how work should move, who owns it, and where human review belongs.',
   },
   {
-    title: 'Let agents pick up\nassigned work',
+    title: 'Give agents\naccountable work',
     description:
-      'Best when you already assigned tasks to an agentic person in Omvra and want the assistant to start with the right context.',
+      'Assign a task once and let the assistant start with the context, constraints, and expected handoff already attached.',
   },
   {
-    title: 'Connect work across\nMCP servers',
+    title: 'Connect the tools\nyou already use',
     description:
-      'Best when the task lives in Omvra but the background information lives in tools across several systems already in use.',
+      'Keep the task in Omvra while approved MCP tools provide the background information needed to complete it.',
   },
 ] as const
 
@@ -23,15 +23,14 @@ const AgentPrompts = () => {
         <div className="mx-auto max-w-[72rem]">
           <div className="mx-auto max-w-[46rem] text-center">
             <h2 className="text-balance text-[clamp(2.9rem,5vw,4rem)] font-medium leading-[1.04] tracking-[-0.05em] text-[#5b5966]">
-              A shared interface between
+              A controlled workspace between
               <br />
-              you and your agents
+              people and agents
             </h2>
             <p className="mx-auto mt-7 max-w-[43rem] text-pretty text-lg leading-9 text-[#6d6a73] sm:text-[1.35rem]">
-              With MCP-capable assistants, it offers a planning surface, while other MCP servers
-              can provide contextual knowledge, and designs around the work.
+              Give approved assistants a clear place to find work, use context, and report back.
               <br />
-              Codex, Claude, and other agents can help take off the load.
+              Codex, Claude, and other agents can help carry the load while people keep the final say.
             </p>
           </div>
 

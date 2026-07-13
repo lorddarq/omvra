@@ -1,22 +1,22 @@
 const reasons = [
   {
-    title: 'See the\nbig picture',
+    title: 'Plan once.\nSee what is next.',
     description:
-      'Plan work on a timeline, move it through Kanban. Spend less time translating status between tools.',
+      'Plan on a timeline, move work through Kanban, and keep one shared view of schedules, status, and ownership.',
     illustration: 'Illustration01.svg',
     glow: 'bg-[linear-gradient(180deg,rgba(149,218,255,1)_20%,rgba(255,202,22,0.2)_100%)] blur-xl',
   },
   {
-    title: 'Keep things\nin one place',
+    title: 'Keep context\nwith the work.',
     description:
-      'Task details, markdown notes, comments, and review-ready handoffs stay attached to the work.',
+      'Tasks, notes, comments, dependencies, and review handoffs stay together instead of getting lost across tools.',
     illustration: 'Illustration02.svg',
     glow: 'bg-[linear-gradient(180deg,rgba(149,218,255,0.88)_20%,rgba(245,188,185,0.3)_100%)] blur-xl',
   },
   {
-    title: 'Stay in control\nof your data',
+    title: 'Keep control\nof sensitive work.',
     description:
-      'Local-first and open source, with no account required, no hidden telemetry, and full-workspace backups.',
+      'Local-first and open source, with no account required, no hosted workspace, and full-workspace backups.',
     illustration: 'Illustration03.svg',
     glow: 'bg-[linear-gradient(180deg,rgba(244,192,222,0.5)_20%,rgba(255,202,22,0.3)_100%)] blur-xl',
   },
@@ -33,18 +33,17 @@ const WhyOmvra = () => {
         <div className="mx-auto max-w-[72rem]">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-balance text-[clamp(2.7rem,5vw,4rem)] font-medium leading-[1.04] tracking-[-0.05em] text-[#5b5966]">
-              Why should I use it?
+              Work faster without giving up control.
             </h2>
             <div className="mx-auto mt-7 max-w-[48rem] space-y-7 text-pretty text-lg leading-9 text-[#6d6a73] sm:text-[1.35rem]">
               <p>
-                Omvra is for people that want clear planning, fast execution, and less overhead.
-                It gives them the visibility of a timeline, the momentum of Kanban, and the
-                control of a local-first desktop app.
+                Omvra is for people who need clear planning and faster execution without moving
+                sensitive project context into another cloud account.
               </p>
               <p>
-                Most tools are built to record what happened.
+                Most tools record what happened.
                 <br />
-                Omvra is built to tell you and your agents, what&apos;s next.
+                Omvra helps you and your agents know what is next—and who is accountable for it.
               </p>
             </div>
           </div>

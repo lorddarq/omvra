@@ -11,7 +11,7 @@ const Footer = () => {
           <div className="max-w-[15.625rem]">
             <img src={logoSrc} alt="Omvra" className="h-8 w-auto" />
             <p className="mt-5 text-sm leading-9 text-[#6d6a73]">
-              Open-source, local-first planning for teams that want clarity without the usual overhead.
+              Free, open-source, local-first execution for teams that want clarity, speed, and control.
             </p>
           </div>
 

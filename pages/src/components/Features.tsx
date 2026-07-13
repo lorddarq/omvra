@@ -3,27 +3,27 @@ const iconBase = `${import.meta.env.BASE_URL}icons`
 
 const spotlightCards = [
   {
-    title: 'Plan on a timeline,\nexecute in Kanban',
+    title: 'One plan from\nstart to finish',
     description:
-      'Start with visual scheduling, switch to execution, and keep the same tasks connected across both views.',
+      'Schedule work visually, execute it in Kanban, and keep dates, status, milestones, and dependencies connected.',
     illustration: 'what-can-do-01.svg',
     chips: ['Timeline', 'Kanban', 'Roadmap'],
     minHeight: 'md:min-h-[30.25rem]',
   },
   {
-    title: 'A workspace for you\nand your agents',
+    title: 'A workspace for people\nand agents',
     description:
-      "Assign work to an agent the same way you'd assign it to your teammates, or yourself.",
+      'Assign work to an agent the same way you would assign it to a teammate—or yourself.',
     extra:
-      'Full context included, no markdown files or copy-pasted instructions.',
+      'The task carries its context, so you spend less time copying instructions between tools.',
     illustration: 'what-can-do-02.svg',
     chips: ['MCP STDIO', 'MCP HTTP'],
     minHeight: 'md:min-h-[33.25rem]',
   },
   {
-    title: 'AI with guardrails',
+    title: 'AI with a clear\nhandoff',
     description:
-      'Use the built-in MCP inside Codex, Claude, or any MCP-capable assistant to read task context, make revision-protected updates, and hand work back for human review.',
+      'Let Codex, Claude, or another MCP-capable assistant read task context, make controlled updates, and hand work back for human review.',
     illustration: 'what-can-do-03.svg',
     chips: ['Codex', 'Claude Code', 'Agentic-capable LLMs'],
     minHeight: 'md:min-h-[29.5rem]',
@@ -32,45 +32,45 @@ const spotlightCards = [
 
 const supportingFeatures = [
   {
-    title: 'See schedules clearly',
+    title: 'See what is coming',
     description:
-      'Use drag-and-drop timeline planning, swimlanes, and date resizing to spot collisions.',
+      'Use timeline planning, swimlanes, and date resizing to spot collisions before they block delivery.',
     icon: 'what-can-do-icon-01.svg',
   },
   {
-    title: 'Keep work moving',
+    title: 'Make ownership visible',
     description:
-      'Organize tasks in status columns, search, and use card previews so handoffs and prioritization take less effort.',
+      'Organize tasks by status and owner so prioritization, handoffs, and review take less effort.',
     icon: 'what-can-do-icon-02.svg',
   },
   {
-    title: 'Coordinate across projects',
+    title: 'Coordinate the whole plan',
     description:
-      'Assign work to multiple projects while keeping one primary scheduling context, to reduce duplication.',
+      'Connect projects, milestones, and dependencies without maintaining separate plans for the same work.',
     icon: 'what-can-do-icon-03.svg',
   },
   {
-    title: 'Map milestones and dependencies',
+    title: 'Make blockers visible',
     description:
-      'Use the roadmap to group tasks into milestones, filter by project, and see dependency across scheduled work.',
+      'Group work into milestones and see the dependencies that can slow delivery.',
     icon: 'what-can-do-icon-04.svg',
   },
   {
-    title: 'Keep context with the task',
+    title: 'Keep evidence with the task',
     description:
-      'Attach markdown notes, comments, local file references, and task details in one place for the full picture.',
+      'Keep notes, comments, local file references, and handoff details attached to the work.',
     icon: 'what-can-do-icon-05.svg',
   },
   {
-    title: 'Spot workload before it becomes overload',
+    title: 'Catch overload early',
     description:
-      'Track load with separate execution and pipeline metrics to rebalance work before it starts blocking delivery.',
+      'See execution and pipeline load early enough to rebalance work before it blocks delivery.',
     icon: 'what-can-do-icon-06.svg',
   },
   {
-    title: 'Back up everything when you want',
+    title: 'Own and move your workspace',
     description:
-      'Perform full workspace backups, inspect storage usage, and manage local settings without the hassle of cloud.',
+      'Back up the full workspace, inspect storage, and move your data without depending on a hosted account.',
     icon: 'what-can-do-icon-07.svg',
   },
 ] as const
@@ -79,7 +79,7 @@ const supportNotes = [
   {
     label: 'Human in the loop',
     body:
-      "When an agent finishes work, it doesn't just mark a task done, but assign it to you to review, so nothing ships without you present.",
+      "When an agent finishes work, Omvra hands the task back to you for review instead of silently closing the loop.",
   },
   {
     label: 'Connection',

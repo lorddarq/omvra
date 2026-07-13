@@ -4,21 +4,21 @@ const pillars = [
   {
     title: 'No account',
     description:
-      'Download and start using it right away. No user profiles, or password accounts to worry about.',
+      'Download it and start working. No user profile, hosted workspace, or password account is required.',
     illustration: 'local-by-design-01.svg',
     widthClassName: 'w-[8.5rem] md:w-[9rem]',
   },
   {
-    title: 'No Cloud',
+    title: 'Local workspace',
     description:
-      'No embedded analytics SDKs silently tracking routine product usage in the app runtime.',
+      'Your planning data stays in the local app workspace instead of being stored in a vendor database.',
     illustration: 'local-by-design-02.svg',
     widthClassName: 'w-[8.8rem] md:w-[9.2rem]',
   },
   {
-    title: 'Limited Network',
+    title: 'Network by choice',
     description:
-      'Controlled traffic, token-secured MCP endpoints, or external MCP tools. You control when.',
+      'Normal planning works offline. Enable token-secured MCP access or online actions only when you choose.',
     illustration: 'local-by-design-03.svg',
     widthClassName: 'w-[8.6rem] md:w-[9.1rem]',
   },
@@ -31,11 +31,11 @@ const PrivacyProof = () => {
         <div className="mx-auto max-w-[72rem]">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-balance text-[clamp(2.9rem,5vw,4rem)] font-medium leading-[1.04] tracking-[-0.05em] text-[#5b5966]">
-              Local by design
+              Keep sensitive work close.
             </h2>
             <p className="mx-auto mt-7 max-w-[36rem] text-pretty text-lg leading-9 text-[#6d6a73] sm:text-[1.35rem]">
-              Designed for people that want more control, fewer surprises, and a tool that does
-              not mine their work for data.
+              Omvra is built for people who need the speed of AI-assisted work without placing
+              project context in another cloud account.
             </p>
           </div>
 

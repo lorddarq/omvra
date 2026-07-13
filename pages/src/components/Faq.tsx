@@ -15,6 +15,11 @@ const faqs = [
       'Not during normal planning and task management. Network access only happens when you choose an online action, such as checking for updates, opening an external link, or connecting an MCP client.',
   },
   {
+    question: 'Can I use Omvra for sensitive or regulated work?',
+    answer:
+      'Omvra keeps normal planning data on your computer and does not require a hosted workspace. That can help teams with strict privacy requirements, but your organization still needs to evaluate device security, backups, access controls, and approved AI connections for its own policies.',
+  },
+  {
     question: 'How do AI agents access Omvra?',
     answer:
       'Through Omvra’s built-in MCP server. Agent access stays off until you enable it, and you can use a local HTTP or stdio connection with an optional token. Stop the server or disable access whenever you want.',

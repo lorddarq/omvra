@@ -47,16 +47,17 @@ const Hero = () => {
       <div className="landing-container relative z-10 pb-16 pt-10 sm:pb-20 sm:pt-14 lg:pb-24 lg:pt-16">
         <div className="mx-auto max-w-[52rem] text-center">
           <h1 className="text-balance text-[clamp(3rem,7vw,5rem)] font-medium leading-[0.96] tracking-[-0.06em] text-[#5a5868]">
-            Plan visually. Keep local.
+            Keep work private. Move it forward.
             <br />
             <span className="relative inline-block pr-2">
-              Delegate to agents.
+              Work with your agents.
             </span>
           </h1>
 
           <p className="mx-auto mt-8 max-w-2xl text-pretty text-lg leading-8 text-[#6d6a73] sm:text-xl">
-            Omvra is a human-and-agent interfacing layer for planning and execution, built
-            local-first, so neither your data nor your agents need the cloud to get work done.
+            Omvra is a free, open-source workspace for planning and executing work with AI agents.
+            Your project data stays on your device while local agent access keeps work assigned,
+            visible, and ready for human review.
           </p>
 
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -65,7 +66,7 @@ const Hero = () => {
               className="inline-flex min-h-14 items-center justify-center gap-3 rounded-2xl bg-[#3b3b43] px-8 py-4 text-lg font-semibold text-white shadow-[0_8px_20px_rgba(59,59,67,0.18)] transition-[transform,background-color,box-shadow] duration-150 hover:-translate-y-0.5 hover:bg-[#303038] hover:shadow-[0_12px_24px_rgba(59,59,67,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f8f7f5]"
             >
               <Download className="size-5" strokeWidth={2.2} />
-              Download
+              Download Omvra
             </a>
             <a
               href="https://github.com/lorddarq/omvra"

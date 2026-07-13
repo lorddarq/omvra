@@ -4,21 +4,21 @@ const steps = [
   {
     title: 'Plan the work',
     description:
-      'Lay out tasks on a visual timeline, group them by project or swimlane, and see what is happening next without a heavyweight process around it.',
+      'Lay out tasks on a visual timeline, group them by project, and make dates, dependencies, and priorities visible before work starts.',
     illustration: 'simple-delivery-01.svg',
     widthClassName: 'w-[9.4rem] md:w-[10.2rem]',
   },
   {
-    title: 'Execute it',
+    title: 'Give work the right owner',
     description:
-      'Switch to Kanban when it is time to ship, reorder priorities quickly, and keep ownership, notes, and status changes tied to the same task.',
+      'Move work through Kanban and assign it to yourself, a teammate, or an agent with the full task context attached.',
     illustration: 'simple-delivery-02.svg',
     widthClassName: 'w-[8.1rem] md:w-[8.75rem]',
   },
   {
-    title: 'Review it',
+    title: 'Review what comes back',
     description:
-      'Use comments, markdown, or AI assistants to pull in context from tools like Figma or Microsoft 365, then hand work back for human review.',
+      'Agents update the workspace through controlled MCP access, then hand completed work back to a person with context and activity intact.',
     illustration: 'simple-delivery-03.svg',
     widthClassName: 'w-[7.2rem] md:w-[7.9rem]',
   },
@@ -31,16 +31,15 @@ const HowItWorks = () => {
         <div className="mx-auto max-w-[72rem]">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-balance text-[clamp(2.9rem,5vw,4rem)] font-medium leading-[1.04] tracking-[-0.05em] text-[#5b5966]">
-              Simple, from planning
+              From planning to
               <br />
-              to delivery
+              accountable delivery
             </h2>
             <p className="mx-auto mt-7 max-w-[40rem] text-pretty text-lg leading-9 text-[#6d6a73] sm:text-[1.35rem]">
-              <span className="font-semibold text-[#5b5966]">Omvra</span> is designed to be easy
-              to understand on day one.
+              <span className="font-semibold text-[#5b5966]">Omvra</span> keeps the planning surface,
+              execution state, and review handoff in one local workspace.
               <br />
-              You plan visually, execute in the same workspace, and keep handoffs clean without
-              adding another cloud service to manage.
+              Use AI where it helps, while the work stays visible and under your control.
             </p>
           </div>
 

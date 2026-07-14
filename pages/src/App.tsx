@@ -1,5 +1,6 @@
 import Hero from './components/Hero'
 import WhyOmvra from './components/WhyOmvra'
+import ProductScreenshots from './components/ProductScreenshots'
 import Features from './components/Features'
 import HowItWorks from './components/HowItWorks'
 import BestFor from './components/BestFor'
@@ -14,6 +15,7 @@ function App() {
     <div className="landing-shell">
       <Hero />
       <WhyOmvra />
+      <ProductScreenshots />
       <Features />
       <HowItWorks />
       <BestFor />

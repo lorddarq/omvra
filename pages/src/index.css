@@ -76,3 +76,14 @@
     transition-delay: 0ms !important;
   }
 }
+
+@keyframes product-screen-in {
+  from {
+    opacity: 0.55;
+    transform: scale(0.995);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

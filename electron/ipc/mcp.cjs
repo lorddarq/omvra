@@ -4,6 +4,7 @@ const {
   buildMcpCapabilitySnapshot,
   buildMcpListenerStatus,
   listMcpAuditLog,
+  buildMcpAuditSummary,
 } = require('../services/workspace-service.cjs');
 
 function deniedResponse() {
@@ -46,6 +47,13 @@ function registerMcpIpcHandlers({ ipcMain, store, getListenerStatus }) {
     return {
       ok: true,
       data: listMcpAuditLog(store, { limit }),
+    };
+  });
+
+  ipcMain.handle('mcp/get-audit-summary', async (_event, options = {}) => {
+    return {
+      ok: true,
+      data: buildMcpAuditSummary(store, options),
     };
   });
 }

@@ -8,6 +8,15 @@ const PEOPLE_KEY = 'omvra.people.v1';
 const SWIMLANES_KEY = 'omvra.swimlanes.v1';
 const STATUS_COLUMNS_KEY = 'omvra.statusColumns.v1';
 
+const SENSITIVE_MCP_INPUTS = Object.freeze({
+  payload: 'payload-secret-must-not-persist',
+  accessToken: 'access-token-must-not-persist',
+  authorization: 'Bearer authorization-must-not-persist',
+  cookie: 'session-cookie-must-not-persist',
+  userAgent: 'Codex/1.0 identifying-user-agent-must-not-persist',
+  taskTitle: 'Private task title must not persist',
+});
+
 class MemoryStore {
   constructor(seed = {}) {
     this.map = new Map(Object.entries(seed));
@@ -43,6 +52,7 @@ module.exports = {
   PEOPLE_KEY,
   SWIMLANES_KEY,
   STATUS_COLUMNS_KEY,
+  SENSITIVE_MCP_INPUTS,
   loadFixture,
   makeStoreFromFixture,
 };

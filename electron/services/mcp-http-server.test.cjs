@@ -5,6 +5,7 @@ const { createRequestDispatcher } = require('./mcp-http-server.cjs');
 const {
   MILESTONES_KEY,
   PREFERENCES_KEY,
+  SENSITIVE_MCP_INPUTS,
   TASKS_KEY,
   makeStoreFromFixture,
 } = require('./test-fixtures.cjs');
@@ -18,6 +19,224 @@ function makeReq(headers = {}, transport = 'http') {
     },
   };
 }
+
+test('tools call audit events capture normalized metadata without payloads', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const dispatch = createRequestDispatcher(store);
+  const response = dispatch({
+    jsonrpc: '2.0',
+    id: 'audit-read-1',
+    method: 'tools/call',
+    params: {
+      name: 'tasks.list',
+      arguments: { search: 'private payload must not persist' },
+    },
+  }, makeReq({
+    'x-mcp-client': 'Codex',
+    'x-mcp-client-version': '1.2.3',
+    origin: 'http://127.0.0.1:5173/mcp?secret=never-store',
+  }));
+
+  assert.equal(response.jsonrpc, '2.0');
+  assert.ok(response.result);
+  const audit = store.get('omvra.mcp.audit.v1').at(-1);
+  assert.equal(audit.schemaVersion, 1);
+  assert.equal(audit.agent, 'codex');
+  assert.equal(audit.clientName, 'Codex');
+  assert.equal(audit.clientVersion, '1.2.3');
+  assert.equal(audit.toolName, 'tasks.list');
+  assert.equal(audit.transport, 'http');
+  assert.equal(audit.origin, 'http://127.0.0.1:5173');
+  assert.equal(audit.outcome, 'success');
+  assert.equal(audit.failureClass, null);
+  assert.equal(typeof audit.startedAt, 'string');
+  assert.equal(typeof audit.finishedAt, 'string');
+  assert.equal(Number.isInteger(audit.durationMs), true);
+  assert.deepEqual(audit.target, { taskId: null, projectId: null, entityId: null });
+  assert.equal(Object.prototype.hasOwnProperty.call(audit, 'arguments'), false);
+  assert.equal(JSON.stringify(audit).includes('private payload must not persist'), false);
+});
+
+test('diagnostics audit summary returns aggregates without raw events', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const dispatch = createRequestDispatcher(store);
+  dispatch({
+    jsonrpc: '2.0',
+    id: 'audit-summary-seed',
+    method: 'tools/call',
+    params: { name: 'tasks.list', arguments: {} },
+  }, makeReq({ 'x-mcp-client': 'Codex' }));
+
+  const response = dispatch({
+    jsonrpc: '2.0',
+    id: 'audit-summary-1',
+    method: 'tools/call',
+    params: {
+      name: 'diagnostics.audit_summary',
+      arguments: { agent: 'codex' },
+    },
+  }, makeReq({ 'x-mcp-client': 'Codex' }));
+
+  assert.equal(response.jsonrpc, '2.0');
+  assert.equal(response.result.structuredContent.sampleSize, 1);
+  assert.equal(response.result.structuredContent.overall.successCount, 1);
+  assert.equal('events' in response.result.structuredContent, false);
+});
+
+test('HTTP and stdio normalize equivalent client provenance and targets', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const dispatch = createRequestDispatcher(store);
+  const httpReq = makeReq({ origin: 'http://127.0.0.1:3456/mcp?secret=drop-me' }, 'http');
+  const stdioReq = makeReq({}, 'stdio');
+  const initialize = req => dispatch({
+    jsonrpc: '2.0',
+    id: `initialize-${req.transport}`,
+    method: 'initialize',
+    params: { clientInfo: { name: 'Codex', version: '1.2.3' } },
+  }, req);
+
+  initialize(httpReq);
+  initialize(stdioReq);
+  dispatch({
+    jsonrpc: '2.0',
+    id: 'http-equivalent-action',
+    method: 'tools/call',
+    params: { name: 'tasks.get', arguments: { taskId: 'task-1' } },
+  }, httpReq);
+  dispatch({
+    jsonrpc: '2.0',
+    id: 'stdio-equivalent-action',
+    method: 'tools/call',
+    params: { name: 'tasks.get', arguments: { taskId: 'task-1' } },
+  }, stdioReq);
+
+  const audits = store.get('omvra.mcp.audit.v1').slice(-2);
+  assert.deepEqual(
+    audits.map(({ agent, clientName, clientVersion, toolName, outcome, failureClass, target }) => ({
+      agent, clientName, clientVersion, toolName, outcome, failureClass, target,
+    })),
+    [
+      {
+        agent: 'codex',
+        clientName: 'Codex',
+        clientVersion: '1.2.3',
+        toolName: 'tasks.get',
+        outcome: 'success',
+        failureClass: null,
+        target: { taskId: 'task-1', projectId: null, entityId: null },
+      },
+      {
+        agent: 'codex',
+        clientName: 'Codex',
+        clientVersion: '1.2.3',
+        toolName: 'tasks.get',
+        outcome: 'success',
+        failureClass: null,
+        target: { taskId: 'task-1', projectId: null, entityId: null },
+      },
+    ]
+  );
+  assert.equal(audits[0].transport, 'http');
+  assert.equal(audits[1].transport, 'stdio');
+  assert.equal(audits[0].origin, 'http://127.0.0.1:3456');
+  assert.equal(audits[1].origin, null);
+  assert.notEqual(audits[0].durationMs, undefined);
+  assert.notEqual(audits[1].durationMs, undefined);
+});
+
+test('sensitive headers, tokens, and payloads stay out of events and summaries', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const dispatch = createRequestDispatcher(store);
+  const req = makeReq({
+    authorization: SENSITIVE_MCP_INPUTS.authorization,
+    cookie: SENSITIVE_MCP_INPUTS.cookie,
+    'user-agent': SENSITIVE_MCP_INPUTS.userAgent,
+    origin: `https://example.test/mcp?token=${SENSITIVE_MCP_INPUTS.accessToken}`,
+  });
+  const response = dispatch({
+    jsonrpc: '2.0',
+    id: 'sensitive-inputs',
+    method: 'tools/call',
+    params: {
+      name: 'tasks.list',
+      arguments: {
+        payload: SENSITIVE_MCP_INPUTS.payload,
+        title: SENSITIVE_MCP_INPUTS.taskTitle,
+        authorization: SENSITIVE_MCP_INPUTS.authorization,
+      },
+    },
+  }, req);
+
+  assert.equal(Array.isArray(response.result.structuredContent), true);
+  const audit = store.get('omvra.mcp.audit.v1').at(-1);
+  const serializedAudit = JSON.stringify(audit);
+  assert.equal(Object.prototype.hasOwnProperty.call(audit, 'arguments'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(audit, 'headers'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(audit, 'userAgent'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(audit, 'remoteAddress'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(audit, 'tokenProvided'), false);
+  for (const secret of Object.values(SENSITIVE_MCP_INPUTS)) {
+    assert.equal(serializedAudit.includes(secret), false, `audit leaked ${secret}`);
+  }
+
+  const summary = dispatch({
+    jsonrpc: '2.0',
+    id: 'sensitive-summary',
+    method: 'tools/call',
+    params: { name: 'diagnostics.audit_summary', arguments: {} },
+  }, req).result.structuredContent;
+  const serializedSummary = JSON.stringify(summary);
+  for (const secret of Object.values(SENSITIVE_MCP_INPUTS)) {
+    assert.equal(serializedSummary.includes(secret), false, `summary leaked ${secret}`);
+  }
+});
+
+test('authorization denial records one bounded failure event', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  store.set(PREFERENCES_KEY, {
+    ...store.get(PREFERENCES_KEY),
+    mcpAccessToken: SENSITIVE_MCP_INPUTS.accessToken,
+    mcpAccessTokenIssuedAt: new Date().toISOString(),
+    mcpAccessTokenTtlMinutes: 60,
+  });
+  const dispatch = createRequestDispatcher(store);
+  const response = dispatch({
+    jsonrpc: '2.0',
+    id: 'denied-audit',
+    method: 'tools/call',
+    params: { name: 'tasks.get', arguments: { taskId: 'task-1' } },
+  }, makeReq({ authorization: 'Bearer wrong-token' }));
+
+  assert.equal(response.error.code, -32002);
+  const audits = store.get('omvra.mcp.audit.v1');
+  assert.equal(audits.length, 1);
+  assert.deepEqual(audits[0].target, { taskId: 'task-1', projectId: null, entityId: null });
+  assert.equal(audits[0].outcome, 'denied');
+  assert.equal(audits[0].failureClass, 'unauthorized');
+  assert.equal(JSON.stringify(audits).includes(SENSITIVE_MCP_INPUTS.accessToken), false);
+});
+
+test('revision conflicts record one failure event with a stable conflict class', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const dispatch = createRequestDispatcher(store);
+  const response = dispatch({
+    jsonrpc: '2.0',
+    id: 'conflict-audit',
+    method: 'tools/call',
+    params: {
+      name: 'tasks.update',
+      arguments: { taskId: 'task-1', title: 'Rejected update', expectedRevision: 99 },
+    },
+  }, makeReq({}, 'stdio'));
+
+  assert.equal(response.error.code, -32602);
+  const audits = store.get('omvra.mcp.audit.v1');
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0].toolName, 'tasks.update');
+  assert.equal(audits[0].outcome, 'failure');
+  assert.equal(audits[0].failureClass, 'conflict');
+  assert.deepEqual(audits[0].target, { taskId: 'task-1', projectId: null, entityId: null });
+});
 
 test('initialize returns MCP server identity and capabilities', () => {
   const dispatch = createRequestDispatcher(makeStoreFromFixture('workspace-basic'));
@@ -694,6 +913,8 @@ test('prompts/list and prompts/get expose guided agent workflows', () => {
   assert.match(getResponse.result.description, /human review/i);
   assert.ok(Array.isArray(getResponse.result.messages));
   assert.match(getResponse.result.messages[0].content.text, /tasks\.complete_and_request_review/);
+  assert.match(getResponse.result.messages[0].content.text, /append the full summary/i);
+  assert.match(getResponse.result.messages[0].content.text, /240 characters or fewer/i);
 
   const assignedPromptResponse = dispatch({
     jsonrpc: '2.0',
@@ -780,6 +1001,8 @@ test('guide and execution schema resources explain the task workflow', () => {
   assert.match(schemaResponse.result.contents[0].text, /assignee-context-preflight/);
   assert.match(schemaResponse.result.contents[0].text, /exact assigneeId/);
   assert.match(schemaResponse.result.contents[0].text, /tell the user.*loaded.*persona and working instructions/i);
+  assert.match(schemaResponse.result.contents[0].text, /Append the full handoff summary to the existing task description/i);
+  assert.match(schemaResponse.result.contents[0].text, /240 characters or fewer/i);
 });
 
 test('template resources resolve assigned work, project work, and board work', () => {

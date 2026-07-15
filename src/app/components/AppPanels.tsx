@@ -72,6 +72,7 @@ export interface PreferencesPanelState {
   mcpCapabilityProfile: 'read_only' | 'task_write' | 'admin';
   mcpListenerStatus: McpListenerStatus | null;
   mcpAuditLog: McpAuditEntry[];
+  mcpAuditSummary: McpAuditSummary | null;
   mcpHealthResult: McpHealthCheckResult | null;
   mcpHealthCheckRunning: boolean;
   mcpRestartPending: boolean;
@@ -280,6 +281,7 @@ export function AppPanels({
         mcpCapabilityProfile={preferences.mcpCapabilityProfile}
         mcpListenerStatus={preferences.mcpListenerStatus}
         mcpAuditLog={preferences.mcpAuditLog}
+        mcpAuditSummary={preferences.mcpAuditSummary}
         onMcpAgentAccessToggle={adminActions.onMcpAgentAccessToggle}
         onMcpAddressChange={adminActions.onMcpAddressChange}
         onMcpBindHostChange={adminActions.onMcpBindHostChange}

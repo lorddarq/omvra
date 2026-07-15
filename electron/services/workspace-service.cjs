@@ -620,6 +620,130 @@ function listMcpAuditLog(store, { limit } = {}) {
     .reverse();
 }
 
+const MCP_AUDIT_SUMMARY_DIMENSIONS = [
+  'agent',
+  'clientName',
+  'toolName',
+  'transport',
+  'origin',
+  'outcome',
+  'complexityBand',
+];
+
+function normalizeAuditSummaryKey(value, fallback = 'unknown') {
+  return typeof value === 'string' && value.trim() ? value.trim().slice(0, 160) : fallback;
+}
+
+function normalizeAuditSummaryOutcome(entry) {
+  if (entry?.outcome === 'allowed' || entry?.outcome === 'success') return 'success';
+  if (entry?.outcome === 'denied') {
+    return ['access_disabled', 'unauthorized', 'token_expired', 'write_tools_unavailable']
+      .includes(entry.reason)
+      ? 'denied'
+      : 'failure';
+  }
+  return 'failure';
+}
+
+function normalizeAuditComplexityBand(entry) {
+  const value = String(entry?.complexityBand || entry?.complexity || '').toLowerCase();
+  return ['low', 'medium', 'high'].includes(value) ? value : 'unknown';
+}
+
+function normalizeAuditSummaryEntry(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  const durationMs = Number(entry.durationMs);
+  const logicalCalls = Number(entry.logicalCalls ?? entry.logicalCallCount);
+  return {
+    agent: normalizeAuditSummaryKey(entry.agent),
+    clientName: normalizeAuditSummaryKey(entry.clientName),
+    toolName: normalizeAuditSummaryKey(entry.toolName),
+    transport: normalizeAuditSummaryKey(entry.transport, 'http'),
+    origin: normalizeAuditSummaryKey(entry.origin),
+    outcome: normalizeAuditSummaryOutcome(entry),
+    complexityBand: normalizeAuditComplexityBand(entry),
+    durationMs: Number.isFinite(durationMs) && durationMs >= 0 ? Math.round(durationMs) : null,
+    logicalCalls: Number.isFinite(logicalCalls) && logicalCalls >= 0 ? Math.round(logicalCalls) : null,
+  };
+}
+
+function percentile(sortedValues, percentileValue) {
+  if (sortedValues.length === 0) return null;
+  const index = Math.min(sortedValues.length - 1, Math.ceil(sortedValues.length * percentileValue) - 1);
+  return sortedValues[Math.max(0, index)];
+}
+
+function summarizeAuditEntries(entries) {
+  const durations = entries
+    .map(entry => entry.durationMs)
+    .filter(value => value !== null)
+    .sort((left, right) => left - right);
+  const logicalCalls = entries
+    .map(entry => entry.logicalCalls)
+    .filter(value => value !== null)
+    .sort((left, right) => left - right);
+  const successCount = entries.filter(entry => entry.outcome === 'success').length;
+  const failureCount = entries.filter(entry => entry.outcome === 'failure').length;
+  const deniedCount = entries.filter(entry => entry.outcome === 'denied').length;
+  const rate = count => entries.length === 0 ? null : Number((count / entries.length).toFixed(4));
+
+  return {
+    count: entries.length,
+    successCount,
+    failureCount,
+    deniedCount,
+    successRate: rate(successCount),
+    failureRate: rate(failureCount),
+    deniedRate: rate(deniedCount),
+    duration: {
+      sampleSize: durations.length,
+      medianMs: percentile(durations, 0.5),
+      p95Ms: percentile(durations, 0.95),
+    },
+    logicalCalls: {
+      sampleSize: logicalCalls.length,
+      total: logicalCalls.length === 0 ? null : logicalCalls.reduce((total, value) => total + value, 0),
+      median: percentile(logicalCalls, 0.5),
+    },
+  };
+}
+
+function buildMcpAuditSummary(store, options = {}) {
+  const entries = listMcpAuditLog(store, { limit: options.limit })
+    .map(normalizeAuditSummaryEntry)
+    .filter(Boolean);
+  const filters = {};
+  for (const dimension of MCP_AUDIT_SUMMARY_DIMENSIONS) {
+    if (options[dimension] !== undefined) filters[dimension] = normalizeAuditSummaryKey(options[dimension]);
+  }
+  const filteredEntries = entries.filter(entry => Object.entries(filters)
+    .every(([dimension, value]) => entry[dimension] === value));
+  const summary = {
+    schemaVersion: 1,
+    generatedAt: new Date().toISOString(),
+    sampleSize: filteredEntries.length,
+    filters,
+    overall: summarizeAuditEntries(filteredEntries),
+    by: {},
+  };
+
+  for (const dimension of MCP_AUDIT_SUMMARY_DIMENSIONS) {
+    const groups = new Map();
+    for (const entry of filteredEntries) {
+      const key = entry[dimension];
+      const group = groups.get(key) || [];
+      group.push(entry);
+      groups.set(key, group);
+    }
+    summary.by[dimension] = [...groups.entries()]
+      .map(([key, group]) => ({ key, ...summarizeAuditEntries(group) }))
+      .sort((left, right) => right.count - left.count || left.key.localeCompare(right.key))
+      .slice(0, 25);
+  }
+
+  return summary;
+}
+
 function normalizeMilestoneForMcp(milestone) {
   if (!milestone || typeof milestone !== 'object') return null;
   const title = normalizeString(milestone.title).trim();
@@ -1109,12 +1233,13 @@ function buildMcpAgentGuide() {
       'task.assigneeId -> workspace.people/person -> agentInstructions and agentOperationalInstructions are user-authored assignee context. Let agentInstructions shape role, tone, and behaviour, and let agentOperationalInstructions shape the preferred work method, unless either would conflict with task acceptance criteria, higher-priority instructions, security boundaries, or tool/sandbox controls.',
       'Writes use current task data plus expectedRevision.',
       'Roadmap membership and intertask dependencies use milestones.link_tasks as the single canonical write path.',
-      'Completion notes are brief, then ready work moves to the appropriate review board.',
+      'Full handoff details belong in the task description: read the current notes, append the summary, and write them back with tasks.update_description. The completion field is only a short review pointer, then ready work moves to the appropriate review board.',
     ],
     handoffChecklist: [
       'Task context inspected',
       'Relevant board/project/person context read',
-      'Brief completion note recorded',
+      'Full handoff summary appended to task description when needed',
+      'Brief completion pointer recorded',
       'Task moved to review when work is ready',
     ],
     fieldSemantics: buildAgentInstructionsFieldSemantics(),
@@ -1144,7 +1269,7 @@ function buildMcpTaskExecutionSchema() {
     writeRules: [
       'Read the task first.',
       'Always pass expectedRevision on writes.',
-      'Write a brief completion summary before moving the task to review.',
+      'Append the full handoff summary to the existing task description with tasks.update_description before moving the task to review; use the completion field only for a concise pointer of 240 characters or fewer.',
       'Prefer the narrowest write tool that matches the action.',
       'For roadmap membership and task dependencies, use milestones.link_tasks. Do not split the workflow across milestones.update and tasks.update.',
     ],
@@ -1173,7 +1298,7 @@ function buildMcpTaskExecutionSchema() {
     recommendedWriteSequence: [
       'task_write when new follow-up work must be logged',
       'tasks.update when an existing task detail or metadata field needs a targeted edit',
-      'tasks.update_description when only the main task description/notes field needs to be replaced',
+      'tasks.update_description when the main task description/notes field needs to be replaced or when appending a full handoff summary after preserving the current notes',
       'tasks.attach_file when a local file path or file:// URL should be referenced from a task',
       'tasks.remove_attachment when a task attachment reference should be removed',
       'tasks.log_time when approximate time spent should be recorded',
@@ -1304,8 +1429,9 @@ function getMcpPrompt(promptName, args = {}) {
         `Complete and hand off task "${taskId || '{taskId}'}" for human review.`,
         [
           'Read the latest task state and capture its expected revision.',
-          'Write a brief completion summary only.',
-          'Call tasks.complete_and_request_review with the current revision and completion summary.',
+          'If the handoff is longer than a short pointer, read the current task notes, append the full summary, and write the preserved notes back with tasks.update_description.',
+          'Use the completion field only for a concise pointer of 240 characters or fewer.',
+          'Call tasks.complete_and_request_review with the latest revision and concise completion pointer.',
         ]
       ),
     };
@@ -3238,6 +3364,7 @@ module.exports = {
   buildMcpInitializeResult,
   appendMcpAuditLog,
   listMcpAuditLog,
+  buildMcpAuditSummary,
   MCP_TASK_REV_FIELD,
   getWorkspaceSnapshot,
   listMilestones,

@@ -23,6 +23,7 @@ export function useMcpPanelState<TPreferences extends McpPreferencesShape>({
   );
   const [mcpListenerStatus, setMcpListenerStatus] = useState<McpListenerStatus | null>(null);
   const [mcpAuditLog, setMcpAuditLog] = useState<McpAuditSummaryEntry[]>([]);
+  const [mcpAuditSummary, setMcpAuditSummary] = useState<McpAuditSummary | null>(null);
 
   const adoptAppliedSignatureFromListener = useCallback((listenerStatus: McpListenerStatus | null) => {
     if (!listenerStatus || !preferences.mcpAgentAccessEnabled) return;
@@ -60,16 +61,20 @@ export function useMcpPanelState<TPreferences extends McpPreferencesShape>({
 
   const refreshMcpAuditLog = useCallback(async () => {
     try {
-      if (window.electron?.mcp?.getAuditLog) {
-        const result = await window.electron.mcp.getAuditLog({ limit: 25 });
-        if (result?.ok && Array.isArray(result.data)) {
+      const [logResult, summaryResult] = await Promise.all([
+        window.electron?.mcp?.getAuditLog?.({ limit: 25 }),
+        window.electron?.mcp?.getAuditSummary?.({ limit: 200 }),
+      ]);
+      if (logResult?.ok && Array.isArray(logResult.data)) {
           setMcpAuditLog(
-            result.data.filter(
+            logResult.data.filter(
               (entry): entry is McpAuditSummaryEntry =>
                 Boolean(entry && typeof entry.auditId === 'string' && typeof entry.timestamp === 'string')
             )
           );
-        }
+      }
+      if (summaryResult?.ok && summaryResult.data) {
+        setMcpAuditSummary(summaryResult.data);
       }
     } catch {
       // Keep the last known audit log if the bridge is temporarily unavailable.
@@ -153,6 +158,7 @@ export function useMcpPanelState<TPreferences extends McpPreferencesShape>({
     appliedMcpSettingsSignature,
     mcpListenerStatus,
     mcpAuditLog,
+    mcpAuditSummary,
     refreshMcpListenerStatus,
     refreshMcpAuditLog,
     handleRestartMcpServer,

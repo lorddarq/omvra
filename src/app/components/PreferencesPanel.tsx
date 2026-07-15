@@ -60,6 +60,7 @@ interface PreferencesPanelProps {
   mcpCapabilityProfile: 'read_only' | 'task_write' | 'admin';
   mcpListenerStatus: McpListenerStatus | null;
   mcpAuditLog: McpAuditEntry[];
+  mcpAuditSummary: McpAuditSummary | null;
   onUpdateChannelChange: (channel: 'stable' | 'rc') => void;
   onMcpAgentAccessToggle: (enabled: boolean) => void;
   onMcpAddressChange: (address: string) => void;
@@ -116,6 +117,7 @@ export function PreferencesPanel({
   mcpCapabilityProfile,
   mcpListenerStatus,
   mcpAuditLog,
+  mcpAuditSummary,
   onUpdateChannelChange,
   onMcpAgentAccessToggle,
   onMcpAddressChange,
@@ -372,6 +374,7 @@ export function PreferencesPanel({
       <McpActivitySettingsSection>
         <McpActivityLogSection
           auditLog={mcpAuditLog}
+          auditSummary={mcpAuditSummary}
           copied={copiedAuditLog}
           onRefresh={onRefreshMcpAuditLog}
           onCopy={copyAuditLog}

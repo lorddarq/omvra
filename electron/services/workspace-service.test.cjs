@@ -19,6 +19,7 @@ const {
   listKanbanCards,
   listTimelineCards,
   listMcpAuditLog,
+  buildMcpAuditSummary,
   listBoardWatcherStates,
   pollBoardWatcher,
   createTask,
@@ -160,6 +161,77 @@ test('audit log returns most recent entries first and respects limit', () => {
   assert.equal(recent[0].toolName, 'tasks.update_agent_summary');
   assert.equal(recent[1].toolName, 'tasks.move_to_status');
   assert.ok(recent.every(entry => typeof entry.auditId === 'string' && entry.auditId.startsWith('audit-')));
+});
+
+test('audit summary normalizes legacy outcomes and groups bounded metadata', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  store.set('omvra.mcp.audit.v1', [
+    {
+      auditId: 'audit-success',
+      timestamp: '2026-07-15T10:00:00.000Z',
+      agent: 'codex',
+      clientName: 'Codex',
+      toolName: 'tasks.update',
+      transport: 'http',
+      outcome: 'allowed',
+      complexityBand: 'medium',
+      durationMs: 10,
+      logicalCalls: 2,
+      arguments: { secret: 'must not appear' },
+    },
+    {
+      auditId: 'audit-conflict',
+      timestamp: '2026-07-15T10:01:00.000Z',
+      agent: 'codex',
+      toolName: 'tasks.update',
+      outcome: 'denied',
+      reason: 'conflict',
+      complexityBand: 'medium',
+      durationMs: 30,
+    },
+    {
+      auditId: 'audit-denied',
+      timestamp: '2026-07-15T10:02:00.000Z',
+      agent: 'claude',
+      toolName: 'tasks.delete',
+      outcome: 'denied',
+      reason: 'unauthorized',
+      durationMs: 5,
+    },
+  ]);
+
+  const summary = buildMcpAuditSummary(store, { agent: 'codex' });
+  assert.equal(summary.schemaVersion, 1);
+  assert.equal(summary.sampleSize, 2);
+  assert.equal(summary.overall.successCount, 1);
+  assert.equal(summary.overall.failureCount, 1);
+  assert.equal(summary.overall.deniedCount, 0);
+  assert.equal(summary.overall.duration.medianMs, 10);
+  assert.equal(summary.overall.logicalCalls.total, 2);
+  assert.deepEqual(summary.by.agent, [{ key: 'codex', ...summary.overall }]);
+  assert.equal(JSON.stringify(summary).includes('must not appear'), false);
+  assert.equal(Array.isArray(summary.by.toolName), true);
+});
+
+test('audit summary caps high-cardinality groups and keeps missing dimensions bounded', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  store.set('omvra.mcp.audit.v1', Array.from({ length: 40 }, (_, index) => ({
+    auditId: `audit-bounded-${index}`,
+    timestamp: `2026-07-15T10:${String(index).padStart(2, '0')}:00.000Z`,
+    outcome: 'success',
+    toolName: `tasks.synthetic_${index}`,
+    durationMs: index,
+    arguments: { payload: 'must not be projected' },
+  })));
+
+  const summary = buildMcpAuditSummary(store);
+  assert.equal(summary.sampleSize, 40);
+  assert.equal(summary.by.toolName.length, 25);
+  assert.equal(summary.by.agent[0].key, 'unknown');
+  assert.equal(summary.by.transport[0].key, 'http');
+  assert.equal(summary.by.outcome[0].key, 'success');
+  assert.equal(JSON.stringify(summary).includes('must not be projected'), false);
+  assert.equal(JSON.stringify(summary).includes('arguments'), false);
 });
 
 test('kanban cards parity: cards.kanban.list aligns with listTasks filters by id', () => {

@@ -70,7 +70,7 @@ For UI tasks, inspect the existing component before editing, compare against the
 ```
 
 ```text
-When working assigned execution tasks, first read the task details, related milestone, and linked dependencies. Check existing docs before inventing new patterns. If a skill applies, use it explicitly. Prefer repository-native tests and targeted manual verification over broad unscoped changes. End with a short handoff note covering what changed, what was verified, and any remaining risk.
+When working assigned execution tasks, first read the task details, related milestone, and linked dependencies. Check existing docs before inventing new patterns. If a skill applies, use it explicitly. Prefer repository-native tests and targeted manual verification over broad unscoped changes. For handoff, append the full summary of what changed, what was verified, and any remaining risk to the existing task description using the task update-description path; use the completion field only for a concise pointer of 240 characters or fewer.
 ```
 
 Avoid using this field for:

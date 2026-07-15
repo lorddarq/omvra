@@ -6,6 +6,7 @@ const {
   buildMcpCapabilitySnapshot,
   buildMcpInitializeResult,
   appendMcpAuditLog,
+  buildMcpAuditSummary,
   getWorkspaceSnapshot,
   listMilestones,
   getMilestoneById,
@@ -80,6 +81,24 @@ const READ_TOOL_DEFINITIONS = [
         assigneeId: { type: 'string' },
         search: { type: 'string' },
         projectId: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'diagnostics.audit_summary',
+    description: 'Returns bounded privacy-preserving MCP audit summaries grouped by agent, client, tool, transport, origin, outcome, and complexity band. It never returns raw audit events or payloads.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        limit: { type: 'integer', minimum: 1, maximum: 200 },
+        agent: { type: 'string' },
+        clientName: { type: 'string' },
+        toolName: { type: 'string' },
+        transport: { type: 'string' },
+        origin: { type: 'string' },
+        outcome: { type: 'string' },
+        complexityBand: { type: 'string' },
       },
     },
   },
@@ -517,7 +536,7 @@ const WRITE_TOOL_DEFINITIONS = [
   },
   {
     name: 'tasks.update_completion_description',
-    description: 'Updates a task description with a brief completion note. Use this to summarize what the agent completed before handing off.',
+    description: 'Replaces the task description/notes. To preserve existing content while adding a full handoff, read the current notes, append the summary, then write the combined notes here. Use this for details longer than the brief completion pointer.',
     inputSchema: {
       type: 'object',
       additionalProperties: true,
@@ -531,7 +550,7 @@ const WRITE_TOOL_DEFINITIONS = [
   },
   {
     name: 'tasks.complete_and_request_review',
-    description: 'Adds a brief completion note and moves the task to Ready for human review using the next safe revision.',
+    description: 'Adds a brief completion pointer (maximum 240 characters) and moves the task to Ready for human review. Store the full handoff in the task description first with tasks.update_description, preserving existing notes.',
     inputSchema: {
       type: 'object',
       additionalProperties: true,
@@ -818,16 +837,142 @@ function hasResponseId(request) {
 
 function getRequestMeta(req) {
   const headers = req?.headers || {};
-  const remoteAddress = req?.transport === 'stdio'
-    ? 'stdio'
-    : req?.socket?.remoteAddress || req?.remoteAddress || null;
+  const clientName = req?.mcpClientInfo?.name
+    || headers['x-mcp-client']
+    || headers['mcp-client']
+    || null;
+  const clientVersion = req?.mcpClientInfo?.version
+    || headers['x-mcp-client-version']
+    || headers['mcp-client-version']
+    || null;
 
   return {
-    remoteAddress,
-    userAgent: typeof headers['user-agent'] === 'string' ? headers['user-agent'] : null,
-    tokenProvided: Boolean(extractBearerToken(req)),
     transport: req?.transport || 'http',
+    origin: normalizeAuditOrigin(headers.origin),
+    agent: normalizeMcpAgent(clientName),
+    clientName: normalizeAuditString(clientName),
+    clientVersion: normalizeAuditString(clientVersion),
   };
+}
+
+const AUDIT_DETAIL_KEYS = [
+  'outcome',
+  'reason',
+  'toolName',
+  'taskId',
+  'projectId',
+  'entityId',
+  'nextRevision',
+  'targetStatusId',
+  'targetStatusTitle',
+  'assigneeId',
+  'assigneeName',
+  'capabilityProfile',
+  'revision',
+  'statusId',
+  'statusTitle',
+  'deletedTaskId',
+  'milestoneId',
+  'milestoneTitle',
+  'target',
+];
+
+function normalizeAuditString(value) {
+  return typeof value === 'string' && value.trim() ? value.trim().slice(0, 160) : null;
+}
+
+function normalizeAuditOrigin(value) {
+  const origin = normalizeAuditString(value);
+  if (!origin) return null;
+  try {
+    return new URL(origin).origin.slice(0, 160);
+  } catch (_error) {
+    return null;
+  }
+}
+
+function normalizeMcpAgent(value) {
+  const normalized = normalizeAuditString(value)?.toLowerCase() || '';
+  if (normalized.includes('codex')) return 'codex';
+  if (normalized.includes('copilot')) return 'copilot';
+  if (normalized.includes('claude')) return 'claude';
+  if (normalized.includes('opencode') || normalized.includes('open code')) return 'opencode';
+  if (normalized.includes('openai')) return 'openai';
+  return 'unknown';
+}
+
+function normalizeAuditOutcome(value, reason) {
+  if (value === 'allowed' || value === 'success') return 'success';
+  if (value === 'denied') {
+    const normalizedReason = normalizeAuditString(reason)?.toLowerCase() || '';
+    return ['access_disabled', 'unauthorized', 'token_expired', 'write_tools_unavailable'].includes(normalizedReason)
+      ? 'denied'
+      : 'failure';
+  }
+  return 'failure';
+}
+
+function normalizeFailureClass(reason, outcome) {
+  if (outcome === 'success') return null;
+  const normalized = normalizeAuditString(reason)?.toLowerCase() || '';
+  if (normalized.includes('unauthor')) return 'unauthorized';
+  if (normalized.includes('access_disabled') || normalized.includes('write_tools_unavailable')) return 'forbidden';
+  if (normalized.includes('invalid') || normalized.includes('params')) return 'invalid_params';
+  if (normalized.includes('not_found') || normalized.includes('not found')) return 'not_found';
+  if (normalized.includes('conflict') || normalized.includes('revision')) return 'conflict';
+  if (normalized.includes('internal') || normalized.includes('error')) return 'internal';
+  return 'unknown';
+}
+
+function getAuditTarget(details = {}) {
+  const target = details.target && typeof details.target === 'object' ? details.target : {};
+  return {
+    taskId: normalizeAuditString(details.taskId || target.taskId),
+    projectId: normalizeAuditString(details.projectId || target.projectId),
+    entityId: normalizeAuditString(details.entityId || target.entityId),
+  };
+}
+
+function getAuditTargetFromArgs(args) {
+  const normalized = normalizeObject(args);
+  return {
+    taskId: normalizeAuditString(normalized.taskId || normalized.id),
+    projectId: normalizeAuditString(normalized.projectId),
+    entityId: normalizeAuditString(normalized.entityId || normalized.milestoneId),
+  };
+}
+
+function getSafeAuditDetails(details = {}) {
+  const safeDetails = {};
+  for (const key of AUDIT_DETAIL_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(details, key)) {
+      safeDetails[key] = sanitizeForAudit(details[key]);
+    }
+  }
+  return safeDetails;
+}
+
+function appendNormalizedMcpAudit(store, req, details = {}) {
+  const startedAt = req?._mcpTelemetryStartedAt || new Date().toISOString();
+  const finishedAt = new Date().toISOString();
+  const durationMs = Math.max(0, Date.parse(finishedAt) - Date.parse(startedAt));
+  const safeDetails = getSafeAuditDetails(details);
+  const outcome = normalizeAuditOutcome(safeDetails.outcome, safeDetails.reason);
+  const entry = {
+    schemaVersion: 1,
+    type: details.type || 'mcp_tool_call',
+    ...getRequestMeta(req),
+    ...safeDetails,
+    outcome,
+    failureClass: normalizeFailureClass(safeDetails.reason, outcome),
+    startedAt,
+    finishedAt,
+    durationMs,
+    target: getAuditTarget(safeDetails),
+  };
+  const audit = appendMcpAuditLog(store, entry);
+  if (req && typeof req === 'object') req._mcpAuditRecorded = true;
+  return audit;
 }
 
 function sanitizeForAudit(value, depth = 0) {
@@ -1058,11 +1203,14 @@ function makeResourceReadResult(resourceUri, data) {
 }
 
 function recordWriteAttempt(store, req, details) {
-  return appendMcpAuditLog(store, {
+  return appendNormalizedMcpAudit(store, req, {
     type: 'mcp_write_attempt',
-    ...getRequestMeta(req),
-    ...sanitizeForAudit(details),
+    ...details,
   });
+}
+
+function recordToolAttempt(store, req, details) {
+  return appendNormalizedMcpAudit(store, req, details);
 }
 
 function handleToolCall(store, req, params) {
@@ -1082,7 +1230,6 @@ function handleToolCall(store, req, params) {
         reason: 'write_tools_unavailable',
         capabilityProfile: profile,
         toolName: name,
-        arguments: args,
       });
 
       return {
@@ -1105,6 +1252,9 @@ function handleToolCall(store, req, params) {
 
     case 'tasks.list':
       return { result: makeToolResult(listTasks(store, args)) };
+
+    case 'diagnostics.audit_summary':
+      return { result: makeToolResult(buildMcpAuditSummary(store, args)) };
 
     case 'tasks.get': {
       const taskId = parseTaskId(args);
@@ -2049,8 +2199,11 @@ function createRequestDispatcher(store) {
     const canRespond = hasResponseId(request);
     const respond = payload => (canRespond ? makeJsonRpcResponse(id, payload) : null);
     const normalizedMethod = method.trim();
+    if (normalizedMethod === 'tools/call' && req && typeof req === 'object') {
+      req._mcpTelemetryStartedAt = new Date().toISOString();
+      req._mcpAuditRecorded = false;
+    }
     const toolPayload = normalizedMethod === 'tools/call' ? getToolCallPayload(params) : null;
-    const isWriteAttempt = normalizedMethod === 'tools/call' && !toolPayload?.error && isKnownWriteToolName(toolPayload.name);
     const currentServerConfig = getMcpServerConfig(store);
 
     if (normalizedMethod === 'notifications/initialized') {
@@ -2058,13 +2211,13 @@ function createRequestDispatcher(store) {
     }
 
     if (!isMcpAgentAccessEnabled(store)) {
-      if (isWriteAttempt) {
-        recordWriteAttempt(store, req, {
+      if (normalizedMethod === 'tools/call') {
+        recordToolAttempt(store, req, {
           outcome: 'denied',
           reason: 'access_disabled',
           capabilityProfile: getMcpCapabilityProfile(store),
-          toolName: toolPayload.name,
-          arguments: toolPayload.args,
+          toolName: toolPayload?.name || null,
+          target: getAuditTargetFromArgs(toolPayload?.args),
         });
       }
       return respond({
@@ -2076,6 +2229,14 @@ function createRequestDispatcher(store) {
     const isStdioTransport = req?.transport === 'stdio';
     if (token && !isStdioTransport) {
       if (isMcpAccessTokenExpired(currentServerConfig)) {
+        if (normalizedMethod === 'tools/call') {
+          recordToolAttempt(store, req, {
+            outcome: 'denied',
+            reason: 'token_expired',
+            toolName: toolPayload?.name || null,
+            target: getAuditTargetFromArgs(toolPayload?.args),
+          });
+        }
         return respond({
           error: createAuthError(
             currentServerConfig,
@@ -2087,13 +2248,13 @@ function createRequestDispatcher(store) {
       }
       const providedToken = extractBearerToken(req);
       if (!providedToken || providedToken !== token) {
-        if (isWriteAttempt) {
-          recordWriteAttempt(store, req, {
+        if (normalizedMethod === 'tools/call') {
+          recordToolAttempt(store, req, {
             outcome: 'denied',
             reason: 'unauthorized',
             capabilityProfile: getMcpCapabilityProfile(store),
-            toolName: toolPayload.name,
-            arguments: toolPayload.args,
+            toolName: toolPayload?.name || null,
+            target: getAuditTargetFromArgs(toolPayload?.args),
           });
         }
         return respond({
@@ -2115,6 +2276,13 @@ function createRequestDispatcher(store) {
         return respond({
           error: invalidParams('Invalid params: initialize expects an object when params are provided.'),
         });
+      }
+      const clientInfo = normalizeObject(params).clientInfo;
+      if (req && clientInfo && typeof clientInfo === 'object') {
+        req.mcpClientInfo = {
+          name: normalizeAuditString(clientInfo.name),
+          version: normalizeAuditString(clientInfo.version),
+        };
       }
       return respond({ result: buildMcpInitializeResult(store) });
     }
@@ -2180,9 +2348,37 @@ function createRequestDispatcher(store) {
     }
 
     if (normalizedMethod === 'tools/call') {
-      const toolResponse = handleToolCall(store, req, params);
+      let toolResponse;
+      try {
+        toolResponse = handleToolCall(store, req, params);
+      } catch (error) {
+        recordToolAttempt(store, req, {
+          outcome: 'failure',
+          reason: 'internal_error',
+          toolName: toolPayload?.name || null,
+          target: getAuditTargetFromArgs(toolPayload?.args),
+        });
+        return respond({
+          error: createJsonRpcError(JSON_RPC_ERROR.INTERNAL_ERROR, 'Internal error'),
+        });
+      }
       if (toolResponse.error) {
+        if (!req?._mcpAuditRecorded) {
+          recordToolAttempt(store, req, {
+            outcome: 'failure',
+            reason: toolResponse.error.data?.reason || 'invalid_params',
+            toolName: toolPayload?.name || null,
+            target: getAuditTargetFromArgs(toolPayload?.args),
+          });
+        }
         return respond({ error: toolResponse.error });
+      }
+      if (!req?._mcpAuditRecorded) {
+        recordToolAttempt(store, req, {
+          outcome: 'success',
+          toolName: toolPayload?.name || null,
+          target: getAuditTargetFromArgs(toolPayload?.args),
+        });
       }
       return respond({ result: toolResponse.result });
     }

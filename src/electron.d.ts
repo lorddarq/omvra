@@ -136,7 +136,42 @@ declare global {
     clientVersion?: string;
     remoteAddress?: string;
     capabilityProfile?: string;
+    durationMs?: number;
+    failureClass?: string | null;
     [key: string]: unknown;
+  }
+
+  interface McpAuditMetricSummary {
+    count: number;
+    successCount: number;
+    failureCount: number;
+    deniedCount: number;
+    successRate: number | null;
+    failureRate: number | null;
+    deniedRate: number | null;
+    duration: {
+      sampleSize: number;
+      medianMs: number | null;
+      p95Ms: number | null;
+    };
+    logicalCalls: {
+      sampleSize: number;
+      total: number | null;
+      median: number | null;
+    };
+  }
+
+  interface McpAuditDimensionGroup extends McpAuditMetricSummary {
+    key: string;
+  }
+
+  interface McpAuditSummary {
+    schemaVersion: 1;
+    generatedAt: string;
+    sampleSize: number;
+    filters: Record<string, string>;
+    overall: McpAuditMetricSummary;
+    by: Record<string, McpAuditDimensionGroup[]>;
   }
 
   interface AppUpdateInfo {
@@ -210,6 +245,7 @@ declare global {
         getCapabilities: () => Promise<McpBridgeResult<McpCapabilities>>;
         getListenerStatus: () => Promise<McpBridgeResult<McpListenerStatus>>;
         getAuditLog: (options?: { limit?: number }) => Promise<McpBridgeResult<McpAuditEntry[]>>;
+        getAuditSummary: (options?: Record<string, string | number>) => Promise<McpBridgeResult<McpAuditSummary>>;
         getWorkspaceSnapshot: () => Promise<McpBridgeResult<McpWorkspaceSnapshot>>;
         restartServer: () => Promise<{ success: boolean; error?: string; listenerStatus?: McpListenerStatus }>;
       };

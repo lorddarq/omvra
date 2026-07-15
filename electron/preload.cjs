@@ -71,6 +71,7 @@ contextBridge.exposeInMainWorld('electron', {
     getCapabilities: () => ipcRenderer.invoke('mcp/get-capabilities'),
     getListenerStatus: () => ipcRenderer.invoke('mcp/get-listener-status'),
     getAuditLog: (options) => ipcRenderer.invoke('mcp/get-audit-log', options),
+    getAuditSummary: (options) => ipcRenderer.invoke('mcp/get-audit-summary', options),
     getWorkspaceSnapshot: () => ipcRenderer.invoke('mcp/workspace/snapshot'),
     restartServer: () => ipcRenderer.invoke('mcp/restart-server'),
   },

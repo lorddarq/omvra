@@ -66,3 +66,35 @@ test('MCP IPC exposes recent audit log entries', async () => {
   assert.equal(response.data[0].auditId, 'audit-1');
   assert.equal(response.data[0].toolName, 'tasks.assign');
 });
+
+test('MCP IPC exposes bounded audit summaries', async () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  store.set('omvra.mcp.audit.v1', [
+    {
+      auditId: 'audit-summary-1',
+      timestamp: '2026-03-26T10:00:00.000Z',
+      agent: 'codex',
+      outcome: 'allowed',
+      toolName: 'tasks.list',
+      durationMs: 12,
+    },
+  ]);
+  const handlers = new Map();
+  const ipcMain = {
+    handle(name, handler) {
+      handlers.set(name, handler);
+    },
+  };
+
+  registerMcpIpcHandlers({
+    ipcMain,
+    store,
+    getListenerStatus: () => ({ status: 'running', listening: true }),
+  });
+
+  const response = await handlers.get('mcp/get-audit-summary')(null, { agent: 'codex' });
+  assert.equal(response.ok, true);
+  assert.equal(response.data.sampleSize, 1);
+  assert.equal(response.data.overall.successCount, 1);
+  assert.equal(response.data.by.agent[0].key, 'codex');
+});

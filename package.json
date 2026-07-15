@@ -3,6 +3,12 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
+  "overrides": {
+    "shell-quote": "1.8.4",
+    "form-data": "4.0.6",
+    "undici": "6.27.0",
+    "js-yaml": "4.2.0"
+  },
   "main": "electron/main.cjs",
   "description": "A modern task management and planning tool",
   "author": "lorddarq",

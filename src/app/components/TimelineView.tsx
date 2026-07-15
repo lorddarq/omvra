@@ -159,6 +159,9 @@ interface TimelineViewProps {
   initialLayoutState?: TimelineLayoutState;
   onLayoutStateChange?: (layout: TimelineLayoutState) => void;
   onTaskClick: (task: Task) => void;
+  onTaskEdit: (task: Task) => void;
+  onTaskDelete: (taskId: string) => void;
+  onTaskDuplicate: (task: Task) => void;
   onAddTask: (date: Date, swimlaneId: string, endDate?: Date, mode?: 'projects' | 'people') => void;
   onUpdateTaskDates: (taskId: string, startDate: string, endDate: string) => void;
   onEditSwimlane: (swimlane: TimelineSwimlane) => void;
@@ -184,6 +187,9 @@ export function TimelineView({
   initialLayoutState,
   onLayoutStateChange,
   onTaskClick,
+  onTaskEdit,
+  onTaskDelete,
+  onTaskDuplicate,
   onAddTask,
   onUpdateTaskDates,
   onEditSwimlane,
@@ -1318,6 +1324,9 @@ export function TimelineView({
                         totalTimelineWidth={totalTimelineWidth}
                         rowHeight={height}
                         onTaskClick={onTaskClick}
+                        onTaskEdit={onTaskEdit}
+                        onTaskDelete={onTaskDelete}
+                        onTaskDuplicate={onTaskDuplicate}
                         onAddTask={(date, swimlaneId, endDate) => onAddTask(date, swimlaneId, endDate, mode)}
                         onEditSwimlane={onEditSwimlane}
                         onMoveSwimlane={handleMoveSwimlane}

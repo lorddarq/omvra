@@ -32,6 +32,7 @@
     "generate:icons": "node electron/scripts/generate-icons.cjs"
   },
   "dependencies": {
+    "@radix-ui/react-context-menu": "^2.2.16",
     "@radix-ui/react-dialog": "1.1.6",
     "@radix-ui/react-label": "2.1.2",
     "@radix-ui/react-select": "2.1.6",

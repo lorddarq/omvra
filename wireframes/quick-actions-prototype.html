@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Omvra · Quick Actions prototype</title>
+  <style>
+    :root {
+      --ink: #172033;
+      --muted: #687386;
+      --soft: #f6f8fb;
+      --line: #e4e8ef;
+      --line-strong: #cbd3df;
+      --blue: #3568f0;
+      --blue-soft: #edf2ff;
+      --green: #198a62;
+      --green-soft: #e8f7f0;
+      --amber: #ad6b00;
+      --amber-soft: #fff5df;
+      --red: #b64242;
+      --red-soft: #fff0f0;
+      --purple: #7057b5;
+      --purple-soft: #f2efff;
+      --shadow: 0 12px 30px rgba(27, 39, 62, .08);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: #fbfcfe; font: 14px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    button { font: inherit; color: inherit; cursor: pointer; }
+    .app { min-height: 100vh; display: grid; grid-template-rows: 58px 1fr; }
+    header { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; background: #fff; border-bottom: 1px solid var(--line); }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 750; letter-spacing: -.02em; }
+    .brand-mark { width: 24px; height: 24px; display: grid; place-items: center; color: #fff; background: var(--blue); border-radius: 7px; font-size: 12px; }
+    .crumbs { display: flex; align-items: center; gap: 9px; margin-left: 28px; color: var(--muted); font-size: 13px; }
+    .crumbs strong { color: var(--ink); font-weight: 650; }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+    .icon-btn, .ghost-btn, .primary-btn { border: 1px solid var(--line-strong); background: #fff; border-radius: 7px; padding: 7px 11px; }
+    .icon-btn { width: 34px; padding: 7px 0; }
+    .primary-btn { color: #fff; border-color: var(--blue); background: var(--blue); font-weight: 650; }
+    .primary-btn:hover, .primary-btn:focus-visible { background: #2958d3; }
+    button:focus-visible { outline: 3px solid rgba(53,104,240,.25); outline-offset: 2px; }
+    main { display: grid; grid-template-columns: 220px minmax(600px, 1fr) 340px; min-height: 0; }
+    aside, .inspector { background: #fff; }
+    .left-rail { padding: 22px 14px; border-right: 1px solid var(--line); }
+    .eyebrow { color: var(--muted); font-size: 11px; font-weight: 750; text-transform: uppercase; letter-spacing: .08em; }
+    .goal-title { margin: 6px 8px 22px; font-size: 16px; line-height: 1.25; font-weight: 720; }
+    nav button { width: 100%; display: flex; justify-content: space-between; border: 0; background: transparent; border-radius: 7px; padding: 9px 10px; text-align: left; color: var(--muted); }
+    nav button.active { color: var(--ink); background: var(--blue-soft); font-weight: 650; }
+    nav button:hover { background: var(--soft); }
+    .rail-section { margin-top: 28px; padding: 0 8px; }
+    .rail-section p { margin: 7px 0; color: var(--muted); font-size: 12px; }
+    .legend { display: grid; gap: 9px; margin-top: 14px; }
+    .legend span { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+    .dot.amber { background: #dfa52e; } .dot.red { background: var(--red); } .dot.gray { background: #a6afbd; }
+    .workspace { min-width: 0; display: flex; flex-direction: column; }
+    .workspace-head { display: flex; align-items: end; justify-content: space-between; padding: 25px 28px 18px; background: #fff; border-bottom: 1px solid var(--line); }
+    h1 { margin: 4px 0 0; font-size: 24px; letter-spacing: -.035em; line-height: 1.1; }
+    .workspace-head p { margin: 7px 0 0; color: var(--muted); }
+    .head-meta { display: flex; gap: 18px; color: var(--muted); font-size: 12px; text-align: right; }
+    .head-meta strong { display: block; color: var(--ink); font-size: 16px; font-weight: 700; }
+    .toolbar { display: flex; align-items: center; gap: 7px; padding: 12px 28px; border-bottom: 1px solid var(--line); background: #fff; }
+    .tool-btn { border: 0; border-radius: 6px; padding: 7px 9px; background: transparent; color: var(--muted); }
+    .tool-btn.active { background: var(--soft); color: var(--ink); font-weight: 650; }
+    .toolbar .spacer { flex: 1; }
+    .canvas { position: relative; flex: 1; min-height: 625px; overflow: auto; background: #fbfcfe; }
+    .canvas-inner { position: relative; width: 920px; height: 625px; margin: 0 auto; }
+    svg.edges { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+    .edge { fill: none; stroke: #aab5c5; stroke-width: 1.8; }
+    .edge.ready { stroke: var(--blue); stroke-dasharray: 5 5; }
+    .node { position: absolute; width: 230px; padding: 13px 14px 12px; border: 1px solid var(--line-strong); border-radius: 9px; background: #fff; box-shadow: 0 5px 12px rgba(36,51,78,.05); text-align: left; transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+    .node:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+    .node.selected { border: 2px solid var(--blue); padding: 12px 13px 11px; box-shadow: 0 0 0 4px rgba(53,104,240,.1); }
+    .node.done { border-color: #b9decf; } .node.pending { border-color: #edcc8e; } .node.blocked { border-color: #e4b8b8; opacity: .78; }
+    .node .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .node h3 { margin: 9px 0 4px; font-size: 14px; line-height: 1.25; }
+    .node p { margin: 0; color: var(--muted); font-size: 11px; }
+    .node-id { color: #8a94a3; font-size: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .status { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+    .status .dot { width: 7px; height: 7px; }
+    .owner { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+    .avatar { display: inline-grid; place-items: center; width: 19px; height: 19px; border-radius: 50%; color: #fff; background: var(--purple); font-size: 9px; font-weight: 700; }
+    .avatar.blue { background: #4772b9; } .avatar.green { background: #27866b; } .avatar.orange { background: #b47724; }
+    .node-actions { display: flex; gap: 6px; margin-top: 12px; }
+    .node-actions button { border: 1px solid var(--line); border-radius: 5px; padding: 5px 7px; background: #fff; color: var(--blue); font-size: 11px; }
+    .node-actions button:disabled { color: #a3acb9; background: var(--soft); cursor: not-allowed; }
+    .start { left: 55px; top: 30px; } .design { left: 350px; top: 30px; } .contracts { left: 350px; top: 215px; }
+    .ui { left: 650px; top: 120px; } .execution { left: 650px; top: 320px; } .qa { left: 650px; top: 495px; }
+    .inspector { border-left: 1px solid var(--line); padding: 22px 20px; overflow: auto; }
+    .inspector-head { display: flex; justify-content: space-between; gap: 12px; align-items: start; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+    .inspector h2 { margin: 5px 0 6px; font-size: 18px; line-height: 1.2; letter-spacing: -.02em; }
+    .inspector p { margin: 0; color: var(--muted); font-size: 12px; }
+    .close { border: 0; background: transparent; color: var(--muted); font-size: 19px; }
+    .section { padding: 18px 0; border-bottom: 1px solid var(--line); }
+    .section h4 { margin: 0 0 11px; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+    .detail-row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 12px; }
+    .detail-row span:first-child { color: var(--muted); } .detail-row span:last-child { font-weight: 650; text-align: right; }
+    .dependency { display: flex; align-items: center; gap: 9px; padding: 7px 0; font-size: 12px; }
+    .dependency .line { width: 16px; height: 1px; background: var(--line-strong); }
+    .action-list { display: grid; gap: 8px; }
+    .action { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 7px; background: #fff; text-align: left; }
+    .action:hover:not(:disabled) { border-color: #a8bce9; background: #f8faff; }
+    .action:disabled { background: var(--soft); color: #a0a8b4; cursor: not-allowed; }
+    .action strong { display: block; font-size: 12px; font-weight: 650; } .action small { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; }
+    .action-tag { padding: 3px 5px; border-radius: 4px; font-size: 10px; white-space: nowrap; background: var(--green-soft); color: var(--green); }
+    .action-tag.confirm { background: var(--amber-soft); color: var(--amber); } .action-tag.denied { background: var(--red-soft); color: var(--red); }
+    .notice { margin-top: 12px; padding: 10px; border-left: 3px solid var(--red); background: var(--red-soft); color: #793333; font-size: 11px; }
+    .log { display: grid; gap: 10px; } .log-item { display: grid; grid-template-columns: 20px 1fr; gap: 8px; font-size: 11px; }
+    .log-item .avatar { width: 20px; height: 20px; } .log-item small { color: var(--muted); }
+    .modal-backdrop { position: fixed; inset: 0; display: none; place-items: center; background: rgba(18,27,43,.24); z-index: 5; }
+    .modal-backdrop.open { display: grid; } .modal { width: min(440px, calc(100vw - 32px)); padding: 22px; border: 1px solid var(--line-strong); border-radius: 10px; background: #fff; box-shadow: 0 20px 60px rgba(16,25,44,.2); }
+    .modal h2 { margin: 0 0 7px; font-size: 18px; } .modal p { margin: 0; color: var(--muted); font-size: 13px; }
+    .preview { margin: 17px 0; padding: 12px; background: var(--soft); border: 1px solid var(--line); border-radius: 7px; font-size: 12px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    @media (max-width: 1100px) { main { grid-template-columns: 190px minmax(520px,1fr); } .inspector { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--line); } }
+    @media (max-width: 700px) { header { padding: 0 14px; } .crumbs { display: none; } main { display: block; } .left-rail { display: none; } .workspace-head { padding: 20px 16px 15px; } .head-meta { display: none; } .toolbar { padding: 10px 16px; overflow-x: auto; } .canvas { min-height: 610px; } .inspector { padding: 20px 16px; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div style="display:flex;align-items:center">
+        <div class="brand"><span class="brand-mark">O</span> omvra</div>
+        <div class="crumbs"><span>Roadmap</span><span>/</span><strong>Goals</strong><span>/</span><strong>Quick actions</strong></div>
+      </div>
+      <div class="top-actions"><button class="icon-btn" aria-label="Search">⌕</button><button class="ghost-btn">Human review queue <span style="color:var(--red)">2</span></button><button class="primary-btn" id="newAction">+ New action</button></div>
+    </header>
+    <main>
+      <aside class="left-rail">
+        <div class="eyebrow">Current goal</div>
+        <div class="goal-title">Quick Actions &amp; Orchestration Controls</div>
+        <nav aria-label="Goal views">
+          <button class="active"><span>Overview</span><span>⌘1</span></button>
+          <button><span>Workflow map</span><span>⌘2</span></button>
+          <button><span>Deliverables</span><span>6</span></button>
+          <button><span>Activity</span><span>18</span></button>
+          <button><span>Policy</span><span>⌘4</span></button>
+        </nav>
+        <div class="rail-section"><div class="eyebrow">Progress</div><p>0 of 6 tasks complete</p><div style="height:5px;background:var(--line);border-radius:4px;margin-top:10px"><div style="height:100%;width:12%;background:var(--blue);border-radius:4px"></div></div></div>
+        <div class="rail-section"><div class="eyebrow">Action states</div><div class="legend"><span><i class="dot"></i> Available</span><span><i class="dot amber"></i> Confirmation</span><span><i class="dot red"></i> Human-only</span><span><i class="dot gray"></i> Blocked by dependency</span></div></div>
+      </aside>
+      <section class="workspace" aria-label="Goal workflow canvas">
+        <div class="workspace-head"><div><div class="eyebrow">Goal orchestration</div><h1>Quick Actions &amp; Orchestration Controls</h1><p>Six tasks · governed handoffs · human acceptance at the end</p></div><div class="head-meta"><div><strong>12%</strong>complete</div><div><strong>2</strong>blocked</div><div><strong>Aug 14</strong>target</div></div></div>
+        <div class="toolbar"><button class="tool-btn active">Workflow map</button><button class="tool-btn">Dependencies</button><button class="tool-btn">Audit trail</button><span class="spacer"></span><button class="tool-btn" id="fitCanvas">Fit canvas</button><button class="tool-btn">⋮</button></div>
+        <div class="canvas" id="canvas">
+          <div class="canvas-inner">
+            <svg class="edges" viewBox="0 0 920 625" aria-hidden="true"><path class="edge" d="M285 91 H320 V275 H350"/><path class="edge" d="M285 91 H320 V90 H350"/><path class="edge" d="M580 91 H615 V180 H650"/><path class="edge" d="M580 275 H615 V180 H650"/><path class="edge" d="M580 275 H615 V380 H650"/><path class="edge" d="M880 180 V320"/><path class="edge" d="M880 380 V495"/><path class="edge ready" d="M285 91 H320 V380 H650"/></svg>
+            <article class="node done" role="button" tabindex="0" data-node="shape" style="left:55px;top:30px"><span class="row"><span class="status"><i class="dot"></i> Done</span><span class="node-id">01</span></span><h3>Shape quick-action taxonomy</h3><p>Pericles · Product Ideas</p><div class="node-actions"><button data-action="open">View deliverable</button></div></article>
+            <article class="node pending selected" role="button" tabindex="0" data-node="design" style="left:350px;top:30px"><span class="row"><span class="status"><i class="dot amber"></i> Open Tasks</span><span class="node-id">02</span></span><h3>Design Goals quick-action canvas</h3><p>Ted · Open Tasks</p><div class="node-actions"><button data-action="start">Start task</button></div></article>
+            <article class="node pending" role="button" tabindex="0" data-node="contracts" style="left:350px;top:215px"><span class="row"><span class="status"><i class="dot amber"></i> In progress</span><span class="node-id">03</span></span><h3>Define MCP contracts &amp; events</h3><p>Arc · Open Tasks</p><div class="node-actions"><button data-action="request">Request deliverable</button></div></article>
+            <article class="node blocked" role="button" tabindex="0" data-node="ui" style="left:650px;top:120px"><span class="row"><span class="status"><i class="dot gray"></i> Blocked</span><span class="node-id">04</span></span><h3>Implement canvas &amp; controls</h3><p>Edgar · Open Tasks</p><div class="node-actions"><button disabled>Start task</button></div></article>
+            <article class="node blocked" role="button" tabindex="0" data-node="execution" style="left:650px;top:320px"><span class="row"><span class="status"><i class="dot gray"></i> Blocked</span><span class="node-id">05</span></span><h3>Implement execution &amp; audit</h3><p>Edgar · Open Tasks</p><div class="node-actions"><button disabled>Start task</button></div></article>
+            <article class="node blocked" role="button" tabindex="0" data-node="qa" style="left:650px;top:495px"><span class="row"><span class="status"><i class="dot gray"></i> Blocked</span><span class="node-id">06</span></span><h3>QA &amp; rollout handoff</h3><p>Teddy · Open Tasks</p><div class="node-actions"><button disabled>Start task</button></div></article>
+          </div>
+        </div>
+      </section>
+      <aside class="inspector" aria-label="Selected task inspector">
+        <div class="inspector-head"><div><div class="eyebrow">Selected node · 02</div><h2 id="inspectorTitle">Design Goals quick-action canvas</h2><p id="inspectorSubtitle">task-9e3619ea · assigned to Ted</p></div><button class="close" aria-label="Close inspector">×</button></div>
+        <div class="section"><h4>Task status</h4><div class="detail-row"><span>Column</span><span id="column">Open Tasks</span></div><div class="detail-row"><span>Schedule</span><span>Jul 20 → Jul 25</span></div><div class="detail-row"><span>Priority</span><span>Normal</span></div></div>
+        <div class="section"><h4>Dependencies</h4><div class="dependency"><i class="dot"></i><span>Shape quick-action taxonomy</span><span style="margin-left:auto;color:var(--green)">ready</span></div><div class="dependency"><span class="line"></span><span style="color:var(--muted)">No other blockers</span></div></div>
+        <div class="section"><h4>Quick actions</h4><div class="action-list"><button class="action" data-action="start"><span><strong>Start task</strong><small>Move to In Progress</small></span><span class="action-tag">Available</span></button><button class="action" data-action="assign"><span><strong>Reassign task</strong><small>Choose an eligible agent</small></span><span class="action-tag confirm">Confirm</span></button><button class="action" data-action="request"><span><strong>Request deliverable</strong><small>Ask Ted for a progress artifact</small></span><span class="action-tag">Available</span></button><button class="action" disabled><span><strong>Mark ready for validation</strong><small>Task must be in progress</small></span><span class="action-tag denied">Blocked</span></button><button class="action" data-action="human"><span><strong>Accept completion</strong><small>Requires human reviewer</small></span><span class="action-tag denied">Human-only</span></button></div><div class="notice"><strong>Why is implementation blocked?</strong><br/>It depends on design and MCP contracts. The next allowed action is to advance either upstream task.</div></div>
+        <div class="section"><h4>Recent activity</h4><div class="log"><div class="log-item"><span class="avatar green">P</span><div><strong>Pericles</strong> completed shaping<br/><small>18 min ago · audit-7b21</small></div></div><div class="log-item"><span class="avatar blue">T</span><div><strong>Ted</strong> was assigned this task<br/><small>24 min ago · audit-7b20</small></div></div></div></div>
+      </aside>
+    </main>
+  </div>
+  <div class="modal-backdrop" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal"><h2 id="modalTitle">Start this task?</h2><p id="modalText">This will move the task from Open Tasks to In Progress.</p><div class="preview"><strong>Policy check</strong><br/><span style="color:var(--green)">✓ Allowed for the selected context</span><br/><span style="color:var(--muted)">Audit event will be recorded with actor, action, and revision.</span></div><div class="modal-actions"><button class="ghost-btn" id="cancelModal">Cancel</button><button class="primary-btn" id="confirmModal">Confirm action</button></div></div></div>
+  <script>
+    const modal = document.getElementById('modal');
+    const title = document.getElementById('modalTitle');
+    const text = document.getElementById('modalText');
+    let pending = 'Start task';
+    function openAction(action) {
+      pending = action;
+      const labels = { start: ['Start this task?', 'This will move the task from Open Tasks to In Progress.'], assign: ['Reassign this task?', 'Choose an eligible persona before the handoff is recorded.'], request: ['Request a deliverable?', 'Ted will receive a request for the current design artifact.'], human: ['Request human acceptance?', 'This action opens the explicit human review gate.'] };
+      [title.textContent, text.textContent] = labels[action] || ['Run quick action?', 'The action will be checked against the current goal policy.'];
+      modal.classList.add('open');
+    }
+    document.querySelectorAll('[data-action]').forEach(el => el.addEventListener('click', e => { e.stopPropagation(); openAction(el.dataset.action); }));
+    document.querySelectorAll('.node').forEach(node => { const select = () => { document.querySelectorAll('.node').forEach(n => n.classList.remove('selected')); node.classList.add('selected'); document.getElementById('inspectorTitle').textContent = node.querySelector('h3').textContent; document.getElementById('inspectorSubtitle').textContent = 'selected node · governed quick actions'; }; node.addEventListener('click', select); node.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(); } }); });
+    document.getElementById('newAction').addEventListener('click', () => openAction('request'));
+    document.getElementById('cancelModal').addEventListener('click', () => modal.classList.remove('open'));
+    document.getElementById('confirmModal').addEventListener('click', () => { modal.classList.remove('open'); document.getElementById('column').textContent = pending === 'start' ? 'In Progress' : 'Open Tasks'; });
+    modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
+    document.getElementById('fitCanvas').addEventListener('click', () => document.getElementById('canvas').scrollTo({left: 0, top: 0, behavior: 'smooth'}));
+  </script>
+</body>
+</html>

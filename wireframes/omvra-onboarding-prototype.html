@@ -1,0 +1,1677 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src 'unsafe-inline' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Omvra Onboarding Wireframe</title>
+<style>:root{color-scheme:light dark;background:light-dark(rgb(255 255 255), rgb(24 24 24))}html,body{margin:0}body{box-sizing:border-box;padding:1rem;background:inherit}iframe{display:block;width:100%;max-width:736px;height:calc(100vh - 2rem);margin:0 auto;border:0}</style>
+</head>
+<body>
+<iframe sandbox="allow-scripts" referrerpolicy="no-referrer" title="Omvra Onboarding Wireframe" srcdoc="&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;meta name=&quot;referrer&quot; content=&quot;no-referrer&quot;&gt;
+&lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src &#x27;none&#x27;; script-src &#x27;unsafe-inline&#x27; &#x27;unsafe-eval&#x27; &#x27;wasm-unsafe-eval&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src &#x27;unsafe-inline&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src &#x27;none&#x27;; object-src &#x27;none&#x27;; base-uri &#x27;none&#x27;; form-action &#x27;none&#x27;&quot;&gt;
+&lt;title&gt;Omvra Onboarding Wireframe&lt;/title&gt;
+&lt;style&gt;:root {
+  color-scheme: light dark;
+  background-color: var(--background) !important;
+
+  /* Agent-facing contract; keep in sync with SKILL.md. */
+  --background: light-dark(rgb(255 255 255), rgb(24 24 24));
+  --foreground: light-dark(rgb(26 28 31), rgb(255 255 255));
+  --card: color-mix(in oklab, var(--foreground) 5%, transparent);
+  --card-foreground: var(--foreground);
+  --popover: light-dark(rgb(255 255 255), rgb(45 45 45));
+  --popover-foreground: var(--foreground);
+  --primary: light-dark(rgb(51 156 255), rgb(131 195 255));
+  --primary-foreground: light-dark(rgb(255 255 255), rgb(13 13 13));
+  --secondary: light-dark(rgb(255 255 255 / 96%), rgb(54 54 54 / 96%));
+  --secondary-foreground: var(--foreground);
+  --muted: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --muted-foreground: light-dark(
+    rgb(26 28 31 / 49.4%),
+    rgb(255 255 255 / 49.8%)
+  );
+  --accent: light-dark(rgb(229 242 255), rgb(13 39 63));
+  --accent-foreground: var(--primary);
+  --destructive: light-dark(rgb(226 85 7), rgb(255 133 73));
+  --border: light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%));
+  --input: light-dark(
+    rgb(26 28 31 / 11.8%),
+    color-mix(in oklab, rgb(0 0 0) 10%, transparent)
+  );
+  --ring: light-dark(rgb(51 156 255), rgb(131 195 255 / 76%));
+  --font-size-base: 14px;
+  --viz-series-1: var(--primary);
+  --viz-series-2: light-dark(rgb(243 136 59), rgb(245 154 86));
+  --viz-series-3: light-dark(rgb(93 201 119), rgb(116 213 139));
+  --viz-series-4: light-dark(rgb(235 119 177), rgb(240 143 192));
+  --viz-series-5: light-dark(rgb(155 121 236), rgb(170 145 239));
+  --viz-series-6: light-dark(rgb(58 185 177), rgb(90 203 194));
+
+  /* Internal implementation variables; not part of the agent contract. */
+  --font-sans: -apple-system, system-ui, &quot;Segoe UI&quot;, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;,
+    monospace;
+  --font-size-normal: max(11px, var(--font-size-base));
+  --font-size-tooltip: calc(var(--font-size-base) - 1px);
+  --font-size-small: max(11px, calc(var(--font-size-base) - 2px));
+  --font-size-h1: calc(var(--font-size-normal) * 1.7142857143);
+  --font-size-h2: calc(var(--font-size-normal) * 1.4285714286);
+  --font-size-h3: calc(var(--font-size-normal) * 1.2857142857);
+  --font-weight-normal: 430;
+  --font-weight-medium: 500;
+  --line-height-normal: calc(var(--font-size-normal) * 1.5);
+  --line-height-tooltip: calc(var(--font-size-tooltip) * 1.4285714286);
+  --line-height-small: calc(var(--font-size-small) + 4px);
+  --radius: 12.5px;
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-2xl: calc(var(--radius) * 1.6);
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px -1px rgb(0 0 0 / 8%);
+  --checkmark-image: url(&quot;data:image/svg+xml,%3Csvg xmlns=&#x27;http://www.w3.org/2000/svg&#x27; viewBox=&#x27;0 0 17 17&#x27;%3E%3Cpath d=&#x27;M12.8961 3.64101C13.1297 3.41418 13.4984 3.37523 13.7779 3.56581C14.0571 3.75635 14.1554 4.11331 14.0299 4.41347L13.9615 4.53847L7.71151 13.7045C7.59411 13.8767 7.4063 13.9877 7.19881 14.0072C6.99136 14.0267 6.78564 13.9533 6.63826 13.806L2.88826 10.056L2.79842 9.9457C2.6192 9.67407 2.64927 9.30496 2.88826 9.06581C3.12738 8.82669 3.49647 8.79676 3.76815 8.97597L3.8785 9.06581L7.03084 12.2182L12.8053 3.74941L12.8961 3.64101Z&#x27;/%3E%3C/svg%3E&quot;);
+
+  /* Legacy aliases; not part of the current agent contract. */
+  --viz-bg: transparent;
+  --viz-panel: var(--card);
+  --viz-border: var(--border);
+  --viz-text: var(--foreground);
+  --viz-muted: var(--muted-foreground);
+  --viz-accent: var(--primary);
+  --viz-accent-text: var(--primary-foreground);
+  --viz-accent-bg: var(--accent);
+  --viz-font-size: var(--font-size-base);
+  --viz-warning: var(--destructive);
+  --color-background-primary: var(--background);
+  --color-text-primary: var(--foreground);
+  --color-border-secondary: var(--border);
+}
+
+:root[data-theme=&quot;light&quot;] {
+  color-scheme: light;
+}
+
+:root[data-theme=&quot;dark&quot;] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html &gt; body {
+  margin: 0;
+  padding: 5px;
+  color: var(--foreground);
+  background: transparent !important;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-normal);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
+}
+
+a {
+  color: color-mix(in srgb, var(--viz-accent) 80%, var(--viz-text) 20%);
+  cursor: pointer;
+  font-weight: var(--viz-font-weight-medium);
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+
+a:is(:hover, :focus-visible) {
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-thickness: 0.5px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin-block: 0;
+}
+
+h1 {
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h2 {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h3,
+h4,
+h5,
+h6 {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.3;
+}
+
+b,
+strong,
+th {
+  font-weight: var(--font-weight-medium);
+}
+
+code:not(pre code) {
+  display: inline;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  corner-shape: superellipse(1.5);
+  background: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  word-break: break-word;
+}
+
+#widget {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: transparent !important;
+}
+
+.card {
+  min-width: 0;
+  padding: 12px;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  border-radius: var(--radius-2xl);
+  corner-shape: superellipse(1.5);
+  color: var(--card-foreground);
+  background: var(--card);
+}
+
+#widget &gt; :not(.card) {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 50;
+  top: 0;
+  left: 0;
+  width: max-content;
+  max-width: min(
+    20rem,
+    var(--tooltip-available-width, calc(100vw - 10px)),
+    calc(100vw - 10px)
+  );
+  max-height: min(
+    var(--tooltip-available-height, calc(100vh - 10px)),
+    calc(100vh - 10px)
+  );
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  box-shadow: none;
+  font-size: var(--font-size-tooltip);
+  line-height: var(--line-height-tooltip);
+  overflow-wrap: break-word;
+  white-space: normal;
+  pointer-events: none;
+  user-select: none;
+}
+
+.viz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(180px, 24%), 1fr));
+  gap: 10px;
+}
+
+.viz-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.viz-stat-value {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+.viz-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.viz-badge {
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  color: var(--accent-foreground);
+  background: var(--accent);
+  font-weight: var(--font-weight-medium);
+}
+
+small,
+.text-small,
+.viz-badge {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.text-muted {
+  color: var(--muted-foreground);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.viz-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.viz-controls &gt; .form-label {
+  display: grid;
+  min-width: min(100%, 260px);
+  flex: 1 1 280px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin-bottom: 0;
+}
+
+.viz-controls &gt; .form-label &gt; :is(.form-control, .form-range, .form-select) {
+  grid-column: 1 / -1;
+}
+
+.btn,
+.form-check-input,
+.form-control,
+.form-range,
+.form-select {
+  font: inherit;
+}
+
+.btn {
+  appearance: button;
+  display: inline-flex;
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0 8px;
+  -webkit-app-region: no-drag;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: var(--cursor-interaction, pointer);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.btn:is(.btn-block, .viz-tile) {
+  inline-size: 100%;
+}
+
+.btn.viz-tile {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+a.btn {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn-primary {
+  border-color: transparent;
+  color: var(--primary-foreground);
+  background: var(--foreground);
+  background-clip: padding-box;
+}
+
+.btn-primary .text-muted {
+  color: color-mix(in srgb, var(--primary-foreground) 50%, transparent);
+}
+
+.btn-primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 80%, transparent);
+  background-clip: padding-box;
+}
+
+.btn-ghost {
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.btn-ghost:not(:disabled):hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+[data-lucide] {
+  stroke-width: 1.6;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--foreground);
+}
+
+.form-control {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.form-control::placeholder {
+  color: var(--muted-foreground);
+}
+
+.form-control[type=&quot;file&quot;] {
+  padding: 0;
+  overflow: hidden;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control[type=&quot;file&quot;]::file-selector-button {
+  min-height: 26px;
+  margin-right: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--input);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: inherit;
+  font: inherit;
+}
+
+.form-control[type=&quot;file&quot;]:not(:disabled):hover::file-selector-button {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-control-color[type=&quot;color&quot;] {
+  width: 40px;
+  height: 28px;
+  padding: 3px;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch {
+  border: 0;
+  border-radius: calc(var(--radius-lg) - 4px);
+  corner-shape: superellipse(1.5);
+}
+
+textarea.form-control {
+  height: auto;
+  min-height: 72px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.form-control:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-control:disabled,
+.form-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.form-select {
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 32px 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--foreground);
+  background-color: var(--secondary);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted-foreground) 50%),
+    linear-gradient(135deg, var(--muted-foreground) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 10px) 50%;
+  background-repeat: no-repeat;
+  background-size: 4px 4px;
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-select:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-select:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-check {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-check-input {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1px solid var(--input);
+  color: var(--primary-foreground);
+  background-color: transparent;
+  cursor: var(--cursor-interaction, default);
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    box-shadow 150ms;
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;] {
+  border-color: var(--input);
+  border-radius: var(--radius-sm);
+  corner-shape: superellipse(1.5);
+  background-color: var(--secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input:not(:disabled):not(:checked):hover {
+  background-color: var(--card);
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;]:checked {
+  border-color: var(--primary);
+  background-color: var(--primary);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input[type=&quot;checkbox&quot;]:checked::before {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--primary-foreground);
+  content: &quot;&quot;;
+  mask: var(--checkmark-image) center / 12px 12px no-repeat;
+}
+
+.form-check-input[type=&quot;radio&quot;] {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+}
+
+.form-check-input[type=&quot;radio&quot;]:checked {
+  border: 2px solid var(--primary);
+  background:
+    radial-gradient(circle, var(--primary-foreground) 0 2.5px, transparent 3px),
+    var(--primary);
+}
+
+.form-check:not(.form-switch) .form-check-input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+}
+
+.form-switch .form-check-input:disabled,
+.form-switch .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.form-check-label {
+  color: var(--foreground);
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-switch .form-check-input {
+  position: relative;
+  width: 32px;
+  height: 20px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  box-shadow: none;
+  transition: background-color 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid light-dark(var(--primary-foreground), var(--foreground));
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+  box-shadow: var(--shadow-sm);
+  content: &quot;&quot;;
+  transform: translate(2px, -50%);
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input:checked {
+  background: var(--primary);
+}
+
+.form-switch .form-check-input:checked::before {
+  transform: translate(14px, -50%);
+}
+
+.form-switch .form-check-input:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.form-range {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 28px;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  outline: none;
+  border: 0;
+  accent-color: var(--primary);
+  background: linear-gradient(
+      color-mix(in srgb, var(--foreground) 7%, transparent),
+      color-mix(in srgb, var(--foreground) 7%, transparent)
+    )
+    center / 100% 2px no-repeat;
+}
+
+.form-range::-webkit-slider-runnable-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-webkit-slider-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range::-moz-range-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-moz-range-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.btn:not(.btn-primary, .viz-tile):is(
+    [aria-pressed=&quot;true&quot;],
+    [aria-selected=&quot;true&quot;],
+    .is-selected
+  ) {
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.btn.viz-tile:is([aria-pressed=&quot;true&quot;], [aria-selected=&quot;true&quot;], .is-selected) {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+#widget &gt; svg {
+  width: 100%;
+}
+
+.text-warning,
+.text-destructive {
+  color: var(--destructive);
+}
+
+html&gt;body{padding:0}&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;style&gt;
+  #omvra-onboarding-prototype {
+    --ob-gap: 1rem;
+    color: var(--foreground);
+  }
+
+  #omvra-onboarding-prototype * {
+    box-sizing: border-box;
+  }
+
+  #omvra-onboarding-prototype .ob-shell {
+    display: grid;
+    grid-template-columns: minmax(10rem, 13rem) minmax(0, 1fr);
+    gap: 1.25rem;
+    align-items: start;
+  }
+
+  #omvra-onboarding-prototype .ob-steps {
+    display: grid;
+    gap: .35rem;
+  }
+
+  #omvra-onboarding-prototype .ob-step {
+    display: grid;
+    grid-template-columns: 1.55rem minmax(0, 1fr);
+    gap: .65rem;
+    align-items: center;
+    width: 100%;
+    padding: .55rem .35rem;
+    border: 0;
+    background: transparent;
+    color: var(--muted-foreground);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  #omvra-onboarding-prototype .ob-step.is-active {
+    color: var(--foreground);
+  }
+
+  #omvra-onboarding-prototype .ob-step-index {
+    display: grid;
+    place-items: center;
+    width: 1.55rem;
+    height: 1.55rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: .75em;
+  }
+
+  #omvra-onboarding-prototype .ob-step.is-active .ob-step-index,
+  #omvra-onboarding-prototype .ob-step.is-complete .ob-step-index {
+    background: var(--primary);
+    color: var(--primary-foreground);
+    border-color: var(--primary);
+  }
+
+  #omvra-onboarding-prototype .ob-progress {
+    height: 2px;
+    background: var(--border);
+    margin-bottom: 1.25rem;
+  }
+
+  #omvra-onboarding-prototype .ob-progress &gt; span {
+    display: block;
+    height: 100%;
+    width: 12.5%;
+    background: var(--primary);
+    transition: width 180ms ease;
+  }
+
+  #omvra-onboarding-prototype .ob-panel {
+    min-width: 0;
+  }
+
+  #omvra-onboarding-prototype .ob-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: start;
+    margin-bottom: 1.25rem;
+  }
+
+  #omvra-onboarding-prototype .ob-header-copy {
+    max-width: 42rem;
+  }
+
+  #omvra-onboarding-prototype .ob-header p {
+    margin: .35rem 0 0;
+    color: var(--muted-foreground);
+  }
+
+  #omvra-onboarding-prototype .ob-stage {
+    min-height: 28rem;
+  }
+
+  #omvra-onboarding-prototype .ob-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  #omvra-onboarding-prototype .ob-stack {
+    display: grid;
+    gap: 1rem;
+  }
+
+  #omvra-onboarding-prototype .ob-option {
+    display: grid;
+    gap: .35rem;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: .65rem;
+    background: transparent;
+    color: var(--foreground);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  #omvra-onboarding-prototype .ob-option.is-selected {
+    border-color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 8%, transparent);
+  }
+
+  #omvra-onboarding-prototype .ob-option span,
+  #omvra-onboarding-prototype .ob-helper {
+    color: var(--muted-foreground);
+  }
+
+  #omvra-onboarding-prototype .ob-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  #omvra-onboarding-prototype .ob-form-wide {
+    grid-column: 1 / -1;
+  }
+
+  #omvra-onboarding-prototype .ob-preview {
+    border-left: 2px solid var(--border);
+    padding-left: 1rem;
+  }
+
+  #omvra-onboarding-prototype .ob-task-list,
+  #omvra-onboarding-prototype .ob-lanes {
+    display: grid;
+    gap: .6rem;
+  }
+
+  #omvra-onboarding-prototype .ob-task {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 1rem;
+    align-items: center;
+    padding: .8rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  #omvra-onboarding-prototype .ob-task:last-child {
+    border-bottom: 0;
+  }
+
+  #omvra-onboarding-prototype .ob-task small {
+    display: block;
+    color: var(--muted-foreground);
+    margin-top: .25rem;
+  }
+
+  #omvra-onboarding-prototype .ob-board {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .75rem;
+  }
+
+  #omvra-onboarding-prototype .ob-column {
+    border-top: 2px solid var(--border);
+    padding-top: .75rem;
+  }
+
+  #omvra-onboarding-prototype .ob-column h3 {
+    margin-bottom: .75rem;
+  }
+
+  #omvra-onboarding-prototype .ob-column-item {
+    padding: .75rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  #omvra-onboarding-prototype .ob-timeline {
+    display: grid;
+    grid-template-columns: 9rem repeat(7, minmax(2.5rem, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+  }
+
+  #omvra-onboarding-prototype .ob-timeline &gt; div {
+    min-height: 2.75rem;
+    padding: .55rem;
+    background: var(--background);
+  }
+
+  #omvra-onboarding-prototype .ob-timeline-task {
+    grid-column: span 3;
+    background: color-mix(in srgb, var(--viz-series-1) 18%, var(--background)) !important;
+  }
+
+  #omvra-onboarding-prototype .ob-code {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    margin: 0;
+    padding: 1rem;
+    border-left: 2px solid var(--border);
+    color: var(--foreground);
+  }
+
+  #omvra-onboarding-prototype .ob-status {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+  }
+
+  #omvra-onboarding-prototype .ob-dot {
+    width: .65rem;
+    height: .65rem;
+    border-radius: 999px;
+    background: var(--muted-foreground);
+  }
+
+  #omvra-onboarding-prototype .ob-dot.is-ok {
+    background: var(--viz-series-1);
+  }
+
+  #omvra-onboarding-prototype .ob-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .75rem 1.5rem;
+  }
+
+  #omvra-onboarding-prototype .ob-summary-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: .7rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  #omvra-onboarding-prototype .ob-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+  }
+
+  #omvra-onboarding-prototype .ob-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .6rem;
+  }
+
+  #omvra-onboarding-prototype [hidden] {
+    display: none !important;
+  }
+
+  @media (max-width: 680px) {
+    #omvra-onboarding-prototype .ob-shell {
+      grid-template-columns: 1fr;
+    }
+
+    #omvra-onboarding-prototype .ob-steps {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    #omvra-onboarding-prototype .ob-step {
+      grid-template-columns: 1fr;
+      justify-items: center;
+      text-align: center;
+    }
+
+    #omvra-onboarding-prototype .ob-step-label {
+      display: none;
+    }
+
+    #omvra-onboarding-prototype .ob-grid,
+    #omvra-onboarding-prototype .ob-form-grid,
+    #omvra-onboarding-prototype .ob-summary,
+    #omvra-onboarding-prototype .ob-board {
+      grid-template-columns: 1fr;
+    }
+
+    #omvra-onboarding-prototype .ob-timeline {
+      grid-template-columns: 6rem repeat(4, minmax(2.5rem, 1fr));
+    }
+
+    #omvra-onboarding-prototype .ob-timeline .ob-hide-small {
+      display: none;
+    }
+
+    #omvra-onboarding-prototype .ob-header,
+    #omvra-onboarding-prototype .ob-footer {
+      align-items: stretch;
+      flex-direction: column;
+    }
+  }
+&lt;/style&gt;
+
+&lt;div id=&quot;omvra-onboarding-prototype&quot;&gt;
+  &lt;div class=&quot;ob-shell&quot;&gt;
+    &lt;nav class=&quot;ob-steps&quot; aria-label=&quot;Onboarding steps&quot;&gt;
+      &lt;button class=&quot;ob-step is-active&quot; type=&quot;button&quot; data-step=&quot;0&quot;&gt;&lt;span class=&quot;ob-step-index&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;ob-step-label&quot;&gt;Start&lt;/span&gt;&lt;/button&gt;
+      &lt;button class=&quot;ob-step&quot; type=&quot;button&quot; data-step=&quot;1&quot;&gt;&lt;span class=&quot;ob-step-index&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;ob-step-label&quot;&gt;Project&lt;/span&gt;&lt;/button&gt;
+      &lt;button class=&quot;ob-step&quot; type=&quot;button&quot; data-step=&quot;2&quot;&gt;&lt;span class=&quot;ob-step-index&quot;&gt;3&lt;/span&gt;&lt;span class=&quot;ob-step-label&quot;&gt;Tasks&lt;/span&gt;&lt;/button&gt;
+      &lt;button class=&quot;ob-step&quot; type=&quot;button&quot; data-step=&quot;3&quot;&gt;&lt;span class=&quot;ob-step-index&quot;&gt;4&lt;/span&gt;&lt;span class=&quot;ob-step-label&quot;&gt;Plan&lt;/span&gt;&lt;/button&gt;
+      &lt;button class=&quot;ob-step&quot; type=&quot;button&quot; data-step=&quot;4&quot;&gt;&lt;span class=&quot;ob-step-index&quot;&gt;5&lt;/span&gt;&lt;span class=&quot;ob-step-label&quot;&gt;Agent&lt;/span&gt;&lt;/button&gt;
+      &lt;button class=&quot;ob-step&quot; type=&quot;button&quot; data-step=&quot;5&quot;&gt;&lt;span class=&quot;ob-step-index&quot;&gt;6&lt;/span&gt;&lt;span class=&quot;ob-step-label&quot;&gt;Assign&lt;/span&gt;&lt;/button&gt;
+      &lt;button class=&quot;ob-step&quot; type=&quot;button&quot; data-step=&quot;6&quot;&gt;&lt;span class=&quot;ob-step-index&quot;&gt;7&lt;/span&gt;&lt;span class=&quot;ob-step-label&quot;&gt;Connect&lt;/span&gt;&lt;/button&gt;
+      &lt;button class=&quot;ob-step&quot; type=&quot;button&quot; data-step=&quot;7&quot;&gt;&lt;span class=&quot;ob-step-index&quot;&gt;8&lt;/span&gt;&lt;span class=&quot;ob-step-label&quot;&gt;Ready&lt;/span&gt;&lt;/button&gt;
+    &lt;/nav&gt;
+
+    &lt;main class=&quot;ob-panel&quot;&gt;
+      &lt;div class=&quot;ob-progress&quot; aria-hidden=&quot;true&quot;&gt;&lt;span id=&quot;ob-progress-fill&quot;&gt;&lt;/span&gt;&lt;/div&gt;
+      &lt;header class=&quot;ob-header&quot;&gt;
+        &lt;div class=&quot;ob-header-copy&quot;&gt;
+          &lt;h2 id=&quot;ob-title&quot;&gt;Make Omvra yours&lt;/h2&gt;
+          &lt;p id=&quot;ob-description&quot;&gt;Build a real workspace or explore with a sample project. You can change everything later.&lt;/p&gt;
+        &lt;/div&gt;
+        &lt;span class=&quot;viz-badge&quot; id=&quot;ob-step-count&quot;&gt;Step 1 of 8&lt;/span&gt;
+      &lt;/header&gt;
+
+      &lt;section class=&quot;ob-stage&quot; id=&quot;ob-stage&quot; aria-live=&quot;polite&quot;&gt;&lt;/section&gt;
+
+      &lt;footer class=&quot;ob-footer&quot;&gt;
+        &lt;button class=&quot;btn btn-ghost&quot; type=&quot;button&quot; id=&quot;ob-back&quot;&gt;Back&lt;/button&gt;
+        &lt;div class=&quot;ob-actions&quot;&gt;
+          &lt;button class=&quot;btn btn-ghost&quot; type=&quot;button&quot; id=&quot;ob-skip&quot;&gt;Do this later&lt;/button&gt;
+          &lt;button class=&quot;btn btn-primary&quot; type=&quot;button&quot; id=&quot;ob-next&quot;&gt;Continue&lt;/button&gt;
+        &lt;/div&gt;
+      &lt;/footer&gt;
+    &lt;/main&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;script&gt;
+  (() =&gt; {
+    const root = document.getElementById(&#x27;omvra-onboarding-prototype&#x27;);
+    const stage = document.getElementById(&#x27;ob-stage&#x27;);
+    const title = document.getElementById(&#x27;ob-title&#x27;);
+    const description = document.getElementById(&#x27;ob-description&#x27;);
+    const count = document.getElementById(&#x27;ob-step-count&#x27;);
+    const progress = document.getElementById(&#x27;ob-progress-fill&#x27;);
+    const back = document.getElementById(&#x27;ob-back&#x27;);
+    const next = document.getElementById(&#x27;ob-next&#x27;);
+    const skip = document.getElementById(&#x27;ob-skip&#x27;);
+    const stepButtons = Array.from(root.querySelectorAll(&#x27;.ob-step&#x27;));
+
+    const state = {
+      step: 0,
+      setupMode: &#x27;sample&#x27;,
+      projectName: &#x27;Website launch&#x27;,
+      projectDescription: &#x27;Plan and ship the next website release.&#x27;,
+      view: &#x27;kanban&#x27;,
+      agentName: &#x27;Cora&#x27;,
+      agentRole: &#x27;Content specialist&#x27;,
+      agentInstructions: &#x27;Write clearly, keep updates concise, and move finished work to human review.&#x27;,
+      assignedTask: &#x27;Draft launch announcement&#x27;,
+      connection: &#x27;codex&#x27;,
+      listenerRestarted: false,
+      healthChecked: false,
+      copied: false,
+    };
+
+    const stepMeta = [
+      [&#x27;Make Omvra yours&#x27;, &#x27;Build a real workspace or explore with a sample project. You can change everything later.&#x27;],
+      [&#x27;Create your first project&#x27;, &#x27;Projects organize related work and become swimlanes on the Timeline.&#x27;],
+      [&#x27;Add three tasks&#x27;, &#x27;Give the project enough shape to see how work moves through Omvra.&#x27;],
+      [&#x27;See one plan in two views&#x27;, &#x27;Kanban shows where work stands. Timeline shows when it happens.&#x27;],
+      [&#x27;Add an agentic teammate&#x27;, &#x27;Give the agent a clear role and a few durable working instructions.&#x27;],
+      [&#x27;Prepare the handoff&#x27;, &#x27;Assign one well-described task so the agent receives useful context.&#x27;],
+      [&#x27;Connect a coding agent&#x27;, &#x27;Codex is the recommended quick path. Claude remains available as a manual setup.&#x27;],
+      [&#x27;Your workspace is ready&#x27;, &#x27;Review what was created, verify MCP, and copy a task prompt when you are ready.&#x27;],
+    ];
+
+    function field(label, id, value, wide = false, textarea = false) {
+      const control = textarea
+        ? `&lt;textarea class=&quot;form-control&quot; id=&quot;${id}&quot; rows=&quot;3&quot;&gt;${value}&lt;/textarea&gt;`
+        : `&lt;input class=&quot;form-control&quot; id=&quot;${id}&quot; value=&quot;${value}&quot;&gt;`;
+      return `&lt;label class=&quot;form-label ${wide ? &#x27;ob-form-wide&#x27; : &#x27;&#x27;}&quot; for=&quot;${id}&quot;&gt;${label}${control}&lt;/label&gt;`;
+    }
+
+    function renderStart() {
+      return `
+        &lt;div class=&quot;ob-grid&quot;&gt;
+          &lt;button class=&quot;ob-option ${state.setupMode === &#x27;own&#x27; ? &#x27;is-selected&#x27; : &#x27;&#x27;}&quot; type=&quot;button&quot; data-mode=&quot;own&quot;&gt;
+            &lt;strong&gt;Build my first project&lt;/strong&gt;
+            &lt;span&gt;Use real names and tasks from your work.&lt;/span&gt;
+          &lt;/button&gt;
+          &lt;button class=&quot;ob-option ${state.setupMode === &#x27;sample&#x27; ? &#x27;is-selected&#x27; : &#x27;&#x27;}&quot; type=&quot;button&quot; data-mode=&quot;sample&quot;&gt;
+            &lt;strong&gt;Explore with a sample&lt;/strong&gt;
+            &lt;span&gt;Start with a small website launch you can remove later.&lt;/span&gt;
+          &lt;/button&gt;
+        &lt;/div&gt;
+        &lt;p class=&quot;ob-helper&quot;&gt;This walkthrough creates real workspace items so every step remains visible when onboarding ends.&lt;/p&gt;
+      `;
+    }
+
+    function renderProject() {
+      return `
+        &lt;div class=&quot;ob-form-grid&quot;&gt;
+          ${field(&#x27;Project name&#x27;, &#x27;ob-project-name&#x27;, state.projectName)}
+          ${field(&#x27;Description&#x27;, &#x27;ob-project-description&#x27;, state.projectDescription, true, true)}
+          &lt;div class=&quot;ob-preview ob-form-wide&quot;&gt;
+            &lt;strong id=&quot;ob-project-preview-name&quot;&gt;${state.projectName}&lt;/strong&gt;
+            &lt;p class=&quot;ob-helper&quot; id=&quot;ob-project-preview-description&quot;&gt;${state.projectDescription}&lt;/p&gt;
+            &lt;span class=&quot;viz-badge&quot;&gt;Timeline swimlane&lt;/span&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      `;
+    }
+
+    function renderTasks() {
+      return `
+        &lt;div class=&quot;ob-task-list&quot;&gt;
+          &lt;div class=&quot;ob-task&quot;&gt;&lt;div&gt;&lt;strong&gt;Outline launch page&lt;/strong&gt;&lt;small&gt;Not started · Jul 14–15&lt;/small&gt;&lt;/div&gt;&lt;span class=&quot;viz-badge&quot;&gt;Open&lt;/span&gt;&lt;/div&gt;
+          &lt;div class=&quot;ob-task&quot;&gt;&lt;div&gt;&lt;strong&gt;Draft launch announcement&lt;/strong&gt;&lt;small&gt;In progress · Jul 15–16&lt;/small&gt;&lt;/div&gt;&lt;span class=&quot;viz-badge&quot;&gt;In progress&lt;/span&gt;&lt;/div&gt;
+          &lt;div class=&quot;ob-task&quot;&gt;&lt;div&gt;&lt;strong&gt;Review launch checklist&lt;/strong&gt;&lt;small&gt;Human review · Jul 17&lt;/small&gt;&lt;/div&gt;&lt;span class=&quot;viz-badge&quot;&gt;Review&lt;/span&gt;&lt;/div&gt;
+        &lt;/div&gt;
+        &lt;button class=&quot;btn&quot; type=&quot;button&quot; id=&quot;ob-add-task&quot;&gt;Add another task&lt;/button&gt;
+      `;
+    }
+
+    function renderPlan() {
+      if (state.view === &#x27;timeline&#x27;) {
+        return `
+          &lt;div class=&quot;viz-controls&quot;&gt;
+            &lt;button class=&quot;btn&quot; type=&quot;button&quot; data-view=&quot;kanban&quot;&gt;Kanban&lt;/button&gt;
+            &lt;button class=&quot;btn btn-primary&quot; type=&quot;button&quot; data-view=&quot;timeline&quot;&gt;Timeline&lt;/button&gt;
+          &lt;/div&gt;
+          &lt;div class=&quot;ob-timeline&quot;&gt;
+            &lt;div&gt;&lt;strong&gt;Project&lt;/strong&gt;&lt;/div&gt;&lt;div&gt;Mon&lt;/div&gt;&lt;div&gt;Tue&lt;/div&gt;&lt;div&gt;Wed&lt;/div&gt;&lt;div&gt;Thu&lt;/div&gt;&lt;div class=&quot;ob-hide-small&quot;&gt;Fri&lt;/div&gt;&lt;div class=&quot;ob-hide-small&quot;&gt;Sat&lt;/div&gt;&lt;div class=&quot;ob-hide-small&quot;&gt;Sun&lt;/div&gt;
+            &lt;div&gt;${state.projectName}&lt;/div&gt;&lt;div class=&quot;ob-timeline-task&quot;&gt;Outline launch page&lt;/div&gt;&lt;div class=&quot;ob-timeline-task&quot;&gt;Draft announcement&lt;/div&gt;&lt;div class=&quot;ob-timeline-task ob-hide-small&quot;&gt;Review checklist&lt;/div&gt;
+          &lt;/div&gt;
+          &lt;p class=&quot;ob-helper&quot;&gt;Try dragging a task later to change its dates. Both views update the same task.&lt;/p&gt;
+        `;
+      }
+      return `
+        &lt;div class=&quot;viz-controls&quot;&gt;
+          &lt;button class=&quot;btn btn-primary&quot; type=&quot;button&quot; data-view=&quot;kanban&quot;&gt;Kanban&lt;/button&gt;
+          &lt;button class=&quot;btn&quot; type=&quot;button&quot; data-view=&quot;timeline&quot;&gt;Timeline&lt;/button&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;ob-board&quot;&gt;
+          &lt;div class=&quot;ob-column&quot;&gt;&lt;h3&gt;Open&lt;/h3&gt;&lt;div class=&quot;ob-column-item&quot;&gt;Outline launch page&lt;/div&gt;&lt;/div&gt;
+          &lt;div class=&quot;ob-column&quot;&gt;&lt;h3&gt;In progress&lt;/h3&gt;&lt;div class=&quot;ob-column-item&quot;&gt;Draft launch announcement&lt;/div&gt;&lt;/div&gt;
+          &lt;div class=&quot;ob-column&quot;&gt;&lt;h3&gt;Human review&lt;/h3&gt;&lt;div class=&quot;ob-column-item&quot;&gt;Review launch checklist&lt;/div&gt;&lt;/div&gt;
+        &lt;/div&gt;
+        &lt;p class=&quot;ob-helper&quot;&gt;Move work between columns later to update its status.&lt;/p&gt;
+      `;
+    }
+
+    function renderAgent() {
+      return `
+        &lt;div class=&quot;ob-form-grid&quot;&gt;
+          ${field(&#x27;Name&#x27;, &#x27;ob-agent-name&#x27;, state.agentName)}
+          ${field(&#x27;Role or description&#x27;, &#x27;ob-agent-role&#x27;, state.agentRole)}
+          ${field(&#x27;Basic instructions&#x27;, &#x27;ob-agent-instructions&#x27;, state.agentInstructions, true, true)}
+          &lt;div class=&quot;ob-preview ob-form-wide&quot;&gt;
+            &lt;strong id=&quot;ob-agent-preview&quot;&gt;${state.agentName} · ${state.agentRole}&lt;/strong&gt;
+            &lt;p class=&quot;ob-helper&quot;&gt;These instructions stay with the agent across assigned tasks.&lt;/p&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      `;
+    }
+
+    function renderAssign() {
+      return `
+        &lt;div class=&quot;ob-form-grid&quot;&gt;
+          &lt;label class=&quot;form-label&quot; for=&quot;ob-assigned-task&quot;&gt;Task
+            &lt;select class=&quot;form-select&quot; id=&quot;ob-assigned-task&quot;&gt;
+              &lt;option&gt;Outline launch page&lt;/option&gt;
+              &lt;option selected&gt;Draft launch announcement&lt;/option&gt;
+              &lt;option&gt;Review launch checklist&lt;/option&gt;
+            &lt;/select&gt;
+          &lt;/label&gt;
+          &lt;label class=&quot;form-label&quot; for=&quot;ob-assignee&quot;&gt;Assignee
+            &lt;select class=&quot;form-select&quot; id=&quot;ob-assignee&quot;&gt;&lt;option&gt;${state.agentName}&lt;/option&gt;&lt;/select&gt;
+          &lt;/label&gt;
+          ${field(&#x27;Task details&#x27;, &#x27;ob-task-details&#x27;, &#x27;Write a short announcement for the website launch. Keep it clear and friendly.&#x27;, true, true)}
+          &lt;div class=&quot;ob-preview ob-form-wide&quot;&gt;
+            &lt;strong&gt;Ready for ${state.agentName}&lt;/strong&gt;
+            &lt;p class=&quot;ob-helper&quot;&gt;Todo: draft copy · verify links · move to human review&lt;/p&gt;
+            &lt;p class=&quot;ob-helper&quot;&gt;Acceptance: one concise announcement ready for review&lt;/p&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      `;
+    }
+
+    function renderConnect() {
+      const codexActive = state.connection === &#x27;codex&#x27;;
+      const claudeActive = state.connection === &#x27;claude&#x27;;
+      const laterActive = state.connection === &#x27;later&#x27;;
+      let body = &#x27;&#x27;;
+      if (codexActive) {
+        body = `
+          &lt;div class=&quot;ob-stack&quot;&gt;
+            &lt;p&gt;Codex is the quickest supported path. Copy the local server configuration, restart the listener, then verify it.&lt;/p&gt;
+            &lt;pre class=&quot;ob-code&quot;&gt;&lt;code&gt;http://127.0.0.1:3456/mcp
+Access: Task Write
+Token: generated locally&lt;/code&gt;&lt;/pre&gt;
+            &lt;div class=&quot;ob-actions&quot;&gt;&lt;button class=&quot;btn&quot; type=&quot;button&quot; id=&quot;ob-copy-config&quot;&gt;Copy Codex setup&lt;/button&gt;&lt;span class=&quot;ob-helper&quot; id=&quot;ob-copy-feedback&quot;&gt;&lt;/span&gt;&lt;/div&gt;
+          &lt;/div&gt;
+        `;
+      } else if (claudeActive) {
+        body = `
+          &lt;div class=&quot;ob-stack&quot;&gt;
+            &lt;p&gt;Claude requires manually editing its MCP configuration and restarting Claude. This can be completed later without losing your workspace setup.&lt;/p&gt;
+            &lt;pre class=&quot;ob-code&quot;&gt;&lt;code&gt;{
+  &quot;mcpServers&quot;: {
+    &quot;omvra&quot;: { &quot;url&quot;: &quot;http://127.0.0.1:3456/mcp&quot; }
+  }
+}&lt;/code&gt;&lt;/pre&gt;
+            &lt;button class=&quot;btn&quot; type=&quot;button&quot; id=&quot;ob-copy-claude&quot;&gt;Copy manual configuration&lt;/button&gt;
+          &lt;/div&gt;
+        `;
+      } else {
+        body = &#x27;&lt;p&gt;Your project, tasks, agent, and assignment are already saved. Finish onboarding now and connect an MCP client from Settings later.&lt;/p&gt;&#x27;;
+      }
+      return `
+        &lt;div class=&quot;viz-controls&quot;&gt;
+          &lt;button class=&quot;btn ${codexActive ? &#x27;btn-primary&#x27; : &#x27;&#x27;}&quot; type=&quot;button&quot; data-connection=&quot;codex&quot;&gt;Codex · recommended&lt;/button&gt;
+          &lt;button class=&quot;btn ${claudeActive ? &#x27;btn-primary&#x27; : &#x27;&#x27;}&quot; type=&quot;button&quot; data-connection=&quot;claude&quot;&gt;Claude · manual&lt;/button&gt;
+          &lt;button class=&quot;btn ${laterActive ? &#x27;btn-primary&#x27; : &#x27;&#x27;}&quot; type=&quot;button&quot; data-connection=&quot;later&quot;&gt;Connect later&lt;/button&gt;
+        &lt;/div&gt;
+        ${body}
+      `;
+    }
+
+    function renderReady() {
+      const statusText = state.healthChecked ? &#x27;MCP verified&#x27; : state.listenerRestarted ? &#x27;Listener restarted · verification pending&#x27; : &#x27;Restart required after configuration&#x27;;
+      return `
+        &lt;div class=&quot;ob-stack&quot;&gt;
+          &lt;div class=&quot;ob-summary&quot;&gt;
+            &lt;div class=&quot;ob-summary-row&quot;&gt;&lt;span&gt;Project&lt;/span&gt;&lt;strong&gt;${state.projectName}&lt;/strong&gt;&lt;/div&gt;
+            &lt;div class=&quot;ob-summary-row&quot;&gt;&lt;span&gt;Tasks&lt;/span&gt;&lt;strong&gt;3 created&lt;/strong&gt;&lt;/div&gt;
+            &lt;div class=&quot;ob-summary-row&quot;&gt;&lt;span&gt;Agent&lt;/span&gt;&lt;strong&gt;${state.agentName}&lt;/strong&gt;&lt;/div&gt;
+            &lt;div class=&quot;ob-summary-row&quot;&gt;&lt;span&gt;Assigned work&lt;/span&gt;&lt;strong&gt;${state.assignedTask}&lt;/strong&gt;&lt;/div&gt;
+          &lt;/div&gt;
+          &lt;div class=&quot;ob-status&quot;&gt;&lt;span class=&quot;ob-dot ${state.healthChecked ? &#x27;is-ok&#x27; : &#x27;&#x27;}&quot;&gt;&lt;/span&gt;&lt;strong&gt;${statusText}&lt;/strong&gt;&lt;/div&gt;
+          &lt;div class=&quot;ob-actions&quot;&gt;
+            &lt;button class=&quot;btn&quot; type=&quot;button&quot; id=&quot;ob-restart&quot;&gt;${state.listenerRestarted ? &#x27;Restarted&#x27; : &#x27;Restart MCP listener&#x27;}&lt;/button&gt;
+            &lt;button class=&quot;btn&quot; type=&quot;button&quot; id=&quot;ob-health&quot; ${state.listenerRestarted ? &#x27;&#x27; : &#x27;disabled&#x27;}&gt;${state.healthChecked ? &#x27;Connection verified&#x27; : &#x27;Run health check&#x27;}&lt;/button&gt;
+            &lt;button class=&quot;btn&quot; type=&quot;button&quot; id=&quot;ob-copy-task&quot;&gt;Copy assigned task prompt&lt;/button&gt;
+          &lt;/div&gt;
+          &lt;pre class=&quot;ob-code&quot;&gt;&lt;code&gt;Read task “${state.assignedTask}” in Omvra, resolve its exact assignee context, complete the todos, and move it to human review.&lt;/code&gt;&lt;/pre&gt;
+        &lt;/div&gt;
+      `;
+    }
+
+    const renderers = [renderStart, renderProject, renderTasks, renderPlan, renderAgent, renderAssign, renderConnect, renderReady];
+
+    function bindStageEvents() {
+      root.querySelectorAll(&#x27;[data-mode]&#x27;).forEach(button =&gt; {
+        button.addEventListener(&#x27;click&#x27;, () =&gt; {
+          state.setupMode = button.dataset.mode;
+          if (state.setupMode === &#x27;own&#x27;) {
+            state.projectName = &#x27;My first project&#x27;;
+            state.projectDescription = &#x27;A clear outcome I want to plan and deliver.&#x27;;
+          } else {
+            state.projectName = &#x27;Website launch&#x27;;
+            state.projectDescription = &#x27;Plan and ship the next website release.&#x27;;
+          }
+          render();
+        });
+      });
+
+      const projectName = document.getElementById(&#x27;ob-project-name&#x27;);
+      const projectDescription = document.getElementById(&#x27;ob-project-description&#x27;);
+      if (projectName) projectName.addEventListener(&#x27;input&#x27;, event =&gt; {
+        state.projectName = event.target.value;
+        document.getElementById(&#x27;ob-project-preview-name&#x27;).textContent = state.projectName || &#x27;Untitled project&#x27;;
+      });
+      if (projectDescription) projectDescription.addEventListener(&#x27;input&#x27;, event =&gt; {
+        state.projectDescription = event.target.value;
+        document.getElementById(&#x27;ob-project-preview-description&#x27;).textContent = state.projectDescription;
+      });
+
+      root.querySelectorAll(&#x27;[data-view]&#x27;).forEach(button =&gt; button.addEventListener(&#x27;click&#x27;, () =&gt; {
+        state.view = button.dataset.view;
+        render();
+      }));
+
+      const agentName = document.getElementById(&#x27;ob-agent-name&#x27;);
+      const agentRole = document.getElementById(&#x27;ob-agent-role&#x27;);
+      const agentInstructions = document.getElementById(&#x27;ob-agent-instructions&#x27;);
+      const updateAgentPreview = () =&gt; {
+        const preview = document.getElementById(&#x27;ob-agent-preview&#x27;);
+        if (preview) preview.textContent = `${state.agentName || &#x27;Unnamed agent&#x27;} · ${state.agentRole || &#x27;No role yet&#x27;}`;
+      };
+      if (agentName) agentName.addEventListener(&#x27;input&#x27;, event =&gt; { state.agentName = event.target.value; updateAgentPreview(); });
+      if (agentRole) agentRole.addEventListener(&#x27;input&#x27;, event =&gt; { state.agentRole = event.target.value; updateAgentPreview(); });
+      if (agentInstructions) agentInstructions.addEventListener(&#x27;input&#x27;, event =&gt; { state.agentInstructions = event.target.value; });
+
+      const assignedTask = document.getElementById(&#x27;ob-assigned-task&#x27;);
+      if (assignedTask) assignedTask.addEventListener(&#x27;change&#x27;, event =&gt; { state.assignedTask = event.target.value; });
+
+      root.querySelectorAll(&#x27;[data-connection]&#x27;).forEach(button =&gt; button.addEventListener(&#x27;click&#x27;, () =&gt; {
+        state.connection = button.dataset.connection;
+        render();
+      }));
+
+      const copyConfig = document.getElementById(&#x27;ob-copy-config&#x27;);
+      if (copyConfig) copyConfig.addEventListener(&#x27;click&#x27;, () =&gt; {
+        state.copied = true;
+        const feedback = document.getElementById(&#x27;ob-copy-feedback&#x27;);
+        if (feedback) feedback.textContent = &#x27;Setup copied&#x27;;
+      });
+
+      const copyClaude = document.getElementById(&#x27;ob-copy-claude&#x27;);
+      if (copyClaude) copyClaude.addEventListener(&#x27;click&#x27;, () =&gt; { copyClaude.textContent = &#x27;Configuration copied&#x27;; });
+
+      const restart = document.getElementById(&#x27;ob-restart&#x27;);
+      if (restart) restart.addEventListener(&#x27;click&#x27;, () =&gt; {
+        state.listenerRestarted = true;
+        state.healthChecked = false;
+        render();
+      });
+
+      const health = document.getElementById(&#x27;ob-health&#x27;);
+      if (health) health.addEventListener(&#x27;click&#x27;, () =&gt; {
+        if (!state.listenerRestarted) return;
+        state.healthChecked = true;
+        render();
+      });
+
+      const copyTask = document.getElementById(&#x27;ob-copy-task&#x27;);
+      if (copyTask) copyTask.addEventListener(&#x27;click&#x27;, () =&gt; { copyTask.textContent = &#x27;Task prompt copied&#x27;; });
+    }
+
+    function render() {
+      const meta = stepMeta[state.step];
+      title.textContent = meta[0];
+      description.textContent = meta[1];
+      count.textContent = `Step ${state.step + 1} of ${stepMeta.length}`;
+      progress.style.width = `${((state.step + 1) / stepMeta.length) * 100}%`;
+      stage.innerHTML = renderers[state.step]();
+      back.disabled = state.step === 0;
+      skip.hidden = state.step &lt; 6 || state.step === 7;
+      next.textContent = state.step === stepMeta.length - 1 ? &#x27;Open workspace&#x27; : &#x27;Continue&#x27;;
+      stepButtons.forEach((button, index) =&gt; {
+        button.classList.toggle(&#x27;is-active&#x27;, index === state.step);
+        button.classList.toggle(&#x27;is-complete&#x27;, index &lt; state.step);
+        button.setAttribute(&#x27;aria-current&#x27;, index === state.step ? &#x27;step&#x27; : &#x27;false&#x27;);
+      });
+      bindStageEvents();
+    }
+
+    back.addEventListener(&#x27;click&#x27;, () =&gt; {
+      if (state.step &gt; 0) state.step -= 1;
+      render();
+    });
+
+    next.addEventListener(&#x27;click&#x27;, () =&gt; {
+      if (state.step &lt; stepMeta.length - 1) state.step += 1;
+      render();
+    });
+
+    skip.addEventListener(&#x27;click&#x27;, () =&gt; {
+      state.connection = &#x27;later&#x27;;
+      state.step = 7;
+      render();
+    });
+
+    stepButtons.forEach(button =&gt; button.addEventListener(&#x27;click&#x27;, () =&gt; {
+      state.step = Number(button.dataset.step);
+      render();
+    }));
+
+    render();
+  })();
+&lt;/script&gt;
+
+&lt;script src=&quot;https://unpkg.com/@floating-ui/core@1.7.3/dist/floating-ui.core.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script src=&quot;https://unpkg.com/@floating-ui/dom@1.7.4/dist/floating-ui.dom.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  if (window.FloatingUIDOM == null) {
+    return;
+  }
+  const { autoUpdate, computePosition, flip, offset, shift, size } =
+    window.FloatingUIDOM;
+  const tooltipPlacements = new Set([&quot;top&quot;, &quot;right&quot;, &quot;bottom&quot;, &quot;left&quot;]);
+  const tooltipId = `codex-visualization-tooltip-${
+    window.crypto?.randomUUID?.() ?? Date.now().toString(36)
+  }`;
+  const tooltipGap = 5;
+  const hoverDelay = 700;
+  const skipDelay = 300;
+  let activeTrigger = null;
+  let pendingTrigger = null;
+  let tooltip = null;
+  let openTimeout = null;
+  let autoUpdateCleanup = null;
+  let positionRequest = 0;
+  let skipDelayUntil = 0;
+
+  const getTrigger = (target) =&gt;
+    target?.nodeType === Node.ELEMENT_NODE
+      ? target.closest(&quot;[data-tooltip]&quot;)
+      : null;
+  const containsTarget = (trigger, target) =&gt;
+    target?.nodeType != null &amp;&amp; trigger.contains(target);
+  const getContent = (trigger) =&gt;
+    trigger.getAttribute(&quot;data-tooltip&quot;)?.trim() ?? &quot;&quot;;
+  const getPlacement = (trigger) =&gt; {
+    const placement = trigger.getAttribute(&quot;data-tooltip-placement&quot;);
+    return tooltipPlacements.has(placement) ? placement : &quot;top&quot;;
+  };
+  const getTooltip = () =&gt; {
+    if (tooltip == null) {
+      tooltip = document.createElement(&quot;div&quot;);
+      tooltip.id = tooltipId;
+      tooltip.className = &quot;tooltip&quot;;
+      tooltip.setAttribute(&quot;role&quot;, &quot;tooltip&quot;);
+    }
+    return tooltip;
+  };
+  const setDescribedBy = (trigger, described) =&gt; {
+    const ids = new Set(
+      (trigger.getAttribute(&quot;aria-describedby&quot;) ?? &quot;&quot;)
+        .split(/\s+/)
+        .filter(Boolean),
+    );
+    if (described) {
+      ids.add(tooltipId);
+    } else {
+      ids.delete(tooltipId);
+    }
+    if (ids.size === 0) {
+      trigger.removeAttribute(&quot;aria-describedby&quot;);
+    } else {
+      trigger.setAttribute(&quot;aria-describedby&quot;, [...ids].join(&quot; &quot;));
+    }
+  };
+  const clearOpenTimeout = () =&gt; {
+    if (openTimeout != null) {
+      window.clearTimeout(openTimeout);
+      openTimeout = null;
+    }
+    pendingTrigger = null;
+  };
+  const closeTooltip = (activateSkipDelay = true) =&gt; {
+    clearOpenTimeout();
+    positionRequest += 1;
+    autoUpdateCleanup?.();
+    autoUpdateCleanup = null;
+    if (activeTrigger == null) {
+      return;
+    }
+    setDescribedBy(activeTrigger, false);
+    activeTrigger = null;
+    tooltip?.remove();
+    if (activateSkipDelay) {
+      skipDelayUntil = Date.now() + skipDelay;
+    }
+  };
+  const updatePosition = (trigger, floating) =&gt; {
+    const request = ++positionRequest;
+    void computePosition(trigger, floating, {
+      middleware: [
+        offset(tooltipGap),
+        flip({ padding: tooltipGap }),
+        shift({ padding: tooltipGap }),
+        size({
+          padding: tooltipGap,
+          apply({ availableHeight, availableWidth, elements }) {
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-width&quot;,
+              `${Math.max(0, availableWidth)}px`,
+            );
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-height&quot;,
+              `${Math.max(0, availableHeight)}px`,
+            );
+          },
+        }),
+      ],
+      placement: getPlacement(trigger),
+      strategy: &quot;fixed&quot;,
+    })
+      .then(({ x, y }) =&gt; {
+        if (activeTrigger !== trigger || request !== positionRequest) {
+          return;
+        }
+        const scale = window.devicePixelRatio || 1;
+        floating.style.transform = `translate(${Math.round(x * scale) / scale}px, ${Math.round(y * scale) / scale}px)`;
+        floating.style.visibility = &quot;visible&quot;;
+      })
+      .catch(() =&gt; {
+        if (activeTrigger === trigger &amp;&amp; request === positionRequest) {
+          closeTooltip(false);
+        }
+      });
+  };
+  const openTooltip = (trigger) =&gt; {
+    const content = getContent(trigger);
+    if (!trigger.isConnected || content.length === 0) {
+      return;
+    }
+    clearOpenTimeout();
+    if (activeTrigger === trigger) {
+      return;
+    }
+    closeTooltip();
+    const floating = getTooltip();
+    floating.textContent = content;
+    floating.style.visibility = &quot;hidden&quot;;
+    floating.style.transform = &quot;translate(0, 0)&quot;;
+    document.body.appendChild(floating);
+    activeTrigger = trigger;
+    setDescribedBy(trigger, true);
+    autoUpdateCleanup = autoUpdate(trigger, floating, () =&gt; {
+      updatePosition(trigger, floating);
+    });
+  };
+  const requestOpen = (trigger, immediate = false) =&gt; {
+    if (
+      getContent(trigger).length === 0 ||
+      activeTrigger === trigger ||
+      pendingTrigger === trigger
+    ) {
+      return;
+    }
+    clearOpenTimeout();
+    pendingTrigger = trigger;
+    const delay =
+      immediate || activeTrigger != null || Date.now() &lt; skipDelayUntil
+        ? 0
+        : hoverDelay;
+    if (delay === 0) {
+      openTooltip(trigger);
+      return;
+    }
+    openTimeout = window.setTimeout(() =&gt; {
+      openTimeout = null;
+      pendingTrigger = null;
+      openTooltip(trigger);
+    }, delay);
+  };
+  const handlePointerOpen = (event) =&gt; {
+    if (event.pointerType === &quot;touch&quot;) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    requestOpen(trigger);
+  };
+  const handleLeave = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const handleFocusIn = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger?.matches(&quot;:focus-visible&quot;)) {
+      requestOpen(trigger, true);
+    }
+  };
+  const handleKeyDown = (event) =&gt; {
+    if (event.key === &quot;Escape&quot;) {
+      closeTooltip();
+    }
+  };
+  const handleContextMenu = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const destroy = () =&gt; {
+    closeTooltip(false);
+    document.removeEventListener(&quot;pointerover&quot;, handlePointerOpen);
+    document.removeEventListener(&quot;pointerout&quot;, handleLeave);
+    document.removeEventListener(&quot;focusin&quot;, handleFocusIn);
+    document.removeEventListener(&quot;focusout&quot;, handleLeave);
+    document.removeEventListener(&quot;keydown&quot;, handleKeyDown);
+    document.removeEventListener(&quot;contextmenu&quot;, handleContextMenu);
+    tooltip = null;
+  };
+
+  document.addEventListener(&quot;pointerover&quot;, handlePointerOpen);
+  document.addEventListener(&quot;pointerout&quot;, handleLeave);
+  document.addEventListener(&quot;focusin&quot;, handleFocusIn);
+  document.addEventListener(&quot;focusout&quot;, handleLeave);
+  document.addEventListener(&quot;keydown&quot;, handleKeyDown);
+  document.addEventListener(&quot;contextmenu&quot;, handleContextMenu);
+  window.addEventListener(&quot;pagehide&quot;, destroy, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-lucide&quot; async src=&quot;https://unpkg.com/lucide@1.17.0/dist/umd/lucide.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  const initialize = () =&gt; {
+    globalThis.lucide?.createIcons({ attrs: { width: 16, height: 16 } });
+  };
+  if (globalThis.lucide != null) {
+    initialize();
+    return;
+  }
+  document
+    .getElementById(&quot;codex-visualization-lucide&quot;)
+    ?.addEventListener(&quot;load&quot;, initialize, { once: true });
+})();
+&lt;/script&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe>
+</body>
+</html>

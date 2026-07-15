@@ -8,6 +8,42 @@ interface UseTaskActionsOptions {
   onTaskDeleted?: (taskId: string) => void;
 }
 
+/**
+ * Creates the standalone planning copy used by task surfaces.
+ * History, roadmap relationships, and external metadata stay attached only to
+ * the source task; the duplicate is a fresh piece of work.
+ */
+export function createDuplicatedTask(source: Task, taskId = `${Date.now()}-copy`): Task {
+  return {
+    id: taskId,
+    title: `${source.title} (copy)`,
+    status: source.status,
+    notes: source.notes,
+    startDate: source.startDate,
+    endDate: source.endDate,
+    color: source.color,
+    size: source.size,
+    complexity: source.complexity,
+    blocked: source.blocked,
+    priority: source.priority,
+    swimlaneOnly: source.swimlaneOnly,
+    swimlaneId: source.swimlaneId,
+    projectIds: source.projectIds ? [...source.projectIds] : undefined,
+    assigneeId: source.assigneeId,
+    project: source.project,
+    // A duplicate starts a new roadmap and work history.
+    milestoneId: undefined,
+    dependencyIds: [],
+    timeSpentMinutes: undefined,
+    timeSpentNote: undefined,
+    timeEntries: [],
+    attachments: [],
+    comments: [],
+    mcpUpdatedAt: undefined,
+    mcpLastActor: undefined,
+  };
+}
+
 export function useTaskActions({
   people,
   setTasks,
@@ -84,6 +120,12 @@ export function useTaskActions({
     onTaskDeleted?.(taskId);
   }, [onTaskDeleted, setTasks]);
 
+  const duplicateTask = useCallback((task: Task) => {
+    const duplicate = createDuplicatedTask(task);
+    setTasks(prevTasks => [duplicate, ...prevTasks]);
+    return duplicate;
+  }, [setTasks]);
+
   const moveTask = useCallback((taskId: string, newStatus: TaskStatus) => {
     setTasks(prevTasks => prevTasks.map(t => (t.id === taskId ? { ...t, status: newStatus } : t)));
   }, [setTasks]);
@@ -109,6 +151,7 @@ export function useTaskActions({
     addTaskComment,
     updateTaskAttachments,
     deleteTask,
+    duplicateTask,
     moveTask,
     moveAgentTaskToReview,
     updateTaskDates,

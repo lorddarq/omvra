@@ -27,6 +27,9 @@ interface DraggableSwimlaneRowProps {
   rowHeight?: number;
   scrollContainerRef?: React.RefObject<HTMLDivElement>; // Reference to the scrollable container for accurate drop calculations
   onTaskClick: (task: Task) => void;
+  onTaskEdit: (task: Task) => void;
+  onTaskDelete: (taskId: string) => void;
+  onTaskDuplicate: (task: Task) => void;
   onAddTask: (date: Date, swimlaneId: string, endDate?: Date, mode?: 'projects' | 'people') => void;
   shouldIgnoreAddTask?: () => boolean;
   onEditSwimlane: (swimlane: TimelineSwimlane) => void;
@@ -77,6 +80,9 @@ export function DraggableSwimlaneRow({
   trailingSpacerWidth = 0,
   totalTimelineWidth,
   onTaskClick,
+  onTaskEdit,
+  onTaskDelete,
+  onTaskDuplicate,
   onAddTask,
   onEditSwimlane,
   onMoveSwimlane,
@@ -650,6 +656,9 @@ export function DraggableSwimlaneRow({
                             getTaskColor={getTaskColor}
                             handleResizeStart={handleResizeStart}
                             onTaskClick={onTaskClick}
+                            onTaskEdit={onTaskEdit}
+                            onTaskDelete={onTaskDelete}
+                            onTaskDuplicate={onTaskDuplicate}
                             resizingTaskId={resizingTaskId}
                           />
                         </div>

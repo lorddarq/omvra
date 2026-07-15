@@ -5,7 +5,7 @@ import TestRenderer from 'react-test-renderer';
 import type { Task, Person } from '../types.ts';
 import { usePeopleActions } from './usePeopleActions.ts';
 import { useStatusColumnActions } from './useStatusColumnActions.ts';
-import { useTaskActions } from './useTaskActions.ts';
+import { createDuplicatedTask, useTaskActions } from './useTaskActions.ts';
 import { useMcpPanelState } from './useMcpPanelState.ts';
 import { useViewState, type AllViewStates } from './useViewState.ts';
 import {
@@ -148,6 +148,54 @@ test('useTaskActions saves, comments, and promotes agentic tasks to review', asy
   assert.equal(tasks[1].status, 'in-progress');
 
   await harness.unmount();
+});
+
+test('createDuplicatedTask copies planning fields and resets identity/history links', () => {
+  const source: Task = {
+    id: 'source-task',
+    title: 'Prepare release',
+    status: 'in-progress',
+    notes: 'Keep the rollout small.',
+    startDate: '2026-07-20',
+    endDate: '2026-07-22',
+    size: 'l',
+    complexity: 'hard',
+    blocked: true,
+    priority: 'urgent',
+    swimlaneOnly: false,
+    swimlaneId: 'project-1',
+    projectIds: ['project-1', 'project-2'],
+    assigneeId: 'agent-1',
+    project: 'omvra',
+    milestoneId: 'milestone-1',
+    dependencyIds: ['dependency-1'],
+    timeSpentMinutes: 45,
+    timeSpentNote: 'Source history',
+    timeEntries: [{ id: 'entry-1', minutes: 45, loggedAt: '2026-07-15T10:00:00.000Z' }],
+    attachments: [{ id: 'attachment-1', name: 'plan.md', path: '/tmp/plan.md', uri: 'file:///tmp/plan.md', addedAt: '2026-07-15T10:00:00.000Z' }],
+    comments: [{ id: 'comment-1', author: 'You', content: 'Source comment', createdAt: '2026-07-15T10:00:00.000Z' }],
+    mcpUpdatedAt: '2026-07-15T10:00:00.000Z',
+    mcpLastActor: 'mcp-agent',
+  };
+
+  const duplicate = createDuplicatedTask(source, 'duplicate-task');
+
+  assert.equal(duplicate.id, 'duplicate-task');
+  assert.equal(duplicate.title, 'Prepare release (copy)');
+  assert.equal(duplicate.status, source.status);
+  assert.equal(duplicate.notes, source.notes);
+  assert.equal(duplicate.startDate, source.startDate);
+  assert.equal(duplicate.endDate, source.endDate);
+  assert.equal(duplicate.assigneeId, source.assigneeId);
+  assert.deepEqual(duplicate.projectIds, source.projectIds);
+  assert.notStrictEqual(duplicate.projectIds, source.projectIds);
+  assert.equal(duplicate.milestoneId, undefined);
+  assert.deepEqual(duplicate.dependencyIds, []);
+  assert.deepEqual(duplicate.timeEntries, []);
+  assert.deepEqual(duplicate.attachments, []);
+  assert.deepEqual(duplicate.comments, []);
+  assert.equal(duplicate.mcpUpdatedAt, undefined);
+  assert.equal(duplicate.mcpLastActor, undefined);
 });
 
 test('UI and MCP task creation agree on canonical workspace fields', async () => {
@@ -743,5 +791,69 @@ test('useAgentWatchRuntime polls, persists runtime state, and manages watcher co
     await effectHarness.unmount();
   } finally {
     (globalThis as any).window = originalWindow;
+  }
+});
+
+test('useAgentWatchRuntime applies column-owned AI actions to assigned changed tasks', async () => {
+  const originalWindow = setWindowMock({
+    setInterval: global.setInterval.bind(global),
+    clearInterval: global.clearInterval.bind(global),
+  });
+
+  try {
+    let tasks: Task[] = [
+      { id: 'task-work', title: 'Work task', status: 'open', assigneeId: 'agent-1' },
+      { id: 'task-review', title: 'Review task', status: 'in-progress', assigneeId: 'agent-1' },
+      { id: 'task-inspect', title: 'Inspect task', status: 'done', assigneeId: 'agent-1' },
+      { id: 'task-other', title: 'Other task', status: 'open', assigneeId: 'human-1' },
+    ];
+    const setTasks = (updater: React.SetStateAction<Task[]>) => {
+      tasks = typeof updater === 'function'
+        ? (updater as (previous: Task[]) => Task[])(tasks)
+        : updater;
+    };
+    const mcpReadService = {
+      pollBoardWatcher: async (filters: Record<string, unknown>) => ({
+        ok: true,
+        watcherState: { watcherId: String(filters.watcherId), statusId: String(filters.statusId) },
+        changes: {
+          newTasks: [{
+            id: String(filters.statusId === 'open' ? 'task-work' : filters.statusId === 'under-review' ? 'task-review' : 'task-inspect'),
+            assigneeId: 'agent-1',
+          }],
+          updatedTasks: [],
+          removedTaskIds: [],
+        },
+      }),
+    };
+    const statusColumns = [
+      { id: 'open', title: 'Backlog', roadmapStage: 'not-started' as const, aiWatchEnabled: true, aiAction: 'inspect_and_work' as const },
+      { id: 'in-progress', title: 'Doing', roadmapStage: 'in-progress' as const },
+      { id: 'under-review', title: 'Review', roadmapStage: 'in-review' as const, aiWatchEnabled: true, aiAction: 'move_to_ready_for_human_review' as const },
+      { id: 'done', title: 'Done', roadmapStage: 'complete' as const, aiWatchEnabled: true, aiAction: 'inspect_only' as const },
+    ];
+    const config: AgentWatchConfig = { personId: 'agent-1', enabled: true, intervalSeconds: 60 };
+    const setConfigs = (() => undefined) as React.Dispatch<React.SetStateAction<AgentWatchConfig[]>>;
+    const harness = await renderHook(
+      () => useAgentWatchRuntime({
+        mcpReadService: mcpReadService as any,
+        enabled: false,
+        agentWatchConfigs: [config],
+        setAgentWatchConfigs: setConfigs,
+        statusColumns,
+        setTasks,
+      }),
+      undefined as never
+    );
+
+    await harness.result().pollAgentWatcher(config);
+    assert.equal(tasks.find(task => task.id === 'task-work')?.status, 'in-progress');
+    assert.equal(tasks.find(task => task.id === 'task-review')?.status, 'under-review');
+    assert.equal(tasks.find(task => task.id === 'task-inspect')?.status, 'done');
+    assert.equal(tasks.find(task => task.id === 'task-other')?.status, 'open');
+    assert.equal(harness.result().agentWatchRuntime['agent-1'].actionedTaskCount, 2);
+    await harness.unmount();
+  } finally {
+    originalWindow();
   }
 });

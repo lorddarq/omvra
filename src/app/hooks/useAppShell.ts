@@ -202,6 +202,7 @@ export function useAppShell(): AppShellState {
     addTaskComment: handleAddTaskComment,
     updateTaskAttachments: handleUpdateTaskAttachments,
     deleteTask: handleDeleteTask,
+    duplicateTask: handleDuplicateTask,
     moveTask: handleMoveTask,
     moveAgentTaskToReview: handleMoveAgentTaskToReview,
     updateTaskDates: handleUpdateTaskDates,
@@ -295,6 +296,7 @@ export function useAppShell(): AppShellState {
     agentWatchConfigs,
     setAgentWatchConfigs,
     statusColumns,
+    setTasks,
   });
 
   useEffect(() => {
@@ -553,6 +555,9 @@ export function useAppShell(): AppShellState {
         timelineInitialLayoutState: timelineLayoutState,
         onTimelineLayoutStateChange: setTimelineLayoutState,
         onTimelineTaskClick: handleTaskClick,
+        onTimelineTaskEdit: handleEditTaskFromKanban,
+        onTimelineTaskDelete: handleDeleteTask,
+        onTimelineTaskDuplicate: handleDuplicateTask,
         onTimelineAddTask: handleAddTaskFromTimeline,
         onTimelineUpdateTaskDates: handleUpdateTaskDates,
         onTimelineEditSwimlane: handleEditSwimlane,

@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Omvra — Goals orchestration wireframe</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --surface: #fff; --surface-2: #f4f5f7; --ink: #20242b;
+      --muted: #737b89; --line: #e1e4e8; --accent: #3568f0; --accent-soft: #edf2ff;
+      --green: #17845b; --green-soft: #e8f7f0; --amber: #a66d00; --amber-soft: #fff6df;
+      --red: #c73b45; --red-soft: #fff0f1; --purple: #7957c8; --purple-soft: #f2efff;
+      --shadow: 0 1px 2px rgba(22, 27, 35, .04), 0 8px 26px rgba(22, 27, 35, .04);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: var(--bg); font-size: 13px; }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    .app { min-height: 100vh; display: grid; grid-template-rows: 54px 46px 1fr; }
+    .topbar { background: #fff; border-bottom: 1px solid var(--line); display: flex; align-items: center; padding: 0 22px; gap: 26px; }
+    .brand { font-weight: 750; letter-spacing: -.03em; font-size: 17px; }
+    .crumb { color: var(--muted); display: flex; gap: 8px; align-items: center; }
+    .top-actions { margin-left: auto; display: flex; align-items: center; gap: 9px; }
+    .icon-btn, .ghost-btn, .primary-btn { border: 1px solid var(--line); background: #fff; border-radius: 7px; padding: 7px 11px; color: #4f5866; }
+    .icon-btn { padding: 7px 9px; }
+    .primary-btn { border-color: var(--accent); background: var(--accent); color: white; font-weight: 650; }
+    .primary-btn:hover { background: #2c5cdb; }
+    .view-tabs { background: #fff; border-bottom: 1px solid var(--line); padding: 0 22px; display: flex; align-items: end; gap: 24px; }
+    .view-tab { height: 46px; border: 0; background: transparent; color: var(--muted); padding: 0 1px; position: relative; }
+    .view-tab.active { color: var(--ink); font-weight: 650; }
+    .view-tab.active::after { content: ""; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: var(--accent); }
+    .workspace { padding: 26px 30px 42px; max-width: 1500px; width: 100%; margin: 0 auto; }
+    .page-head { display: flex; align-items: flex-start; gap: 18px; margin-bottom: 21px; }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: 23px; letter-spacing: -.035em; line-height: 1.2; }
+    .eyebrow { color: var(--accent); font-size: 11px; font-weight: 750; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 7px; }
+    .page-copy { color: var(--muted); margin-top: 7px; }
+    .head-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+    .summary { display: grid; grid-template-columns: 1.5fr repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); margin-bottom: 17px; }
+    .summary > div { background: var(--surface); padding: 15px 17px; }
+    .summary .primary-stat { background: #fbfcff; }
+    .summary-label { color: var(--muted); font-size: 11px; margin-bottom: 5px; }
+    .summary-value { font-size: 20px; font-weight: 720; letter-spacing: -.04em; }
+    .summary-note { color: var(--muted); font-size: 11px; margin-top: 5px; }
+    .layout { display: grid; grid-template-columns: minmax(610px, 1.5fr) minmax(350px, .8fr); gap: 17px; align-items: start; }
+    .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+    .panel-head { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+    .panel-title { font-weight: 700; font-size: 14px; }
+    .panel-subtitle { color: var(--muted); font-size: 11px; margin-top: 3px; }
+    .panel-head .right { margin-left: auto; display: flex; gap: 7px; align-items: center; }
+    .select, .search { border: 1px solid var(--line); border-radius: 6px; background: #fff; color: #586170; padding: 7px 9px; }
+    .search { width: 154px; }
+    .goal-root { margin: 18px; border: 1px solid #ccd6ee; border-left: 3px solid var(--accent); border-radius: 8px; background: #fbfcff; }
+    .root-head { padding: 16px 17px; display: flex; align-items: flex-start; gap: 12px; }
+    .root-icon, .sub-icon { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 7px; font-weight: 800; }
+    .root-icon { color: var(--accent); background: var(--accent-soft); }
+    .root-title { font-weight: 720; font-size: 15px; }
+    .root-meta { color: var(--muted); font-size: 11px; margin-top: 4px; }
+    .root-actions { margin-left: auto; display: flex; gap: 5px; }
+    .mini-btn { border: 0; background: transparent; color: var(--muted); padding: 4px 6px; border-radius: 5px; }
+    .mini-btn:hover { background: var(--surface-2); color: var(--ink); }
+    .progress-track { height: 6px; background: #e9edf4; border-radius: 99px; overflow: hidden; margin: 0 17px 16px; }
+    .progress-track span { display: block; width: 42%; height: 100%; background: var(--accent); border-radius: inherit; }
+    .subgoals { border-top: 1px solid var(--line); }
+    .subgoal { border-bottom: 1px solid var(--line); }
+    .subgoal:last-child { border-bottom: 0; }
+    .subgoal-row { display: grid; grid-template-columns: 26px minmax(170px, 1fr) 110px 135px 28px; gap: 11px; align-items: center; padding: 13px 17px; }
+    .subgoal-row:hover { background: #fcfcfd; }
+    .sub-icon { color: var(--muted); background: var(--surface-2); font-size: 12px; }
+    .subgoal-title { font-weight: 650; }
+    .subgoal-meta { color: var(--muted); font-size: 11px; margin-top: 3px; }
+    .status, .persona, .tag { display: inline-flex; align-items: center; gap: 5px; width: fit-content; border-radius: 99px; padding: 4px 8px; font-size: 11px; font-weight: 650; white-space: nowrap; }
+    .status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .status.progress { color: var(--accent); background: var(--accent-soft); }
+    .status.ready { color: var(--green); background: var(--green-soft); }
+    .status.waiting { color: var(--amber); background: var(--amber-soft); }
+    .status.blocked { color: var(--red); background: var(--red-soft); }
+    .persona { color: var(--purple); background: var(--purple-soft); font-weight: 550; }
+    .chevron { color: var(--muted); transition: transform .18s ease; }
+    .subgoal.open .chevron { transform: rotate(90deg); }
+    .subgoal-detail { display: none; padding: 0 17px 17px 54px; background: #fcfcfd; }
+    .subgoal.open .subgoal-detail { display: block; }
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .detail-box { border: 1px solid var(--line); border-radius: 7px; padding: 11px; background: #fff; }
+    .detail-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 7px; font-weight: 750; }
+    .deliverable { display: flex; align-items: center; gap: 7px; padding: 5px 0; }
+    .check { color: var(--green); font-weight: 800; }
+    .check.pending { color: var(--amber); }
+    .gate { margin-top: 12px; padding: 10px 11px; border-radius: 7px; background: var(--amber-soft); color: #74500b; font-size: 11px; display: flex; gap: 8px; }
+    .side-stack { display: grid; gap: 17px; }
+    .rule-list, .activity-list { padding: 6px 17px 13px; }
+    .rule { display: grid; grid-template-columns: 23px 1fr; gap: 9px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+    .rule:last-child { border-bottom: 0; }
+    .rule-icon { color: var(--red); background: var(--red-soft); width: 23px; height: 23px; display: grid; place-items: center; border-radius: 6px; font-weight: 800; }
+    .rule strong { display: block; font-size: 12px; }
+    .rule span { color: var(--muted); font-size: 11px; line-height: 1.4; display: block; margin-top: 3px; }
+    .permission { padding: 15px 17px; border-top: 1px solid var(--line); }
+    .permission-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; }
+    .permission-row span { color: #4f5866; }
+    .toggle { width: 34px; height: 20px; border-radius: 99px; background: #cbd1da; border: 0; padding: 2px; }
+    .toggle span { display: block; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .18s ease; }
+    .toggle.on { background: var(--accent); }
+    .toggle.on span { transform: translateX(14px); }
+    .activity { padding: 7px 17px 14px; }
+    .activity-item { display: grid; grid-template-columns: 22px 1fr; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+    .activity-item:last-child { border: 0; }
+    .avatar { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: #e8ecf5; color: #536075; font-size: 10px; font-weight: 750; }
+    .activity-text { line-height: 1.35; }
+    .activity-text span { color: var(--muted); display: block; font-size: 11px; margin-top: 2px; }
+    .toast { position: fixed; right: 24px; bottom: 22px; background: #20242b; color: #fff; padding: 11px 14px; border-radius: 7px; box-shadow: var(--shadow); opacity: 0; transform: translateY(8px); transition: .2s ease; pointer-events: none; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(23, 28, 38, .34); display: grid; place-items: center; padding: 24px; z-index: 10; }
+    .modal-backdrop[hidden] { display: none; }
+    .wizard { width: min(880px, 100%); max-height: min(760px, 92vh); overflow: auto; background: #fff; border: 1px solid #d8dce4; border-radius: 12px; box-shadow: 0 24px 70px rgba(20, 26, 38, .2); }
+    .wizard-head { display: flex; align-items: flex-start; gap: 14px; padding: 21px 23px 18px; border-bottom: 1px solid var(--line); }
+    .wizard-head h2 { font-size: 18px; letter-spacing: -.025em; }
+    .wizard-head p { color: var(--muted); margin-top: 5px; }
+    .wizard-close { margin-left: auto; border: 0; background: transparent; color: var(--muted); font-size: 20px; line-height: 1; padding: 2px 5px; }
+    .stepper { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 17px 23px; border-bottom: 1px solid var(--line); background: #fcfcfd; }
+    .step { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 11px; font-weight: 650; }
+    .step-number { width: 23px; height: 23px; border-radius: 50%; display: grid; place-items: center; background: #e9edf3; color: #697384; }
+    .step.active { color: var(--ink); }
+    .step.active .step-number { background: var(--accent); color: #fff; }
+    .step.done .step-number { background: var(--green-soft); color: var(--green); }
+    .wizard-body { padding: 23px; }
+    .wizard-pane { display: none; }
+    .wizard-pane.active { display: block; }
+    .wizard-pane h3 { font-size: 15px; margin-bottom: 5px; }
+    .wizard-pane > p { color: var(--muted); line-height: 1.45; max-width: 650px; }
+    .field-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 15px; margin-top: 19px; }
+    .field { display: grid; gap: 6px; }
+    .field.full { grid-column: 1 / -1; }
+    .field label { color: #4d5665; font-size: 11px; font-weight: 700; }
+    .field input, .field textarea, .field select { width: 100%; border: 1px solid var(--line); border-radius: 7px; padding: 10px 11px; background: #fff; color: var(--ink); outline: 0; }
+    .field textarea { min-height: 92px; resize: vertical; }
+    .field input:focus, .field textarea:focus, .field select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .hint { color: var(--muted); font-size: 11px; line-height: 1.4; }
+    .outline-preview { margin-top: 18px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+    .outline-row { display: grid; grid-template-columns: 25px minmax(170px, 1fr) 150px 1fr; gap: 10px; align-items: center; padding: 12px; border-bottom: 1px solid var(--line); }
+    .outline-row:last-child { border-bottom: 0; }
+    .outline-row strong { font-size: 12px; }
+    .outline-row small { display: block; color: var(--muted); margin-top: 3px; }
+    .outline-num { width: 23px; height: 23px; display: grid; place-items: center; border-radius: 6px; background: var(--surface-2); color: var(--muted); font-weight: 750; }
+    .outline-deliverable { color: #586170; font-size: 11px; }
+    .policy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 18px; }
+    .policy-box { border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
+    .policy-box h4 { margin: 0 0 9px; font-size: 12px; }
+    .policy-box ul { padding-left: 17px; margin: 0; color: #586170; line-height: 1.7; font-size: 11px; }
+    .policy-box li::marker { color: var(--red); }
+    .review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 18px; }
+    .review-card { border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
+    .review-card h4 { margin: 0 0 8px; font-size: 12px; }
+    .review-card p { color: #586170; line-height: 1.45; font-size: 11px; }
+    .wizard-footer { display: flex; align-items: center; gap: 8px; padding: 15px 23px; border-top: 1px solid var(--line); background: #fcfcfd; }
+    .wizard-footer .spacer { margin-left: auto; }
+    .wizard-footer .back { display: none; }
+    .wizard-footer .back.visible { display: inline-flex; }
+    @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } .summary { grid-template-columns: repeat(2, 1fr); } .summary .primary-stat { grid-column: 1 / -1; } }
+    @media (max-width: 650px) { .topbar { padding: 0 14px; gap: 12px; } .crumb, .top-actions .ghost-btn { display: none; } .workspace { padding: 20px 14px 32px; } .page-head { display: block; } .head-actions { margin-top: 16px; } .subgoal-row { grid-template-columns: 26px 1fr 28px; } .subgoal-row .status, .subgoal-row .persona { display: none; } .detail-grid, .field-grid, .policy-grid, .review-grid { grid-template-columns: 1fr; } .field.full { grid-column: auto; } .stepper { gap: 3px; } .step { display: block; text-align: center; } .step-number { margin: 0 auto 5px; } .step-label { font-size: 10px; } .outline-row { grid-template-columns: 25px 1fr; } .outline-row .persona, .outline-deliverable { grid-column: 2; } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">Omvra</div>
+      <div class="crumb"><span>omvra</span><span>/</span><strong>UI 2.0 rollout</strong></div>
+      <div class="top-actions"><button class="ghost-btn" data-toast="Workspace settings opened">Settings</button><button class="icon-btn" aria-label="Help" data-toast="Help opened">?</button><button class="icon-btn" aria-label="Account" data-toast="Account menu opened">SJ</button></div>
+    </header>
+    <nav class="view-tabs" aria-label="Workspace views">
+      <button class="view-tab">Timeline</button><button class="view-tab">Kanban</button><button class="view-tab active">Goals</button>
+    </nav>
+    <main class="workspace">
+      <section class="page-head">
+        <div><div class="eyebrow">Orchestration</div><h1>Goals</h1><p class="page-copy">Turn a roadmap into delegated work, deliverables, and review gates.</p></div>
+        <div class="head-actions"><button class="ghost-btn" data-toast="Goal outline copied">Export outline</button><button class="primary-btn" id="open-new-goal">+ New goal</button></div>
+      </section>
+
+      <section class="summary" aria-label="Goal summary">
+        <div class="primary-stat"><div class="summary-label">Parent goal</div><div class="summary-value">Deliver UI 2.0 rollout</div><div class="summary-note">Autonomous execution with human acceptance gate</div></div>
+        <div><div class="summary-label">Progress</div><div class="summary-value">42%</div><div class="summary-note">3 of 7 subgoals</div></div>
+        <div><div class="summary-label">Active agents</div><div class="summary-value">2</div><div class="summary-note">1 waiting</div></div>
+        <div><div class="summary-label">Deliverables</div><div class="summary-value">8/14</div><div class="summary-note">6 remaining</div></div>
+        <div><div class="summary-label">Next gate</div><div class="summary-value">Design</div><div class="summary-note">Due tomorrow</div></div>
+      </section>
+
+      <div class="layout">
+        <section class="panel">
+          <div class="panel-head"><div><div class="panel-title">Execution outline</div><div class="panel-subtitle">The orchestrator follows this dependency order.</div></div><div class="right"><input class="search" placeholder="Filter subgoals" aria-label="Filter subgoals" /><button class="ghost-btn" data-toast="Subgoal added">+ Subgoal</button></div></div>
+          <div class="goal-root">
+            <div class="root-head"><div class="root-icon">◎</div><div><div class="root-title">Deliver UI 2.0 rollout</div><div class="root-meta">Roadmap goal · Owner: Orchestrator · Updated 4m ago</div></div><div class="root-actions"><button class="mini-btn" data-toast="Goal menu opened">•••</button></div></div>
+            <div class="progress-track"><span></span></div>
+            <div class="subgoals">
+              <article class="subgoal open"><div class="subgoal-row"><div class="sub-icon">1</div><div><div class="subgoal-title">Shaping</div><div class="subgoal-meta">Product architecture and scope</div></div><span class="status ready">Complete</span><span class="persona">Product Architect</span><button class="mini-btn chevron" aria-label="Toggle Shaping details">›</button></div><div class="subgoal-detail"><div class="detail-grid"><div class="detail-box"><div class="detail-label">Deliverables</div><div class="deliverable"><span class="check">✓</span>Product architecture</div><div class="deliverable"><span class="check">✓</span>PRD</div><div class="deliverable"><span class="check">✓</span>Functional specification</div></div><div class="detail-box"><div class="detail-label">Completion gate</div><div>Scope, risks, dependencies, and acceptance criteria recorded.</div><div style="margin-top:9px"><span class="status ready">Passed by orchestrator</span></div></div></div></div></article>
+              <article class="subgoal open"><div class="subgoal-row"><div class="sub-icon">2</div><div><div class="subgoal-title">Design</div><div class="subgoal-meta">Flows, interface, and interaction states</div></div><span class="status progress">In progress</span><span class="persona">UX/UI agent</span><button class="mini-btn chevron" aria-label="Toggle Design details">›</button></div><div class="subgoal-detail"><div class="detail-grid"><div class="detail-box"><div class="detail-label">Deliverables</div><div class="deliverable"><span class="check">✓</span>User flows</div><div class="deliverable"><span class="check pending">◷</span>Figma file</div><div class="deliverable"><span class="check pending">◷</span>Interaction specification</div></div><div class="detail-box"><div class="detail-label">Assigned execution</div><div><strong>Nova</strong> · UX/UI Designer</div><div class="subgoal-meta">Started 18m ago · 2 active tasks</div><button class="ghost-btn" style="margin-top:10px" data-toast="Handoff drawer opened">View handoff</button></div></div><div class="gate">⚑ <span>Gate: all approved requirements must be represented in the design before Implementation can start.</span></div></div></article>
+              <article class="subgoal"><div class="subgoal-row"><div class="sub-icon">3</div><div><div class="subgoal-title">Implementation</div><div class="subgoal-meta">Frontend, backend, and integration work</div></div><span class="status waiting">Blocked by Design</span><span class="persona">Full-stack agent</span><button class="mini-btn chevron" aria-label="Toggle Implementation details">›</button></div><div class="subgoal-detail"><div class="detail-grid"><div class="detail-box"><div class="detail-label">Deliverables</div><div class="deliverable"><span class="check pending">◷</span>Production code</div><div class="deliverable"><span class="check pending">◷</span>Automated tests</div></div><div class="detail-box"><div class="detail-label">Dependency</div><div>Waiting for <strong>Design</strong> to pass its completion gate.</div></div></div></div></article>
+              <article class="subgoal"><div class="subgoal-row"><div class="sub-icon">4</div><div><div class="subgoal-title">QA</div><div class="subgoal-meta">Regression, acceptance, and bug triage</div></div><span class="status waiting">Waiting</span><span class="persona">Senior QA tester</span><button class="mini-btn chevron" aria-label="Toggle QA details">›</button></div><div class="subgoal-detail"><div class="detail-grid"><div class="detail-box"><div class="detail-label">Deliverables</div><div class="deliverable"><span class="check pending">◷</span>Test report</div><div class="deliverable"><span class="check pending">◷</span>Regression evidence</div></div><div class="detail-box"><div class="detail-label">Gate</div><div>All acceptance criteria pass; no blocking findings remain.</div></div></div></div></article>
+              <article class="subgoal"><div class="subgoal-row"><div class="sub-icon">5</div><div><div class="subgoal-title">Human acceptance</div><div class="subgoal-meta">Review final evidence and approve release</div></div><span class="status waiting">Manual gate</span><span class="persona">Human reviewer</span><button class="mini-btn chevron" aria-label="Toggle Human acceptance details">›</button></div><div class="subgoal-detail"><div class="detail-box"><div class="detail-label">Required decision</div><div>Approve, request changes, or reject the completed roadmap.</div></div></div></article>
+            </div>
+          </div>
+        </section>
+
+        <aside class="side-stack">
+          <section class="panel"><div class="panel-head"><div><div class="panel-title">Orchestrator controls</div><div class="panel-subtitle">Execution authority for this goal.</div></div></div><div class="permission"><div class="permission-row"><span>Autonomous handoffs</span><button class="toggle on" aria-label="Toggle autonomous handoffs"><span></span></button></div><div class="permission-row"><span>Spawn specialist agents</span><button class="toggle on" aria-label="Toggle spawning agents"><span></span></button></div><div class="permission-row"><span>Create bug tasks</span><button class="toggle on" aria-label="Toggle bug tasks"><span></span></button></div><div class="permission-row"><span>Human approval required</span><button class="toggle on" aria-label="Toggle human approval"><span></span></button></div><div style="margin-top:8px"><label class="summary-label" for="mode">Execution mode</label><select id="mode" class="select" style="width:100%"><option>Autonomous with human gates</option><option>Supervised — approve each handoff</option><option>Planning only</option></select></div></div></section>
+          <section class="panel"><div class="panel-head"><div><div class="panel-title">Interdiction rules</div><div class="panel-subtitle">Actions the orchestrator must refuse.</div></div><div class="right"><button class="mini-btn" data-toast="Rule editor opened">Edit</button></div></div><div class="rule-list"><div class="rule"><div class="rule-icon">!</div><div><strong>Cannot deploy to production</strong><span>Requires explicit human approval and a release task.</span></div></div><div class="rule"><div class="rule-icon">!</div><div><strong>Cannot change product scope</strong><span>May propose a change, but cannot rewrite approved requirements.</span></div></div><div class="rule"><div class="rule-icon">!</div><div><strong>Cannot access private credentials</strong><span>Secrets, billing, and external accounts remain outside agent authority.</span></div></div><div class="rule"><div class="rule-icon">!</div><div><strong>Cannot skip a failed gate</strong><span>Must create rework or request a human decision.</span></div></div></div></section>
+          <section class="panel"><div class="panel-head"><div><div class="panel-title">Recent orchestration</div><div class="panel-subtitle">Auditable assignments and decisions.</div></div><div class="right"><button class="mini-btn" data-toast="Activity log opened">View all</button></div></div><div class="activity"><div class="activity-item"><div class="avatar">O</div><div class="activity-text"><strong>Orchestrator assigned Design to Nova</strong><span>4 minutes ago · dependency passed</span></div></div><div class="activity-item"><div class="avatar">PA</div><div class="activity-text"><strong>Shaping gate accepted</strong><span>Product architecture and PRD attached</span></div></div><div class="activity-item"><div class="avatar">O</div><div class="activity-text"><strong>Implementation held</strong><span>Waiting for Design deliverables</span></div></div></div></section>
+        </aside>
+      </div>
+    </main>
+  </div>
+  <div class="modal-backdrop" id="goal-wizard" hidden>
+    <section class="wizard" role="dialog" aria-modal="true" aria-labelledby="wizard-title">
+      <div class="wizard-head"><div><div class="eyebrow">New orchestration</div><h2 id="wizard-title">Create a goal</h2><p>Define the outcome first. Omvra will turn it into an explicit, reviewable execution plan.</p></div><button class="wizard-close" id="close-wizard" aria-label="Close new goal wizard">×</button></div>
+      <div class="stepper" aria-label="Goal creation steps"><div class="step active" data-step-label="1"><span class="step-number">1</span><span class="step-label">Define outcome</span></div><div class="step" data-step-label="2"><span class="step-number">2</span><span class="step-label">Shape outline</span></div><div class="step" data-step-label="3"><span class="step-number">3</span><span class="step-label">Set authority</span></div><div class="step" data-step-label="4"><span class="step-number">4</span><span class="step-label">Review & launch</span></div></div>
+      <div class="wizard-body">
+        <div class="wizard-pane active" data-step="1"><h3>What should be true when this goal is complete?</h3><p>This is the parent goal. Keep it outcome-focused; the orchestrator will propose the work needed to reach it.</p><div class="field-grid"><div class="field full"><label for="goal-name">Goal name</label><input id="goal-name" value="Deliver the new onboarding experience" /></div><div class="field full"><label for="goal-description">Outcome and context</label><textarea id="goal-description">Ship a complete onboarding experience that helps a new user reach a real workspace payoff.</textarea><span class="hint">Include constraints, product context, and what success looks like. Avoid prescribing every implementation step.</span></div><div class="field"><label for="goal-project">Project</label><select id="goal-project"><option>omvra</option><option>grazy-figma</option></select></div><div class="field"><label for="goal-owner">Orchestrator</label><select id="goal-owner"><option>Orchestrator · workspace default</option><option>Pericles · agentic</option></select></div></div></div>
+        <div class="wizard-pane" data-step="2"><h3>Review the proposed execution outline</h3><p>The outline is a deliverable of goal creation. You can reorder, remove, or add subgoals before agents receive work.</p><div class="outline-preview"><div class="outline-row"><span class="outline-num">1</span><div><strong>Shaping</strong><small>Product architecture, PRD, functional specification</small></div><span class="persona">Product Architect + PM</span><span class="outline-deliverable">3 deliverables · gate required</span></div><div class="outline-row"><span class="outline-num">2</span><div><strong>Design</strong><small>User flows, visual direction, interaction states</small></div><span class="persona">UX/UI Designer</span><span class="outline-deliverable">Figma file · interaction spec</span></div><div class="outline-row"><span class="outline-num">3</span><div><strong>Implementation</strong><small>Build, integrate, and cover behavior with tests</small></div><span class="persona">Frontend / Backend</span><span class="outline-deliverable">Production code · automated tests</span></div><div class="outline-row"><span class="outline-num">4</span><div><strong>QA</strong><small>Validate acceptance criteria and regressions</small></div><span class="persona">Senior QA tester</span><span class="outline-deliverable">Test report · evidence</span></div><div class="outline-row"><span class="outline-num">5</span><div><strong>Human acceptance</strong><small>Review the evidence and approve the result</small></div><span class="persona">Human reviewer</span><span class="outline-deliverable">Decision · follow-up</span></div></div><button class="ghost-btn" style="margin-top:12px" data-toast="Subgoal editor opened">+ Add subgoal</button></div>
+        <div class="wizard-pane" data-step="3"><h3>Set the orchestrator’s authority</h3><p>Autonomy is scoped here before work begins. These rules become the guardrails every delegated agent inherits.</p><div class="policy-grid"><div class="policy-box"><h4>Allowed without approval</h4><ul><li>Assign eligible agents to unblocked subgoals</li><li>Create tasks and bug reports</li><li>Attach and validate deliverables</li><li>Request rework after a failed gate</li></ul></div><div class="policy-box"><h4>Interdictions</h4><ul><li>Cannot deploy to production</li><li>Cannot change approved product scope</li><li>Cannot access private credentials</li><li>Cannot skip a failed completion gate</li></ul></div></div><div class="field-grid"><div class="field"><label for="execution-mode">Execution mode</label><select id="execution-mode"><option>Autonomous with human gates</option><option>Supervised — approve each handoff</option><option>Planning only</option></select></div><div class="field"><label for="approval-gate">Human approval required at</label><select id="approval-gate"><option>Human acceptance and production release</option><option>Every subgoal handoff</option><option>Never (workspace policy may override)</option></select></div></div></div>
+        <div class="wizard-pane" data-step="4"><h3>Review before launch</h3><p>Nothing is assigned yet. Launching creates the parent goal, persists this outline, and starts only the first unblocked subgoal.</p><div class="review-grid"><div class="review-card"><h4>Parent goal</h4><p><strong>Deliver the new onboarding experience</strong><br />Project: omvra<br />Owner: Orchestrator</p></div><div class="review-card"><h4>Execution plan</h4><p>5 subgoals · 12 deliverables<br />Sequential dependencies<br />Human acceptance terminal gate</p></div><div class="review-card"><h4>First assignment</h4><p>Shaping → Product Architect + Product Manager<br />Starts immediately after launch.</p></div><div class="review-card"><h4>Authority</h4><p>Autonomous handoffs enabled<br />Production deployment prohibited<br />Scope changes require approval</p></div></div></div>
+      </div>
+      <footer class="wizard-footer"><button class="ghost-btn back" id="wizard-back">Back</button><span class="spacer"></span><button class="ghost-btn" id="wizard-cancel">Cancel</button><button class="primary-btn" id="wizard-next">Continue</button></footer>
+    </section>
+  </div>
+  <div class="toast" role="status" aria-live="polite"></div>
+  <script>
+    const toast = document.querySelector('.toast'); let timer;
+    function showToast(message) { toast.textContent = message; toast.classList.add('show'); clearTimeout(timer); timer = setTimeout(() => toast.classList.remove('show'), 2200); }
+    document.querySelectorAll('[data-toast]').forEach(button => button.addEventListener('click', () => showToast(button.dataset.toast)));
+    document.querySelectorAll('.subgoal').forEach(item => { item.querySelector('.subgoal-row').addEventListener('click', event => { if (event.target.closest('button')) return; item.classList.toggle('open'); }); item.querySelector('.chevron').addEventListener('click', event => { event.stopPropagation(); item.classList.toggle('open'); }); });
+    document.querySelectorAll('.toggle').forEach(toggle => toggle.addEventListener('click', () => { toggle.classList.toggle('on'); showToast(toggle.classList.contains('on') ? 'Permission enabled' : 'Permission disabled'); }));
+    document.querySelectorAll('.view-tab').forEach(tab => tab.addEventListener('click', () => { document.querySelector('.view-tab.active').classList.remove('active'); tab.classList.add('active'); showToast(tab.textContent + ' view selected'); }));
+    const wizard = document.querySelector('#goal-wizard'); const panes = [...document.querySelectorAll('.wizard-pane')]; const steps = [...document.querySelectorAll('.step')]; const next = document.querySelector('#wizard-next'); const back = document.querySelector('#wizard-back'); let currentStep = 0;
+    function renderWizard() { panes.forEach((pane, index) => pane.classList.toggle('active', index === currentStep)); steps.forEach((step, index) => { step.classList.toggle('active', index === currentStep); step.classList.toggle('done', index < currentStep); }); back.classList.toggle('visible', currentStep > 0); next.textContent = currentStep === panes.length - 1 ? 'Launch goal' : 'Continue'; }
+    function closeWizard() { wizard.hidden = true; currentStep = 0; renderWizard(); }
+    document.querySelector('#open-new-goal').addEventListener('click', () => { wizard.hidden = false; document.querySelector('#goal-name').focus(); });
+    document.querySelector('#close-wizard').addEventListener('click', closeWizard); document.querySelector('#wizard-cancel').addEventListener('click', closeWizard); wizard.addEventListener('click', event => { if (event.target === wizard) closeWizard(); });
+    back.addEventListener('click', () => { currentStep = Math.max(0, currentStep - 1); renderWizard(); }); next.addEventListener('click', () => { if (currentStep === panes.length - 1) { closeWizard(); showToast('Goal created — Shaping is ready to start'); return; } currentStep += 1; renderWizard(); });
+  </script>
+</body>
+</html>

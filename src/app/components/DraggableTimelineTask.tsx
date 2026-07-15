@@ -1,6 +1,13 @@
 import { useRef } from 'react';
 import { useDrag } from 'react-dnd';
+import { Copy, Edit2, Trash2 } from 'lucide-react';
 import { Task } from '../types';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from './ui/context-menu';
 
 const TIMELINE_TASK_TYPE = 'TIMELINE_TASK';
 const PRIORITY_STYLES: Record<string, { className: string }> = {
@@ -16,6 +23,9 @@ interface DraggableTimelineTaskProps {
   getTaskColor: (status: string) => { className?: string; style?: React.CSSProperties; textClass?: string; bulletOutlineColor?: string };
   handleResizeStart: (e: React.MouseEvent, task: Task, edge: 'start' | 'end') => void;
   onTaskClick: (task: Task) => void;
+  onTaskEdit: (task: Task) => void;
+  onTaskDelete: (taskId: string) => void;
+  onTaskDuplicate: (task: Task) => void;
   resizingTaskId: string | null;
 }
 
@@ -25,6 +35,9 @@ export function DraggableTimelineTask({
   getTaskColor,
   handleResizeStart,
   onTaskClick,
+  onTaskEdit,
+  onTaskDelete,
+  onTaskDuplicate,
   resizingTaskId,
 }: DraggableTimelineTaskProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -53,12 +66,14 @@ export function DraggableTimelineTask({
   const bulletOutlineColor = color.bulletOutlineColor ?? 'rgba(255,255,255,0.28)';
 
   function handleMouseDown(e: React.MouseEvent) {
+    if (e.button !== 0) return;
     mouseDownPos.current = { x: e.clientX, y: e.clientY };
     const rect = ref.current?.getBoundingClientRect();
     dragOffsetXRef.current = rect ? e.clientX - rect.left : 0;
   }
 
   function handleMouseUp(e: React.MouseEvent) {
+    if (e.button !== 0) return;
     if (!mouseDownPos.current) return;
     
     const dx = Math.abs(e.clientX - mouseDownPos.current.x);
@@ -81,23 +96,25 @@ export function DraggableTimelineTask({
   const isResizing = resizingTaskId === task.id;
 
   return (
-    <div
-      ref={ref}
-      role="button"
-      tabIndex={0}
-      aria-label={`Open task ${task.title}`}
-      className={`timeline-task-bar absolute h-8 rounded-md px-3 flex items-center gap-2 cursor-pointer pointer-events-auto group/task ${backgroundClass} ${textClass} text-xs ${
-        isResizing ? 'is-resizing shadow-lg z-10' : ''
-      } ${isDragging ? 'is-dragging opacity-0' : ''}`}
-      style={{
-        left: `${position.left + 4}px`,
-        width: `${position.width}px`,
-        ...(color.style || {}),
-      }}
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
-      onKeyDown={handleKeyDown}
-    >
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          ref={ref}
+          role="button"
+          tabIndex={0}
+          aria-label={`Open task ${task.title}`}
+          className={`timeline-task-bar absolute h-8 rounded-md px-3 flex items-center gap-2 cursor-pointer pointer-events-auto group/task ${backgroundClass} ${textClass} text-xs ${
+            isResizing ? 'is-resizing shadow-lg z-10' : ''
+          } ${isDragging ? 'is-dragging opacity-0' : ''}`}
+          style={{
+            left: `${position.left + 4}px`,
+            width: `${position.width}px`,
+            ...(color.style || {}),
+          }}
+          onMouseDown={handleMouseDown}
+          onMouseUp={handleMouseUp}
+          onKeyDown={handleKeyDown}
+        >
       {/* Left resize handle */}
       <div
         className="timeline-task-resize-grip left-0 absolute top-0 bottom-0 w-2 cursor-ew-resize flex items-center justify-center opacity-0 group-hover/task:opacity-100"
@@ -131,7 +148,23 @@ export function DraggableTimelineTask({
       >
         <div className="timeline-task-resize-grip-indicator w-0.5 h-4 bg-white/50 rounded"></div>
       </div>
-    </div>
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent aria-label={`Actions for ${task.title}`}>
+        <ContextMenuItem onSelect={() => onTaskEdit(task)}>
+          <Edit2 />
+          Edit
+        </ContextMenuItem>
+        <ContextMenuItem variant="destructive" onSelect={() => onTaskDelete(task.id)}>
+          <Trash2 />
+          Delete
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={() => onTaskDuplicate(task)}>
+          <Copy />
+          Duplicate
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 

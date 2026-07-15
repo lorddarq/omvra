@@ -38,6 +38,9 @@ export interface TimelineViewController {
   timelineInitialLayoutState: TimelineLayoutState;
   onTimelineLayoutStateChange: (layout: TimelineLayoutState) => void;
   onTimelineTaskClick: (task: Task) => void;
+  onTimelineTaskEdit: (task: Task) => void;
+  onTimelineTaskDelete: (taskId: string) => void;
+  onTimelineTaskDuplicate: (task: Task) => void;
   onTimelineAddTask: (date: Date, swimlaneId: string, endDate?: Date, mode?: 'projects' | 'people') => void;
   onTimelineUpdateTaskDates: (taskId: string, startDate: string, endDate: string) => void;
   onTimelineEditSwimlane: (swimlane: TimelineSwimlane) => void;
@@ -106,6 +109,9 @@ export function AppMainViews({
             initialLayoutState={timeline.timelineInitialLayoutState}
             onLayoutStateChange={timeline.onTimelineLayoutStateChange}
             onTaskClick={timeline.onTimelineTaskClick}
+            onTaskEdit={timeline.onTimelineTaskEdit}
+            onTaskDelete={timeline.onTimelineTaskDelete}
+            onTaskDuplicate={timeline.onTimelineTaskDuplicate}
             onAddTask={timeline.onTimelineAddTask}
             onUpdateTaskDates={timeline.onTimelineUpdateTaskDates}
             onEditSwimlane={timeline.onTimelineEditSwimlane}

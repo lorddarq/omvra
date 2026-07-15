@@ -64,6 +64,7 @@ export interface KanbanViewController {
 }
 
 export interface RoadmapViewController {
+  showCompleted: boolean;
   onRoadmapAddMilestone: () => void;
   onRoadmapMilestoneClick: (milestone: ProjectMilestone) => void;
   onRoadmapTaskClick: (task: Task) => void;
@@ -151,6 +152,7 @@ export function AppMainViews({
             projects={data.timelineSwimlanes}
             statusColumns={data.statusColumns}
             readModel={data.readModel}
+            showCompleted={roadmap.showCompleted}
             onAddMilestone={roadmap.onRoadmapAddMilestone}
             onMilestoneClick={roadmap.onRoadmapMilestoneClick}
             onTaskClick={roadmap.onRoadmapTaskClick}

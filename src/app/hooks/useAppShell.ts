@@ -577,6 +577,7 @@ export function useAppShell(): AppShellState {
         onKanbanDeleteColumn: handleDeleteStatusColumn,
       },
       roadmap: {
+        showCompleted: timelineLayoutState.showCompleted,
         onRoadmapAddMilestone: addMilestone,
         onRoadmapMilestoneClick: openMilestoneDetails,
         onRoadmapTaskClick: handleTaskClick,

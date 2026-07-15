@@ -221,13 +221,13 @@ export function TasksSettingsSection({
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <div className="text-sm font-semibold leading-5 text-[#71717a]">Completed tasks on Timeline</div>
+              <div className="text-sm font-semibold leading-5 text-[#71717a]">Completed work on Timeline and Roadmap</div>
               <p className="mt-1 break-words text-xs leading-4 text-[#6a7282] [overflow-wrap:anywhere]">
-                Show tasks from Kanban columns classified as Done.
+                Show tasks and milestones classified as complete.
               </p>
             </div>
             <Switch
-              aria-label="Show completed tasks on Timeline"
+              aria-label="Show completed work on Timeline and Roadmap"
               checked={showCompletedTimelineTasks}
               onCheckedChange={onShowCompletedTimelineTasksChange}
             />

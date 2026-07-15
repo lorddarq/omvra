@@ -105,7 +105,11 @@ function McpAuditSummaryCard({ summary }: { summary: McpAuditSummary | null }) {
   }
 
   const { overall } = summary;
-  const formatRate = (value: number | null) => value === null ? 'n/a' : `${Math.round(value * 100)}%`;
+  const formatRate = (value: number | null) => {
+    if (value === null) return 'n/a';
+    const percent = value * 100;
+    return `${Number.isInteger(percent) ? percent : percent.toFixed(1)}%`;
+  };
   const topAgents = (summary.by.agent || []).slice(0, 3);
 
   return (
@@ -114,7 +118,7 @@ function McpAuditSummaryCard({ summary }: { summary: McpAuditSummary | null }) {
         <div>
           <div className="text-sm font-semibold leading-5 text-[#71717a]">Benchmark Summary</div>
           <p className="text-xs leading-4 text-[#6a7282]">
-            {summary.sampleSize} redacted event{summary.sampleSize === 1 ? '' : 's'}; grouped locally.
+            {summary.sampleSize} sampled redacted event{summary.sampleSize === 1 ? '' : 's'}; grouped locally.
           </p>
         </div>
         <BarChart3 className="mt-0.5 size-4 text-[#71717a]" aria-hidden="true" />
@@ -129,14 +133,20 @@ function McpAuditSummaryCard({ summary }: { summary: McpAuditSummary | null }) {
 
       {topAgents.length > 0 && (
         <div className="space-y-1 text-xs leading-4 text-[#6a7282]">
-          <div className="font-medium text-[#71717a]">Top agents</div>
+          <div className="font-medium text-[#71717a]">Provenance groups</div>
           {topAgents.map(agent => (
             <div className="flex items-center justify-between gap-3" key={agent.key}>
-              <span className="truncate">{agent.key}</span>
+              <span className="truncate">{agent.key === 'unknown' ? 'Unknown / missing metadata' : agent.key}</span>
               <span className="shrink-0">{agent.count} · {formatRate(agent.successRate)} success</span>
             </div>
           ))}
         </div>
+      )}
+
+      {overall.duration.sampleSize === 0 && (
+        <p className="text-xs leading-4 text-[#6a7282]">
+          Timing is unavailable for this sample. Older audit entries may predate telemetry capture.
+        </p>
       )}
     </div>
   );

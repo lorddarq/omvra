@@ -6,6 +6,7 @@ import {
   getStatusVisual,
   getMilestoneProjectIds,
   getTasksForMilestone,
+  isMilestoneComplete,
   summarizeMilestone,
   type MilestoneHealth,
 } from '../utils/roadmap';
@@ -36,6 +37,7 @@ interface RoadmapViewProps {
   projects: TimelineSwimlane[];
   statusColumns: StatusColumn[];
   readModel?: WorkspaceReadModel;
+  showCompleted: boolean;
   onAddMilestone: () => void;
   onMilestoneClick: (milestone: ProjectMilestone) => void;
   onTaskClick: (task: Task) => void;
@@ -160,6 +162,7 @@ export function RoadmapView({
   projects,
   statusColumns,
   readModel,
+  showCompleted,
   onAddMilestone,
   onMilestoneClick,
   onTaskClick,
@@ -176,6 +179,7 @@ export function RoadmapView({
   const filteredMilestones = useMemo(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
     return milestones
+      .filter(milestone => showCompleted || !isMilestoneComplete(milestone, tasks, statusColumns))
       .filter(milestone => {
         if (!normalizedSearch) return true;
         const enrichedMilestone = enrichedMilestoneById?.get(milestone.id);
@@ -203,7 +207,7 @@ export function RoadmapView({
       })
       .filter(milestone => isMilestoneInDateWindow(milestone, dateWindow))
       .sort((a, b) => a.endDate.localeCompare(b.endDate));
-  }, [dateWindow, enrichedMilestoneById, healthFilter, milestones, projectFilter, projects, searchQuery, statusColumns, tasks]);
+  }, [dateWindow, enrichedMilestoneById, healthFilter, milestones, projectFilter, projects, searchQuery, showCompleted, statusColumns, tasks]);
 
   const hasActiveFilters = searchQuery.trim() !== '' || projectFilter !== 'all' || healthFilter !== 'all' || dateWindow !== 'all';
   const range = useMemo(() => getDateRange(filteredMilestones, tasks), [filteredMilestones, tasks]);
@@ -337,8 +341,8 @@ export function RoadmapView({
         ) : filteredMilestones.length === 0 ? (
           <EmptyStateCard
             icon={<Filter className="size-5" />}
-            title="No milestones match these filters"
-            description="Adjust the project, health, or date filters to bring milestones back into view."
+            title="No milestones match these filters or visibility settings"
+            description="Adjust the roadmap filters or enable completed work in Settings to bring milestones back into view."
             action={<Button onClick={resetFilters} variant="outline">Reset filters</Button>}
           />
         ) : (

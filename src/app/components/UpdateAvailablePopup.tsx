@@ -129,7 +129,7 @@ export function UpdateAvailablePopup({
                     style={{ width: `${progressPercent}%` }}
                   />
                   <div className="relative flex h-full items-center justify-center">
-                    <span className="text-[24px] leading-none font-semibold text-white">{progressPercent}%</span>
+                    <span className="text-[14px] font-bold leading-5 text-white">{progressPercent}%</span>
                   </div>
                 </div>
               ) : null}

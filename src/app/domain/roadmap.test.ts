@@ -4,6 +4,7 @@ import type { ProjectMilestone, Task } from '../types.ts';
 import {
   assertNoDependencyCycle,
   getMilestoneHealthVisual,
+  isMilestoneComplete,
   summarizeMilestone,
   wouldCreateDependencyCycle,
 } from './roadmap.ts';
@@ -84,6 +85,18 @@ test('summarizeMilestone derives progress from column roadmap stages and exclude
   assert.equal(summary.stageCounts.complete, 1);
   assert.equal(getRoadmapStageProgress('complete'), 100);
   assert.equal(getRoadmapStageProgress('excluded'), 0);
+});
+
+test('isMilestoneComplete follows the shared milestone health semantics', () => {
+  const milestone: ProjectMilestone = {
+    id: 'milestone-complete',
+    title: 'Completed milestone',
+    endDate: '2026-07-10',
+    linkedTaskIds: ['task-done'],
+  };
+
+  assert.equal(isMilestoneComplete(milestone, [{ id: 'task-done', title: 'Shipped', status: 'done' }]), true);
+  assert.equal(isMilestoneComplete(milestone, [{ id: 'task-done', title: 'Still working', status: 'in-progress' }]), false);
 });
 
 test('wouldCreateDependencyCycle catches loops across linked tasks', () => {

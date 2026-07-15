@@ -6,6 +6,7 @@ export {
   getMilestoneProjectIds,
   getTaskProjectIds,
   getTasksForMilestone,
+  isMilestoneComplete,
   isTaskLateForMilestone,
   MILESTONE_HEALTH_VISUALS,
   summarizeMilestone,

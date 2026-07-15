@@ -136,6 +136,14 @@ export function summarizeMilestone(milestone: ProjectMilestone, tasks: Task[], s
   };
 }
 
+export function isMilestoneComplete(
+  milestone: ProjectMilestone,
+  tasks: Task[],
+  statusColumns: StatusColumn[] = []
+): boolean {
+  return summarizeMilestone(milestone, tasks, statusColumns).health === 'complete';
+}
+
 export function getMilestoneDateRangeLabel(milestone: ProjectMilestone): string {
   return formatDateRangeLabel(milestone.startDate, milestone.endDate);
 }

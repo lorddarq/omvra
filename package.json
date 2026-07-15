@@ -86,7 +86,8 @@
       "target": [
         "dmg",
         "zip"
-      ]
+      ],
+      "notarize": true
     },
     "dmg": {
       "background": "electron/assets/dmg-background.png"

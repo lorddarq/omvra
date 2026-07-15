@@ -228,14 +228,24 @@ jobs:
         run: |
           security find-identity -v -p codesigning "${KEYCHAIN_PATH}"
 
+      - name: Validate notarization credentials
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          [[ -n "${APPLE_ID:-}" ]] || { echo "Missing APPLE_ID" >&2; exit 1; }
+          [[ -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" ]] || { echo "Missing APPLE_APP_SPECIFIC_PASSWORD" >&2; exit 1; }
+          [[ -n "${APPLE_TEAM_ID:-}" ]] || { echo "Missing APPLE_TEAM_ID" >&2; exit 1; }
+
       - name: Package app
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           GITHUB_REF_TYPE: tag
           GITHUB_REF_NAME: ${{ needs.prepare_release.outputs.release_tag }}
         run: npm run build:electron

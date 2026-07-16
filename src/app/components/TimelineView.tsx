@@ -16,12 +16,9 @@ import { Task, TimelineSwimlane, TaskStatus, Person, StatusColumn } from '../typ
 import { DndProvider, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { CalendarDays, Plus, Users } from 'lucide-react';
-import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
-import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import { TimelineHeader } from './TimelineHeader';
 import { TimelineToolbar } from './TimelineToolbar';
 import { filterTimelineTasks } from '../utils/statusColumnSemantics';
-import { AppStatusBar } from './AppStatusBar';
 import { EmptyStateCard } from './EmptyStateCard';
 import {
   DraggableSwimlaneLabel,
@@ -148,12 +145,6 @@ interface TimelineViewProps {
   tasks: Task[];
   swimlanes: TimelineSwimlane[];
   people?: Person[];
-  agentWatchConfigs?: AgentWatchConfig[];
-  agentWatchRuntime?: Record<string, AgentWatchRuntimeState>;
-  mcpAuditLog?: McpAuditEntry[];
-  mcpAgentAccessEnabled?: boolean;
-  mcpListenerStatus?: McpListenerStatus | null;
-  mcpRestartPending?: boolean;
   statusColumns?: StatusColumn[];
   initialScrollLeft?: number;
   initialLayoutState?: TimelineLayoutState;
@@ -176,12 +167,6 @@ export function TimelineView({
   tasks,
   swimlanes,
   people = [],
-  agentWatchConfigs = [],
-  agentWatchRuntime = {},
-  mcpAuditLog = [],
-  mcpAgentAccessEnabled = false,
-  mcpListenerStatus = null,
-  mcpRestartPending = false,
   statusColumns,
   initialScrollLeft,
   initialLayoutState,
@@ -1397,16 +1382,6 @@ export function TimelineView({
         </div>
         )}
 
-        <AppStatusBar
-          tasks={tasks}
-          people={people}
-          agentWatchConfigs={agentWatchConfigs}
-          agentWatchRuntime={agentWatchRuntime}
-          mcpAuditLog={mcpAuditLog}
-          mcpAgentAccessEnabled={mcpAgentAccessEnabled}
-          mcpListenerStatus={mcpListenerStatus}
-          mcpRestartPending={mcpRestartPending}
-        />
       </div>
     </DndProvider>
   );

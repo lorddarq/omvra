@@ -23,6 +23,7 @@ const {
   isMcpAgentAccessEnabled,
   buildMcpListenerStatus,
 } = require('./services/workspace-service.cjs');
+const { getBundledSkillsRoot } = require('./services/skill-service.cjs');
 
 const APP_NAME = 'Omvra';
 // Consider the app to be in dev mode when it's not packaged. This avoids trying to load a dev server in packaged builds.
@@ -90,6 +91,12 @@ function restartMcpServer() {
   mcpHttpServer = startMcpHttpServer(store, {
     logger: console,
     onStatusChange: setMcpRuntimeState,
+    skillsRoot: getBundledSkillsRoot({
+      isPackaged: app.isPackaged,
+      appPath: app.getAppPath(),
+      resourcesPath: process.resourcesPath,
+    }),
+    userSkillsRoot: app.getPath('userData'),
   });
 }
 

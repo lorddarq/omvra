@@ -3,9 +3,7 @@ import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { Task, TimelineSwimlane, Person, TaskStatus, StatusColumn, ProjectMilestone } from '../types';
 import { ViewType } from '../hooks/useViewState';
-import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import type { KanbanTaskFilters } from '../utils/taskFilters';
-import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import type { TimelineLayoutState } from '../services/uiState';
 import { TimelineView } from './TimelineView';
@@ -29,12 +27,6 @@ export interface AppViewDataProps {
 }
 
 export interface TimelineViewController {
-  agentWatchConfigs: AgentWatchConfig[];
-  agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
-  mcpAuditLog: McpAuditEntry[];
-  mcpAgentAccessEnabled: boolean;
-  mcpListenerStatus: McpListenerStatus | null;
-  mcpRestartPending: boolean;
   timelineInitialScrollLeft: number;
   timelineInitialLayoutState: TimelineLayoutState;
   onTimelineLayoutStateChange: (layout: TimelineLayoutState) => void;
@@ -99,12 +91,6 @@ export function AppMainViews({
             tasks={data.tasks}
             swimlanes={data.timelineSwimlanes}
             people={data.people}
-            agentWatchConfigs={timeline.agentWatchConfigs}
-            agentWatchRuntime={timeline.agentWatchRuntime}
-            mcpAuditLog={timeline.mcpAuditLog}
-            mcpAgentAccessEnabled={timeline.mcpAgentAccessEnabled}
-            mcpListenerStatus={timeline.mcpListenerStatus}
-            mcpRestartPending={timeline.mcpRestartPending}
             statusColumns={data.statusColumns}
             initialScrollLeft={timeline.timelineInitialScrollLeft}
             initialLayoutState={timeline.timelineInitialLayoutState}

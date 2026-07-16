@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Activity, AlertTriangle, Bot, CheckCircle2, Download, HelpCircle, Info, Terminal, Upload, Users } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle2, Download, HelpCircle, Info, Terminal, Upload } from 'lucide-react';
 import { Person, RoadmapStage, StatusColumn, StorageMeter } from '../types';
 import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import { AnchoredPanel, AnchoredPanelSection } from './AnchoredPanel';
 import { AgentBoardWatchSettings } from './AgentBoardWatchSettings';
+import { AgentIcon } from './AgentIcon';
+import { UsersIcon } from './UsersIcon';
 import { EmptyStateCard } from './EmptyStateCard';
 import { Switch } from './ui/switch';
 import { getDefaultColumnSemantics } from '../utils/statusColumnSemantics';
@@ -32,12 +34,12 @@ const SETTINGS_PANEL_NAV_GROUPS = [
       {
         id: 'people',
         label: 'People',
-        icon: Users,
+        icon: UsersIcon,
       },
       {
         id: 'agents',
         label: 'Agents',
-        icon: Bot,
+        icon: AgentIcon,
       },
       {
         id: 'mcp-access',

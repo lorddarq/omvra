@@ -30,6 +30,7 @@ import {
 import { useMcpDiagnostics } from './useMcpDiagnostics.ts';
 import type { AppMainViewsProps } from '../components/AppMainViews.tsx';
 import type { AppPanelsProps } from '../components/AppPanels.tsx';
+import type { AppStatusBarProps } from '../components/AppStatusBar.tsx';
 import type { ComponentProps } from 'react';
 import { AppHeader } from '../components/AppHeader.tsx';
 import { DeleteConfirmDialog } from '../components/DeleteConfirmDialog.tsx';
@@ -66,6 +67,7 @@ export interface AppShellState {
   isHydrated: boolean;
   headerProps: ComponentProps<typeof AppHeader>;
   mainViewsProps: AppMainViewsProps;
+  statusBarProps: AppStatusBarProps;
   panelsProps: AppPanelsProps;
   updatePopupProps: ComponentProps<typeof UpdateAvailablePopup>;
   deleteConfirmProps: ComponentProps<typeof DeleteConfirmDialog>;
@@ -545,12 +547,6 @@ export function useAppShell(): AppShellState {
         readModel: workspaceReadModel,
       },
       timeline: {
-        agentWatchConfigs,
-        agentWatchRuntime,
-        mcpAuditLog,
-        mcpAgentAccessEnabled: preferences.mcpAgentAccessEnabled,
-        mcpListenerStatus,
-        mcpRestartPending: isMcpRestartPending,
         timelineInitialScrollLeft: getViewStateSnapshot('timeline').scrollLeft || 0,
         timelineInitialLayoutState: timelineLayoutState,
         onTimelineLayoutStateChange: setTimelineLayoutState,
@@ -587,6 +583,16 @@ export function useAppShell(): AppShellState {
         onRoadmapMilestoneClick: openMilestoneDetails,
         onRoadmapTaskClick: handleTaskClick,
       },
+    },
+    statusBarProps: {
+      tasks,
+      people,
+      agentWatchConfigs,
+      agentWatchRuntime,
+      mcpAuditLog,
+      mcpAgentAccessEnabled: preferences.mcpAgentAccessEnabled,
+      mcpListenerStatus,
+      mcpRestartPending: isMcpRestartPending,
     },
     panelsProps: {
       dialogs: {

@@ -8,6 +8,9 @@ const {
   appendMcpAuditLog,
   buildMcpAuditSummary,
   getWorkspaceSnapshot,
+  listGoals,
+  getGoalById,
+  updateGoal,
   listMilestones,
   getMilestoneById,
   buildMcpAgentGuide,
@@ -44,6 +47,7 @@ const {
   assignTaskToPerson,
   isMcpAccessTokenExpired,
 } = require('./workspace-service.cjs');
+const { listAvailableSkills, getAvailableSkill } = require('./skill-service.cjs');
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const ALLOWED_CORS_HEADERS = 'Content-Type, Accept, Authorization, X-MCP-Token';
@@ -82,6 +86,15 @@ const READ_TOOL_DEFINITIONS = [
         search: { type: 'string' },
         projectId: { type: 'string' },
       },
+    },
+  },
+  {
+    name: 'goals.list',
+    description: 'Lists complete goal graphs, including subgoals, linked personas, scoped instructions, conditions, approval gates, sequence connectors, and execution metadata.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {},
     },
   },
   {
@@ -192,9 +205,57 @@ const READ_TOOL_DEFINITIONS = [
       oneOf: [{ required: ['id'] }, { required: ['milestoneId'] }],
     },
   },
+  {
+    name: 'goals.get',
+    description: 'Gets one complete goal graph by id, including all canvas and execution subinformation.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        id: { type: 'string' },
+        goalId: { type: 'string' },
+      },
+      oneOf: [{ required: ['id'] }, { required: ['goalId'] }],
+    },
+  },
+  {
+    name: 'skills.list',
+    description: 'Lists the read-only skills bundled with the local Omvra app, including stage and persona compatibility.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {},
+    },
+  },
+  {
+    name: 'skills.get',
+    description: 'Reads one skill from the local Omvra bundled skills catalog by skillId.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: { skillId: { type: 'string' } },
+      required: ['skillId'],
+    },
+  },
 ];
 
 const WRITE_TOOL_DEFINITIONS = [
+  {
+    name: 'goals.update',
+    description: 'Replaces a goal graph through MCP with optimistic revision protection. Use this for canvas positions, nodes, typed connectors, scoped instructions, conditions, approval gates, and overseer assignment.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        goalId: { type: 'string' },
+        title: { type: 'string' },
+        elements: { type: 'array', items: { type: 'object' } },
+        overseerAgentId: { type: 'string' },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+      },
+      required: ['goalId', 'elements', 'expectedRevision'],
+    },
+  },
   {
     name: 'task_write',
     description: 'Creates a new standalone task with optional project, timeline, assignment, schedule, and task metadata. For roadmap membership or task dependencies, create the task first, then use milestones_link_tasks as the single canonical roadmap write.',
@@ -629,6 +690,9 @@ const WRITE_TOOL_DEFINITIONS = [
 
 const TOOL_NAME_ALIASES = new Map([
   ['workspace_get_snapshot', 'workspace.get_snapshot'],
+  ['goals_list', 'goals.list'],
+  ['goals_get', 'goals.get'],
+  ['goals_update', 'goals.update'],
   ['tasks_list', 'tasks.list'],
   ['tasks_get', 'tasks.get'],
   ['agent_resolve_task_context', 'agent.resolve_task_context'],
@@ -716,6 +780,12 @@ const RESOURCE_DEFINITIONS = [
     mimeType: 'application/json',
   },
   {
+    uri: 'omvra://goals',
+    name: 'Goals and loops',
+    description: 'Read-only complete goal graph list',
+    mimeType: 'application/json',
+  },
+  {
     uriTemplate: 'omvra://tasks/{taskId}',
     name: 'Task by id',
     description: 'Read-only task resource',
@@ -734,6 +804,12 @@ const RESOURCE_TEMPLATE_DEFINITIONS = [
     uriTemplate: 'omvra://milestones/{milestoneId}',
     name: 'Milestone by id',
     description: 'Resolve a roadmap milestone by id',
+    mimeType: 'application/json',
+  },
+  {
+    uriTemplate: 'omvra://goals/{goalId}',
+    name: 'Goal by id',
+    description: 'Resolve a complete goal graph by id',
     mimeType: 'application/json',
   },
   {
@@ -804,6 +880,15 @@ function makeWriteToolResult(action, payload = {}) {
     if (!Object.prototype.hasOwnProperty.call(structuredContent, 'revision')) {
       structuredContent.revision = payload.task && typeof payload.task === 'object'
         ? payload.task.__mcpRevision ?? null
+        : null;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'goal')) {
+    structuredContent.goal = payload.goal;
+    if (!Object.prototype.hasOwnProperty.call(structuredContent, 'revision')) {
+      structuredContent.revision = payload.goal && typeof payload.goal === 'object'
+        ? payload.goal.__mcpRevision ?? null
         : null;
     }
   }
@@ -1018,6 +1103,17 @@ function parseMilestoneId(args) {
   return null;
 }
 
+function parseGoalId(args) {
+  const normalized = normalizeObject(args);
+  if (typeof normalized.id === 'string' && normalized.id.trim()) {
+    return normalized.id.trim();
+  }
+  if (typeof normalized.goalId === 'string' && normalized.goalId.trim()) {
+    return normalized.goalId.trim();
+  }
+  return null;
+}
+
 function isJsonRpcIdValid(id) {
   return id === undefined
     || id === null
@@ -1056,7 +1152,7 @@ function isKnownWriteToolName(name) {
   if (WRITE_TOOL_DEFINITIONS.some(tool => tool.name === name)) {
     return true;
   }
-  return /^(tasks\.(create|update|delete|write|set|transition|complete|log_time)|milestones\.(create|update|delete))/.test(name);
+  return /^(goals\.update|tasks\.(create|update|delete|write|set|transition|complete|log_time)|milestones\.(create|update|delete))/.test(name);
 }
 
 function getResourceForUri(store, uri, requestParams) {
@@ -1076,8 +1172,13 @@ function getResourceForUri(store, uri, requestParams) {
     return { uri, data: listMilestones(store) };
   }
 
+  if (uri === 'omvra://goals') {
+    return { uri, data: listGoals(store) };
+  }
+
   if (uri === 'omvra://tasks/{taskId}'
     || uri === 'omvra://milestones/{milestoneId}'
+    || uri === 'omvra://goals/{goalId}'
     || uri === 'omvra://agents/{personId}/assigned'
     || uri === 'omvra://projects/{projectId}/tasks'
     || uri === 'omvra://boards/{statusId}/tasks') {
@@ -1104,6 +1205,16 @@ function getResourceForUri(store, uri, requestParams) {
       };
     }
     return { uri, data: getMilestoneById(store, milestoneId) };
+  }
+
+  if (uri.startsWith('omvra://goals/')) {
+    const goalId = decodeURIComponent(uri.slice('omvra://goals/'.length));
+    if (!goalId) {
+      return {
+        error: invalidParams('Invalid params: goal resource URI must include goal id.', { uri }),
+      };
+    }
+    return { uri, data: getGoalById(store, goalId) };
   }
 
   if (uri.startsWith('omvra://agents/') && uri.endsWith('/assigned')) {
@@ -1213,7 +1324,7 @@ function recordToolAttempt(store, req, details) {
   return appendNormalizedMcpAudit(store, req, details);
 }
 
-function handleToolCall(store, req, params) {
+function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot } = {}) {
   const payload = getToolCallPayload(params);
   if (payload.error) {
     return { error: payload.error };
@@ -1252,6 +1363,9 @@ function handleToolCall(store, req, params) {
 
     case 'tasks.list':
       return { result: makeToolResult(listTasks(store, args)) };
+
+    case 'goals.list':
+      return { result: makeToolResult(listGoals(store)) };
 
     case 'diagnostics.audit_summary':
       return { result: makeToolResult(buildMcpAuditSummary(store, args)) };
@@ -1315,6 +1429,65 @@ function handleToolCall(store, req, params) {
         };
       }
       return { result: makeToolResult(getMilestoneById(store, milestoneId)) };
+    }
+
+    case 'goals.get': {
+      const goalId = parseGoalId(args);
+      if (!goalId) {
+        return {
+          error: invalidParams('Invalid params: "id" (or "goalId") is required for goals.get.'),
+        };
+      }
+      return { result: makeToolResult(getGoalById(store, goalId)) };
+    }
+
+    case 'skills.list':
+      return { result: makeToolResult(listAvailableSkills({ skillsRoot, userDataPath: userSkillsRoot })) };
+
+    case 'skills.get': {
+      const skillId = typeof args.skillId === 'string' ? args.skillId.trim() : '';
+      if (!skillId) return { error: invalidParams('Invalid params: "skillId" is required for skills.get.') };
+      const skill = getAvailableSkill(skillId, { skillsRoot, userDataPath: userSkillsRoot });
+      if (!skill) return { error: invalidParams(`Bundled skill "${skillId}" was not found.`) };
+      return { result: makeToolResult(skill) };
+    }
+
+    case 'goals.update': {
+      const goalId = parseGoalId(args);
+      if (!goalId) return { error: invalidParams('Invalid params: "goalId" (or "id") is required.') };
+      const result = updateGoal(store, {
+        goalId,
+        title: args.title,
+        elements: args.elements,
+        overseerAgentId: args.overseerAgentId,
+        expectedRevision: args.expectedRevision,
+        actor: 'mcp-agent',
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, {
+          outcome: 'denied',
+          reason: result.error,
+          toolName: name,
+          entityId: goalId,
+          fields: Object.keys(args).filter(key => key !== 'expectedRevision'),
+        });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        entityId: goalId,
+        fields: Object.keys(args).filter(key => key !== 'expectedRevision'),
+        nextRevision: result.revision,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: true,
+          auditId: audit?.auditId,
+          goal: result.goal,
+          revision: result.revision,
+        }),
+      };
     }
 
     case 'task_write':
@@ -2172,7 +2345,7 @@ function createAccessDisabledError(serverConfig, req) {
   );
 }
 
-function createRequestDispatcher(store) {
+function createRequestDispatcher(store, { skillsRoot, userSkillsRoot } = {}) {
   return (request, req) => {
     if (!request || typeof request !== 'object' || Array.isArray(request)) {
       return makeJsonRpcResponse(
@@ -2350,7 +2523,7 @@ function createRequestDispatcher(store) {
     if (normalizedMethod === 'tools/call') {
       let toolResponse;
       try {
-        toolResponse = handleToolCall(store, req, params);
+        toolResponse = handleToolCall(store, req, params, { skillsRoot, userSkillsRoot });
       } catch (error) {
         recordToolAttempt(store, req, {
           outcome: 'failure',
@@ -2447,8 +2620,8 @@ function applyCorsHeaders(req, res) {
   res.setHeader('Access-Control-Max-Age', '600');
 }
 
-function startMcpHttpServer(store, { logger = console, onStatusChange } = {}) {
-  const dispatch = createRequestDispatcher(store);
+function startMcpHttpServer(store, { logger = console, onStatusChange, skillsRoot, userSkillsRoot } = {}) {
+  const dispatch = createRequestDispatcher(store, { skillsRoot, userSkillsRoot });
   const serverConfig = getMcpServerConfig(store);
   const emitStatus = (status) => {
     if (typeof onStatusChange !== 'function') return;

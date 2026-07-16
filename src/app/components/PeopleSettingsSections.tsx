@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Bot, FileText, Pencil, Trash2, Users } from 'lucide-react';
+import { FileText, Pencil, Trash2, Users } from 'lucide-react';
 import type { Person, PersonKind, StatusColumn, Task, TaskStatus, TimelineSwimlane } from '../types';
 import { getStatusLabel, getTaskProjectIds } from '../utils/roadmap';
 import { getLoadPercentageForTasks, getTaskLoadPoints, PERSON_CAPACITY_POINTS } from '../utils/taskLoad';
@@ -16,6 +16,7 @@ import { OverflowActionMenu } from './OverflowActionMenu';
 import { exportPdfDocument } from '../utils/pdfExport';
 import { buildPersonPdfExportHtml, buildPersonTaskExportListItem, createPersonPdfFileName } from '../utils/personPdfExport';
 import { AgentInstructionFields } from './AgentInstructionFields';
+import { AgentIcon } from './AgentIcon';
 
 interface PeopleManagementSectionsProps {
   people: Person[];
@@ -474,7 +475,7 @@ function AddAgentPopover({
               id="settings-agent-kind"
               className="flex h-8 items-center gap-1 rounded-xl bg-white px-2 text-sm font-normal text-[#303038] shadow-[0_0_1px_1px_rgba(0,0,0,0.05),0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06)]"
             >
-              <Bot className="size-4 shrink-0" />
+              <AgentIcon className="size-4 shrink-0" />
               <span className="min-w-0 flex-1 truncate">Agentic</span>
             </div>
           </div>
@@ -967,7 +968,7 @@ export function AgentsSettingsSection({ children, empty = false, action, popupOp
         {empty ? (
           <EmptyStateCard
             compact
-            icon={<Bot className="size-4" />}
+            icon={<AgentIcon className="size-4" />}
             title="No agents available"
             description="Add an agentic teammate to configure assignment, load, and watcher behavior."
           />

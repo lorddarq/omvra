@@ -6,6 +6,7 @@ const MILESTONES_KEY = 'omvra.milestones.v1';
 const PEOPLE_KEY = 'omvra.people.v1';
 const SWIMLANES_KEY = 'omvra.swimlanes.v1';
 const STATUS_COLUMNS_KEY = 'omvra.statusColumns.v1';
+const GOALS_KEY = 'omvra.goals.v1';
 const MCP_BOARD_WATCHERS_KEY = 'omvra.mcp.boardWatchers.v1';
 const REQUIRES_HUMAN_REVIEW_STATUS_ID = 'requires-human-review';
 const REQUIRES_HUMAN_REVIEW_STATUS_TITLE = 'Requires human review';
@@ -824,6 +825,108 @@ function normalizeProjectForMcp(project) {
   };
 }
 
+const GOAL_ACCEPTANCE_ACTORS = ['human', 'agentic', 'both'];
+const GOAL_BUDGET_MODES = ['hard-cap', 'goal-pool', 'approval-required', 'unbounded'];
+
+function normalizeGoalPolicy(policy) {
+  if (!policy || typeof policy !== 'object' || Array.isArray(policy)) return undefined;
+  const normalized = {};
+  const acceptanceActor = normalizeOptionalEnum(policy.acceptanceActor, GOAL_ACCEPTANCE_ACTORS);
+  if (acceptanceActor) normalized.acceptanceActor = acceptanceActor;
+  for (const field of ['financialBudgetMode', 'tokenBudgetMode', 'timeBudgetMode', 'concurrencyBudgetMode', 'retryBudgetMode']) {
+    const mode = normalizeOptionalEnum(policy[field], GOAL_BUDGET_MODES);
+    if (mode) normalized[field] = mode;
+  }
+  for (const field of ['maxRetries', 'maxLoopAttempts', 'maxConcurrentLoops']) {
+    const value = Number(policy[field]);
+    if (Number.isFinite(value) && value >= 0) normalized[field] = Math.floor(value);
+  }
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
+function normalizeGoalForMcp(goal) {
+  if (!goal || typeof goal !== 'object' || Array.isArray(goal)) return goal;
+  const elements = Array.isArray(goal.elements)
+    ? goal.elements.filter(element => element && typeof element === 'object' && !Array.isArray(element)).map(element => {
+      const normalizedElement = { ...element };
+      const policy = normalizeGoalPolicy(element.policy);
+      if (policy) normalizedElement.policy = policy;
+      else delete normalizedElement.policy;
+      return normalizedElement;
+    })
+    : [];
+  const byType = type => elements.filter(element => element.type === type);
+  return {
+    ...goal,
+    policy: normalizeGoalPolicy(goal.policy),
+    elements,
+    subgoals: byType('subgoal'),
+    agents: byType('agent'),
+    instructions: byType('instructions'),
+    conditions: byType('condition'),
+    approvalGates: byType('approval-gate'),
+    sequences: elements
+      .filter(element => element.type === 'connector' && element.sourceId && element.targetId)
+      .map(element => ({
+        id: element.id,
+        title: element.title,
+        sourceId: element.sourceId,
+        targetId: element.targetId,
+        sourceSide: element.sourceSide,
+        targetSide: element.targetSide,
+      })),
+  };
+}
+
+function listGoals(store) {
+  return readArray(store, GOALS_KEY).map(normalizeGoalForMcp);
+}
+
+function getGoalById(store, goalId) {
+  const normalizedId = normalizeString(goalId).trim();
+  if (!normalizedId) return null;
+  return listGoals(store).find(goal => goal && goal.id === normalizedId) || null;
+}
+
+function updateGoal(store, { goalId, title, elements, overseerAgentId, expectedRevision, actor = 'agent' } = {}) {
+  const normalizedGoalId = normalizeString(goalId).trim();
+  if (!normalizedGoalId) return { ok: false, error: 'GOAL_ID_REQUIRED', message: 'goalId is required.' };
+  const goals = readArray(store, GOALS_KEY);
+  const goalIndex = goals.findIndex(goal => goal && goal.id === normalizedGoalId);
+  if (goalIndex < 0) return { ok: false, error: 'GOAL_NOT_FOUND', message: `Goal "${normalizedGoalId}" not found.` };
+
+  const currentGoal = normalizeGoalForMcp(goals[goalIndex]);
+  const currentRevision = Number.isFinite(Number(currentGoal[MCP_TASK_REV_FIELD]))
+    ? Math.max(0, Math.floor(Number(currentGoal[MCP_TASK_REV_FIELD])))
+    : 0;
+  if (!Number.isFinite(Number(expectedRevision))) {
+    return { ok: false, error: 'EXPECTED_REVISION_REQUIRED', message: 'expectedRevision is required and must be a finite number.', currentRevision };
+  }
+  const expected = Math.max(0, Math.floor(Number(expectedRevision)));
+  if (expected !== currentRevision) {
+    return { ok: false, error: 'REVISION_MISMATCH', message: 'Goal revision mismatch.', currentRevision, expectedRevision: expected };
+  }
+  if (hasOwn(arguments[1] || {}, 'title') && !normalizeString(title).trim()) {
+    return { ok: false, error: 'INVALID_TITLE', message: 'title cannot be empty.' };
+  }
+  if (hasOwn(arguments[1] || {}, 'elements') && !Array.isArray(elements)) {
+    return { ok: false, error: 'INVALID_ELEMENTS', message: 'elements must be an array.' };
+  }
+
+  const nextGoal = normalizeGoalForMcp({
+    ...currentGoal,
+    title: hasOwn(arguments[1] || {}, 'title') ? normalizeString(title).trim() : currentGoal.title,
+    elements: hasOwn(arguments[1] || {}, 'elements') ? elements : currentGoal.elements,
+    overseerAgentId: hasOwn(arguments[1] || {}, 'overseerAgentId') ? normalizeString(overseerAgentId).trim() || undefined : currentGoal.overseerAgentId,
+    [MCP_TASK_REV_FIELD]: currentRevision + 1,
+    mcpUpdatedAt: new Date().toISOString(),
+    mcpLastActor: actor,
+  });
+  goals[goalIndex] = nextGoal;
+  store.set(GOALS_KEY, goals);
+  return { ok: true, changed: true, goal: nextGoal, revision: nextGoal[MCP_TASK_REV_FIELD] };
+}
+
 function getWorkspaceSnapshot(store) {
   // TODO(next-phase): unify storage source of truth. The renderer currently persists
   // most workspace state in localStorage; MCP should read from a canonical backend store.
@@ -832,6 +935,7 @@ function getWorkspaceSnapshot(store) {
   const people = readArray(store, PEOPLE_KEY).map(normalizePersonForMcp);
   const projects = readArray(store, SWIMLANES_KEY).map(normalizeProjectForMcp);
   const statusColumns = readArray(store, STATUS_COLUMNS_KEY).map(normalizeStatusColumnForMcp);
+  const goals = listGoals(store);
 
   return {
     schemaVersion: '1',
@@ -846,6 +950,7 @@ function getWorkspaceSnapshot(store) {
       // Alias kept for compatibility with existing naming in the app.
       swimlanes: projects,
       statusColumns,
+      goals,
     },
     meta: {
       source: 'electron-store',
@@ -857,6 +962,7 @@ function getWorkspaceSnapshot(store) {
         people: people.length,
         projects: projects.length,
         statusColumns: statusColumns.length,
+        goals: goals.length,
       },
     },
   };
@@ -3367,6 +3473,9 @@ module.exports = {
   buildMcpAuditSummary,
   MCP_TASK_REV_FIELD,
   getWorkspaceSnapshot,
+  listGoals,
+  getGoalById,
+  updateGoal,
   listMilestones,
   getMilestoneById,
   listTasks,

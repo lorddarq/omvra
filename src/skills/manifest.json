@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "source": "omvra-bundled",
+  "readOnly": true,
+  "skills": [
+    { "skillId": "business-problem-framing", "path": "business/business-problem-framing.md", "stages": ["shaping"], "personas": ["product-manager", "product-architect"] },
+    { "skillId": "gather-business-context", "path": "business/gather-business-context.md", "stages": ["shaping"], "personas": ["product-manager", "product-architect"] },
+    { "skillId": "product-business-analysis", "path": "business/product-business-analysis.md", "stages": ["shaping", "qa"], "personas": ["product-manager", "product-architect", "qa"] },
+    { "skillId": "frontend-app-builder", "path": "development/frontend-app-builder.md", "stages": ["implementation"], "personas": ["frontend-engineer", "fullstack-engineer"] },
+    { "skillId": "react-best-practices", "path": "development/react-best-practices.md", "stages": ["implementation", "qa"], "personas": ["frontend-engineer", "fullstack-engineer", "qa"] },
+    { "skillId": "code-simplification", "path": "development/code-simplification.md", "stages": ["implementation", "qa"], "personas": ["frontend-engineer", "backend-engineer", "fullstack-engineer", "qa"] },
+    { "skillId": "positioning-messaging", "path": "marketing/positioning-messaging.md", "stages": ["shaping", "human-acceptance"], "personas": ["product-manager", "marketing"] },
+    { "skillId": "content-strategy", "path": "marketing/content-strategy.md", "stages": ["design", "human-acceptance"], "personas": ["content-strategist", "marketing"] },
+    { "skillId": "copywriting", "path": "marketing/copywriting.md", "stages": ["design", "human-acceptance"], "personas": ["copywriter", "marketing"] },
+    { "skillId": "process-modeler", "path": "projectManagement/process-modeler.md", "stages": ["shaping", "qa"], "personas": ["product-manager", "product-architect", "qa"] },
+    { "skillId": "backlog-groomer", "path": "projectManagement/backlog-groomer.md", "stages": ["shaping", "implementation"], "personas": ["product-manager", "product-architect"] },
+    { "skillId": "acceptance-criteria-writer", "path": "projectManagement/acceptance-criteria-writer.md", "stages": ["shaping", "qa"], "personas": ["product-manager", "product-architect", "qa"] },
+    { "skillId": "definition-of-done-drafter", "path": "projectManagement/definition-of-done-drafter.md", "stages": ["shaping", "qa"], "personas": ["product-manager", "qa"] },
+    { "skillId": "ux-audit", "path": "ux/ux-audit.md", "stages": ["design", "qa"], "personas": ["ux-designer", "qa"] },
+    { "skillId": "ui-ux-guardrails", "path": "ux/ui-ux-guardrails.md", "stages": ["design", "implementation", "qa"], "personas": ["ux-designer", "frontend-engineer", "qa"] }
+  ]
+}

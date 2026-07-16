@@ -94,8 +94,22 @@ export interface ProjectMilestone {
   linkedTaskIds?: string[];
 }
 
-export type GoalElementType = 'goal' | 'subgoal' | 'agent' | 'connector' | 'instructions' | 'text';
+export type GoalElementType = 'goal' | 'subgoal' | 'agent' | 'connector' | 'instructions' | 'condition' | 'approval-gate';
 export type GoalConnectorSide = 'top' | 'right' | 'bottom' | 'left';
+export type GoalAcceptanceActor = 'human' | 'agentic' | 'both';
+export type GoalBudgetMode = 'hard-cap' | 'goal-pool' | 'approval-required' | 'unbounded';
+
+export interface GoalPolicy {
+  acceptanceActor?: GoalAcceptanceActor;
+  financialBudgetMode?: GoalBudgetMode;
+  tokenBudgetMode?: GoalBudgetMode;
+  timeBudgetMode?: GoalBudgetMode;
+  concurrencyBudgetMode?: GoalBudgetMode;
+  retryBudgetMode?: GoalBudgetMode;
+  maxRetries?: number;
+  maxLoopAttempts?: number;
+  maxConcurrentLoops?: number;
+}
 
 export interface GoalElement {
   id: string;
@@ -112,14 +126,17 @@ export interface GoalElement {
   targetId?: string;
   sourceSide?: GoalConnectorSide;
   targetSide?: GoalConnectorSide;
+  policy?: GoalPolicy;
 }
 
 export interface GoalRecord {
   id: string;
   title: string;
+  color?: string;
   updatedAt: string;
   elements: GoalElement[];
   overseerAgentId?: string;
+  policy?: GoalPolicy;
 }
 
 export type Swimlane = StatusColumn;

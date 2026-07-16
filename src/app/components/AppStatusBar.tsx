@@ -1,4 +1,4 @@
-import { Bot, Server } from 'lucide-react';
+import { Server } from 'lucide-react';
 import type React from 'react';
 import { cn } from './ui/utils';
 import {
@@ -12,8 +12,9 @@ import {
 import type { Person, Task } from '../types';
 import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
+import { AgentIcon } from './AgentIcon';
 
-interface AppStatusBarProps {
+export interface AppStatusBarProps {
   tasks: Task[];
   people: Person[];
   agentWatchConfigs: AgentWatchConfig[];
@@ -80,7 +81,7 @@ export function AppStatusBar({
     >
       <div className="flex min-w-0 items-center gap-2">
         <span className="shrink-0 text-gray-500">
-          <Bot className="size-3.5" aria-hidden="true" />
+          <AgentIcon className="size-3.5" aria-hidden="true" />
         </span>
         <span className="whitespace-nowrap text-center text-xs font-medium text-[#828282]">Agents:</span>
         {agents.total === 0 ? (

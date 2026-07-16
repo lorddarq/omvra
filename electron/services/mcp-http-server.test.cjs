@@ -6,6 +6,7 @@ const {
   MILESTONES_KEY,
   PREFERENCES_KEY,
   SENSITIVE_MCP_INPUTS,
+  GOALS_KEY,
   TASKS_KEY,
   makeStoreFromFixture,
 } = require('./test-fixtures.cjs');
@@ -290,6 +291,9 @@ test('tools/list remains available after initialize handshake', () => {
   assert.ok(Array.isArray(response.result.tools));
   assert.ok(response.result.tools.every(tool => /^[a-zA-Z0-9_-]{1,64}$/.test(tool.name)));
   assert.ok(response.result.tools.some(tool => tool.name === 'workspace_get_snapshot'));
+  assert.ok(response.result.tools.some(tool => tool.name === 'goals_list'));
+  assert.ok(response.result.tools.some(tool => tool.name === 'goals_get'));
+  assert.ok(response.result.tools.some(tool => tool.name === 'goals_update'));
   assert.ok(response.result.tools.some(tool => tool.name === 'boards_watch_poll'));
   assert.ok(response.result.tools.some(tool => tool.name === 'milestones_list'));
   assert.ok(response.result.tools.some(tool => tool.name === 'task_write'));
@@ -348,6 +352,67 @@ test('resources/list exposes the guide, schema, and lookup templates', () => {
   assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'omvra://agents/{personId}/assigned'));
   assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'omvra://projects/{projectId}/tasks'));
   assert.ok(response.result.resourceTemplates.some(template => template.uriTemplate === 'omvra://boards/{statusId}/tasks'));
+});
+
+test('goals expose the complete graph through tools, resources, and workspace snapshots', () => {
+  const store = makeStoreFromFixture('workspace-basic', {
+    [GOALS_KEY]: [{
+      id: 'goal-1',
+      title: 'Ship the feature',
+      updatedAt: '2026-07-16T00:00:00.000Z',
+      overseerAgentId: 'agent-1',
+      policy: {
+        acceptanceActor: 'both',
+        retryBudgetMode: 'goal-pool',
+        maxRetries: 3.8,
+        unsupportedField: 'discard me',
+      },
+      elements: [
+        { id: 'subgoal-1', type: 'subgoal', title: 'Build', x: 10, y: 10, policy: { acceptanceActor: 'agentic', maxRetries: 2 } },
+        { id: 'agent-node-1', type: 'agent', title: 'Builder', assigneeId: 'agent-1', x: 10, y: 120 },
+        { id: 'instructions-1', type: 'instructions', title: 'Contract', body: 'Return evidence', x: 10, y: 230 },
+        { id: 'condition-1', type: 'condition', title: 'Passing', x: 10, y: 340 },
+        { id: 'approval-1', type: 'approval-gate', title: 'Approve', x: 10, y: 450 },
+        { id: 'sequence-1', type: 'connector', title: 'Sequence', sourceId: 'subgoal-1', targetId: 'agent-node-1' },
+      ],
+    }],
+  });
+  const dispatch = createRequestDispatcher(store);
+  const call = (name, args = {}) => dispatch({
+    jsonrpc: '2.0',
+    id: `${name}-test`,
+    method: 'tools/call',
+    params: { name, arguments: args },
+  }, makeReq());
+
+  const list = call('goals.list').result.structuredContent;
+  assert.equal(list[0].subgoals.length, 1);
+  assert.equal(list[0].agents[0].assigneeId, 'agent-1');
+  assert.equal(list[0].instructions[0].body, 'Return evidence');
+  assert.equal(list[0].conditions.length, 1);
+  assert.equal(list[0].approvalGates.length, 1);
+  assert.equal(list[0].sequences[0].targetId, 'agent-node-1');
+  assert.deepEqual(list[0].policy, { acceptanceActor: 'both', retryBudgetMode: 'goal-pool', maxRetries: 3 });
+  assert.deepEqual(list[0].subgoals[0].policy, { acceptanceActor: 'agentic', maxRetries: 2 });
+  assert.equal(call('goals.get', { goalId: 'goal-1' }).result.structuredContent.id, 'goal-1');
+  assert.equal(call('workspace.get_snapshot').result.structuredContent.workspace.goals.length, 1);
+  const resource = dispatch({
+    jsonrpc: '2.0', id: 'goal-resource-test', method: 'resources/read',
+    params: { uri: 'omvra://goals/goal-1' },
+  }, makeReq());
+  assert.equal(JSON.parse(resource.result.contents[0].text).id, 'goal-1');
+
+  const update = call('goals.update', {
+    goalId: 'goal-1',
+    expectedRevision: 0,
+    title: 'Ship the feature safely',
+    elements: [
+      { id: 'subgoal-1', type: 'subgoal', title: 'Build', x: 20, y: 20 },
+    ],
+  });
+  assert.equal(update.result.structuredContent.goal.title, 'Ship the feature safely');
+  assert.equal(update.result.structuredContent.revision, 1);
+  assert.equal(call('goals.update', { goalId: 'goal-1', expectedRevision: 0, elements: [] }).error.code, -32602);
 });
 
 test('task_write creates a new task through the MCP write surface with metadata', () => {

@@ -32,6 +32,8 @@ export interface McpResourceResponse {
 
 export type McpReadToolName =
   | 'workspace.get_snapshot'
+  | 'goals.list'
+  | 'goals.get'
   | 'tasks.list'
   | 'tasks.get'
   | 'cards.kanban.list'
@@ -119,6 +121,7 @@ export interface McpWorkspaceSnapshot {
     projects?: unknown[];
     swimlanes?: unknown[];
     statusColumns?: unknown[];
+    goals?: unknown[];
   };
   [key: string]: unknown;
 }

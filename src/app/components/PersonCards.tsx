@@ -1,8 +1,9 @@
-import { Bot, User } from 'lucide-react';
+import { User } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { Person, StatusColumn } from '../types';
 import { getAgentAvatarStyle, getAgentCardBackground } from '../utils/agentProvenance';
 import { cn } from './ui/utils';
+import { AgentIcon } from './AgentIcon';
 
 interface PersonStatusCount {
   column: StatusColumn;
@@ -35,7 +36,7 @@ export function AgentCard(props: PersonCardProps) {
       {...props}
       typeLabel="Agent"
       variant="agent"
-      icon={<Bot className="size-4" />}
+      icon={<AgentIcon className="size-4" />}
     />
   );
 }

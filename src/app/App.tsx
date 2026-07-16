@@ -1,6 +1,7 @@
 import { AppHeader } from './components/AppHeader';
 import { AppMainViews } from './components/AppMainViews';
 import { AppPanels } from './components/AppPanels';
+import { AppStatusBar } from './components/AppStatusBar';
 import { DeleteConfirmDialog } from './components/DeleteConfirmDialog';
 import { UpdateAvailablePopup } from './components/UpdateAvailablePopup';
 import { useAppShell } from './hooks/useAppShell.ts';
@@ -67,6 +68,7 @@ function AppContent() {
       <div className="flex h-dvh flex-col bg-gray-50">
         <AppHeader {...appShell.headerProps} />
         <AppMainViews {...appShell.mainViewsProps} />
+        <AppStatusBar {...appShell.statusBarProps} />
         <AppPanels {...appShell.panelsProps} />
         <UpdateAvailablePopup {...appShell.updatePopupProps} />
       </div>

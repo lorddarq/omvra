@@ -84,6 +84,12 @@
       "electron/**",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "src/skills",
+        "to": "skills"
+      }
+    ],
     "mac": {
       "icon": "electron/assets/app.icns",
       "hardenedRuntime": true,

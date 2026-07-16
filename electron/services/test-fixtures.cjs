@@ -7,6 +7,7 @@ const MILESTONES_KEY = 'omvra.milestones.v1';
 const PEOPLE_KEY = 'omvra.people.v1';
 const SWIMLANES_KEY = 'omvra.swimlanes.v1';
 const STATUS_COLUMNS_KEY = 'omvra.statusColumns.v1';
+const GOALS_KEY = 'omvra.goals.v1';
 
 const SENSITIVE_MCP_INPUTS = Object.freeze({
   payload: 'payload-secret-must-not-persist',
@@ -52,6 +53,7 @@ module.exports = {
   PEOPLE_KEY,
   SWIMLANES_KEY,
   STATUS_COLUMNS_KEY,
+  GOALS_KEY,
   SENSITIVE_MCP_INPUTS,
   loadFixture,
   makeStoreFromFixture,

@@ -65,6 +65,10 @@
   transition-timing-function: ease;
 }
 
+.view-toggle-button svg {
+  color: #797981;
+}
+
 .view-toggle-button.active {
   color: #111827;
 }
@@ -77,6 +81,48 @@
 .view-toggle-button:focus-visible {
   outline: 2px solid rgba(75, 85, 99, 0.35);
   outline-offset: 2px;
+}
+
+/* Goals canvas texture: customize the variables to tune density and contrast. */
+.goals-canvas-grid {
+  --goals-grid-size: 24px;
+  --goals-grid-dot-size: 1px;
+  --goals-grid-dot-color: rgba(148, 163, 184, 0.32);
+  background-image: radial-gradient(circle, var(--goals-grid-dot-color) var(--goals-grid-dot-size), transparent var(--goals-grid-dot-size));
+  background-position: 1px 1px;
+  background-size: var(--goals-grid-size) var(--goals-grid-size);
+}
+
+/* Keep the canvas toolbar compact while preserving aria-labels for assistive technology. */
+.goals-view button[aria-label="Pan canvas"],
+.goals-view button[aria-label="Add agent"],
+.goals-view button[aria-label^="Add "] {
+  font-size: 0;
+}
+
+.goals-view button[aria-label="Pan canvas"] svg,
+.goals-view button[aria-label^="Add "] svg {
+  width: 20px;
+  height: 20px;
+}
+
+.goals-view button[aria-label="Pan canvas"] svg {
+  display: none;
+}
+
+.goals-view button[aria-label="Pan canvas"]::before {
+  display: block;
+  width: 20px;
+  height: 20px;
+  content: '';
+  background-color: #797981;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath fill='%23797981' fill-opacity='.3' d='M9.5 1.25C8.81 1.25 8.25 1.81 8.25 2.5v.75C8.25 2.56 7.69 2 7 2s-1.25.56-1.25 1.25v7.965L3.982 8.963a1.25 1.25 0 0 0-1.755-.211c-.54.424-.604 1.131-.211 1.755l2.551 3.924a4.75 4.75 0 0 0 3.354 2.82h3.83a4 4 0 0 0 4-4V4c0-.69-.564-1.25-1.25-1.25S13.25 3.31 13.25 4v4.25L13.25 3.25C13.25 2.56 12.69 2 12 2s-1.25.56-1.25 1.25V2.5c0-.69-.56-1.25-1.25-1.25Z'/%3E%3Cpath d='M10.75 8.25V2.5c0-.69-.564-1.25-1.25-1.25s-1.25.56-1.25 1.25v5.75m5 0v-5c0-.69-.564-1.25-1.25-1.25s-1.25.56-1.25 1.25v5m-2.5 0v-5c0-.69-.564-1.25-1.25-1.25s-1.25.56-1.25 1.25v8.803m0-.838L3.982 8.963a1.25 1.25 0 0 0-1.755-.211c-.54.424-.604 1.131-.211 1.755l2.551 3.924a4.75 4.75 0 0 0 3.354 2.82h3.83a4 4 0 0 0 4-4V4c0-.69-.564-1.25-1.25-1.25S13.25 3.31 13.25 4v4.25' fill='none' stroke='%23797981' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath fill='%23797981' fill-opacity='.3' d='M9.5 1.25C8.81 1.25 8.25 1.81 8.25 2.5v.75C8.25 2.56 7.69 2 7 2s-1.25.56-1.25 1.25v7.965L3.982 8.963a1.25 1.25 0 0 0-1.755-.211c-.54.424-.604 1.131-.211 1.755l2.551 3.924a4.75 4.75 0 0 0 3.354 2.82h3.83a4 4 0 0 0 4-4V4c0-.69-.564-1.25-1.25-1.25S13.25 3.31 13.25 4v4.25L13.25 3.25C13.25 2.56 12.69 2 12 2s-1.25.56-1.25 1.25V2.5c0-.69-.56-1.25-1.25-1.25Z'/%3E%3Cpath d='M10.75 8.25V2.5c0-.69-.564-1.25-1.25-1.25s-1.25.56-1.25 1.25v5.75m5 0v-5c0-.69-.564-1.25-1.25-1.25s-1.25.56-1.25 1.25v5m-2.5 0v-5c0-.69-.564-1.25-1.25-1.25s-1.25.56-1.25 1.25v8.803m0-.838L3.982 8.963a1.25 1.25 0 0 0-1.755-.211c-.54.424-.604 1.131-.211 1.755l2.551 3.924a4.75 4.75 0 0 0 3.354 2.82h3.83a4 4 0 0 0 4-4V4c0-.69-.564-1.25-1.25-1.25S13.25 3.31 13.25 4v4.25' fill='none' stroke='%23797981' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* Keep the Details panel aligned with the Goals panel at the top edge. */
+.goals-view > aside:nth-of-type(2) {
+  top: 1rem;
 }
 
 @media (hover: hover) and (pointer: fine) {

@@ -1,6 +1,8 @@
 import { Button } from './ui/button';
 import { ViewToggle } from './ViewToggle';
 import { ViewType } from '../hooks/useViewState';
+import { AgentIcon } from './AgentIcon';
+import { UsersIcon } from './UsersIcon';
 
 interface AppHeaderProps {
   currentView: ViewType;
@@ -45,22 +47,10 @@ export function AppHeader({
 
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" onClick={onOpenPeople} aria-label="Open people settings" className="text-[#8B8B93]">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-users-icon lucide-users">
-            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-            <path d="M16 3.128a4 4 0 0 1 0 7.744"/>
-            <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
-            <circle cx="9" cy="7" r="4"/>
-          </svg>
+          <UsersIcon />
         </Button>
         <Button variant="ghost" size="icon" onClick={onOpenAgents} aria-label="Open agents settings" className="text-[#8B8B93]">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-bot-icon lucide-bot">
-            <path d="M12 8V4H8"/>
-            <rect width="16" height="12" x="4" y="8" rx="2"/>
-            <path d="M2 14h2"/>
-            <path d="M20 14h2"/>
-            <path d="M15 13v2"/>
-            <path d="M9 13v2"/>
-          </svg>
+          <AgentIcon />
         </Button>
         <Button variant="ghost" size="icon" onClick={onOpenPreferences} aria-label="Open preferences" className="text-[#8B8B93]">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-4">

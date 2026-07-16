@@ -5,11 +5,42 @@
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <title>Omvra</title>
+      <style>
+        :root { color: #71717a; background: #f9fafb; font-family: ui-sans-serif, system-ui, sans-serif; }
+        body { margin: 0; }
+        .boot-loader { display: flex; height: 100dvh; align-items: center; justify-content: center; font-size: 0.875rem; }
+        .boot-loader-content { display: inline-flex; align-items: center; gap: 0.5rem; }
+        .boot-loader-dots { --animation-duration: 0.8s; }
+        .boot-loader-dots circle { opacity: 0.4; transform: scale(0.75); animation: boot-loader-dots var(--animation-duration) infinite; }
+        .boot-loader-dots circle:nth-child(1) { transform-origin: 3px 8px; animation-delay: calc(var(--animation-duration) / -2.666); }
+        .boot-loader-dots circle:nth-child(2) { transform-origin: 8px 8px; animation-delay: calc(var(--animation-duration) / -5.333); }
+        .boot-loader-dots circle:nth-child(3) { transform-origin: 13px 8px; }
+        @keyframes boot-loader-dots {
+          0%, 100% { opacity: 0.4; transform: scale(0.75); }
+          50% { opacity: 1; transform: scale(1); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .boot-loader-dots circle { animation: none; opacity: 0.7; transform: scale(0.9); }
+        }
+      </style>
     </head>
 
     <body>
-      <div id="root"></div>
+      <div id="root">
+        <div class="boot-loader" role="status" aria-live="polite">
+          <span class="boot-loader-content">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+              <title>Loading</title>
+              <g class="boot-loader-dots" fill="#71717A">
+                <circle cx="3" cy="8" r="2" />
+                <circle cx="8" cy="8" r="2" />
+                <circle cx="13" cy="8" r="2" />
+              </g>
+            </svg>
+            Loading workspace...
+          </span>
+        </div>
+      </div>
       <script type="module" src="/src/main.tsx"></script>
     </body>
   </html>
-  

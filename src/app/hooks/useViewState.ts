@@ -23,7 +23,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { deleteStoredValue, persistJSONWithElectronMirror } from '../utils/storage.ts';
 
-export type ViewType = 'timeline' | 'kanban' | 'roadmap';
+export type ViewType = 'timeline' | 'kanban' | 'roadmap' | 'loops';
 
 export interface TimelineViewState {
   scrollLeft: number;
@@ -45,10 +45,18 @@ export interface RoadmapViewState {
   scrollTop: number;
 }
 
+export interface LoopsViewState {
+  selectedGoalId?: string;
+  zoom: number;
+  panX: number;
+  panY: number;
+}
+
 export type AllViewStates = {
   timeline: TimelineViewState;
   kanban: KanbanViewState;
   roadmap: RoadmapViewState;
+  loops: LoopsViewState;
 };
 
 /**
@@ -68,6 +76,11 @@ export const DEFAULT_STATES: AllViewStates = {
     scrollLeft: 0,
     scrollTop: 0,
   },
+  loops: {
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+  },
 };
 
 export function useViewState(initialView: ViewType = 'timeline', initialStates: AllViewStates = DEFAULT_STATES) {
@@ -79,6 +92,7 @@ export function useViewState(initialView: ViewType = 'timeline', initialStates: 
     timeline: { ...DEFAULT_STATES.timeline, ...initialStates.timeline },
     kanban: { ...DEFAULT_STATES.kanban, ...initialStates.kanban },
     roadmap: { ...DEFAULT_STATES.roadmap, ...initialStates.roadmap },
+    loops: { ...DEFAULT_STATES.loops, ...initialStates.loops },
   });
 
   useEffect(() => {
@@ -86,6 +100,7 @@ export function useViewState(initialView: ViewType = 'timeline', initialStates: 
       timeline: { ...DEFAULT_STATES.timeline, ...initialStates.timeline },
       kanban: { ...DEFAULT_STATES.kanban, ...initialStates.kanban },
       roadmap: { ...DEFAULT_STATES.roadmap, ...initialStates.roadmap },
+      loops: { ...DEFAULT_STATES.loops, ...initialStates.loops },
     };
   }, [initialStates]);
 
@@ -172,6 +187,7 @@ export function useViewState(initialView: ViewType = 'timeline', initialStates: 
         timeline: { ...DEFAULT_STATES.timeline },
         kanban: { ...DEFAULT_STATES.kanban },
         roadmap: { ...DEFAULT_STATES.roadmap },
+        loops: { ...DEFAULT_STATES.loops },
       };
     }
   }, []);

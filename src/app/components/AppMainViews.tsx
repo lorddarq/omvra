@@ -11,6 +11,7 @@ import type { TimelineLayoutState } from '../services/uiState';
 import { TimelineView } from './TimelineView';
 import { KanbanView } from './KanbanView';
 import { RoadmapView } from './RoadmapView';
+import { GoalsView } from './GoalsView';
 
 export interface AppViewFrameProps {
   timelineContainerRef: RefObject<HTMLDivElement>;
@@ -165,6 +166,8 @@ export function AppMainViews({
           />
         </div>
       )}
+
+      {currentView === 'loops' && <GoalsView people={data.people} />}
     </div>
   );
 }

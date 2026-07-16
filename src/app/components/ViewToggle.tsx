@@ -46,6 +46,10 @@ export function ViewToggle({
               <path d="M15 3.75H9v16.5h6V3.75ZM16.5 20.25h3.375c1.035 0 1.875-.84 1.875-1.875V5.625c0-1.036-.84-1.875-1.875-1.875H16.5v16.5ZM4.125 3.75H7.5v16.5H4.125a1.875 1.875 0 0 1-1.875-1.875V5.625c0-1.036.84-1.875 1.875-1.875Z" />
             </svg>
     },
+    { value: 'loops',
+      label: 'Loops',
+      icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-4"><path d="M8 7a4 4 0 1 1 4 4H8a4 4 0 1 0-4-4"/><path d="M16 17a4 4 0 1 1-4-4h4a4 4 0 1 0 4 4"/></svg>
+    },
   ];
   const activeIndex = Math.max(0, views.findIndex(view => view.value === currentView));
 

@@ -4,6 +4,7 @@ import {
   DEFAULT_STATES,
   type KanbanViewState,
   type RoadmapViewState,
+  type LoopsViewState,
   type TimelineViewState,
 } from '../hooks/useViewState.ts';
 import {
@@ -16,6 +17,7 @@ import { getJSON, persistJSONWithElectronMirror } from '../utils/storage.ts';
 export const TIMELINE_VIEW_STATE_KEY = 'omvra_viewstate_timeline';
 export const KANBAN_VIEW_STATE_KEY = 'omvra_viewstate_kanban';
 export const ROADMAP_VIEW_STATE_KEY = 'omvra_viewstate_roadmap';
+export const LOOPS_VIEW_STATE_KEY = 'omvra_viewstate_loops';
 export const TIMELINE_MONTH_WIDTHS_KEY = 'omvra.monthWidths.v1';
 export const TIMELINE_LEFT_COL_WIDTH_KEY = 'omvra.leftColWidth.v1';
 export const TIMELINE_SHOW_COMPLETED_KEY = 'omvra.timelineShowCompleted.v1';
@@ -78,11 +80,23 @@ function sanitizeRoadmapViewState(value: unknown): RoadmapViewState {
   };
 }
 
+function sanitizeLoopsViewState(value: unknown): LoopsViewState {
+  if (!isRecord(value)) return { ...DEFAULT_STATES.loops };
+  return {
+    ...DEFAULT_STATES.loops,
+    selectedGoalId: typeof value.selectedGoalId === 'string' ? value.selectedGoalId : undefined,
+    zoom: Math.max(0.6, Math.min(1.4, Number(value.zoom) || DEFAULT_STATES.loops.zoom)),
+    panX: Number.isFinite(Number(value.panX)) ? Number(value.panX) : 0,
+    panY: Number.isFinite(Number(value.panY)) ? Number(value.panY) : 0,
+  };
+}
+
 export function sanitizeViewStates(value: Partial<Record<ViewType, unknown>> | null | undefined): AllViewStates {
   return {
     timeline: sanitizeTimelineViewState(value?.timeline),
     kanban: sanitizeKanbanViewState(value?.kanban),
     roadmap: sanitizeRoadmapViewState(value?.roadmap),
+    loops: sanitizeLoopsViewState(value?.loops),
   };
 }
 
@@ -116,10 +130,11 @@ export async function loadUiStateSnapshot(
   projects: TimelineSwimlane[],
   people: Person[]
 ): Promise<UiStateSnapshot> {
-  const [timelineState, kanbanState, roadmapState, leftColWidth, monthWidths, showCompleted, kanbanFilters] = await Promise.all([
+  const [timelineState, kanbanState, roadmapState, loopsState, leftColWidth, monthWidths, showCompleted, kanbanFilters] = await Promise.all([
     getJSON<Record<string, unknown>>(TIMELINE_VIEW_STATE_KEY, null),
     getJSON<Record<string, unknown>>(KANBAN_VIEW_STATE_KEY, null),
     getJSON<Record<string, unknown>>(ROADMAP_VIEW_STATE_KEY, null),
+    getJSON<Record<string, unknown>>(LOOPS_VIEW_STATE_KEY, null),
     getJSON<number>(TIMELINE_LEFT_COL_WIDTH_KEY, null),
     getJSON<Record<string, number>>(TIMELINE_MONTH_WIDTHS_KEY, null),
     getJSON<boolean>(TIMELINE_SHOW_COMPLETED_KEY, null),
@@ -131,6 +146,7 @@ export async function loadUiStateSnapshot(
       timeline: timelineState,
       kanban: kanbanState,
       roadmap: roadmapState,
+      loops: loopsState,
     }),
     timelineLayout: sanitizeTimelineLayoutState({
       leftColWidth,

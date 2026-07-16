@@ -94,6 +94,34 @@ export interface ProjectMilestone {
   linkedTaskIds?: string[];
 }
 
+export type GoalElementType = 'goal' | 'subgoal' | 'agent' | 'connector' | 'instructions' | 'text';
+export type GoalConnectorSide = 'top' | 'right' | 'bottom' | 'left';
+
+export interface GoalElement {
+  id: string;
+  type: GoalElementType;
+  title: string;
+  body?: string;
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  status?: 'draft' | 'working' | 'blocked' | 'complete';
+  assigneeId?: string;
+  sourceId?: string;
+  targetId?: string;
+  sourceSide?: GoalConnectorSide;
+  targetSide?: GoalConnectorSide;
+}
+
+export interface GoalRecord {
+  id: string;
+  title: string;
+  updatedAt: string;
+  elements: GoalElement[];
+  overseerAgentId?: string;
+}
+
 export type Swimlane = StatusColumn;
 
 export interface TimelineSwimlane {

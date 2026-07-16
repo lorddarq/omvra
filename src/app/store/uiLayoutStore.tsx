@@ -114,7 +114,7 @@ const UiLayoutStoreContext = createContext<UiLayoutStoreValue | null>(null);
 const DEFAULT_SCROLL_STATE: ViewScrollState = { scrollLeft: 0, scrollTop: 0 };
 
 function isViewType(value: unknown): value is ViewType {
-  return value === 'timeline' || value === 'kanban' || value === 'roadmap';
+  return value === 'timeline' || value === 'kanban' || value === 'roadmap' || value === 'loops';
 }
 
 interface UiLayoutStoreProviderProps extends PropsWithChildren {
@@ -234,7 +234,9 @@ export function UiLayoutStoreProvider({
       };
     }
 
-    return viewState.getViewState('roadmap');
+    return view === 'roadmap'
+      ? viewState.getViewState('roadmap')
+      : viewState.getViewState('loops');
   }, [viewState]);
 
   const saveActiveViewState = useCallback((view: ViewType = viewState.currentView) => {
@@ -263,6 +265,7 @@ export function UiLayoutStoreProvider({
       timeline: getViewStateSnapshot('timeline'),
       kanban: getViewStateSnapshot('kanban'),
       roadmap: getViewStateSnapshot('roadmap'),
+      loops: getViewStateSnapshot('loops'),
     },
     timeline: timelineLayoutState,
   }), [getViewStateSnapshot, timelineLayoutState, viewState.currentView]);
@@ -280,6 +283,9 @@ export function UiLayoutStoreProvider({
     }
     if (payload?.viewState?.roadmap) {
       viewState.saveViewState('roadmap', payload.viewState.roadmap);
+    }
+    if (payload?.viewState?.loops) {
+      viewState.saveViewState('loops', payload.viewState.loops);
     }
 
     const nextLayoutState = sanitizeTimelineLayoutState(payload?.timeline);

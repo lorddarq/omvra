@@ -12,6 +12,7 @@ import {
   McpTestingSettingsSection,
   SettingsPanel,
   TasksSettingsSection,
+  WorkflowSettingsSection,
 } from './SettingsPanel';
 import { AboutSettingsSection, HelpSettingsSection } from './AboutHelpSettingsSections';
 import { McpAccessSettingsSection } from './McpAccessSettingsSection';
@@ -25,6 +26,7 @@ interface PreferencesPanelProps {
   initialAnchor?: string;
   statusColumns: StatusColumn[];
   showCompletedTimelineTasks: boolean;
+  cleanupGoalArtifacts: boolean;
   executionLoadStatusIds: TaskStatus[];
   pipelineLoadStatusIds: TaskStatus[];
   updateChannel: 'stable' | 'rc';
@@ -36,6 +38,7 @@ interface PreferencesPanelProps {
   agentWatchRuntime: Record<string, AgentWatchRuntimeState>;
   onMarkdownAppearanceChange: (updates: Partial<MarkdownAppearance>) => void;
   onShowCompletedTimelineTasksChange: (show: boolean) => void;
+  onCleanupGoalArtifactsChange: (enabled: boolean) => void;
   onUpdateStatusColumn: (columnId: string, updates: Partial<Omit<StatusColumn, 'id'>>) => void;
   onAddPerson: (person: Omit<Person, 'id'>) => void;
   onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions' | 'agentOperationalInstructions'>) => void;
@@ -85,6 +88,7 @@ export function PreferencesPanel({
   initialAnchor,
   statusColumns,
   showCompletedTimelineTasks,
+  cleanupGoalArtifacts,
   executionLoadStatusIds,
   pipelineLoadStatusIds,
   updateChannel,
@@ -96,6 +100,7 @@ export function PreferencesPanel({
   agentWatchRuntime,
   onMarkdownAppearanceChange,
   onShowCompletedTimelineTasksChange,
+  onCleanupGoalArtifactsChange,
   onUpdateStatusColumn,
   onAddPerson,
   onUpdatePerson,
@@ -295,6 +300,11 @@ export function PreferencesPanel({
           onChange={onMarkdownAppearanceChange}
         />
       </GeneralSettingsSection>
+
+      <WorkflowSettingsSection
+        cleanupGoalArtifacts={cleanupGoalArtifacts}
+        onCleanupGoalArtifactsChange={onCleanupGoalArtifactsChange}
+      />
 
       <TasksSettingsSection
         people={people}

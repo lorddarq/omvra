@@ -91,6 +91,10 @@ The overseer should distinguish a symptom from a changed business outcome. It ma
 
 The negotiation must preserve the original request, the worker's rationale, the alternatives, the decision, and the resulting contract revision in `project.md` and the durable execution history. The overseer must not use negotiation to consume unbounded budget while deferring a decision.
 
+Workers have proposal authority, not governing-contract authority. They may report contradictions, missing inputs, infeasible requirements, implementation realities, and proposed changes through the typed assessment and negotiation record. The overseer owns the default decision and evaluates the proposal against the ultimate goal, not only the local subgoal.
+
+If a proposal could endanger the goal or subgoal, change the approved outcome, invalidate downstream work, or consume material unapproved budget, the overseer should prefer user input over inference and continuation. A goal may explicitly delegate a defined class of decisions to the overseer through operational policy, such as “resolve implementation-level tradeoffs without interrupting the user when acceptance criteria and architecture remain unchanged.” Delegation must be typed, scoped, and visible in the contract; it must not be inferred from ordinary prose.
+
 ## Skill distribution and resolution
 
 Goals may require skills for business framing, product analysis, design, implementation, QA, or other specialized work. Skill availability is part of goal setup and agent preflight, not an implicit assumption in free-hand instructions.
@@ -205,11 +209,11 @@ The working context must be granular enough for a newly activated agent to resum
 - handoff requirements and the exact condition for advancing;
 - the next recommended action and the stop/escalation reason, when applicable.
 
-The file should be scoped per goal or execution context, versioned with the goal revision, and updated atomically with a handoff where possible. It may be cleared at goal completion or retained as an opt-in final decision log. If it is cleared, the durable structured execution record and final evidence must remain available.
+The file should be scoped per goal or execution context, versioned with the goal revision, and updated atomically with a handoff where possible. Completed goals retain `project.md` and `roster.md` by default as an inspectable final decision and recruitment log. The user can enable the `Cleanup goal artefacts` workflow setting to remove them after durable execution records and final evidence are verified; cleanup must never remove those durable records or evidence.
 
 Markdown is for resumability and inspection. Metrics must come from durable structured events and execution records, including task and subgoal attempts, failures, elapsed time, agent transitions, issue counts, evidence submissions, retries, and approval/blocked periods. The system must not depend on parsing `project.md` to calculate metrics.
 
-The goal should also maintain an ephemeral `roster.md` for temporary agent recruitment. It should record the recruited agent type/persona, why the existing pool was insufficient, the competencies and skills requested, relevant instruction sources, the subgoals served, and whether the agent was dismissed or retained at completion. This helps inspect overseer recruitment rationale and discover recurring competency gaps. The durable agent assignment, recruitment, and dismissal events remain the authoritative audit and metrics source.
+The goal should also maintain an ephemeral `roster.md` for temporary agent recruitment. It should record the recruited agent type/persona, why the existing pool was insufficient, the competencies and skills requested, relevant instruction sources, the subgoals served, and whether the agent was dismissed or retained at completion. This helps inspect overseer recruitment rationale and discover recurring competency gaps. The durable agent assignment, recruitment, and dismissal events remain the authoritative audit and metrics source. Retention is the default; cleanup is controlled by the `Cleanup goal artefacts` workflow setting.
 
 ## Responsibility boundaries
 
@@ -242,10 +246,9 @@ These decisions remain intentionally unresolved and must be agreed before the op
 - **Contract changes:** use the impact gate above; resume locally when valid, otherwise create a new execution attempt from the earliest affected stage. Full restart is reserved for goal-defining changes.
 - **Acceptance boundary:** whether the user must accept every subgoal, or only the final goal and configured human-acceptance gates.
 - **Agent recruitment:** whether the orchestrator creates an agent only when no matching canonical persona exists, or may proactively create specialized agents.
-- **Working-context retention:** whether completed goals retain `project.md` by default or delete it after durable records and final evidence are verified.
-- **Roster retention:** whether completed goals retain `roster.md` by default or clear it after durable recruitment events and the final evidence are verified.
+- **Resolved — working-context retention:** completed goals retain `project.md` and `roster.md` by default. The `Cleanup goal artefacts` workflow setting opts into deletion after durable records and final evidence are verified.
 
-Until resolved, the safe default is to pause at ambiguity, approval, stale-contract, missing-evidence, and failed-gate states; preserve evidence; and request a human decision.
+Until the remaining decisions are resolved, the safe default is to pause at ambiguity, approval, stale-contract, missing-evidence, and failed-gate states; preserve evidence; and request a human decision.
 
 ## Implementation handoff
 

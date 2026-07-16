@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Activity, AlertTriangle, CheckCircle2, Download, HelpCircle, Info, Terminal, Upload } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle2, Download, GitBranch, HelpCircle, Info, Terminal, Upload } from 'lucide-react';
 import { Person, RoadmapStage, StatusColumn, StorageMeter } from '../types';
 import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
@@ -25,6 +25,11 @@ const SETTINGS_PANEL_NAV_GROUPS = [
         id: 'general',
         label: 'General',
         icon: Cog6ToothIcon,
+      },
+      {
+        id: 'workflows',
+        label: 'Workflows',
+        icon: GitBranch,
       },
       {
         id: 'task-load',
@@ -125,6 +130,38 @@ export function GeneralSettingsSection({ children }: McpSettingsSectionProps) {
       description="Workspace-wide appearance and behavior preferences"
     >
       {children}
+    </AnchoredPanelSection>
+  );
+}
+
+interface WorkflowSettingsSectionProps {
+  cleanupGoalArtifacts: boolean;
+  onCleanupGoalArtifactsChange: (enabled: boolean) => void;
+}
+
+export function WorkflowSettingsSection({
+  cleanupGoalArtifacts,
+  onCleanupGoalArtifactsChange,
+}: WorkflowSettingsSectionProps) {
+  return (
+    <AnchoredPanelSection
+      id="workflows"
+      title="Workflows"
+      description="Configure how completed Goals retain their working artefacts."
+    >
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <div className="text-sm font-semibold leading-5 text-[#71717a]">Cleanup goal artefacts</div>
+          <p className="mt-1 max-w-[32rem] text-xs leading-4 text-[#6a7282]">
+            When enabled, remove completed goals’ project.md and roster.md after durable evidence is verified. Off retains them for inspection.
+          </p>
+        </div>
+        <Switch
+          aria-label="Cleanup goal artefacts"
+          checked={cleanupGoalArtifacts}
+          onCheckedChange={onCleanupGoalArtifactsChange}
+        />
+      </div>
     </AnchoredPanelSection>
   );
 }

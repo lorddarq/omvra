@@ -72,6 +72,7 @@ const DEFAULT_MILESTONES_SEED = ENABLE_SAMPLE_WORKSPACE ? initialMilestones : []
 export interface AppPreferences {
   executionLoadStatusIds: TaskStatus[];
   pipelineLoadStatusIds: TaskStatus[];
+  cleanupGoalArtifacts: boolean;
   updateChannel: 'stable' | 'rc';
   markdownAppearance: MarkdownAppearance;
   mcpAgentAccessEnabled: boolean;
@@ -115,6 +116,7 @@ interface WorkspaceStoreValue {
   applyRoadmapTaskDependencies: (updates: Array<{ taskId: string; dependencyIds: string[] }>) => void;
   toggleExecutionLoadStatus: (statusId: TaskStatus) => void;
   togglePipelineLoadStatus: (statusId: TaskStatus) => void;
+  setCleanupGoalArtifacts: (enabled: boolean) => void;
   setUpdateChannel: (channel: AppPreferences['updateChannel']) => void;
   setMarkdownAppearance: (updates: Partial<MarkdownAppearance>) => void;
   setMcpAgentAccessEnabled: (enabled: boolean) => void;
@@ -173,6 +175,7 @@ export function createDefaultAppPreferences(
   return {
     executionLoadStatusIds: [getDefaultStatusId(statusColumns, 'in-progress')],
     pipelineLoadStatusIds: [getDefaultStatusId(statusColumns, 'open')],
+    cleanupGoalArtifacts: false,
     updateChannel: 'stable',
     markdownAppearance: { ...DEFAULT_MARKDOWN_APPEARANCE },
     mcpAgentAccessEnabled: false,
@@ -240,6 +243,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
         [pipelineDefault],
         defaultSwimlanes
       ),
+      cleanupGoalArtifacts: Boolean(stored.cleanupGoalArtifacts),
       updateChannel: stored.updateChannel === 'rc' ? 'rc' : 'stable',
       markdownAppearance: sanitizeMarkdownAppearance(stored.markdownAppearance, DEFAULT_MARKDOWN_APPEARANCE),
       mcpAgentAccessEnabled: Boolean(stored.mcpAgentAccessEnabled),
@@ -559,6 +563,10 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     setPreferences(previous => ({ ...previous, mcpAgentAccessEnabled: enabled }));
   }, []);
 
+  const setCleanupGoalArtifacts = useCallback((enabled: boolean) => {
+    setPreferences(previous => ({ ...previous, cleanupGoalArtifacts: enabled }));
+  }, []);
+
   const setMcpServerAddress = useCallback((address: string) => {
     setPreferences(previous => ({ ...previous, mcpServerAddress: address }));
   }, []);
@@ -632,6 +640,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     applyRoadmapTaskDependencies: applyRoadmapDependencies,
     toggleExecutionLoadStatus,
     togglePipelineLoadStatus,
+    setCleanupGoalArtifacts,
     setUpdateChannel,
     setMarkdownAppearance,
     setMcpAgentAccessEnabled,
@@ -665,6 +674,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     setMcpServerAddress,
     setUpdateChannel,
     setMarkdownAppearance,
+    setCleanupGoalArtifacts,
     statusColumns,
     tasks,
     timelineSwimlanes,

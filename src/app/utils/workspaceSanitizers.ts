@@ -12,6 +12,7 @@ export type StatusColumnState = StatusColumn;
 export interface AppPreferencesLike {
   executionLoadStatusIds: TaskStatus[];
   pipelineLoadStatusIds: TaskStatus[];
+  cleanupGoalArtifacts: boolean;
   executionLoadStatusId?: TaskStatus;
   pipelineLoadStatusId?: TaskStatus;
   updateChannel: 'stable' | 'rc';
@@ -405,6 +406,7 @@ export function sanitizePreferences(
   return {
     executionLoadStatusIds,
     pipelineLoadStatusIds,
+    cleanupGoalArtifacts: Boolean(preferences.cleanupGoalArtifacts),
     updateChannel: preferences.updateChannel === 'rc' ? 'rc' : 'stable',
     markdownAppearance: sanitizeMarkdownAppearance(preferences.markdownAppearance, fallback.markdownAppearance || DEFAULT_MARKDOWN_APPEARANCE),
     mcpAgentAccessEnabled: Boolean(preferences.mcpAgentAccessEnabled),

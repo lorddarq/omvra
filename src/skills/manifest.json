@@ -3,6 +3,7 @@
   "source": "omvra-bundled",
   "readOnly": true,
   "skills": [
+    { "skillId": "omvra-goals-loops", "path": "omvra-goals-loops/SKILL.md", "stages": ["shaping", "design", "implementation", "qa", "human-acceptance"], "personas": ["product-manager", "product-architect", "frontend-engineer", "backend-engineer", "fullstack-engineer", "qa"] },
     { "skillId": "business-problem-framing", "path": "business/business-problem-framing.md", "stages": ["shaping"], "personas": ["product-manager", "product-architect"] },
     { "skillId": "gather-business-context", "path": "business/gather-business-context.md", "stages": ["shaping"], "personas": ["product-manager", "product-architect"] },
     { "skillId": "product-business-analysis", "path": "business/product-business-analysis.md", "stages": ["shaping", "qa"], "personas": ["product-manager", "product-architect", "qa"] },

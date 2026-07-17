@@ -1,0 +1,7 @@
+interface:
+  display_name: "Omvra Goals & Loops"
+  short_description: "Groom and ship layered Goals / Loops work"
+  default_prompt: "Use $omvra-goals-loops to groom or implement Omvra Goals / Loops work."
+
+policy:
+  allow_implicit_invocation: true

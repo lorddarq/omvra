@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react';
-import type { Person } from '../types';
-import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
-import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
-import { EmptyStateCard } from './EmptyStateCard';
-import { Input } from './ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Switch } from './ui/switch';
+import type { Person } from '../../types';
+import type { AgentWatchConfig } from '../../utils/workspaceSanitizers';
+import type { AgentWatchRuntimeState } from '../../hooks/useAgentWatchRuntime';
+import { EmptyStateCard } from '../EmptyStateCard';
+import { Input } from '../ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Switch } from '../ui/switch';
 
 interface AgentBoardWatchSettingsProps {
   agent: Person;

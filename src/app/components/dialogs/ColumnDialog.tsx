@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
-import { AgentWatchAction, LoadClassification, RoadmapStage, StatusColumn } from '../types';
-import { AI_ACTIONS, LOAD_CLASSIFICATIONS, ROADMAP_STAGES, getDefaultColumnSemantics } from '../utils/statusColumnSemantics';
-import { Dialog, DialogTitle } from '../components/ui/dialog';
-import { Button } from '../components/ui/button';
+import { AgentWatchAction, LoadClassification, RoadmapStage, StatusColumn } from '../../types';
+import { AI_ACTIONS, LOAD_CLASSIFICATIONS, ROADMAP_STAGES, getDefaultColumnSemantics } from '../../utils/statusColumnSemantics';
+import { Dialog, DialogTitle } from '../ui/dialog';
+import { Button } from '../ui/button';
 import { DialogSurface } from './DialogSurface';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import { Textarea } from '../components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Switch } from '../components/ui/switch';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Switch } from '../ui/switch';
 
 interface ColumnDialogProps {
   isOpen: boolean;

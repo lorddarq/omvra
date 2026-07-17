@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { AlertTriangle, ChevronsUpDown, FileText, RefreshCw, Search, Trash2 } from 'lucide-react';
-import { Task, TaskStatus, TimelineSwimlane, Person, TaskSize, TaskComplexity, TaskPriority, StatusColumn, ProjectMilestone, TaskAttachment } from '../types';
-import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
-import { toLocalISODate } from '../utils/date';
-import { getMilestoneForTask, getMilestoneProjectIds, getTaskProjectIds, getTasksForMilestone, wouldCreateDependencyCycle } from '../utils/roadmap';
+import { Task, TaskStatus, TimelineSwimlane, Person, TaskSize, TaskComplexity, TaskPriority, StatusColumn, ProjectMilestone, TaskAttachment } from '../../types';
+import type { WorkspaceReadModel } from '../../domain/workspaceReadModel';
+import { toLocalISODate } from '../../utils/date';
+import { getMilestoneForTask, getMilestoneProjectIds, getTaskProjectIds, getTasksForMilestone, wouldCreateDependencyCycle } from '../../utils/roadmap';
 import {
   Dialog,
   DialogDescription,
@@ -20,11 +20,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/app/components/ui/select';
-import { normalizeTaskNotesForSave } from '../utils/taskNotes';
-import { TaskDependenciesSection } from './TaskDependenciesSection';
-import { AnchoredPanel, AnchoredPanelSection } from './AnchoredPanel';
+import { normalizeTaskNotesForSave } from '../../utils/taskNotes';
+import { TaskDependenciesSection } from '../TaskDependenciesSection';
+import { AnchoredPanel, AnchoredPanelSection } from '../AnchoredPanel';
 import { DialogSurface } from './DialogSurface';
-import { EmptyStateCard } from './EmptyStateCard';
+import { EmptyStateCard } from '../EmptyStateCard';
 import {
   taskEditFieldClassName,
   taskEditIconFieldClassName,
@@ -32,16 +32,16 @@ import {
   taskEditLabelClassName,
   taskEditSelectClassName,
   taskEditTextAreaClassName,
-} from './taskFormStyles';
-import { TASK_PRIORITY_ICONS } from './taskPriorityIcons';
-import { NodesIcon } from './NodesIcon';
-import { AttachmentIcon } from './AttachmentIcon';
-import { BasicInfoIcon } from './BasicInfoIcon';
-import { DescriptionIcon } from './DescriptionIcon';
-import { FolderIcon } from './FolderIcon';
-import { CalendarIcon } from './CalendarIcon';
-import { TaskCheckboxControl } from './TaskCheckboxControl';
-import { LOAD_CLASSIFICATIONS, ROADMAP_STAGES, getDefaultColumnSemantics } from '../utils/statusColumnSemantics';
+} from '../taskFormStyles';
+import { TASK_PRIORITY_ICONS } from '../taskPriorityIcons';
+import { NodesIcon } from '../icons/NodesIcon';
+import { AttachmentIcon } from '../icons/AttachmentIcon';
+import { BasicInfoIcon } from '../icons/BasicInfoIcon';
+import { DescriptionIcon } from '../icons/DescriptionIcon';
+import { FolderIcon } from '../icons/FolderIcon';
+import { CalendarIcon } from '../icons/CalendarIcon';
+import { TaskCheckboxControl } from '../TaskCheckboxControl';
+import { LOAD_CLASSIFICATIONS, ROADMAP_STAGES, getDefaultColumnSemantics } from '../../utils/statusColumnSemantics';
 
 function getFileNameFromPath(filePath: string): string {
   const normalized = filePath.replace(/\\/g, '/');

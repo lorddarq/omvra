@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
-import { TimelineSwimlane } from '../types';
-import { Dialog, DialogTitle } from '../components/ui/dialog';
-import { Button } from '../components/ui/button';
+import { TimelineSwimlane } from '../../types';
+import { Dialog, DialogTitle } from '../ui/dialog';
+import { Button } from '../ui/button';
 import { DialogSurface } from './DialogSurface';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 import { DeleteConfirmDialog } from './DeleteConfirmDialog';
-import { Textarea } from '../components/ui/textarea';
+import { Textarea } from '../ui/textarea';
 
 interface SwimlaneDialogProps {
   isOpen: boolean;

@@ -1,8 +1,8 @@
-import { AppHeader } from './components/AppHeader';
-import { AppMainViews } from './components/AppMainViews';
+import { AppHeader } from './components/headers/AppHeader';
+import { AppMainViews } from './components/views/AppMainViews';
 import { AppPanels } from './components/AppPanels';
-import { AppStatusBar } from './components/AppStatusBar';
-import { DeleteConfirmDialog } from './components/DeleteConfirmDialog';
+import { AppStatusBar } from './components/statuses/AppStatusBar';
+import { DeleteConfirmDialog } from './components/dialogs/DeleteConfirmDialog';
 import { UpdateAvailablePopup } from './components/UpdateAvailablePopup';
 import { useAppShell } from './hooks/useAppShell.ts';
 import { UiLayoutStoreProvider } from './store/uiLayoutStore.tsx';

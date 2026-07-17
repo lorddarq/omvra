@@ -1,8 +1,8 @@
 import { Check, TriangleAlert } from 'lucide-react';
 import { OverflowActionMenu } from './OverflowActionMenu';
-import { PenWritingIcon } from './PenWritingIcon';
-import { FilesCopyIcon } from './FilesCopyIcon';
-import { DesktopArrowDownIcon } from './DesktopArrowDownIcon';
+import { PenWritingIcon } from './icons/PenWritingIcon';
+import { FilesCopyIcon } from './icons/FilesCopyIcon';
+import { DesktopArrowDownIcon } from './icons/DesktopArrowDownIcon';
 
 type CopyState = 'idle' | 'copied' | 'failed';
 

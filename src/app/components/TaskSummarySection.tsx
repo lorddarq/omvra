@@ -6,9 +6,9 @@ import { PERSON_CAPACITY_POINTS } from '../utils/taskLoad';
 import { getReadableTextClassFor } from '../utils/contrast';
 import { EmptyStateCard } from './EmptyStateCard';
 import { TASK_PRIORITY_ICONS } from './taskPriorityIcons';
-import { AgentIcon } from './AgentIcon';
-import { UserIcon } from './UserIcon';
-import { NodesIcon } from './NodesIcon';
+import { AgentIcon } from './icons/AgentIcon';
+import { UserIcon } from './icons/UserIcon';
+import { NodesIcon } from './icons/NodesIcon';
 
 interface TaskSummarySectionProps {
   statusLabel: string;

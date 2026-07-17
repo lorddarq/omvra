@@ -3,8 +3,8 @@ import type { CSSProperties } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { TimelineSwimlane, Person } from '../types';
 import { getProjectVisual } from '../utils/projectVisual';
-import { AgentIcon } from './AgentIcon';
-import { UserIcon } from './UserIcon';
+import { AgentIcon } from './icons/AgentIcon';
+import { UserIcon } from './icons/UserIcon';
 
 export const SWIMLANE_ROW_ITEM_TYPE = 'SWIMLANE_ROW';
 

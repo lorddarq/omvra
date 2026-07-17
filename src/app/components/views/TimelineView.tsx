@@ -12,44 +12,44 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
-import { Task, TimelineSwimlane, TaskStatus, Person, StatusColumn } from '../types';
+import { Task, TimelineSwimlane, TaskStatus, Person, StatusColumn } from '../../types';
 import { DndProvider, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { CalendarDays } from 'lucide-react';
-import { TimelineHeader } from './TimelineHeader';
-import { TimelineToolbar } from './TimelineToolbar';
-import { PlusIcon } from './PlusIcon';
-import { UsersIcon } from './UsersIcon';
-import { filterTimelineTasks } from '../utils/statusColumnSemantics';
-import { EmptyStateCard } from './EmptyStateCard';
+import { TimelineHeader } from '../headers/TimelineHeader';
+import { TimelineToolbar } from '../TimelineToolbar';
+import { PlusIcon } from '../icons/PlusIcon';
+import { UsersIcon } from '../icons/UsersIcon';
+import { filterTimelineTasks } from '../../utils/statusColumnSemantics';
+import { EmptyStateCard } from '../EmptyStateCard';
 import {
   DraggableSwimlaneLabel,
   SWIMLANE_ROW_ITEM_TYPE,
   type SwimlaneRowDragItem,
   type SwimlaneRowDropIndicator,
-} from './DraggableSwimlaneLabel';
-import { DraggableSwimlaneRow } from './DraggableSwimlaneRow';
-import { allocateTasksToTracks, calculateSwimlaneHeight } from '../utils/trackAllocation';
-import { getStatusVisual } from '../utils/roadmap';
-import { getReadableOutlineColorFor } from '../utils/contrast';
-import { parseISODateLocal, toLocalISODate } from '../utils/date';
+} from '../DraggableSwimlaneLabel';
+import { DraggableSwimlaneRow } from '../DraggableSwimlaneRow';
+import { allocateTasksToTracks, calculateSwimlaneHeight } from '../../utils/trackAllocation';
+import { getStatusVisual } from '../../utils/roadmap';
+import { getReadableOutlineColorFor } from '../../utils/contrast';
+import { parseISODateLocal, toLocalISODate } from '../../utils/date';
 import {
   createInitialTimelineWindow,
   extendTimelineWindow,
   extendTimelineWindowToDate,
   getTimelineWindowDates,
   getTimelineWindowScrollCompensation,
-} from '../utils/timelineWindow';
-import { applyTimelineTaskDrop } from '../utils/timelineTaskDrop';
-import { resolveReorderDropIndex } from '../utils/swimlaneReorder';
+} from '../../utils/timelineWindow';
+import { applyTimelineTaskDrop } from '../../utils/timelineTaskDrop';
+import { resolveReorderDropIndex } from '../../utils/swimlaneReorder';
 import {
   findNearestVisibleDateIndex,
   getCenteredScrollLeftForMarker,
   getVariableDaySurfaceMarker,
-} from '../utils/timeSurface';
-import type { TimelineLayoutState } from '../services/uiState';
-import { persistTimelineLayoutState } from '../services/uiState';
-import { isPointerReleased } from '../utils/pointerInteraction';
+} from '../../utils/timeSurface';
+import type { TimelineLayoutState } from '../../services/uiState';
+import { persistTimelineLayoutState } from '../../services/uiState';
+import { isPointerReleased } from '../../utils/pointerInteraction';
 
 const DEFAULT_ROW_HEIGHT = 48;
 const HEADER_HEIGHT = 89;

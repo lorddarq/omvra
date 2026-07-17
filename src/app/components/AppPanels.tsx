@@ -12,14 +12,14 @@ import { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import type { MarkdownAppearance } from '../utils/markdownAppearance';
-import { MilestoneDialog } from './MilestoneDialog';
-import { MilestoneDetailsDialog } from './MilestoneDetailsDialog';
-import { SwimlaneDialog } from './SwimlaneDialog';
+import { MilestoneDialog } from './dialogs/MilestoneDialog';
+import { MilestoneDetailsDialog } from './dialogs/MilestoneDetailsDialog';
+import { SwimlaneDialog } from './dialogs/SwimlaneDialog';
 import { PreferencesPanel } from './PreferencesPanel';
 import { McpHealthCheckResult } from '../services/mcp/types';
 
-const TaskDialog = lazy(() => import('./TaskDialog').then(module => ({ default: module.TaskDialog })));
-const TaskDetailsDialog = lazy(() => import('./TaskDetailsDialog').then(module => ({ default: module.TaskDetailsDialog })));
+const TaskDialog = lazy(() => import('./dialogs/TaskDialog').then(module => ({ default: module.TaskDialog })));
+const TaskDetailsDialog = lazy(() => import('./dialogs/TaskDetailsDialog').then(module => ({ default: module.TaskDetailsDialog })));
 
 export interface AppPanelDialogState {
   isTaskDialogOpen: boolean;

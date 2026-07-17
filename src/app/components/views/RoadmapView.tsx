@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Filter, Flag, TriangleAlert } from 'lucide-react';
-import { ProjectMilestone, StatusColumn, Task, TimelineSwimlane } from '../types';
-import { getProjectVisual } from '../utils/projectVisual';
+import { ProjectMilestone, StatusColumn, Task, TimelineSwimlane } from '../../types';
+import { getProjectVisual } from '../../utils/projectVisual';
 import {
   getStatusVisual,
   getMilestoneProjectIds,
@@ -9,8 +9,8 @@ import {
   isMilestoneComplete,
   summarizeMilestone,
   type MilestoneHealth,
-} from '../utils/roadmap';
-import { parseISODateLocal, toLocalISODate } from '../utils/date';
+} from '../../utils/roadmap';
+import { parseISODateLocal, toLocalISODate } from '../../utils/date';
 import {
   addCalendarDays,
   buildDateRangeFromDates,
@@ -18,18 +18,18 @@ import {
   daysBetweenLocal,
   getMonthKey,
   startOfLocalDay,
-} from '../utils/timeSurface';
-import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
-import { getRoadmapStage, getRoadmapStageProgress } from '../utils/statusColumnSemantics';
-import { useFixedTimeSurfaceNavigation } from '../hooks/useFixedTimeSurfaceNavigation.ts';
-import { Badge } from './ui/badge';
-import { Button } from './ui/button';
-import { EmptyStateCard } from './EmptyStateCard';
+} from '../../utils/timeSurface';
+import type { WorkspaceReadModel } from '../../domain/workspaceReadModel';
+import { getRoadmapStage, getRoadmapStageProgress } from '../../utils/statusColumnSemantics';
+import { useFixedTimeSurfaceNavigation } from '../../hooks/useFixedTimeSurfaceNavigation.ts';
+import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
+import { EmptyStateCard } from '../EmptyStateCard';
 import {
   MilestoneStatusComposition,
-} from './MilestoneSections';
-import { RoadmapMilestoneSidebar } from './RoadmapMilestoneSidebar';
-import { RoadmapToolbar, type RoadmapDateWindow } from './RoadmapToolbar';
+} from '../MilestoneSections';
+import { RoadmapMilestoneSidebar } from '../RoadmapMilestoneSidebar';
+import { RoadmapToolbar, type RoadmapDateWindow } from '../RoadmapToolbar';
 
 interface RoadmapViewProps {
   milestones: ProjectMilestone[];

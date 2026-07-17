@@ -9,7 +9,7 @@ import {
   type TaskDragItem,
   type TaskDropIndicator,
 } from '../components/DraggableTaskCard';
-import { ColumnDialog } from '../components/ColumnDialog';
+import { ColumnDialog } from '../components/dialogs/ColumnDialog';
 
 interface DroppableColumnProps {
   swimlane: StatusColumn;

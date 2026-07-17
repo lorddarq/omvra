@@ -1,8 +1,8 @@
-import { Button } from './ui/button';
-import { ViewToggle } from './ViewToggle';
-import { ViewType } from '../hooks/useViewState';
-import { AgentIcon } from './AgentIcon';
-import { UsersIcon } from './UsersIcon';
+import { Button } from '../ui/button';
+import { ViewToggle } from '../ViewToggle';
+import { ViewType } from '../../hooks/useViewState';
+import { AgentIcon } from '../icons/AgentIcon';
+import { UsersIcon } from '../icons/UsersIcon';
 
 interface AppHeaderProps {
   currentView: ViewType;

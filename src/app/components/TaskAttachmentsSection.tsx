@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, Folder } from 'lucide-react';
 import type { TaskAttachment } from '../types';
-import { AttachmentIcon } from './AttachmentIcon';
+import { AttachmentIcon } from './icons/AttachmentIcon';
 import { EmptyStateCard } from './EmptyStateCard';
 
 interface TaskAttachmentsSectionProps {

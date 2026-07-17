@@ -1,10 +1,10 @@
 import { RefreshCcw } from 'lucide-react';
-import type { McpHealthCheckResult } from '../services/mcp/types';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Switch } from './ui/switch';
-import { FilesCopyIcon } from './FilesCopyIcon';
+import type { McpHealthCheckResult } from '../../services/mcp/types';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Switch } from '../ui/switch';
+import { FilesCopyIcon } from '../icons/FilesCopyIcon';
 
 type McpCapabilityProfile = 'read_only' | 'task_write' | 'admin';
 

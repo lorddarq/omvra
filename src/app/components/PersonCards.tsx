@@ -2,8 +2,8 @@ import type { ReactNode } from 'react';
 import type { Person, StatusColumn } from '../types';
 import { getAgentAvatarStyle, getAgentCardBackground } from '../utils/agentProvenance';
 import { cn } from './ui/utils';
-import { AgentIcon } from './AgentIcon';
-import { UserIcon } from './UserIcon';
+import { AgentIcon } from './icons/AgentIcon';
+import { UserIcon } from './icons/UserIcon';
 
 interface PersonStatusCount {
   column: StatusColumn;

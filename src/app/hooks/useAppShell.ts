@@ -28,12 +28,12 @@ import {
   restorePortableStorageSnapshot,
 } from '../utils/storage.ts';
 import { useMcpDiagnostics } from './useMcpDiagnostics.ts';
-import type { AppMainViewsProps } from '../components/AppMainViews.tsx';
+import type { AppMainViewsProps } from '../components/views/AppMainViews.tsx';
 import type { AppPanelsProps } from '../components/AppPanels.tsx';
-import type { AppStatusBarProps } from '../components/AppStatusBar.tsx';
+import type { AppStatusBarProps } from '../components/statuses/AppStatusBar.tsx';
 import type { ComponentProps } from 'react';
-import { AppHeader } from '../components/AppHeader.tsx';
-import { DeleteConfirmDialog } from '../components/DeleteConfirmDialog.tsx';
+import { AppHeader } from '../components/headers/AppHeader.tsx';
+import { DeleteConfirmDialog } from '../components/dialogs/DeleteConfirmDialog.tsx';
 import { UpdateAvailablePopup } from '../components/UpdateAvailablePopup.tsx';
 import {
   normalizeMcpBindHost,

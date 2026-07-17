@@ -1,4 +1,4 @@
-import { FilesCopyIcon } from './FilesCopyIcon';
+import { FilesCopyIcon } from './icons/FilesCopyIcon';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';

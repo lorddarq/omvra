@@ -1,11 +1,11 @@
 import React, { type RefObject } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { Task, TimelineSwimlane, Person, TaskStatus, StatusColumn, ProjectMilestone } from '../types';
-import { ViewType } from '../hooks/useViewState';
-import type { KanbanTaskFilters } from '../utils/taskFilters';
-import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
-import type { TimelineLayoutState } from '../services/uiState';
+import { Task, TimelineSwimlane, Person, TaskStatus, StatusColumn, ProjectMilestone } from '../../types';
+import { ViewType } from '../../hooks/useViewState';
+import type { KanbanTaskFilters } from '../../utils/taskFilters';
+import type { WorkspaceReadModel } from '../../domain/workspaceReadModel';
+import type { TimelineLayoutState } from '../../services/uiState';
 import { TimelineView } from './TimelineView';
 import { KanbanView } from './KanbanView';
 import { RoadmapView } from './RoadmapView';

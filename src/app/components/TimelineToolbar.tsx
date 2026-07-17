@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { TodayButton } from './TodayButton';
-import { UsersIcon } from './UsersIcon';
+import { UsersIcon } from './icons/UsersIcon';
 
 interface TimelineToolbarProps {
   mode: 'projects' | 'people';

@@ -1,10 +1,10 @@
 import { Activity, Download, RefreshCcw, ShieldAlert } from 'lucide-react';
-import type { McpHealthCheckResult } from '../services/mcp/types';
-import { Button } from './ui/button';
-import { EmptyStateCard } from './EmptyStateCard';
-import { Label } from './ui/label';
-import { LoadIcon } from './LoadIcon';
-import { FilesCopyIcon } from './FilesCopyIcon';
+import type { McpHealthCheckResult } from '../../services/mcp/types';
+import { Button } from '../ui/button';
+import { EmptyStateCard } from '../EmptyStateCard';
+import { Label } from '../ui/label';
+import { LoadIcon } from '../icons/LoadIcon';
+import { FilesCopyIcon } from '../icons/FilesCopyIcon';
 
 interface McpActivityLogSectionProps {
   auditLog: McpAuditEntry[];

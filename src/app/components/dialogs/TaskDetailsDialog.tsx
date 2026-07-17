@@ -1,4 +1,4 @@
-import { Task, TimelineSwimlane, Person, TaskStatus, StatusColumn, ProjectMilestone, TaskAttachment } from '../types';
+import { Task, TimelineSwimlane, Person, TaskStatus, StatusColumn, ProjectMilestone, TaskAttachment } from '../../types';
 import { useMemo, useState } from 'react';
 import { FileText } from 'lucide-react';
 import {
@@ -6,27 +6,27 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/app/components/ui/dialog';
-import { formatDateRangeLabel } from '../utils/dateRange';
-import { getTaskLoadContributionPercent, getTaskLoadPoints, PERSON_CAPACITY_POINTS } from '../utils/taskLoad';
-import { getMilestoneForTask, getStatusLabel, getStatusVisual } from '../utils/roadmap';
-import { formatTaskDetailsForClipboard } from '../utils/taskClipboard';
-import { buildTaskPdfExportHtml, createTaskPdfFileName } from '../utils/taskPdfExport';
-import { exportPdfDocument } from '../utils/pdfExport';
-import { TaskAttachmentsSection } from './TaskAttachmentsSection';
-import { TaskCommentsSection } from './TaskCommentsSection';
-import { TaskDescriptionSection } from './TaskDescriptionSection';
-import { TaskDetailsActionMenu } from './TaskDetailsActionMenu';
-import { TaskFooterActions } from './TaskFooterActions';
-import { TaskDependencyDetailsSection, TaskLoadDetailsSection, TaskSummarySection } from './TaskSummarySection';
-import { AnchoredPanel, AnchoredPanelSection } from './AnchoredPanel';
-import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
+import { formatDateRangeLabel } from '../../utils/dateRange';
+import { getTaskLoadContributionPercent, getTaskLoadPoints, PERSON_CAPACITY_POINTS } from '../../utils/taskLoad';
+import { getMilestoneForTask, getStatusLabel, getStatusVisual } from '../../utils/roadmap';
+import { formatTaskDetailsForClipboard } from '../../utils/taskClipboard';
+import { buildTaskPdfExportHtml, createTaskPdfFileName } from '../../utils/taskPdfExport';
+import { exportPdfDocument } from '../../utils/pdfExport';
+import { TaskAttachmentsSection } from '../TaskAttachmentsSection';
+import { TaskCommentsSection } from '../TaskCommentsSection';
+import { TaskDescriptionSection } from '../TaskDescriptionSection';
+import { TaskDetailsActionMenu } from '../TaskDetailsActionMenu';
+import { TaskFooterActions } from '../TaskFooterActions';
+import { TaskDependencyDetailsSection, TaskLoadDetailsSection, TaskSummarySection } from '../TaskSummarySection';
+import { AnchoredPanel, AnchoredPanelSection } from '../AnchoredPanel';
+import type { WorkspaceReadModel } from '../../domain/workspaceReadModel';
 import { DialogSurface } from './DialogSurface';
-import { MessagesIcon } from './MessagesIcon';
-import { NodesIcon } from './NodesIcon';
-import { LoadIcon } from './LoadIcon';
-import { AttachmentIcon } from './AttachmentIcon';
-import { BasicInfoIcon } from './BasicInfoIcon';
-import { DescriptionIcon } from './DescriptionIcon';
+import { MessagesIcon } from '../icons/MessagesIcon';
+import { NodesIcon } from '../icons/NodesIcon';
+import { LoadIcon } from '../icons/LoadIcon';
+import { AttachmentIcon } from '../icons/AttachmentIcon';
+import { BasicInfoIcon } from '../icons/BasicInfoIcon';
+import { DescriptionIcon } from '../icons/DescriptionIcon';
 
 interface TaskDetailsDialogProps {
   isOpen: boolean;

@@ -1,32 +1,32 @@
 import { CalendarDays, ChevronsUpDown, Search, Trash2 } from 'lucide-react';
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { ProjectMilestone, StatusColumn, Task, TimelineSwimlane } from '../types';
-import { resolveProjectColor } from '../utils/projectVisual';
-import { getMilestoneProjectIds, getTaskProjectIds, wouldCreateDependencyCycle } from '../utils/roadmap';
-import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
+import { ProjectMilestone, StatusColumn, Task, TimelineSwimlane } from '../../types';
+import { resolveProjectColor } from '../../utils/projectVisual';
+import { getMilestoneProjectIds, getTaskProjectIds, wouldCreateDependencyCycle } from '../../utils/roadmap';
+import type { WorkspaceReadModel } from '../../domain/workspaceReadModel';
 import {
   Dialog,
   DialogDescription,
   DialogTitle,
-} from './ui/dialog';
-import { Badge } from './ui/badge';
-import { Button } from './ui/button';
+} from '../ui/dialog';
+import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
 import { DialogSurface, DialogSurfaceFooter } from './DialogSurface';
 import { DeleteConfirmDialog } from './DeleteConfirmDialog';
-import { EmptyStateCard } from './EmptyStateCard';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { MilestoneTaskLinker } from './MilestoneSections';
-import { ProjectBadge } from './ProjectBadge';
-import { FolderIcon } from './FolderIcon';
-import { TaskCheckboxControl } from './TaskCheckboxControl';
-import { Textarea } from './ui/textarea';
+import { EmptyStateCard } from '../EmptyStateCard';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { MilestoneTaskLinker } from '../MilestoneSections';
+import { ProjectBadge } from '../ProjectBadge';
+import { FolderIcon } from '../icons/FolderIcon';
+import { TaskCheckboxControl } from '../TaskCheckboxControl';
+import { Textarea } from '../ui/textarea';
 import {
   taskEditFieldClassName,
   taskEditIconFieldClassName,
   taskEditIconSelectClassName,
   taskEditLabelClassName,
-} from './taskFormStyles';
+} from '../taskFormStyles';
 
 const milestoneDialogProjectListClassName = 'max-h-36 overflow-y-auto rounded-[18px] border border-black/[0.06] bg-white p-3 shadow-[0_0_1px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.06),0_2px_4px_rgba(0,0,0,0.04)]';
 

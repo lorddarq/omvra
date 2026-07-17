@@ -1,5 +1,5 @@
-import { Dialog } from './ui/dialog';
-import { Button } from './ui/button';
+import { Dialog } from '../ui/dialog';
+import { Button } from '../ui/button';
 import { DialogSurface, DialogSurfaceFooter, DialogSurfaceHeader } from './DialogSurface';
 
 interface DeleteConfirmDialogProps {

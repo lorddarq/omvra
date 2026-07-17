@@ -9,9 +9,9 @@
  */
 
 import { useRef, useEffect, useLayoutEffect, useCallback, useMemo, useState, type RefObject } from 'react';
-import { Task, TaskStatus, StatusColumn, TimelineSwimlane, Person } from '../types';
+import { Task, TaskStatus, StatusColumn, TimelineSwimlane, Person } from '../../types';
 import { SwimlanesView } from './SwimlanesView';
-import { ALL_FILTER_VALUE, KanbanToolbar } from './KanbanToolbar';
+import { ALL_FILTER_VALUE, KanbanToolbar } from '../KanbanToolbar';
 import {
   clearAllKanbanTaskFilters,
   clearKanbanTaskFilter,
@@ -21,7 +21,7 @@ import {
   sanitizeKanbanTaskFilters,
   type KanbanTaskFilterKey,
   type KanbanTaskFilters,
-} from '../utils/taskFilters';
+} from '../../utils/taskFilters';
 
 const COLUMN_DRAG_EDGE_SCROLL_ZONE = 96;
 const COLUMN_DRAG_EDGE_SCROLL_STEP = 28;

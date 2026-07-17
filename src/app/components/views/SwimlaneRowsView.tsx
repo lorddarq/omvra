@@ -12,8 +12,8 @@
  */
 
 import React, { useRef, useCallback } from 'react';
-import { Task, TimelineSwimlane } from '../types';
-import { DraggableSwimlaneRow } from './DraggableSwimlaneRow';
+import { Task, TimelineSwimlane } from '../../types';
+import { DraggableSwimlaneRow } from '../DraggableSwimlaneRow';
 
 interface SwimlaneRowsViewProps {
   swimlanes: TimelineSwimlane[];

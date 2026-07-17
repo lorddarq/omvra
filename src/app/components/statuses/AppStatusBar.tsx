@@ -1,5 +1,5 @@
 import type React from 'react';
-import { cn } from './ui/utils';
+import { cn } from '../ui/utils';
 import {
   deriveAgentStatuses,
   getMcpStatusSummary,
@@ -7,12 +7,12 @@ import {
   rollupActiveAgentProvenance,
   rollupAgentStatuses,
   type AgentStatusTone,
-} from '../utils/statusBar';
-import type { Person, Task } from '../types';
-import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
-import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
-import { AgentIcon } from './AgentIcon';
-import { FiltersIcon } from './SettingsPanel';
+} from '../../utils/statusBar';
+import type { Person, Task } from '../../types';
+import type { AgentWatchConfig } from '../../utils/workspaceSanitizers';
+import type { AgentWatchRuntimeState } from '../../hooks/useAgentWatchRuntime';
+import { AgentIcon } from '../icons/AgentIcon';
+import { FiltersIcon } from '../SettingsPanel';
 
 export interface AppStatusBarProps {
   tasks: Task[];

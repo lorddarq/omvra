@@ -1,6 +1,6 @@
-import { FilesCopyIcon } from './FilesCopyIcon';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
+import { FilesCopyIcon } from '../icons/FilesCopyIcon';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 
 interface McpCommandSettingsSectionProps {
   testCommand: string;

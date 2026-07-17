@@ -6,18 +6,18 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
-import defaultHelpContentJson from '../content/helpContent.json';
-import { useAppUpdateState } from '../hooks/useAppUpdateState.ts';
-import omvraLogo from '../images/logo-large.svg';
-import profilePicture from '../images/profile.png';
+import defaultHelpContentJson from '../../content/helpContent.json';
+import { useAppUpdateState } from '../../hooks/useAppUpdateState.ts';
+import omvraLogo from '../../images/logo-large.svg';
+import profilePicture from '../../images/profile.png';
 import {
   type HelpContent,
   type HelpFaq,
   type HelpResource,
 } from '../utils/helpContent.ts';
-import { parseUpdateReleaseNotes } from '../utils/updateReleaseNotes.ts';
-import { AnchoredPanelSection } from './AnchoredPanel';
-import { AboutIcon, HelpIcon } from './SettingsPanel';
+import { parseUpdateReleaseNotes } from '../../utils/updateReleaseNotes.ts';
+import { AnchoredPanelSection } from '../AnchoredPanel';
+import { AboutIcon, HelpIcon } from '../SettingsPanel';
 
 const CONTACT_EMAIL_URL = 'mailto:sorin.jurcut@gmail.com';
 const LINKEDIN_URL = 'https://www.linkedin.com/in/sorinjurcut/';

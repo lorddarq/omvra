@@ -2,8 +2,8 @@ import { useRef } from 'react';
 import { useDrag } from 'react-dnd';
 import { Trash2 } from 'lucide-react';
 import { Task } from '../types';
-import { PenWritingIcon } from './PenWritingIcon';
-import { FilesCopyIcon } from './FilesCopyIcon';
+import { PenWritingIcon } from './icons/PenWritingIcon';
+import { FilesCopyIcon } from './icons/FilesCopyIcon';
 import {
   ContextMenu,
   ContextMenuContent,

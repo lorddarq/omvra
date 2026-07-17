@@ -1,32 +1,32 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ProjectMilestone, StatusColumn, Task, TimelineSwimlane } from '../types';
+import type { ProjectMilestone, StatusColumn, Task, TimelineSwimlane } from '../../types';
 import {
   getMilestoneDateRangeLabel,
   getMilestoneHealthVisual,
   getMilestoneProjectIds,
   getStatusLabel,
   summarizeMilestone,
-} from '../utils/roadmap';
-import { formatDateRangeLabel } from '../utils/dateRange';
+} from '../../utils/roadmap';
+import { formatDateRangeLabel } from '../../utils/dateRange';
 import {
   Dialog,
   DialogDescription,
   DialogTitle,
-} from './ui/dialog';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
+} from '../ui/dialog';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import type { WorkspaceReadModel } from '../../domain/workspaceReadModel';
 import { DialogSurface, DialogSurfaceBody, DialogSurfaceFooter, DialogSurfaceHeader, DialogSurfaceSection } from './DialogSurface';
-import { EmptyStateCard } from './EmptyStateCard';
+import { EmptyStateCard } from '../EmptyStateCard';
 import {
   MilestoneLinkedTasksSection,
   MilestoneSummaryCard,
-} from './MilestoneSections';
-import { TaskDetailsActionMenu } from './TaskDetailsActionMenu';
-import { buildMilestonePdfExportHtml, createMilestonePdfFileName } from '../utils/milestonePdfExport';
-import { formatMilestoneDetailsForClipboard } from '../utils/milestoneClipboard';
-import { exportPdfDocument } from '../utils/pdfExport';
-import { MarkdownContent } from './MarkdownContent';
+} from '../MilestoneSections';
+import { TaskDetailsActionMenu } from '../TaskDetailsActionMenu';
+import { buildMilestonePdfExportHtml, createMilestonePdfFileName } from '../../utils/milestonePdfExport';
+import { formatMilestoneDetailsForClipboard } from '../../utils/milestoneClipboard';
+import { exportPdfDocument } from '../../utils/pdfExport';
+import { MarkdownContent } from '../MarkdownContent';
 
 interface MilestoneDetailsDialogProps {
   isOpen: boolean;

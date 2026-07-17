@@ -1,8 +1,8 @@
 import { Fragment, useRef, useState } from 'react';
 import { useDrag, useDragLayer, useDrop } from 'react-dnd';
-import { Task, TaskStatus, StatusColumn } from '../types';
-import { EmptyStateCard } from './EmptyStateCard';
-import { DroppableColumn } from './DroppableColumn';
+import { Task, TaskStatus, StatusColumn } from '../../types';
+import { EmptyStateCard } from '../EmptyStateCard';
+import { DroppableColumn } from '../DroppableColumn';
 
 const SWIMLANE_COLUMN = 'SWIMLANE_COLUMN';
 const COLUMN_REORDER_EDGE_RATIO = 0.25;

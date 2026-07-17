@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { FilesCopyIcon } from './FilesCopyIcon';
+import { FilesCopyIcon } from './icons/FilesCopyIcon';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { cn } from './ui/utils';

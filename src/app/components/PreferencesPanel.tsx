@@ -14,11 +14,11 @@ import {
   TasksSettingsSection,
   WorkflowSettingsSection,
 } from './SettingsPanel';
-import { AboutSettingsSection, HelpSettingsSection } from './AboutHelpSettingsSections';
-import { McpAccessSettingsSection } from './McpAccessSettingsSection';
-import { McpCommandSettingsSection } from './McpCommandSettingsSection';
-import { McpActivityLogSection } from './McpDiagnosticsSections';
-import { PeopleManagementSections } from './PeopleSettingsSections';
+import { AboutSettingsSection, HelpSettingsSection } from './settings/AboutHelpSettingsSections';
+import { McpAccessSettingsSection } from './settings/McpAccessSettingsSection';
+import { McpCommandSettingsSection } from './settings/McpCommandSettingsSection';
+import { McpActivityLogSection } from './settings/McpDiagnosticsSections';
+import { PeopleManagementSections } from './settings/PeopleSettingsSections';
 
 interface PreferencesPanelProps {
   isOpen: boolean;

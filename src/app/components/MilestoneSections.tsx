@@ -10,13 +10,13 @@ import { ProjectBadge } from './ProjectBadge';
 import type { StatusColumn, Task, TimelineSwimlane } from '../types';
 import { EmptyStateCard } from './EmptyStateCard';
 import { DependencyStatusPill } from './TaskSummarySection';
-import { DialogSurfaceSection } from './DialogSurface';
+import { DialogSurfaceSection } from './dialogs/DialogSurface';
 import { TaskCheckboxControl } from './TaskCheckboxControl';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { taskEditIconFieldClassName } from './taskFormStyles';
-import { CalendarIcon } from './CalendarIcon';
+import { CalendarIcon } from './icons/CalendarIcon';
 
 type MilestoneStatusColumn = StatusColumn[];
 

@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, CircleDot, FileText, GitBranch, Minus, Plus, ShieldCheck, Sparkles, Target, Trash2, ZoomIn } from 'lucide-react';
-import type { GoalAcceptanceActor, GoalBudgetMode, GoalConnectorSide, GoalElement, GoalElementType, GoalPolicy, GoalRecord, Person } from '../types.ts';
-import { safeReadJSON, persistJSONWithElectronMirror } from '../utils/storage.ts';
-import { AgentIcon as Bot } from './AgentIcon';
-import { LinkIcon as Link2 } from './LinkIcon';
-import { Input } from './ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import type { GoalAcceptanceActor, GoalBudgetMode, GoalConnectorSide, GoalElement, GoalElementType, GoalPolicy, GoalRecord, Person } from '../../types.ts';
+import { safeReadJSON, persistJSONWithElectronMirror } from '../../utils/storage.ts';
+import { AgentIcon as Bot } from '../icons/AgentIcon';
+import { LinkIcon as Link2 } from '../icons/LinkIcon';
+import { Input } from '../ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 const STORAGE_KEY = 'omvra.goals.v1';
 const GOAL_ID = 'goal-lights-off-factory';
@@ -270,7 +270,7 @@ export function GoalsView({ people = [] }: { people?: Person[] }) {
       </div>
     </div>
 
-    <div className="absolute left-1/2 top-4 z-20 flex -translate-x-1/2 items-center gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-sm">{TOOL_ITEMS.map(tool => tool.type === 'agent' ? <div key={tool.type} className="relative"><button onClick={() => setAgentMenuOpen(value => !value)} className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-100" aria-label="Add agent">{tool.icon}{tool.label}</button>{agentMenuOpen && <div className="absolute left-0 top-full mt-1 w-56 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">{people.filter(person => person.kind === 'agentic').map(person => <button key={person.id} onClick={() => addAgent(person)} className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs hover:bg-slate-100"><Bot className="size-3.5 text-amber-500" /><span><span className="block font-medium text-slate-800">{person.name}</span><span className="block text-[11px] text-slate-400">{person.role}</span></span></button>)}{people.filter(person => person.kind === 'agentic').length === 0 && <p className="px-2.5 py-2 text-xs text-slate-400">No agents configured</p>}</div>}</div> : <button key={tool.type} onClick={() => tool.type === 'connector' ? (setConnectorMode(true), setConnectorSourceId(null)) : addElement(tool.type)} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs ${tool.type === 'connector' && connectorMode ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`} aria-label={`Add ${tool.label}`}>{tool.icon}{tool.type === 'connector' && connectorMode ? 'Choose source' : tool.label}</button>)}</div>
+    <div className="absolute left-1/2 top-4 z-20 flex -translate-x-1/2 items-center gap-1 rounded-full border border-slate-200 bg-white p-1 shadow-sm">{TOOL_ITEMS.map(tool => tool.type === 'agent' ? <div key={tool.type} className="relative"><button onClick={() => setAgentMenuOpen(value => !value)} className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-100" aria-label="Add agent">{tool.icon}{tool.label}</button>{agentMenuOpen && <div className="absolute left-0 top-full mt-1 w-56 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">{people.filter(person => person.kind === 'agentic').map(person => <button key={person.id} onClick={() => addAgent(person)} className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs hover:bg-slate-100"><Bot className="size-3.5 text-amber-500" /><span><span className="block font-medium text-slate-800">{person.name}</span><span className="block text-[11px] text-slate-400">{person.role}</span></span></button>)}{people.filter(person => person.kind === 'agentic').length === 0 && <p className="px-2.5 py-2 text-xs text-slate-400">No agents configured</p>}</div>}</div> : <button key={tool.type} onClick={() => tool.type === 'connector' ? (setConnectorMode(true), setConnectorSourceId(null)) : addElement(tool.type)} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs ${tool.type === 'connector' && connectorMode ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`} aria-label={`Add ${tool.label}`}>{tool.icon}{tool.type === 'connector' && connectorMode ? 'Choose source' : tool.label}</button>)}</div>
     {selectedElement && (
       <aside className="absolute bottom-16 right-4 top-16 z-20 w-72 overflow-auto rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between">
@@ -403,24 +403,26 @@ export function GoalsView({ people = [] }: { people?: Person[] }) {
         </button>
       </aside>
     )}
-    <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500 shadow-sm">
+    <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-2">
       {(spacePressed || panMode) && (
-        <span className="rounded bg-slate-900/80 px-2 py-1 text-white">
+        <div className="pointer-events-none rounded bg-slate-900/80 px-2 py-1 text-xs text-white shadow-sm">
           {spacePressed ? 'Release space to edit' : 'Pan mode · drag to move'}
-        </span>
+        </div>
       )}
-      <button
-        onClick={() => setPanMode(value => !value)}
-        className={`rounded-md px-2 py-1.5 text-xs ${panMode ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`}
-        aria-pressed={panMode}
-        aria-label="Pan canvas"
-      >
-        Pan
-      </button>
-      <div className="flex items-center gap-1 rounded-md border border-slate-200 bg-white px-1">
-        <button className="rounded p-1 hover:bg-slate-100" onClick={() => setZoom(value => Math.max(.6, value - .1))} aria-label="Zoom out"><Minus className="size-3" /></button>
-        <span className="min-w-9 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
-        <button className="rounded p-1 hover:bg-slate-100" onClick={() => setZoom(value => Math.min(1.4, value + .1))} aria-label="Zoom in"><ZoomIn className="size-3" /></button>
+      <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500 shadow-sm">
+        <button
+          onClick={() => setPanMode(value => !value)}
+          className={`rounded-md px-2 py-1.5 text-xs ${panMode ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`}
+          aria-pressed={panMode}
+          aria-label="Pan canvas"
+        >
+          Pan
+        </button>
+        <div className="flex items-center gap-1 rounded-md border border-slate-200 bg-white px-1">
+          <button className="rounded p-1 hover:bg-slate-100" onClick={() => setZoom(value => Math.max(.6, value - .1))} aria-label="Zoom out"><Minus className="size-3" /></button>
+          <span className="min-w-9 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
+          <button className="rounded p-1 hover:bg-slate-100" onClick={() => setZoom(value => Math.min(1.4, value + .1))} aria-label="Zoom in"><ZoomIn className="size-3" /></button>
+        </div>
       </div>
     </div>
   </section>;

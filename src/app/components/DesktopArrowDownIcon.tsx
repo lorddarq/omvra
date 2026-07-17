@@ -1,0 +1,17 @@
+import type { SVGProps } from 'react';
+
+export function DesktopArrowDownIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" {...props}>
+      <title>desktop-arrow-down</title>
+      <g fill="currentColor">
+        <path d="M12 2.75H14.25C15.355 2.75 16.25 3.645 16.25 4.75V10.75C16.25 11.855 15.355 12.75 14.25 12.75H3.75C2.645 12.75 1.75 11.855 1.75 10.75V4.75C1.75 3.645 2.645 2.75 3.75 2.75H12Z" fill="currentColor" fillOpacity="0.3" data-stroke="none" stroke="none" />
+        <path d="M11.75 7L9 9.75L6.25 7" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M9 9.75V2.75" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M12 2.75H14.25C15.355 2.75 16.25 3.645 16.25 4.75V10.75C16.25 11.855 15.355 12.75 14.25 12.75H3.75C2.645 12.75 1.75 11.855 1.75 10.75V4.75C1.75 3.645 2.645 2.75 3.75 2.75H6" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M5.75 15.75C6.508 15.511 7.628 15.25 9 15.25C9.795 15.25 10.941 15.338 12.25 15.75" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M9 12.75V15.25" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      </g>
+    </svg>
+  );
+}

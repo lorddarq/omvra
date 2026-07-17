@@ -1,5 +1,5 @@
-import { Copy } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { FilesCopyIcon } from './FilesCopyIcon';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { cn } from './ui/utils';
@@ -39,7 +39,7 @@ export function McpCommandBlock({
           )}
         </div>
         <Button type="button" variant="outline" onClick={onCopy} className="shrink-0">
-          <Copy className="mr-2 h-4 w-4" />
+          <FilesCopyIcon className="mr-2 h-4 w-4" />
           {copied ? copiedLabel : copyLabel}
         </Button>
       </div>

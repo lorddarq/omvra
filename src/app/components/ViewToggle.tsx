@@ -78,7 +78,9 @@ export function ViewToggle({
             </svg>
     },
   ];
-  const activeIndex = Math.max(0, views.findIndex(view => view.value === currentView));
+  const viewOrder: ViewType[] = ['timeline', 'kanban', 'roadmap', 'loops'];
+  const orderedViews = [...views].sort((a, b) => viewOrder.indexOf(a.value) - viewOrder.indexOf(b.value));
+  const activeIndex = Math.max(0, orderedViews.findIndex(view => view.value === currentView));
 
   return (
     <div
@@ -86,7 +88,7 @@ export function ViewToggle({
       data-active-index={activeIndex}
     >
       <span className="view-toggle-indicator" aria-hidden="true" />
-      {views.map(view => (
+      {orderedViews.map(view => (
         <button
           key={view.value}
           onClick={() => onViewChange(view.value)}

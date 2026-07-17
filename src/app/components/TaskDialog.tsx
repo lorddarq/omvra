@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { AlertTriangle, Briefcase, CalendarDays, ChevronsUpDown, FileText, Info, Paperclip, RefreshCw, Search, Sparkles, Trash2 } from 'lucide-react';
+import { AlertTriangle, ChevronsUpDown, FileText, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { Task, TaskStatus, TimelineSwimlane, Person, TaskSize, TaskComplexity, TaskPriority, StatusColumn, ProjectMilestone, TaskAttachment } from '../types';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import { toLocalISODate } from '../utils/date';
@@ -34,7 +34,12 @@ import {
   taskEditTextAreaClassName,
 } from './taskFormStyles';
 import { TASK_PRIORITY_ICONS } from './taskPriorityIcons';
-import { LinkIcon } from './LinkIcon';
+import { NodesIcon } from './NodesIcon';
+import { AttachmentIcon } from './AttachmentIcon';
+import { BasicInfoIcon } from './BasicInfoIcon';
+import { DescriptionIcon } from './DescriptionIcon';
+import { FolderIcon } from './FolderIcon';
+import { CalendarIcon } from './CalendarIcon';
 import { TaskCheckboxControl } from './TaskCheckboxControl';
 import { LOAD_CLASSIFICATIONS, ROADMAP_STAGES, getDefaultColumnSemantics } from '../utils/statusColumnSemantics';
 
@@ -348,10 +353,10 @@ export function TaskDialog({
       {
         label: 'Task Details',
         items: [
-          { id: 'task-edit-basic', label: 'Basic Info', icon: Info },
-          { id: 'task-edit-roadmap', label: 'Dependencies', icon: LinkIcon },
-          { id: 'task-edit-description', label: 'Description', icon: FileText },
-          { id: 'task-edit-attachments', label: 'Attachments', icon: Paperclip },
+          { id: 'task-edit-basic', label: 'Basic Info', icon: BasicInfoIcon },
+          { id: 'task-edit-roadmap', label: 'Dependencies', icon: NodesIcon },
+          { id: 'task-edit-description', label: 'Description', icon: DescriptionIcon },
+          { id: 'task-edit-attachments', label: 'Attachments', icon: AttachmentIcon },
         ],
       },
     ],
@@ -375,6 +380,7 @@ export function TaskDialog({
         </DialogDescription>
         <AnchoredPanel
           className="h-auto min-h-0 flex-1"
+          contentClassName="space-y-8"
           title={task ? 'Edit Task' : 'Create Task'}
           description={task ? 'Edit the task details below.' : 'Enter the task details below.'}
           navGroups={editNavGroups}
@@ -497,8 +503,7 @@ export function TaskDialog({
                   <div className="space-y-1">
                     <Label htmlFor="assignee" className={taskEditLabelClassName}>Assignee</Label>
                     <Select value={assigneeId} onValueChange={setAssigneeId}>
-                      <SelectTrigger id="assignee" className={taskEditIconSelectClassName}>
-                        <Sparkles className="absolute left-2 top-1/2 size-4 -translate-y-1/2 text-[#71717a]" />
+                      <SelectTrigger id="assignee" className={taskEditSelectClassName}>
                         <SelectValue placeholder="Unassigned" />
                       </SelectTrigger>
                       <SelectContent>
@@ -606,10 +611,9 @@ export function TaskDialog({
                   <Select value={swimlaneId} onValueChange={setSwimlaneId}>
                     <SelectTrigger
                       id="swimlane"
-                      className={taskEditIconSelectClassName}
+                      className={taskEditSelectClassName}
                       disabled={projectIds.length === 0}
                     >
-                      <Briefcase className="absolute left-2 top-1/2 size-4 -translate-y-1/2 text-[#71717a]" />
                       <SelectValue placeholder={projectIds.length ? 'Select project' : 'No project selected'} />
                     </SelectTrigger>
                     <SelectContent>
@@ -656,7 +660,7 @@ export function TaskDialog({
                             });
                           }}
                         />
-                        <Briefcase className="size-4 shrink-0 text-[#f59e0b]" />
+                        <FolderIcon className="size-4 shrink-0 text-[#71717a]" />
                         <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#3f3f46]">{swimlane.name}</span>
                       </label>
                     );
@@ -664,7 +668,7 @@ export function TaskDialog({
                 ) : (
                   <EmptyStateCard
                     compact
-                    icon={<Briefcase className="size-4" />}
+                    icon={<FolderIcon className="size-4 text-[#71717a]" />}
                     title={`No projects match "${projectSearchQuery}"`}
                     description="Try a different project name or clear the search to see all available timeline projects."
                   />
@@ -786,7 +790,7 @@ export function TaskDialog({
                   disabled={!window.electron?.attachments?.pick}
                   className="h-8 gap-2 rounded-full px-3 text-xs"
                 >
-                  <Paperclip className="size-4" />
+                  <AttachmentIcon className="size-4" />
                   Add files
                 </Button>
               </div>
@@ -834,7 +838,7 @@ export function TaskDialog({
               ) : (
                 <EmptyStateCard
                   compact
-                  icon={<Paperclip className="size-4" />}
+                  icon={<AttachmentIcon className="size-4" />}
                   title="No files attached"
                   description="Add files here to keep source material, exports, and supporting artifacts attached while editing."
                 />
@@ -886,7 +890,7 @@ function TaskDateSelectField({ id, label, value, min, onChange }: TaskDateSelect
           openDatePicker();
         }}
       >
-        <CalendarDays className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-[#71717a]" />
+        <CalendarIcon className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-[#71717a]" />
         <span className="min-w-0 flex-1 truncate text-[#67676f]">
           {formatTaskDateDisplay(value)}
         </span>

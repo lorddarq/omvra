@@ -1,4 +1,4 @@
-import { Briefcase, CalendarDays, ChevronsUpDown, Search, Trash2 } from 'lucide-react';
+import { CalendarDays, ChevronsUpDown, Search, Trash2 } from 'lucide-react';
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { ProjectMilestone, StatusColumn, Task, TimelineSwimlane } from '../types';
 import { resolveProjectColor } from '../utils/projectVisual';
@@ -18,6 +18,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { MilestoneTaskLinker } from './MilestoneSections';
 import { ProjectBadge } from './ProjectBadge';
+import { FolderIcon } from './FolderIcon';
 import { TaskCheckboxControl } from './TaskCheckboxControl';
 import { Textarea } from './ui/textarea';
 import {
@@ -329,7 +330,7 @@ export function MilestoneDialog({
                           ariaLabel={`Select ${project.name}`}
                           onCheckedChange={() => toggleProject(project.id)}
                         />
-                        <Briefcase className="size-4 shrink-0 text-[#f59e0b]" />
+                        <FolderIcon className="size-4 shrink-0 text-[#71717a]" />
                         <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#3f3f46]">
                           {project.name}
                         </span>
@@ -339,7 +340,7 @@ export function MilestoneDialog({
                 ) : (
                   <EmptyStateCard
                     compact
-                    icon={<Briefcase className="size-4" />}
+                    icon={<FolderIcon className="size-4 text-[#71717a]" />}
                     title={`No projects match "${projectSearchQuery}"`}
                     description="Try a different project name or clear the search to see all available projects."
                   />

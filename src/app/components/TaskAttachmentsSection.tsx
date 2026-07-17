@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Folder, Paperclip } from 'lucide-react';
+import { AlertTriangle, Folder } from 'lucide-react';
 import type { TaskAttachment } from '../types';
+import { AttachmentIcon } from './AttachmentIcon';
 import { EmptyStateCard } from './EmptyStateCard';
 
 interface TaskAttachmentsSectionProps {
@@ -67,7 +68,7 @@ export function TaskAttachmentsSection({
                 }`}
               >
                 <div className="flex min-w-0 items-center gap-2">
-                  <Paperclip className="size-4 shrink-0 text-[#71717a]" />
+                  <AttachmentIcon className="size-4 shrink-0 text-[#71717a]" />
                   <div className="min-w-0">
                     <div className="truncate text-sm font-semibold leading-5 text-[#71717a]">{attachment.name}</div>
                     {sizeLabel && !isMissing && (
@@ -97,7 +98,7 @@ export function TaskAttachmentsSection({
       ) : (
         <EmptyStateCard
           compact
-          icon={<Paperclip className="size-4" />}
+          icon={<AttachmentIcon className="size-4" />}
           title="No files attached"
           description="Add files to keep source material and supporting artifacts attached to this task."
         />

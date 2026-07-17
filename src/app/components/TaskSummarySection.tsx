@@ -1,4 +1,4 @@
-import { Ban, GitBranch } from 'lucide-react';
+import { Ban } from 'lucide-react';
 import { ReactNode } from 'react';
 import { TaskPriority, Person } from '../types';
 import { resolveStatusColor } from '../utils/roadmap';
@@ -8,6 +8,7 @@ import { EmptyStateCard } from './EmptyStateCard';
 import { TASK_PRIORITY_ICONS } from './taskPriorityIcons';
 import { AgentIcon } from './AgentIcon';
 import { UserIcon } from './UserIcon';
+import { NodesIcon } from './NodesIcon';
 
 interface TaskSummarySectionProps {
   statusLabel: string;
@@ -120,7 +121,7 @@ export function TaskDependencyDetailsSection({ dependencies }: TaskDependencyDet
             className="flex min-h-[42px] min-w-0 items-center justify-between gap-3 rounded-xl border border-black/[0.05] px-3 py-2"
           >
             <div className="flex min-w-0 flex-1 items-center gap-2">
-              <GitBranch className="size-4 shrink-0 text-[#67676f]" aria-hidden="true" />
+              <NodesIcon className="size-4 shrink-0 text-[#67676f]" aria-hidden="true" />
               <div className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-medium leading-5 text-[#67676f]">
                 {dependency.title}
               </div>

@@ -1,4 +1,4 @@
-import { CalendarDays, Search, TriangleAlert } from 'lucide-react';
+import { Search, TriangleAlert } from 'lucide-react';
 import {
   getMilestoneHealthVisual,
   getStatusLabel,
@@ -16,6 +16,7 @@ import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { taskEditIconFieldClassName } from './taskFormStyles';
+import { CalendarIcon } from './CalendarIcon';
 
 type MilestoneStatusColumn = StatusColumn[];
 
@@ -93,7 +94,7 @@ export function MilestoneSummaryCard({
             <div>
               <div className="text-[12px] font-medium text-[#71717a]">Start Date</div>
               <div className="mt-2 flex items-center gap-1.5">
-                <CalendarDays className="size-4 text-[#71717a]" />
+                <CalendarIcon className="size-4 text-[#71717a]" />
                 <span className="rounded-full border border-black/10 bg-white px-2 py-0.5 text-[11px] font-semibold text-[#71717a]">
                   <DateRangeLabel startDate={startDate} className="" />
                 </span>
@@ -121,7 +122,7 @@ export function MilestoneSummaryCard({
             <div>
               <div className="text-[12px] font-medium text-[#71717a]">End Date</div>
               <div className="mt-2 flex items-center gap-1.5">
-                <CalendarDays className="size-4 text-[#71717a]" />
+                <CalendarIcon className="size-4 text-[#71717a]" />
                 <span className="rounded-full border border-black/10 bg-white px-2 py-0.5 text-[11px] font-semibold text-[#71717a]">
                   <DateRangeLabel endDate={endDate} className="" />
                 </span>

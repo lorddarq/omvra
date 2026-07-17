@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { FileText, Trash2 } from 'lucide-react';
+import { DesktopArrowDownIcon } from './DesktopArrowDownIcon';
 import type { Person, PersonKind, StatusColumn, Task, TaskStatus, TimelineSwimlane } from '../types';
 import { getStatusLabel, getTaskProjectIds } from '../utils/roadmap';
 import { getLoadPercentageForTasks, getTaskLoadPoints, PERSON_CAPACITY_POINTS } from '../utils/taskLoad';
@@ -19,6 +19,7 @@ import { AgentInstructionFields } from './AgentInstructionFields';
 import { AgentIcon } from './AgentIcon';
 import { PenWritingIcon } from './PenWritingIcon';
 import { UsersIcon } from './UsersIcon';
+import { TrashIcon } from './TrashIcon';
 
 interface PeopleManagementSectionsProps {
   people: Person[];
@@ -743,7 +744,7 @@ function PersonCardActions({
             },
             {
               label: 'Delete',
-              icon: Trash2,
+              icon: TrashIcon,
               tone: 'danger',
               onSelect: () => {
                 handleMenuOpenChange(false);
@@ -752,7 +753,7 @@ function PersonCardActions({
             },
             {
               label: 'Export tasks',
-              icon: FileText,
+              icon: DesktopArrowDownIcon,
               disabled: !canExportPdf,
               onSelect: () => {
                 handleMenuOpenChange(false);
@@ -927,6 +928,7 @@ export function PeopleSettingsSection({ children, empty = false, action, popupOp
     <AnchoredPanelSection
       id="people"
       title="People"
+      icon={UsersIcon}
       description="The information below is used to calculate individual person and agentic load, for better capacity management."
       className={popupOpen ? 'relative z-[100]' : 'relative z-0'}
     >
@@ -956,6 +958,7 @@ export function AgentsSettingsSection({ children, empty = false, action, popupOp
     <AnchoredPanelSection
       id="agents"
       title="Agents"
+      icon={AgentIcon}
       description="The information below is used to calculate individual person and agentic load, for better capacity management."
       className={popupOpen ? 'relative z-[100]' : 'relative z-0'}
     >

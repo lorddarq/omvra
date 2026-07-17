@@ -15,9 +15,10 @@ import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffe
 import { Task, TimelineSwimlane, TaskStatus, Person, StatusColumn } from '../types';
 import { DndProvider, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { CalendarDays, Plus } from 'lucide-react';
+import { CalendarDays } from 'lucide-react';
 import { TimelineHeader } from './TimelineHeader';
 import { TimelineToolbar } from './TimelineToolbar';
+import { PlusIcon } from './PlusIcon';
 import { UsersIcon } from './UsersIcon';
 import { filterTimelineTasks } from '../utils/statusColumnSemantics';
 import { EmptyStateCard } from './EmptyStateCard';
@@ -1090,7 +1091,7 @@ export function TimelineView({
                   : 'Create a project lane to start planning work on the timeline. Tasks placed into a project will show up here automatically.'}
                 action={mode === 'projects' ? (
                   <button type="button" onClick={onAddSwimlane} className="timeline-left-header-button h-auto px-4 py-2">
-                    <Plus className="size-4" />
+                    <PlusIcon className="size-4" />
                     <span>Add first project</span>
                   </button>
                 ) : undefined}
@@ -1108,7 +1109,7 @@ export function TimelineView({
               </span>
               {mode === 'projects' && (
                 <button onClick={onAddSwimlane} className="timeline-left-header-button">
-                  <Plus className="w-4 h-4" />
+                  <PlusIcon className="size-4" />
                 </button>
               )}
               <div

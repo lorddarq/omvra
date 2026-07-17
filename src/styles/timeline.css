@@ -185,8 +185,8 @@
   line-height: 1.3125rem;
   font-variant-numeric: tabular-nums;
   color: #4a5565;
-  background-color: #ffffff;
-  box-shadow: 0 0 1px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.04);
+  background-color: #f2f2f3;
+  box-shadow: none;
   transition-property: background-color, color, transform, box-shadow;
   transition-duration: 140ms;
   transition-timing-function: ease;
@@ -194,8 +194,8 @@
 
 @media (hover: hover) and (pointer: fine) {
   .timeline-week-toggle:hover {
-    background-color: #f8fafc;
-    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.1);
+    background-color: #e9e9eb;
+    box-shadow: none;
   }
 }
 
@@ -651,13 +651,23 @@
   position: absolute;
   right: 0.5rem;
   top: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0.375rem;
+  padding: 0.25rem 0.375rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
   transform: translateY(-50%);
   color: #1a60cb;
-  transition-property: opacity, background-color, color, transform;
+  opacity: 0;
+  transition-property: opacity, background-color, color;
   transition-duration: 140ms;
   transition-timing-function: ease;
 }
 
+.timeline-swimlane-label:hover .timeline-row-edit-button,
 .timeline-swimlane-label:focus-within .timeline-row-edit-button {
   opacity: 1;
 }
@@ -665,8 +675,7 @@
 @media (hover: hover) and (pointer: fine) {
   .timeline-row-edit-button:hover {
     color: #004ec5;
-    background-color: rgba(26, 96, 203, 0.08);
-    transform: translateY(-50%) scale(1.04);
+    background-color: rgba(26, 96, 203, 0.12);
   }
 }
 

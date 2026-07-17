@@ -10,6 +10,7 @@ import { UsersIcon } from './UsersIcon';
 import { WorkflowsIcon } from './WorkflowsIcon';
 import { EmptyStateCard } from './EmptyStateCard';
 import { Switch } from './ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { getDefaultColumnSemantics } from '../utils/statusColumnSemantics';
 import {
   Sheet,
@@ -128,6 +129,7 @@ export function GeneralSettingsSection({ children }: McpSettingsSectionProps) {
     <AnchoredPanelSection
       id="general"
       title="General"
+      icon={SlidersIcon}
       description="Workspace-wide appearance and behavior preferences"
     >
       {children}
@@ -148,6 +150,7 @@ export function WorkflowSettingsSection({
     <AnchoredPanelSection
       id="workflows"
       title="Workflows"
+      icon={WorkflowsIcon}
       description="Configure how completed Goals retain their working artefacts."
     >
       <div className="flex items-center justify-between gap-4">
@@ -173,7 +176,7 @@ interface McpSettingsSectionProps {
 
 export function McpSettingsSection({ children }: McpSettingsSectionProps) {
   return (
-    <AnchoredPanelSection id="mcp-access" title="MCP">
+    <AnchoredPanelSection id="mcp-access" title="MCP" icon={FiltersIcon}>
       {children}
     </AnchoredPanelSection>
   );
@@ -184,6 +187,7 @@ export function McpTestingSettingsSection({ children }: McpSettingsSectionProps)
     <AnchoredPanelSection
       id="mcp-testing"
       title="MCP Testing"
+      icon={GaugeIcon}
       description="Check MCP activity and debug issues"
     >
       {children}
@@ -196,6 +200,7 @@ export function McpActivitySettingsSection({ children }: McpSettingsSectionProps
     <AnchoredPanelSection
       id="mcp-activity"
       title="MCP Activity Log"
+      icon={WindowPointerIcon}
       description="MCP Activity log used for debugging agent behavior"
     >
       {children}
@@ -255,6 +260,7 @@ export function TasksSettingsSection({
     <AnchoredPanelSection
       id="task-load"
       title="Tasks"
+      icon={TasksIcon}
       description="Configure agent polling here. Workload, roadmap, and AI watch behavior now belong to each Kanban column."
     >
       <div className="space-y-6">
@@ -278,20 +284,23 @@ export function TasksSettingsSection({
               Define what each column means. Names can stay completely custom.
             </p>
             {statusColumns.map(column => (
-              <label key={column.id} className="flex items-center justify-between gap-4 rounded-xl border border-black/10 px-3 py-2">
+              <label key={column.id} className="flex items-center justify-between gap-4 rounded-xl bg-[#f7f7f8] px-3 py-2">
                 <span className="min-w-0 truncate text-sm text-[#52525b]">{column.title}</span>
-                <select
+                <Select
                   value={column.roadmapStage ?? getDefaultColumnSemantics(column.id).roadmapStage}
-                  onChange={event => onUpdateStatusColumn(column.id, { roadmapStage: event.target.value as RoadmapStage })}
-                  className="h-8 rounded-lg border border-black/10 bg-white px-2 text-sm text-[#52525b]"
-                  aria-label={`${column.title} workflow category`}
+                  onValueChange={value => onUpdateStatusColumn(column.id, { roadmapStage: value as RoadmapStage })}
                 >
-                  <option value="not-started">Backlog</option>
-                  <option value="in-progress">In progress</option>
-                  <option value="in-review">In review</option>
-                  <option value="complete">Done</option>
-                  <option value="excluded">Excluded</option>
-                </select>
+                  <SelectTrigger className="h-9 w-40 max-w-full shrink-0 rounded-xl border-0 bg-white px-3 text-sm font-medium text-[#71717a] shadow-[0_1px_2px_rgba(0,0,0,0.04)] focus-visible:ring-gray-200" aria-label={`${column.title} workflow category`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="not-started">Backlog</SelectItem>
+                    <SelectItem value="in-progress">In progress</SelectItem>
+                    <SelectItem value="in-review">In review</SelectItem>
+                    <SelectItem value="complete">Done</SelectItem>
+                    <SelectItem value="excluded">Excluded</SelectItem>
+                  </SelectContent>
+                </Select>
               </label>
             ))}
           </div>
@@ -350,7 +359,7 @@ export function DataSettingsSection({
   const usagePercent = Math.min(100, Math.max(0, storageMeter.usagePercent));
 
   return (
-    <AnchoredPanelSection id="storage" title="Data" description="Data and backup settings">
+    <AnchoredPanelSection id="storage" title="Data" icon={LayersIcon} description="Data and backup settings">
       <div className="min-w-0 space-y-8">
         <div className="space-y-3">
           <div className="text-sm font-semibold leading-5 text-[#71717a]">Storage Usage</div>
@@ -387,7 +396,7 @@ export function DataSettingsSection({
               className="inline-flex h-8 items-center gap-2 rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-[#67676f] outline-none hover:bg-[#71717a]/5 focus-visible:ring-2 focus-visible:ring-gray-300"
             >
               <Download className="size-4 shrink-0" />
-              Backup
+              Backup Data
             </button>
             <button
               type="button"
@@ -395,7 +404,7 @@ export function DataSettingsSection({
               className="inline-flex h-8 items-center gap-2 rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-[#67676f] outline-none hover:bg-[#71717a]/5 focus-visible:ring-2 focus-visible:ring-gray-300"
             >
               <Upload className="size-4 shrink-0" />
-              Restore
+              Restore Data
             </button>
           </div>
           {importFeedback ? (
@@ -469,7 +478,7 @@ function TasksIcon({ className }: { className?: string }) {
   );
 }
 
-function HelpIcon({ className }: { className?: string }) {
+export function HelpIcon({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" className={className}>
       <title>life-ring</title>
@@ -485,7 +494,7 @@ function HelpIcon({ className }: { className?: string }) {
   );
 }
 
-function AboutIcon({ className }: { className?: string }) {
+export function AboutIcon({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" className={className}>
       <title>circle-info</title>
@@ -513,7 +522,7 @@ export function FiltersIcon({ className }: { className?: string }) {
   );
 }
 
-function WindowPointerIcon({ className }: { className?: string }) {
+export function WindowPointerIcon({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" className={className}>
       <title>window-pointer</title>
@@ -530,7 +539,7 @@ function WindowPointerIcon({ className }: { className?: string }) {
   );
 }
 
-function GaugeIcon({ className }: { className?: string }) {
+export function GaugeIcon({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" className={className}>
       <title>gauge-3</title>
@@ -549,7 +558,7 @@ function GaugeIcon({ className }: { className?: string }) {
   );
 }
 
-function LayersIcon({ className }: { className?: string }) {
+export function LayersIcon({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" className={className}>
       <title>layers-3</title>
@@ -563,7 +572,7 @@ function LayersIcon({ className }: { className?: string }) {
   );
 }
 
-function SlidersIcon({ className }: { className?: string }) {
+export function SlidersIcon({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" className={className}>
       <title>sliders</title>

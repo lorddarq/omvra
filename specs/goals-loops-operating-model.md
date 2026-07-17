@@ -346,6 +346,46 @@ These decisions remain intentionally unresolved and must be agreed before the op
 - **Agent recruitment:** whether the orchestrator creates an agent only when no matching canonical persona exists, or may proactively create specialized agents.
 - **Resolved — working-context retention:** completed goals retain `project.md` and `roster.md` by default. The `Cleanup goal artefacts` workflow setting opts into deletion after durable records and final evidence are verified.
 
+## Resolved architecture boundary: governor, not runtime
+
+Loops is a planning/orchestration surface with an executable governance boundary, not a first-class workflow runtime or cronjob scheduler. Omvra owns quality, process, direction, contracts, permissions, evidence, acceptance, and durable lifecycle state. Agents own the technical approach and self-regulation while executing accepted work.
+
+Omvra must therefore:
+
+- validate dispatch, pause, retry, handoff, evidence, acceptance, and completion requests;
+- enforce contracts, dependencies, conditions, approval gates, budgets, permissions, and interdictions;
+- preserve durable state, evidence, decisions, and audit history;
+- reject or pause work that violates the governing contract; and
+- expose the next eligible action without owning the worker's internal loop, scheduling strategy, model invocation, or technical implementation approach.
+
+Agents may choose their technical methods, regulate their own working loop, and report evidence, rescope proposals, failures, or handoffs. They may not redefine the governing outcome, bypass Omvra's transition boundary, or self-authorize completion.
+
+This boundary intentionally avoids building an n8n-like scheduler inside Omvra. Any future background execution service would be an optional adapter for dispatch and reconciliation, not the owner of workflow meaning or agent technique.
+
+## Resolved action authority policy
+
+The action pool is the set of control-plane actions Omvra can recognize, authorize, audit, or reject. It does not include an agent's internal reasoning or technical implementation choices.
+
+| Action category | Default authority | Boundary |
+| --- | --- | --- |
+| Observation | Overseer/agent | No confirmation. Read-only inspection of goals, tasks, milestones, evidence, dependencies, skills, and status. |
+| Planning | Human | Human confirmation is required. Subgoal redefinition always requires confirmation because it may change the goal's final outcome. |
+| Execution control | Overseer | No confirmation within scope. Raise an exception when the action conflicts with the subgoal or end goal, or requires changing operational instructions to finish the goal. |
+| Evidence and handoff | Overseer/agent | No confirmation. Record outcomes ephemerally per goal for debugging and resumability, while durable structured events remain authoritative for audit and metrics. |
+| Workflow mutation | Human | Human confirmation is required for changes to scope, dependencies, acceptance criteria, contracts, gates, permissions, or interdictions. |
+| Project mutations | Overseer/agent | No confirmation by default, but notify the human. Use canonical project-management writes and preserve auditability. |
+| Send messages on the user's behalf | Human | Human confirmation is required. |
+| Write files, call external MCP tools, modify repositories | Agent configuration | Follow the configured approvals for the responsible agent/runtime. For example, use Codex's configured approval behavior rather than inventing a second Omvra policy. |
+| Budget overruns, release approval, gate bypass, artifact removal | Human | Human confirmation is required. |
+| Delete data | Human when project-critical | Require confirmation for project-critical data; otherwise follow the applicable agent configuration and project policy. |
+| Lifecycle actions | Human or delegated overseer | Require a human decision by default. No confirmation is needed when the human expressly prompted the action or it is an explicitly assigned task within the accepted contract. |
+
+The overseer may execute an action autonomously only when the action category and current contract authorize it. A conflict, missing authority, material scope change, or operational-instruction change pauses the action and creates an exception for human review. This policy governs Omvra's control-plane decisions; it does not constrain an agent's internal technical approach.
+
+### Parked product idea: operational policy editor
+
+An operational policy editor is a future product feature, not part of the current Goals / Loops implementation. It would provide a typed UI backed by a policy file or durable policy record, with scoped rules, approval defaults, agent configuration references, and audit history. Park it for separate discovery and architecture work rather than adding an ad hoc policy editor to the current canvas or lifecycle slice.
+
 Until the remaining decisions are resolved, the safe default is to pause at ambiguity, approval, stale-contract, missing-evidence, and failed-gate states; preserve evidence; and request a human decision.
 
 ## Implementation handoff

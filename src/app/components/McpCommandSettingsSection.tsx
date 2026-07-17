@@ -1,4 +1,4 @@
-import { Copy } from 'lucide-react';
+import { FilesCopyIcon } from './FilesCopyIcon';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 
@@ -98,7 +98,7 @@ function CommandField({
           title={copied ? 'Copied' : `Copy ${title}`}
           className="absolute right-2 top-1/2 inline-flex size-7 -translate-y-1/2 items-center justify-center rounded-lg text-[#71717a] outline-none transition-[background-color,color] hover:bg-zinc-500/10 hover:text-[#4b4b54] focus-visible:ring-2 focus-visible:ring-gray-300"
         >
-          <Copy className="size-4" />
+          <FilesCopyIcon className="size-4" />
         </button>
       </div>
       {footer && <p className={DESCRIPTION_CLASS}>{footer}</p>}

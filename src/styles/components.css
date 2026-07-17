@@ -925,6 +925,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 0.375rem;
+  padding: 0.25rem 0.375rem;
   color: #1a60cb;
   font-size: 0.75rem;
   font-weight: 400;
@@ -936,7 +937,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .kanban-column-edit-control:hover {
-    background-color: rgba(26, 96, 203, 0.08);
+    background-color: rgba(26, 96, 203, 0.12);
     color: #004ec5;
   }
 }
@@ -1055,25 +1056,21 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: auto;
+  height: auto;
   flex-shrink: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: 0.375rem;
   background: transparent;
-  padding: 0.3125rem;
+  padding: 0.25rem 0.375rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
   color: #1a60cb;
   opacity: 0;
   transform: translateY(-1px);
   transition-property: background-color, color, opacity, transform;
   transition-duration: 140ms;
   transition-timing-function: ease;
-}
-
-.kanban-task-edit-button svg {
-  width: 0.875rem;
-  height: 0.875rem;
-  flex: 0 0 0.875rem;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1084,7 +1081,7 @@
   }
 
   .kanban-task-edit-button:hover {
-    background-color: rgba(26, 96, 203, 0.2);
+    background-color: rgba(26, 96, 203, 0.12);
     color: #004ec5;
   }
 }

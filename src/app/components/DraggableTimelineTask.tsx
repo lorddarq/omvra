@@ -1,8 +1,9 @@
 import { useRef } from 'react';
 import { useDrag } from 'react-dnd';
-import { Copy, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { Task } from '../types';
 import { PenWritingIcon } from './PenWritingIcon';
+import { FilesCopyIcon } from './FilesCopyIcon';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -161,7 +162,7 @@ export function DraggableTimelineTask({
           Delete
         </ContextMenuItem>
         <ContextMenuItem onSelect={() => onTaskDuplicate(task)}>
-          <Copy />
+          <FilesCopyIcon />
           Duplicate
         </ContextMenuItem>
       </ContextMenuContent>

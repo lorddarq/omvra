@@ -1,9 +1,10 @@
-import { Copy, RefreshCcw } from 'lucide-react';
+import { RefreshCcw } from 'lucide-react';
 import type { McpHealthCheckResult } from '../services/mcp/types';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Switch } from './ui/switch';
+import { FilesCopyIcon } from './FilesCopyIcon';
 
 type McpCapabilityProfile = 'read_only' | 'task_write' | 'admin';
 
@@ -283,7 +284,7 @@ function CopySettingField({
     <div className="space-y-3">
       <Label htmlFor={id} className={LABEL_CLASS}>{label}</Label>
       <p className={DESCRIPTION_CLASS}>{description}</p>
-      <div className="relative">
+      <div className="relative overflow-hidden rounded-xl">
         <Input
           id={id}
           value={value}
@@ -315,7 +316,7 @@ function ReadOnlyCopyField({
     <div className="space-y-3">
       <Label htmlFor={id} className={LABEL_CLASS}>{label}</Label>
       <p className={DESCRIPTION_CLASS}>{description}</p>
-      <div className="relative">
+      <div className="relative overflow-hidden rounded-xl">
         <Input id={id} value={value} readOnly className={`${FIELD_CLASS} pr-12`} />
         <CopyButton copied={copied} onCopy={onCopy} label={`Copy ${label}`} />
       </div>
@@ -340,7 +341,7 @@ function CopyButton({
       title={copied ? 'Copied' : label}
       className="absolute right-3 top-1/2 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-[#71717a] outline-none transition-[background-color,color] hover:bg-zinc-500/10 hover:text-[#4b4b54] focus-visible:ring-2 focus-visible:ring-gray-300"
     >
-      <Copy className="size-4" />
+      <FilesCopyIcon className="size-4" />
     </button>
   );
 }

@@ -5,7 +5,6 @@ import { TimelineSwimlane, Person } from '../types';
 import { getProjectVisual } from '../utils/projectVisual';
 import { AgentIcon } from './AgentIcon';
 import { UserIcon } from './UserIcon';
-import { PenWritingIcon } from './PenWritingIcon';
 
 export const SWIMLANE_ROW_ITEM_TYPE = 'SWIMLANE_ROW';
 
@@ -157,12 +156,12 @@ export function DraggableSwimlaneLabel({
         {mode === 'projects' && (
           <button
             type="button"
-            className="timeline-row-edit-button h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0 inline-flex items-center justify-center rounded-md"
+            className="timeline-row-edit-button"
             onClick={() => onEditSwimlane(swimlane)}
             aria-label={`Edit project ${swimlane.name}`}
             title={`Edit ${swimlane.name}`}
           >
-            <PenWritingIcon className="w-3 h-3" />
+            Edit
           </button>
         )}
       </div>

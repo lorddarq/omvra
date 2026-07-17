@@ -17,9 +17,66 @@ import {
 } from '../utils/helpContent.ts';
 import { parseUpdateReleaseNotes } from '../utils/updateReleaseNotes.ts';
 import { AnchoredPanelSection } from './AnchoredPanel';
+import { AboutIcon, HelpIcon } from './SettingsPanel';
 
 const CONTACT_EMAIL_URL = 'mailto:sorin.jurcut@gmail.com';
 const LINKEDIN_URL = 'https://www.linkedin.com/in/sorinjurcut/';
+
+const MIT_LICENSE_TERMS = `Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.`;
+
+const LICENSE_TEXT = [
+  `React — MIT License
+Copyright (c) Facebook, Inc. and its affiliates.
+
+${MIT_LICENSE_TERMS}`,
+  `Electron — MIT License
+Copyright (c) Electron contributors
+Copyright (c) 2013-2020 GitHub Inc.
+
+${MIT_LICENSE_TERMS}`,
+  `Vite — MIT License
+Copyright (c) 2019-present, VoidZero Inc. and Vite contributors
+
+${MIT_LICENSE_TERMS}`,
+  `Tailwind CSS — MIT License
+Copyright (c) Tailwind Labs, Inc.
+
+${MIT_LICENSE_TERMS}`,
+  `Radix UI — MIT License
+Copyright (c) 2022 WorkOS
+
+${MIT_LICENSE_TERMS}`,
+  `Lucide — ISC License
+Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022.
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.`,
+].join('\n\n────────────────────────────────────────\n\n');
 
 const helpContent = defaultHelpContentJson as HelpContent;
 
@@ -40,6 +97,7 @@ export function HelpSettingsSection() {
     <AnchoredPanelSection
       id="help"
       title="Help"
+      icon={HelpIcon}
       description="Useful resources for learning and troubleshooting Omvra"
     >
       <div className="min-w-0 space-y-8">
@@ -54,7 +112,8 @@ export function HelpSettingsSection() {
           </div>
           <button
             type="button"
-            className="inline-flex h-8 items-center gap-2 rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-[#67676f] outline-none hover:bg-[#71717a]/5 focus-visible:ring-2 focus-visible:ring-gray-300"
+            disabled
+            className="inline-flex h-8 cursor-not-allowed items-center gap-2 rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-[#a5a5ac] opacity-70 outline-none"
           >
             <RotateCcw className="size-4" />
             Restart Onboarding
@@ -136,7 +195,7 @@ export function AboutSettingsSection({
   const parsedReleaseNotes = parseUpdateReleaseNotes(updateState.update?.releaseNotes, { maxItems: 4 });
 
   return (
-    <AnchoredPanelSection id="about" title="About">
+    <AnchoredPanelSection id="about" title="About" icon={AboutIcon}>
       <div className="min-w-0 space-y-8">
         <div className="pt-1">
           <img src={omvraLogo} alt="Omvra" className="h-8 w-auto" />
@@ -332,13 +391,14 @@ export function AboutSettingsSection({
               Omvra is built with React, Electron, Vite, Tailwind CSS, Radix UI, and Lucide.
             </p>
           </div>
-          <button
-            type="button"
-            className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl bg-[#fafafa] px-4 py-3 text-left outline-none hover:bg-[#f4f4f5] focus-visible:ring-2 focus-visible:ring-gray-300"
-          >
-            <span className="min-w-0 text-sm font-semibold leading-5 text-[#71717a]">More</span>
-            <ChevronRight className="size-4 shrink-0 text-[#8a8a92]" />
-          </button>
+          <textarea
+            disabled
+            aria-label="Open-source licenses"
+            value={LICENSE_TEXT}
+            readOnly
+            rows={6}
+            className="min-h-32 w-full resize-none rounded-xl border border-black/10 bg-[#fafafa] px-4 py-3 text-sm leading-5 text-[#71717a] opacity-100 outline-none disabled:cursor-default disabled:opacity-100"
+          />
         </section>
       </div>
     </AnchoredPanelSection>

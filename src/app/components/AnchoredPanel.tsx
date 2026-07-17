@@ -28,6 +28,7 @@ interface AnchoredPanelProps {
   footer?: ReactNode;
   headerAction?: ReactNode;
   className?: string;
+  contentClassName?: string;
 }
 
 export function AnchoredPanel({
@@ -41,6 +42,7 @@ export function AnchoredPanel({
   footer,
   headerAction,
   className,
+  contentClassName,
 }: AnchoredPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const programmaticAnchorRef = useRef<string | null>(null);
@@ -174,6 +176,7 @@ export function AnchoredPanel({
           <AnchoredPanelScrollView
             ref={scrollRef}
             onScroll={syncActiveSection}
+            contentClassName={contentClassName}
             className={footer ? 'pb-28' : undefined}
           >
             {children}
@@ -255,10 +258,11 @@ export function AnchoredPanelNav({ groups, activeAnchor, onSelect, onBack }: Anc
 
 interface AnchoredPanelScrollViewProps extends ComponentPropsWithoutRef<'div'> {
   children: ReactNode;
+  contentClassName?: string;
 }
 
 export const AnchoredPanelScrollView = forwardRef<HTMLDivElement, AnchoredPanelScrollViewProps>(
-  ({ children, className, ...props }, ref) => (
+  ({ children, className, contentClassName, ...props }, ref) => (
     <div
       ref={ref}
       className={cn(
@@ -268,7 +272,7 @@ export const AnchoredPanelScrollView = forwardRef<HTMLDivElement, AnchoredPanelS
       )}
       {...props}
     >
-      <div className="mx-auto w-full max-w-[566px] space-y-8">
+      <div className={cn('mx-auto w-full max-w-[566px] space-y-32', contentClassName)}>
         {children}
       </div>
     </div>
@@ -279,6 +283,7 @@ AnchoredPanelScrollView.displayName = 'AnchoredPanelScrollView';
 interface AnchoredPanelSectionProps extends ComponentPropsWithoutRef<'section'> {
   id: string;
   title: string;
+  icon?: ComponentType<{ className?: string }>;
   description?: string;
   headerAction?: ReactNode;
   children: ReactNode;
@@ -287,6 +292,7 @@ interface AnchoredPanelSectionProps extends ComponentPropsWithoutRef<'section'> 
 export function AnchoredPanelSection({
   id,
   title,
+  icon: Icon,
   description,
   headerAction,
   children,
@@ -305,7 +311,8 @@ export function AnchoredPanelSection({
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 space-y-1">
-          <h3 id={titleId} className="text-sm font-semibold leading-5 text-[#71717a]">
+          <h3 id={titleId} className="flex items-center gap-2 text-[18px] font-normal leading-6 text-[#a5a5ac]">
+            {Icon && <Icon className="size-[18px] shrink-0" />}
             {title}
           </h3>
           {description && <p className="text-xs leading-5 text-[#8a8a92]">{description}</p>}

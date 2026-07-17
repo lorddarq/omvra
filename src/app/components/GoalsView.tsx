@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { Check, ChevronLeft, ChevronRight, CircleDot, FileText, GitBranch, Minus, MousePointer2, Plus, ShieldCheck, Sparkles, Target, Trash2, ZoomIn } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CircleDot, FileText, GitBranch, Minus, Plus, ShieldCheck, Sparkles, Target, Trash2, ZoomIn } from 'lucide-react';
 import type { GoalAcceptanceActor, GoalBudgetMode, GoalConnectorSide, GoalElement, GoalElementType, GoalPolicy, GoalRecord, Person } from '../types.ts';
 import { safeReadJSON, persistJSONWithElectronMirror } from '../utils/storage.ts';
 import { AgentIcon as Bot } from './AgentIcon';
 import { LinkIcon as Link2 } from './LinkIcon';
+import { Input } from './ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 const STORAGE_KEY = 'omvra.goals.v1';
 const GOAL_ID = 'goal-lights-off-factory';
@@ -268,8 +270,158 @@ export function GoalsView({ people = [] }: { people?: Person[] }) {
       </div>
     </div>
 
-    <div className="absolute left-1/2 top-4 z-20 flex -translate-x-1/2 items-center gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-sm"><button onClick={() => setPanMode(value => !value)} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs ${panMode ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`} aria-pressed={panMode} aria-label="Pan canvas"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="#71717A" d="M12.951,5.238L6.485,3.621C5.223,3.306,4,4.26,4,5.562V9H3V7H2.5C1.672,7,1,7.672,1,8.5v1.833c0,1.082,0.351,2.135,1,3L4,16h9l2.097-6.99C15.589,7.371,14.612,5.653,12.951,5.238z M8,13H7V8h1V13z M11,13h-1V8h1V13z" /></svg>Pan</button>{TOOL_ITEMS.map(tool => tool.type === 'agent' ? <div key={tool.type} className="relative"><button onClick={() => setAgentMenuOpen(value => !value)} className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-100" aria-label="Add agent">{tool.icon}{tool.label}</button>{agentMenuOpen && <div className="absolute left-0 top-full mt-1 w-56 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">{people.filter(person => person.kind === 'agentic').map(person => <button key={person.id} onClick={() => addAgent(person)} className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs hover:bg-slate-100"><Bot className="size-3.5 text-amber-500" /><span><span className="block font-medium text-slate-800">{person.name}</span><span className="block text-[11px] text-slate-400">{person.role}</span></span></button>)}{people.filter(person => person.kind === 'agentic').length === 0 && <p className="px-2.5 py-2 text-xs text-slate-400">No agents configured</p>}</div>}</div> : <button key={tool.type} onClick={() => tool.type === 'connector' ? (setConnectorMode(true), setConnectorSourceId(null)) : addElement(tool.type)} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs ${tool.type === 'connector' && connectorMode ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`} aria-label={`Add ${tool.label}`}>{tool.icon}{tool.type === 'connector' && connectorMode ? 'Choose source' : tool.label}</button>)}</div>
-    {selectedElement && <aside className="absolute right-4 top-16 bottom-16 z-20 w-72 overflow-auto rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-center justify-between"><div><p className="text-[11px] uppercase text-slate-400">Details</p><h2 className="mt-1 text-sm font-semibold text-slate-900">{selectedElement.type}</h2></div><MousePointer2 className="size-4 text-slate-400" /></div><label className="mt-5 block text-xs font-medium text-slate-600">Title<input value={selectedAgent?.name ?? selectedElement.title} readOnly={selectedElement.type === 'agent'} onChange={selectedElement.type === 'agent' ? undefined : event => updateElement({ title: event.target.value })} className="mt-1 w-full rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 read-only:bg-slate-50 read-only:text-slate-500" /></label>{selectedElement.type === 'goal' && <><label className="mt-4 block text-xs font-medium text-slate-600">Color<input type="color" value={activeGoal?.color ?? '#2563eb'} onChange={event => updateGoal({ color: event.target.value })} aria-label="Goal color" className="mt-1 h-9 w-full cursor-pointer rounded-md border border-slate-200 bg-white p-1" /></label><label className="mt-4 block text-xs font-medium text-slate-600">Overseer agent<select value={activeGoal?.overseerAgentId ?? ''} onChange={event => updateGoal({ overseerAgentId: event.target.value || undefined })} className="mt-1 w-full rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"><option value="">Select an agent</option>{people.filter(person => person.kind === 'agentic').map(person => <option key={person.id} value={person.id}>{person.name} · {person.role}</option>)}</select><span className="mt-1 block text-[11px] font-normal text-slate-400">This agent derives subgoal status toward the goal.</span></label></>}<label className="mt-4 block text-xs font-medium text-slate-600">Notes<textarea value={selectedAgent?.role ?? selectedElement.body ?? ''} readOnly={selectedElement.type === 'agent'} onChange={selectedElement.type === 'agent' ? undefined : event => updateElement({ body: event.target.value })} rows={4} className="mt-1 w-full resize-none rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 read-only:bg-slate-50 read-only:text-slate-500" /></label>{selectedPolicyElement && <section className="mt-5 border-t border-slate-100 pt-4"><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Policy</p><p className="mt-1 text-[11px] text-slate-400">Typed controls become part of the execution contract.</p><label className="mt-3 block text-xs font-medium text-slate-600">Acceptance actor<select value={selectedPolicyElement.policy?.acceptanceActor ?? ''} onChange={event => updatePolicy({ acceptanceActor: (event.target.value || undefined) as GoalAcceptanceActor | undefined })} className="mt-1 w-full rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"><option value="">Use goal default</option><option value="human">Human</option><option value="agentic">Agentic</option><option value="both">Both</option></select></label><label className="mt-3 block text-xs font-medium text-slate-600">Retry budget<select value={selectedPolicyElement.policy?.retryBudgetMode ?? ''} onChange={event => updatePolicy({ retryBudgetMode: (event.target.value || undefined) as GoalBudgetMode | undefined })} className="mt-1 w-full rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"><option value="">Use goal default</option><option value="hard-cap">Hard cap</option><option value="goal-pool">Goal pool</option><option value="approval-required">Approval required</option><option value="unbounded">Unbounded</option></select></label><label className="mt-3 block text-xs font-medium text-slate-600">Max retries<input type="number" min="0" value={selectedPolicyElement.policy?.maxRetries ?? ''} onChange={event => updatePolicy({ maxRetries: event.target.value === '' ? undefined : Math.max(0, Number(event.target.value)) })} className="mt-1 w-full rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label></section>}<label className="mt-4 block text-xs font-medium text-slate-600">Status{selectedElement.type === 'subgoal' ? <><div className="mt-1 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-sm text-slate-600">{selectedElement.status ?? 'draft'}</div><span className="mt-1 block text-[11px] font-normal text-slate-400">Managed by the overseer agent</span></> : <select value={selectedElement.status ?? 'draft'} onChange={event => updateElement({ status: event.target.value as GoalElement['status'] })} className="mt-1 w-full rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"><option value="draft">Draft</option><option value="working">Working</option><option value="blocked">Blocked</option><option value="complete">Complete</option></select>}</label>{selectedElement.type === 'connector' && <button onClick={() => { setConnectorMode(true); setRewireConnectorId(selectedElement.id); setConnectorSourceId(selectedElement.sourceId ?? null); }} className="mt-5 flex items-center gap-2 text-xs font-medium text-blue-600 hover:text-blue-700"><Link2 className="size-3.5" /> Rewire connector</button>}<button onClick={deleteElement} className="mt-6 flex items-center gap-2 text-xs font-medium text-red-600 hover:text-red-700"><Trash2 className="size-3.5" /> Delete element</button></aside>}
-    <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500 shadow-sm"><span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-emerald-500" />1 agent working</span><span className="text-slate-300">·</span><span>2 idle</span><span className="ml-2 rounded bg-slate-100 px-2 py-1">{spacePressed ? 'Release space to edit' : panMode ? 'Pan mode' : 'Space + drag to pan'}</span><span className="ml-1 inline-flex items-center gap-1 text-slate-400"><Check className="size-3.5" /> MCP off</span><span className="ml-2 flex items-center gap-1 rounded-md border border-slate-200 bg-white px-1"><button className="rounded p-1 hover:bg-slate-100" onClick={() => setZoom(value => Math.max(.6, value - .1))} aria-label="Zoom out"><Minus className="size-3" /></button><span className="min-w-9 text-center tabular-nums">{Math.round(zoom * 100)}%</span><button className="rounded p-1 hover:bg-slate-100" onClick={() => setZoom(value => Math.min(1.4, value + .1))} aria-label="Zoom in"><ZoomIn className="size-3" /></button></span></div>
+    <div className="absolute left-1/2 top-4 z-20 flex -translate-x-1/2 items-center gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-sm">{TOOL_ITEMS.map(tool => tool.type === 'agent' ? <div key={tool.type} className="relative"><button onClick={() => setAgentMenuOpen(value => !value)} className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-100" aria-label="Add agent">{tool.icon}{tool.label}</button>{agentMenuOpen && <div className="absolute left-0 top-full mt-1 w-56 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">{people.filter(person => person.kind === 'agentic').map(person => <button key={person.id} onClick={() => addAgent(person)} className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs hover:bg-slate-100"><Bot className="size-3.5 text-amber-500" /><span><span className="block font-medium text-slate-800">{person.name}</span><span className="block text-[11px] text-slate-400">{person.role}</span></span></button>)}{people.filter(person => person.kind === 'agentic').length === 0 && <p className="px-2.5 py-2 text-xs text-slate-400">No agents configured</p>}</div>}</div> : <button key={tool.type} onClick={() => tool.type === 'connector' ? (setConnectorMode(true), setConnectorSourceId(null)) : addElement(tool.type)} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs ${tool.type === 'connector' && connectorMode ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`} aria-label={`Add ${tool.label}`}>{tool.icon}{tool.type === 'connector' && connectorMode ? 'Choose source' : tool.label}</button>)}</div>
+    {selectedElement && (
+      <aside className="absolute bottom-16 right-4 top-16 z-20 w-72 overflow-auto rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[11px] uppercase text-slate-400">Details</p>
+            <h2 className="mt-1 text-sm font-semibold text-slate-900">{selectedElement.type}</h2>
+          </div>
+        </div>
+        <label className="mt-5 block text-xs font-medium text-slate-600">
+          Title
+          <Input
+            value={selectedAgent?.name ?? selectedElement.title}
+            readOnly={selectedElement.type === 'agent'}
+            onChange={selectedElement.type === 'agent' ? undefined : event => updateElement({ title: event.target.value })}
+            className="mt-1"
+          />
+        </label>
+        {selectedElement.type === 'goal' && (
+          <>
+            <label className="mt-4 block text-xs font-medium text-slate-600">
+              Color
+              <input
+                type="color"
+                value={activeGoal?.color ?? '#2563eb'}
+                onChange={event => updateGoal({ color: event.target.value })}
+                aria-label="Goal color"
+                className="mt-1 h-9 w-full cursor-pointer rounded-md border border-slate-200 bg-white p-1"
+              />
+            </label>
+            <label className="mt-4 block text-xs font-medium text-slate-600">
+              Overseer agent
+              <Select value={activeGoal?.overseerAgentId ?? '__none__'} onValueChange={value => updateGoal({ overseerAgentId: value === '__none__' ? undefined : value })}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select an agent" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Select an agent</SelectItem>
+                  {people.filter(person => person.kind === 'agentic').map(person => (
+                    <SelectItem key={person.id} value={person.id}>{person.name} · {person.role}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="mt-1 block text-[11px] font-normal text-slate-400">This agent derives subgoal status toward the goal.</span>
+            </label>
+          </>
+        )}
+        <label className="mt-4 block text-xs font-medium text-slate-600">
+          Notes
+          <textarea
+            value={selectedAgent?.role ?? selectedElement.body ?? ''}
+            readOnly={selectedElement.type === 'agent'}
+            onChange={selectedElement.type === 'agent' ? undefined : event => updateElement({ body: event.target.value })}
+            rows={4}
+            className="mt-1 w-full resize-none rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 read-only:bg-slate-50 read-only:text-slate-500"
+          />
+        </label>
+        {selectedPolicyElement && (
+          <section className="mt-5 border-t border-slate-100 pt-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Policy</p>
+            <p className="mt-1 text-[11px] text-slate-400">Typed controls become part of the execution contract.</p>
+            <label className="mt-3 block text-xs font-medium text-slate-600">
+              Acceptance actor
+              <Select value={selectedPolicyElement.policy?.acceptanceActor ?? '__default__'} onValueChange={value => updatePolicy({ acceptanceActor: value === '__default__' ? undefined : value as GoalAcceptanceActor })}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Use goal default" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__default__">Use goal default</SelectItem>
+                  <SelectItem value="human">Human</SelectItem>
+                  <SelectItem value="agentic">Agentic</SelectItem>
+                  <SelectItem value="both">Both</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+            <label className="mt-3 block text-xs font-medium text-slate-600">
+              Retry budget
+              <Select value={selectedPolicyElement.policy?.retryBudgetMode ?? '__default__'} onValueChange={value => updatePolicy({ retryBudgetMode: value === '__default__' ? undefined : value as GoalBudgetMode })}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Use goal default" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__default__">Use goal default</SelectItem>
+                  <SelectItem value="hard-cap">Hard cap</SelectItem>
+                  <SelectItem value="goal-pool">Goal pool</SelectItem>
+                  <SelectItem value="approval-required">Approval required</SelectItem>
+                  <SelectItem value="unbounded">Unbounded</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+            <label className="mt-3 block text-xs font-medium text-slate-600">
+              Max retries
+              <Input
+                type="number"
+                min={0}
+                value={selectedPolicyElement.policy?.maxRetries ?? ''}
+                onChange={event => updatePolicy({ maxRetries: event.target.value === '' ? undefined : Math.max(0, Number(event.target.value)) })}
+                className="mt-1"
+              />
+            </label>
+          </section>
+        )}
+        <label className="mt-4 block text-xs font-medium text-slate-600">
+          Status
+          {selectedElement.type === 'subgoal' ? (
+            <>
+              <div className="mt-1 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-sm text-slate-600">{selectedElement.status ?? 'draft'}</div>
+              <span className="mt-1 block text-[11px] text-slate-400">Managed by the overseer agent</span>
+            </>
+          ) : (
+            <Select value={selectedElement.status ?? 'draft'} onValueChange={value => updateElement({ status: value as GoalElement['status'] })}>
+              <SelectTrigger className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="working">Working</SelectItem>
+                <SelectItem value="blocked">Blocked</SelectItem>
+                <SelectItem value="complete">Complete</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        </label>
+        {selectedElement.type === 'connector' && (
+          <button onClick={() => { setConnectorMode(true); setRewireConnectorId(selectedElement.id); setConnectorSourceId(selectedElement.sourceId ?? null); }} className="mt-5 flex items-center gap-2 text-xs font-medium text-blue-600 hover:text-blue-700">
+            <Link2 className="size-3.5" /> Rewire connector
+          </button>
+        )}
+        <button onClick={deleteElement} className="mt-6 flex items-center gap-2 text-xs font-medium text-red-600 hover:text-red-700">
+          <Trash2 className="size-3.5" /> Delete element
+        </button>
+      </aside>
+    )}
+    <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500 shadow-sm">
+      {(spacePressed || panMode) && (
+        <span className="rounded bg-slate-900/80 px-2 py-1 text-white">
+          {spacePressed ? 'Release space to edit' : 'Pan mode · drag to move'}
+        </span>
+      )}
+      <button
+        onClick={() => setPanMode(value => !value)}
+        className={`rounded-md px-2 py-1.5 text-xs ${panMode ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`}
+        aria-pressed={panMode}
+        aria-label="Pan canvas"
+      >
+        Pan
+      </button>
+      <div className="flex items-center gap-1 rounded-md border border-slate-200 bg-white px-1">
+        <button className="rounded p-1 hover:bg-slate-100" onClick={() => setZoom(value => Math.max(.6, value - .1))} aria-label="Zoom out"><Minus className="size-3" /></button>
+        <span className="min-w-9 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
+        <button className="rounded p-1 hover:bg-slate-100" onClick={() => setZoom(value => Math.min(1.4, value + .1))} aria-label="Zoom in"><ZoomIn className="size-3" /></button>
+      </div>
+    </div>
   </section>;
 }

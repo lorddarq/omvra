@@ -12,6 +12,7 @@ Use this skill for Omvra Goals / Loops work in the Plumy repository and its live
 - Treat the Goals / Loops canvas as a semantic graph. Position supports the user's mental model; typed connectors and explicit scopes define execution meaning.
 - Treat Omvra as the durable system of record for goal definitions, contracts, task projections, execution state, evidence, acknowledgements, handoffs, and audit history.
 - Treat the orchestrator/overseer as the coordinator that proposes and advances work within policy. Workers propose evidence, handoffs, and rescope; they do not change governing scope or self-declare completion.
+- Treat Loops as a governed orchestration surface, not an n8n-like scheduler. Omvra owns quality, process, direction, contracts, evidence, acceptance, and durable lifecycle state; agents own technical approach and self-regulation.
 - Keep the UI responsible for shaping/editing definitions and presenting state. It must not directly invent durable execution truth.
 - Keep lifecycle ownership in a dedicated `GoalLifecycleService` boundary. It validates revision-protected transitions, commits durable lifecycle events, and invokes cleanup only after a successful completion commit.
 - Keep cleanup as a post-completion, fail-closed side effect. It may remove only verified goal-scoped `project.md` and `roster.md` files under Electron `<userData>/goal-artifacts/<goalId>`; retention is the default.
@@ -103,14 +104,16 @@ Use revision-checked, idempotent commands for `start`, `dispatch`, `submit-evide
 
 Prompt the human when the answer is not discoverable and could materially affect the product. Common Goals / Loops decisions include:
 
-- whether Loops is a first-class workflow runtime or a planning/orchestration surface;
-- which agent actions require human confirmation;
+- **Resolved — runtime boundary:** Loops is a governed planning/orchestration surface, not a first-class workflow runtime. Do not add cron-like scheduling, worker-loop ownership, or model-invocation control to Omvra as part of the core product.
+- **Resolved — action authority:** observation, bounded execution control, evidence/handoff, and project mutations require no confirmation by default; planning, workflow mutation, subgoal redefinition, budget overruns, release approval, gate bypass, artifact removal, and project-critical deletion require human confirmation. External writes, MCP calls, and repository changes follow the responsible agent's configured approvals. Lifecycle actions require human decision unless expressly prompted or assigned within the accepted contract.
 - how goals link across projects, tasks, milestones, MCP capabilities, and approval gates;
 - who owns lifecycle truth and whether execution state is separate from graph definitions;
 - stable IDs, revision scope, migration strategy, and Electron-store/localStorage precedence;
 - link cardinality and authority when goal, task, or milestone revisions disagree;
 - evidence ownership, acceptance boundaries, and test-environment authority;
 - default autonomy budgets and cleanup retention policy.
+
+Park the operational policy editor as a separate future product idea. Do not add a policy-file editor to the current canvas or lifecycle implementation without a dedicated discovery and architecture task.
 
 Do not convert these into implementation tasks until the decision is recorded.
 

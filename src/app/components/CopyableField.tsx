@@ -1,4 +1,4 @@
-import { Copy } from 'lucide-react';
+import { FilesCopyIcon } from './FilesCopyIcon';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -37,7 +37,7 @@ export function CopyableField({
           className="h-10 min-w-0 flex-1"
         />
         <Button type="button" variant="outline" onClick={onCopy} className="shrink-0">
-          <Copy className="mr-2 h-4 w-4" />
+        <FilesCopyIcon className="mr-2 h-4 w-4" />
           {copied ? copiedLabel : copyLabel}
         </Button>
       </div>

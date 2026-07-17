@@ -1,6 +1,6 @@
 import { Task, TimelineSwimlane, Person, TaskStatus, StatusColumn, ProjectMilestone, TaskAttachment } from '../types';
 import { useMemo, useState } from 'react';
-import { Activity, FileText, GitBranch, Info, MessageSquare, Paperclip } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import {
   Dialog,
   DialogDescription,
@@ -21,6 +21,12 @@ import { TaskDependencyDetailsSection, TaskLoadDetailsSection, TaskSummarySectio
 import { AnchoredPanel, AnchoredPanelSection } from './AnchoredPanel';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import { DialogSurface } from './DialogSurface';
+import { MessagesIcon } from './MessagesIcon';
+import { NodesIcon } from './NodesIcon';
+import { LoadIcon } from './LoadIcon';
+import { AttachmentIcon } from './AttachmentIcon';
+import { BasicInfoIcon } from './BasicInfoIcon';
+import { DescriptionIcon } from './DescriptionIcon';
 
 interface TaskDetailsDialogProps {
   isOpen: boolean;
@@ -125,12 +131,12 @@ export function TaskDetailsDialog({
       {
         label: 'Task Details',
         items: [
-          { id: 'task-basic', label: 'Basic Info', icon: Info },
-          { id: 'task-description', label: 'Description', icon: FileText },
-          { id: 'task-load', label: 'Load', icon: Activity },
-          { id: 'task-dependencies', label: 'Dependencies', icon: GitBranch },
-          { id: 'task-attachments', label: 'Attachments', icon: Paperclip },
-          { id: 'task-comments', label: 'Comments', icon: MessageSquare },
+          { id: 'task-basic', label: 'Basic Info', icon: BasicInfoIcon },
+          { id: 'task-description', label: 'Description', icon: DescriptionIcon },
+          { id: 'task-load', label: 'Load', icon: LoadIcon },
+          { id: 'task-dependencies', label: 'Dependencies', icon: NodesIcon },
+          { id: 'task-attachments', label: 'Attachments', icon: AttachmentIcon },
+          { id: 'task-comments', label: 'Comments', icon: MessagesIcon },
         ],
       },
     ],
@@ -289,6 +295,7 @@ export function TaskDetailsDialog({
         </div>
         <AnchoredPanel
           className="h-auto min-h-0 flex-1"
+          contentClassName="space-y-8"
           title={task?.title || 'Task details'}
           description="Review task details and markdown description."
           navGroups={detailsNavGroups}

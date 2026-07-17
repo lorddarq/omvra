@@ -1,6 +1,8 @@
-import { Check, Copy, FileText, TriangleAlert } from 'lucide-react';
+import { Check, TriangleAlert } from 'lucide-react';
 import { OverflowActionMenu } from './OverflowActionMenu';
 import { PenWritingIcon } from './PenWritingIcon';
+import { FilesCopyIcon } from './FilesCopyIcon';
+import { DesktopArrowDownIcon } from './DesktopArrowDownIcon';
 
 type CopyState = 'idle' | 'copied' | 'failed';
 
@@ -27,7 +29,7 @@ export function TaskDetailsActionMenu({
   onCopy,
   onExportPdf,
 }: TaskDetailsActionMenuProps) {
-  const CopyIcon = copyState === 'copied' ? Check : copyState === 'failed' ? TriangleAlert : Copy;
+  const CopyIcon = copyState === 'copied' ? Check : copyState === 'failed' ? TriangleAlert : FilesCopyIcon;
 
   return (
     <OverflowActionMenu
@@ -42,7 +44,7 @@ export function TaskDetailsActionMenu({
         },
         {
           label: exportLabel,
-          icon: FileText,
+          icon: DesktopArrowDownIcon,
           disabled: !canExportPdf,
           onSelect: canExportPdf ? onExportPdf : undefined,
         },

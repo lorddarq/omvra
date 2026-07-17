@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { AlertTriangle, Briefcase, CalendarDays, ChevronsUpDown, FileText, Info, Link2, Paperclip, RefreshCw, Search, Sparkles, Trash2 } from 'lucide-react';
+import { AlertTriangle, Briefcase, CalendarDays, ChevronsUpDown, FileText, Info, Paperclip, RefreshCw, Search, Sparkles, Trash2 } from 'lucide-react';
 import { Task, TaskStatus, TimelineSwimlane, Person, TaskSize, TaskComplexity, TaskPriority, StatusColumn, ProjectMilestone, TaskAttachment } from '../types';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import { toLocalISODate } from '../utils/date';
@@ -34,6 +34,7 @@ import {
   taskEditTextAreaClassName,
 } from './taskFormStyles';
 import { TASK_PRIORITY_ICONS } from './taskPriorityIcons';
+import { LinkIcon } from './LinkIcon';
 import { TaskCheckboxControl } from './TaskCheckboxControl';
 import { LOAD_CLASSIFICATIONS, ROADMAP_STAGES, getDefaultColumnSemantics } from '../utils/statusColumnSemantics';
 
@@ -348,7 +349,7 @@ export function TaskDialog({
         label: 'Task Details',
         items: [
           { id: 'task-edit-basic', label: 'Basic Info', icon: Info },
-          { id: 'task-edit-roadmap', label: 'Dependencies', icon: Link2 },
+          { id: 'task-edit-roadmap', label: 'Dependencies', icon: LinkIcon },
           { id: 'task-edit-description', label: 'Description', icon: FileText },
           { id: 'task-edit-attachments', label: 'Attachments', icon: Paperclip },
         ],

@@ -1,5 +1,6 @@
-import { Check, Copy, FileText, Pencil, TriangleAlert } from 'lucide-react';
+import { Check, Copy, FileText, TriangleAlert } from 'lucide-react';
 import { OverflowActionMenu } from './OverflowActionMenu';
+import { PenWritingIcon } from './PenWritingIcon';
 
 type CopyState = 'idle' | 'copied' | 'failed';
 
@@ -32,7 +33,7 @@ export function TaskDetailsActionMenu({
     <OverflowActionMenu
       menuLabel={menuLabel}
       items={[
-        ...(canEdit ? [{ label: 'Edit', icon: Pencil, onSelect: onEdit }] : []),
+        ...(canEdit ? [{ label: 'Edit', icon: PenWritingIcon, onSelect: onEdit }] : []),
         {
           label: copyLabel,
           icon: CopyIcon,

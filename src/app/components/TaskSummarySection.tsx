@@ -1,4 +1,4 @@
-import { Ban, GitBranch, Sparkles, User } from 'lucide-react';
+import { Ban, GitBranch } from 'lucide-react';
 import { ReactNode } from 'react';
 import { TaskPriority, Person } from '../types';
 import { resolveStatusColor } from '../utils/roadmap';
@@ -6,6 +6,8 @@ import { PERSON_CAPACITY_POINTS } from '../utils/taskLoad';
 import { getReadableTextClassFor } from '../utils/contrast';
 import { EmptyStateCard } from './EmptyStateCard';
 import { TASK_PRIORITY_ICONS } from './taskPriorityIcons';
+import { AgentIcon } from './AgentIcon';
+import { UserIcon } from './UserIcon';
 
 interface TaskSummarySectionProps {
   statusLabel: string;
@@ -42,7 +44,7 @@ export function TaskSummarySection({
   milestoneLabel,
 }: TaskSummarySectionProps) {
   const priorityIcon = TASK_PRIORITY_ICONS[priority];
-  const AssigneeIcon = assigneeKind === 'agentic' ? Sparkles : User;
+  const AssigneeIcon = assigneeKind === 'agentic' ? AgentIcon : UserIcon;
 
   return (
     <div className="min-w-0 space-y-4">

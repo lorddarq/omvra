@@ -1,7 +1,8 @@
 import { useRef } from 'react';
 import { useDrag } from 'react-dnd';
-import { Copy, Edit2, Trash2 } from 'lucide-react';
+import { Copy, Trash2 } from 'lucide-react';
 import { Task } from '../types';
+import { PenWritingIcon } from './PenWritingIcon';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -152,7 +153,7 @@ export function DraggableTimelineTask({
       </ContextMenuTrigger>
       <ContextMenuContent aria-label={`Actions for ${task.title}`}>
         <ContextMenuItem onSelect={() => onTaskEdit(task)}>
-          <Edit2 />
+          <PenWritingIcon />
           Edit
         </ContextMenuItem>
         <ContextMenuItem variant="destructive" onSelect={() => onTaskDelete(task.id)}>

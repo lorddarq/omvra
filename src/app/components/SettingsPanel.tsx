@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Activity, AlertTriangle, CheckCircle2, Download, GitBranch, HelpCircle, Info, Terminal, Upload } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Download, Upload } from 'lucide-react';
 import { Person, RoadmapStage, StatusColumn, StorageMeter } from '../types';
 import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
@@ -7,6 +7,7 @@ import { AnchoredPanel, AnchoredPanelSection } from './AnchoredPanel';
 import { AgentBoardWatchSettings } from './AgentBoardWatchSettings';
 import { AgentIcon } from './AgentIcon';
 import { UsersIcon } from './UsersIcon';
+import { WorkflowsIcon } from './WorkflowsIcon';
 import { EmptyStateCard } from './EmptyStateCard';
 import { Switch } from './ui/switch';
 import { getDefaultColumnSemantics } from '../utils/statusColumnSemantics';
@@ -24,17 +25,17 @@ const SETTINGS_PANEL_NAV_GROUPS = [
       {
         id: 'general',
         label: 'General',
-        icon: Cog6ToothIcon,
+        icon: SlidersIcon,
       },
       {
         id: 'workflows',
         label: 'Workflows',
-        icon: GitBranch,
+        icon: WorkflowsIcon,
       },
       {
         id: 'task-load',
         label: 'Tasks',
-        icon: CheckCircleIcon,
+        icon: TasksIcon,
       },
       {
         id: 'people',
@@ -49,17 +50,17 @@ const SETTINGS_PANEL_NAV_GROUPS = [
       {
         id: 'mcp-access',
         label: 'MCP',
-        icon: CodeBracketSquareIcon,
+        icon: FiltersIcon,
       },
       {
         id: 'mcp-testing',
         label: 'MCP Testing',
-        icon: Terminal,
+        icon: GaugeIcon,
       },
       {
         id: 'mcp-activity',
         label: 'MCP Activity',
-        icon: Activity,
+        icon: WindowPointerIcon,
       },
     ],
   },
@@ -69,7 +70,7 @@ const SETTINGS_PANEL_NAV_GROUPS = [
       {
         id: 'storage',
         label: 'Data',
-        icon: CircleStackIcon,
+        icon: LayersIcon,
       },
     ],
   },
@@ -79,12 +80,12 @@ const SETTINGS_PANEL_NAV_GROUPS = [
       {
         id: 'about',
         label: 'About',
-        icon: Info,
+        icon: AboutIcon,
       },
       {
         id: 'help',
         label: 'Help',
-        icon: HelpCircle,
+        icon: HelpIcon,
       },
     ],
   },
@@ -448,48 +449,134 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-function CheckCircleIcon({ className }: { className?: string }) {
+function TasksIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
-      <path
-        fillRule="evenodd"
-        d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53-1.684-1.684a.75.75 0 1 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.81-5.19Z"
-        clipRule="evenodd"
-      />
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" className={className}>
+      <title>circle-half-dotted-check</title>
+      <g fill="currentColor">
+        <path d="M9 16.25C13.0041 16.25 16.25 13.0041 16.25 9C16.25 4.99594 13.0041 1.75 9 1.75C4.99594 1.75 1.75 4.99594 1.75 9C1.75 13.0041 4.99594 16.25 9 16.25Z" fill="currentColor" fillOpacity="0.3" data-stroke="none" stroke="none" />
+        <path d="M9 1.75C13.004 1.75 16.25 4.996 16.25 9C16.25 13.004 13.004 16.25 9 16.25" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M5.75 9.25L8 11.75L12.25 6.25" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M3.87299 14.877C4.2872 14.877 4.62299 14.5412 4.62299 14.127C4.62299 13.7128 4.2872 13.377 3.87299 13.377C3.45877 13.377 3.12299 13.7128 3.12299 14.127C3.12299 14.5412 3.45877 14.877 3.87299 14.877Z" fill="currentColor" data-stroke="none" stroke="none" />
+        <path d="M1.75 9.75C2.16421 9.75 2.5 9.41421 2.5 9C2.5 8.58579 2.16421 8.25 1.75 8.25C1.33579 8.25 1 8.58579 1 9C1 9.41421 1.33579 9.75 1.75 9.75Z" fill="currentColor" data-stroke="none" stroke="none" />
+        <path d="M3.87299 4.62299C4.2872 4.62299 4.62299 4.2872 4.62299 3.87299C4.62299 3.45877 4.2872 3.12299 3.87299 3.12299C3.45877 3.12299 3.12299 3.45877 3.12299 3.87299C3.12299 4.2872 3.45877 4.62299 3.87299 4.62299Z" fill="currentColor" data-stroke="none" stroke="none" />
+        <path d="M6.22601 16.448C6.64023 16.448 6.97601 16.1122 6.97601 15.698C6.97601 15.2838 6.64023 14.948 6.22601 14.948C5.8118 14.948 5.47601 15.2838 5.47601 15.698C5.47601 16.1122 5.8118 16.448 6.22601 16.448Z" fill="currentColor" data-stroke="none" stroke="none" />
+        <path d="M2.302 12.524C2.71622 12.524 3.052 12.1882 3.052 11.774C3.052 11.3598 2.71622 11.024 2.302 11.024C1.88779 11.024 1.552 11.3598 1.552 11.774C1.552 12.1882 1.88779 12.524 2.302 12.524Z" fill="currentColor" data-stroke="none" stroke="none" />
+        <path d="M2.302 6.97601C2.71622 6.97601 3.052 6.64023 3.052 6.22601C3.052 5.8118 2.71622 5.47601 2.302 5.47601C1.88779 5.47601 1.552 5.8118 1.552 6.22601C1.552 6.64023 1.88779 6.97601 2.302 6.97601Z" fill="currentColor" data-stroke="none" stroke="none" />
+        <path d="M6.22601 3.052C6.64023 3.052 6.97601 2.71622 6.97601 2.302C6.97601 1.88779 6.64023 1.552 6.22601 1.552C5.8118 1.552 5.47601 1.88779 5.47601 2.302C5.47601 2.71622 5.8118 3.052 6.22601 3.052Z" fill="currentColor" data-stroke="none" stroke="none" />
+      </g>
     </svg>
   );
 }
 
-function CodeBracketSquareIcon({ className }: { className?: string }) {
+function HelpIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
-      <path
-        fillRule="evenodd"
-        d="M3 6.75A3.75 3.75 0 0 1 6.75 3h10.5A3.75 3.75 0 0 1 21 6.75v10.5A3.75 3.75 0 0 1 17.25 21H6.75A3.75 3.75 0 0 1 3 17.25V6.75Zm6.22 3.22a.75.75 0 0 1 0 1.06L8.25 12l.97.97a.75.75 0 1 1-1.06 1.06l-1.5-1.5a.75.75 0 0 1 0-1.06l1.5-1.5a.75.75 0 0 1 1.06 0Zm5.56 0a.75.75 0 0 1 1.06 0l1.5 1.5a.75.75 0 0 1 0 1.06l-1.5 1.5a.75.75 0 1 1-1.06-1.06l.97-.97-.97-.97a.75.75 0 0 1 0-1.06Zm-1.56-.22a.75.75 0 0 1 .53.92l-1.5 5.5a.75.75 0 1 1-1.45-.4l1.5-5.5a.75.75 0 0 1 .92-.52Z"
-        clipRule="evenodd"
-      />
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" className={className}>
+      <title>life-ring</title>
+      <g fill="currentColor">
+        <path d="M10.311 5.487L11.71 1.738C10.866 1.423 9.95302 1.251 8.99902 1.251C8.04502 1.251 7.13202 1.423 6.28802 1.738L7.68702 5.487C8.09602 5.334 8.53602 5.251 8.99802 5.251C9.46002 5.251 9.90102 5.335 10.309 5.488L10.311 5.487Z" fill="currentColor" fillOpacity="0.3" data-stroke="none" stroke="none" />
+        <path d="M12.513 10.311L16.262 11.71C16.577 10.866 16.749 9.953 16.749 9C16.749 8.046 16.577 7.133 16.262 6.289L12.513 7.688C12.666 8.097 12.749 8.537 12.749 8.999C12.749 9.461 12.665 9.902 12.512 10.31L12.513 10.311Z" fill="currentColor" fillOpacity="0.3" data-stroke="none" stroke="none" />
+        <path d="M7.68898 12.513L6.28998 16.262C7.13398 16.577 8.04698 16.749 9.00098 16.749C9.95498 16.749 10.868 16.577 11.712 16.262L10.313 12.513C9.90398 12.666 9.46398 12.749 9.00198 12.749C8.53998 12.749 8.09898 12.665 7.69098 12.512L7.68898 12.513Z" fill="currentColor" fillOpacity="0.3" data-stroke="none" stroke="none" />
+        <path d="M5.48698 7.689L1.73798 6.29C1.42298 7.134 1.25098 8.047 1.25098 9C1.25098 9.954 1.42298 10.867 1.73798 11.711L5.48698 10.312C5.33398 9.903 5.25098 9.463 5.25098 9.001C5.25098 8.539 5.33498 8.098 5.48798 7.69L5.48698 7.689Z" fill="currentColor" fillOpacity="0.3" data-stroke="none" stroke="none" />
+        <path d="M5.48602 7.688C5.86502 6.672 6.67302 5.865 7.68902 5.485M10.312 5.486C11.328 5.865 12.135 6.673 12.515 7.689M12.514 10.312C12.135 11.328 11.327 12.135 10.311 12.515M7.68799 12.514C6.67199 12.135 5.86499 11.327 5.48499 10.311M6.46402 15.794C4.50002 15.061 2.93902 13.5 2.20502 11.535M15.794 11.536C15.061 13.5 13.499 15.061 11.535 15.795M11.536 2.206C13.5 2.939 15.061 4.501 15.795 6.465M2.20599 6.464C2.93899 4.5 4.49999 2.939 6.46499 2.205" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M10.311 5.487L11.71 1.738C10.866 1.423 9.95302 1.251 8.99902 1.251C8.04502 1.251 7.13202 1.423 6.28802 1.738L7.68702 5.487C8.09602 5.334 8.53602 5.251 8.99802 5.251C9.46002 5.251 9.90102 5.335 10.309 5.488L10.311 5.487ZM12.513 10.311L16.262 11.71C16.577 10.866 16.749 9.953 16.749 9C16.749 8.046 16.577 7.133 16.262 6.289L12.513 7.688C12.666 8.097 12.749 8.537 12.749 8.999C12.749 9.461 12.665 9.902 12.512 10.31L12.513 10.311ZM7.68898 12.513L6.28998 16.262C7.13398 16.577 8.04698 16.749 9.00098 16.749C9.95498 16.749 10.868 16.577 11.712 16.262L10.313 12.513C9.90398 12.666 9.46398 12.749 9.00198 12.749C8.53998 12.749 8.09898 12.665 7.69098 12.512L7.68898 12.513ZM5.48698 7.689L1.73798 6.29C1.42298 7.134 1.25098 8.047 1.25098 9C1.25098 9.954 1.42298 10.867 1.73798 11.711L5.48698 10.312C5.33398 9.903 5.25098 9.463 5.25098 9.001C5.25098 8.539 5.33498 8.098 5.48798 7.69L5.48698 7.689Z" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      </g>
     </svg>
   );
 }
 
-function CircleStackIcon({ className }: { className?: string }) {
+function AboutIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
-      <path d="M12 2.25c-4.97 0-9 1.68-9 3.75s4.03 3.75 9 3.75 9-1.68 9-3.75-4.03-3.75-9-3.75Z" />
-      <path d="M3 9.75c0 2.07 4.03 3.75 9 3.75s9-1.68 9-3.75v2.5c0 2.07-4.03 3.75-9 3.75s-9-1.68-9-3.75v-2.5Z" />
-      <path d="M3 15.75c0 2.07 4.03 3.75 9 3.75s9-1.68 9-3.75v2.25c0 2.07-4.03 3.75-9 3.75s-9-1.68-9-3.75v-2.25Z" />
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" className={className}>
+      <title>circle-info</title>
+      <g fill="currentColor">
+        <path d="M9 16.25C13.0041 16.25 16.25 13.004 16.25 9C16.25 4.996 13.0041 1.75 9 1.75C4.9959 1.75 1.75 4.996 1.75 9C1.75 13.004 4.9959 16.25 9 16.25Z" fill="currentColor" fillOpacity="0.3" data-stroke="none" stroke="none" />
+        <path d="M9 16.25C13.004 16.25 16.25 13.004 16.25 9C16.25 4.996 13.004 1.75 9 1.75C4.996 1.75 1.75 4.996 1.75 9C1.75 13.004 4.996 16.25 9 16.25Z" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M9 12.75V9.25C9 8.9739 8.7761 8.75 8.5 8.75H7.75" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M9 6.75C8.448 6.75 8 6.301 8 5.75C8 5.199 8.448 4.75 9 4.75C9.552 4.75 10 5.199 10 5.75C10 6.301 9.552 6.75 9 6.75Z" fill="currentColor" data-stroke="none" stroke="none" />
+      </g>
     </svg>
   );
 }
 
-function Cog6ToothIcon({ className }: { className?: string }) {
+export function FiltersIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
-      <path
-        fillRule="evenodd"
-        d="M11.078 2.25c-.917 0-1.699.663-1.85 1.567L9.05 4.889c-.02.12-.115.26-.297.348a7.493 7.493 0 0 0-.986.57c-.166.115-.334.126-.45.083L6.3 5.508a1.875 1.875 0 0 0-2.282.819l-.922 1.597a1.875 1.875 0 0 0 .432 2.385l.84.692c.095.078.17.229.154.43a7.598 7.598 0 0 0 0 1.139c.015.2-.059.352-.153.43l-.841.692a1.875 1.875 0 0 0-.432 2.385l.922 1.597a1.875 1.875 0 0 0 2.282.818l1.019-.382c.115-.043.283-.031.45.082.312.214.641.405.985.57.182.088.277.228.297.35l.178 1.071c.151.904.933 1.567 1.85 1.567h1.844c.916 0 1.699-.663 1.85-1.567l.178-1.072c.02-.12.114-.26.297-.349.344-.165.673-.356.985-.57.167-.114.335-.125.45-.082l1.02.382a1.875 1.875 0 0 0 2.28-.819l.923-1.597a1.875 1.875 0 0 0-.432-2.385l-.84-.692c-.095-.078-.17-.229-.154-.43a7.614 7.614 0 0 0 0-1.139c-.016-.2.059-.352.153-.43l.84-.692c.708-.582.891-1.59.433-2.385l-.922-1.597a1.875 1.875 0 0 0-2.282-.818l-1.02.382c-.114.043-.282.031-.449-.083a7.49 7.49 0 0 0-.985-.57c-.183-.087-.277-.227-.297-.348l-.179-1.072a1.875 1.875 0 0 0-1.85-1.567h-1.843ZM12 15.75a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Z"
-        clipRule="evenodd"
-      />
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" className={className}>
+      <title>filters</title>
+      <g fill="currentColor">
+        <path fillRule="evenodd" clipRule="evenodd" d="M13.4868 7.0974C13.4955 6.98275 13.5 6.8669 13.5 6.75C13.5 4.26472 11.4853 2.25 9 2.25C6.51472 2.25 4.5 4.26472 4.5 6.75C4.5 6.86689 4.50446 6.98275 4.51321 7.0974C2.89021 7.777 1.75 9.38035 1.75 11.25C1.75 13.7353 3.76472 15.75 6.25 15.75C7.28562 15.75 8.23953 15.4002 9 14.8122C9.76047 15.4002 10.7144 15.75 11.75 15.75C14.2353 15.75 16.25 13.7353 16.25 11.25C16.25 9.38035 15.1098 7.77701 13.4868 7.0974Z" fill="currentColor" fillOpacity="0.3" data-stroke="none" stroke="none" />
+        <path d="M10.496 9.757C10.66 10.224 10.75 10.727 10.75 11.25C10.75 13.735 8.735 15.75 6.25 15.75C3.765 15.75 1.75 13.735 1.75 11.25C1.75 10.339 2.021 9.491 2.486 8.783" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M11.511 15.745C12.042 15.773 12.587 15.707 13.123 15.536C15.49 14.778 16.794 12.245 16.036 9.878C15.278 7.511 12.745 6.207 10.378 6.965C9.50999 7.243 8.78599 7.759 8.25299 8.418" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M8.156 11.171C7.695 11.083 7.239 10.92 6.806 10.679C4.636 9.468 3.859 6.727 5.07 4.556C6.281 2.385 9.022 1.609 11.193 2.82C11.904 3.217 12.465 3.778 12.856 4.429" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      </g>
+    </svg>
+  );
+}
+
+function WindowPointerIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" className={className}>
+      <title>window-pointer</title>
+      <g fill="currentColor">
+        <path d="M11.126 10.7701L17.066 12.94C17.316 13.0301 17.309 13.39 17.055 13.4699L14.336 14.3399L13.466 17.0601C13.385 17.3101 13.028 17.32 12.937 17.07L10.767 11.13C10.685 10.9 10.902 10.69 11.126 10.7701Z" fill="currentColor" fillOpacity="0.3" data-stroke="none" stroke="none" />
+        <path d="M1.75 4.75C1.75 3.64543 2.64543 2.75 3.75 2.75H14.25C15.3546 2.75 16.25 3.64543 16.25 4.75V7.75H1.75V4.75Z" fill="currentColor" fillOpacity="0.3" data-stroke="none" stroke="none" />
+        <path d="M4.25 6C4.664 6 5 5.66 5 5.25C5 4.84 4.664 4.5 4.25 4.5C3.836 4.5 3.5 4.84 3.5 5.25C3.5 5.66 3.836 6 4.25 6Z" fill="currentColor" data-stroke="none" stroke="none" />
+        <path d="M6.75 6C7.164 6 7.5 5.66 7.5 5.25C7.5 4.84 7.164 4.5 6.75 4.5C6.336 4.5 6 4.84 6 5.25C6 5.66 6.336 6 6.75 6Z" fill="currentColor" data-stroke="none" stroke="none" />
+        <path d="M1.75 7.75H16.25" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M16.25 9.44788V4.75C16.25 3.65 15.355 2.75 14.25 2.75H3.75C2.645 2.75 1.75 3.65 1.75 4.75V13.25C1.75 14.35 2.645 15.25 3.75 15.25H9.0779" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M11.126 10.7701L17.066 12.94C17.316 13.0301 17.309 13.39 17.055 13.4699L14.336 14.3399L13.466 17.0601C13.385 17.3101 13.028 17.32 12.937 17.07L10.767 11.13C10.685 10.9 10.902 10.69 11.126 10.7701Z" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      </g>
+    </svg>
+  );
+}
+
+function GaugeIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" className={className}>
+      <title>gauge-3</title>
+      <g fill="currentColor">
+        <path opacity="0.3" fillRule="evenodd" clipRule="evenodd" d="M3.75 15H14.25C15.489 13.699 16.25 11.938 16.25 10C16.25 5.996 13.004 2.75 9 2.75C4.996 2.75 1.75 5.996 1.75 10C1.75 11.938 2.511 13.699 3.75 15Z" fill="currentColor" data-stroke="none" stroke="none" />
+        <path d="M9 2.75V4.75" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M14.127 4.87299L12.712 6.28799" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M16.25 10H14.25" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M3.87305 4.87299L8.29305 9.293" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M1.75 10H3.75" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M6.45264 3.2103C7.24504 2.9128 8.10363 2.75 9.00003 2.75C13.004 2.75 16.25 5.996 16.25 10C16.25 12.002 15.439 13.815 14.127 15.127L12.713 13.713" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M5.28799 13.712L3.87399 15.126C2.56199 13.814 1.75 12.002 1.75 9.99899C1.75 9.10279 1.91271 8.2445 2.21001 7.4523" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M9 11.25C9.69 11.25 10.25 10.69 10.25 10C10.25 9.31 9.69 8.75 9 8.75C8.31 8.75 7.75 9.31 7.75 10C7.75 10.69 8.31 11.25 9 11.25Z" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+      </g>
+    </svg>
+  );
+}
+
+function LayersIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" className={className}>
+      <title>layers-3</title>
+      <g fill="currentColor">
+        <path d="M2.665 5.086L8.534 1.995C8.826 1.841 9.174 1.841 9.466 1.995L15.336 5.086C15.87 5.367 15.87 6.132 15.336 6.413L9.466 9.504C9.174 9.658 8.826 9.658 8.534 9.504L2.665 6.414C2.131 6.133 2.131 5.367 2.665 5.086Z" fill="currentColor" fillOpacity="0.3" data-stroke="none" stroke="none" />
+        <path d="M2.665 5.086L8.534 1.995C8.826 1.841 9.174 1.841 9.466 1.995L15.336 5.086C15.87 5.367 15.87 6.132 15.336 6.413L9.466 9.504C9.174 9.658 8.826 9.658 8.534 9.504L2.665 6.414C2.131 6.133 2.131 5.367 2.665 5.086Z" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M15.736 9C15.736 9.261 15.602 9.523 15.335 9.664L9.46499 12.755C9.17299 12.909 8.82499 12.909 8.53299 12.755L2.66299 9.664C2.39599 9.523 2.26199 9.262 2.26199 9" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M15.736 12.25C15.736 12.511 15.602 12.773 15.335 12.914L9.46499 16.005C9.17299 16.159 8.82499 16.159 8.53299 16.005L2.66299 12.914C2.39599 12.773 2.26199 12.512 2.26199 12.25" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      </g>
+    </svg>
+  );
+}
+
+function SlidersIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" className={className}>
+      <title>sliders</title>
+      <g fill="currentColor">
+        <path d="M11 7.5C12.2426 7.5 13.25 6.49264 13.25 5.25C13.25 4.00736 12.2426 3 11 3C9.75736 3 8.75 4.00736 8.75 5.25C8.75 6.49264 9.75736 7.5 11 7.5Z" fill="currentColor" fillOpacity="0.3" data-stroke="none" stroke="none" />
+        <path d="M7 15C8.24264 15 9.25 13.9926 9.25 12.75C9.25 11.5074 8.24264 10.5 7 10.5C5.75736 10.5 4.75 11.5074 4.75 12.75C4.75 13.9926 5.75736 15 7 15Z" fill="currentColor" fillOpacity="0.3" data-stroke="none" stroke="none" />
+        <path d="M13.25 5.25H16.25" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M1.75 5.25H8.75" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M11 7.5C12.2426 7.5 13.25 6.49264 13.25 5.25C13.25 4.00736 12.2426 3 11 3C9.75736 3 8.75 4.00736 8.75 5.25C8.75 6.49264 9.75736 7.5 11 7.5Z" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M4.75 12.75H1.75" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M16.25 12.75H9.25" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M7 15C8.24264 15 9.25 13.9926 9.25 12.75C9.25 11.5074 8.24264 10.5 7 10.5C5.75736 10.5 4.75 11.5074 4.75 12.75C4.75 13.9926 5.75736 15 7 15Z" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      </g>
     </svg>
   );
 }

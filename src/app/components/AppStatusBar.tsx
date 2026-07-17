@@ -1,4 +1,3 @@
-import { Server } from 'lucide-react';
 import type React from 'react';
 import { cn } from './ui/utils';
 import {
@@ -13,6 +12,7 @@ import type { Person, Task } from '../types';
 import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import { AgentIcon } from './AgentIcon';
+import { FiltersIcon } from './SettingsPanel';
 
 export interface AppStatusBarProps {
   tasks: Task[];
@@ -115,7 +115,7 @@ export function AppStatusBar({
         ) : null}
       </div>
       <StatusPill
-        icon={<Server className="size-3.5" aria-hidden="true" />}
+        icon={<FiltersIcon className="size-3.5" aria-hidden="true" />}
         label="MCP:"
         value={mcpValue}
         tone={mcp.tone}

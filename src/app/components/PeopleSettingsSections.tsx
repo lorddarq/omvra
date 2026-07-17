@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { FileText, Pencil, Trash2, Users } from 'lucide-react';
+import { FileText, Trash2 } from 'lucide-react';
 import type { Person, PersonKind, StatusColumn, Task, TaskStatus, TimelineSwimlane } from '../types';
 import { getStatusLabel, getTaskProjectIds } from '../utils/roadmap';
 import { getLoadPercentageForTasks, getTaskLoadPoints, PERSON_CAPACITY_POINTS } from '../utils/taskLoad';
@@ -17,6 +17,8 @@ import { exportPdfDocument } from '../utils/pdfExport';
 import { buildPersonPdfExportHtml, buildPersonTaskExportListItem, createPersonPdfFileName } from '../utils/personPdfExport';
 import { AgentInstructionFields } from './AgentInstructionFields';
 import { AgentIcon } from './AgentIcon';
+import { PenWritingIcon } from './PenWritingIcon';
+import { UsersIcon } from './UsersIcon';
 
 interface PeopleManagementSectionsProps {
   people: Person[];
@@ -733,7 +735,7 @@ function PersonCardActions({
           items={[
             {
               label: 'Edit',
-              icon: Pencil,
+              icon: PenWritingIcon,
               onSelect: () => {
                 handleMenuOpenChange(false);
                 handleEditOpenChange(true);
@@ -939,7 +941,7 @@ export function PeopleSettingsSection({ children, empty = false, action, popupOp
         {empty ? (
           <EmptyStateCard
             compact
-            icon={<Users className="size-4" />}
+            icon={<UsersIcon className="size-4" />}
             title="No people available"
             description="Add a teammate to make human assignment and load tracking available here."
           />

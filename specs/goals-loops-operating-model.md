@@ -215,6 +215,104 @@ Markdown is for resumability and inspection. Metrics must come from durable stru
 
 The goal should also maintain an ephemeral `roster.md` for temporary agent recruitment. It should record the recruited agent type/persona, why the existing pool was insufficient, the competencies and skills requested, relevant instruction sources, the subgoals served, and whether the agent was dismissed or retained at completion. This helps inspect overseer recruitment rationale and discover recurring competency gaps. The durable agent assignment, recruitment, and dismissal events remain the authoritative audit and metrics source. Retention is the default; cleanup is controlled by the `Cleanup goal artefacts` workflow setting.
 
+### Completion cleanup hook
+
+Cleanup is a post-completion side effect, never part of the state transition that establishes completion. The completion transition must first persist the final goal state, durable execution events, final evidence references, and any required human acceptance. Only then may it invoke the cleanup hook.
+
+Electron owns the canonical artifact root at `<userData>/goal-artifacts`, where `<userData>` is `app.getPath('userData')`. Each goal uses a child directory named by its validated goal id. This keeps the files recoverable from the app's Library/Application Support data location while keeping them outside the project workspace. The hook receives `{ goalId, artifactRoot, cleanupEnabled, durableRecordsVerified, finalEvidenceVerified }`, with the Electron owner deriving `artifactRoot` from that user-data root, and is fail-closed:
+
+- `cleanupEnabled: false` returns `skipped` and leaves both working-context files untouched;
+- either verification flag being false returns `blocked` and leaves both files untouched;
+- a missing goal id, unsafe artifact path, or unknown artifact location returns `invalid` and performs no deletion;
+- when all preconditions pass, the runner may delete only the goal-scoped `project.md` and `roster.md` files, never the artifact directory, durable records, evidence, or unrelated files;
+- deletion is idempotent: missing target files count as already-cleaned, while individual failures are returned as `partial-failure` with the error and any successful deletions;
+- cleanup emits a structured `goal.artifacts.cleanup` event containing the goal id, setting state, verification outcome, requested files, removed files, and result. The event is written before or alongside the cleanup attempt by the durable execution owner, and is never stored in either Markdown artifact.
+
+The first implementation exposes this hook as a side-effect service. The goal-completion orchestrator must call it only after its durable commit succeeds and must treat `blocked`, `invalid`, and `partial-failure` as observable cleanup outcomes rather than as completion failures. Until that orchestrator boundary exists, the default remains retention and no cleanup is attempted automatically.
+
+## Proposed goal lifecycle owner and transition protocol
+
+The lifecycle owner should be a dedicated `GoalLifecycleService` in the Omvra durable-state boundary. It owns validation, state transitions, revision checks, durable lifecycle events, and the post-commit cleanup invocation. It must not be the cleanup runner itself: cleanup is a narrow side effect of a successful completion transition.
+
+The ownership boundary is:
+
+| Actor | Authority |
+| --- | --- |
+| Goals UI | Edit the goal graph and shaping fields; it may request lifecycle commands but may not directly set execution state or emit completion evidence. |
+| Orchestrator/overseer | Propose dispatch, pause, retry, handoff, acceptance, and completion commands with evidence and policy context. |
+| Worker agent | Submit acknowledgement, assessment, evidence, and handoff proposals; it cannot promote its own work to complete. |
+| `GoalLifecycleService` | Validate and atomically commit allowed transitions, increment revisions, append durable events, and invoke post-commit effects. |
+| Cleanup runner | Delete only verified goal-scoped working-context files and return an observable cleanup result. |
+
+The current `GoalRecord` shape is sufficient for graph editing but is not sufficient as the execution record. Execution state should be stored beside the goal definition rather than overloaded into `GoalElement.status`:
+
+```ts
+type GoalExecutionStatus =
+  | 'draft'
+  | 'ready'
+  | 'working'
+  | 'evidence-required'
+  | 'handoff-pending'
+  | 'awaiting-acceptance'
+  | 'complete'
+  | 'blocked'
+  | 'approval-required'
+  | 'failed';
+
+interface GoalExecutionRecord {
+  goalId: string;
+  goalRevision: number;
+  executionAttemptId: string;
+  status: GoalExecutionStatus;
+  overseerAgentId?: string;
+  contractRevision?: number;
+  contractHash?: string;
+  requiredAcceptanceActor: GoalAcceptanceActor;
+  durableEvidenceRefs: string[];
+  finalEvidenceVerified: boolean;
+  durableRecordsVerified: boolean;
+  cleanupStatus?: 'not-requested' | 'skipped' | 'blocked' | 'cleaned' | 'invalid' | 'partial-failure';
+  updatedAt: string;
+}
+```
+
+### Allowed transitions
+
+Every command includes `goalId`, `expectedGoalRevision`, `executionAttemptId`, `actorId`, `requestedAt`, and an idempotency key. The service rejects stale revisions before evaluating the command. It returns the current revision and conflict reason; callers must re-read and reconcile rather than overwrite.
+
+| From | Command | Preconditions | To |
+| --- | --- | --- | --- |
+| `draft` | `start` | Graph valid, required agents/skills resolved, policy and budget present | `ready` |
+| `ready` | `dispatch` | Predecessors complete, contract acknowledged, no gate or budget block | `working` |
+| `working` | `submit-evidence` | Evidence references are durable and scoped to the attempt | `evidence-required` |
+| `evidence-required` | `request-handoff` | Acceptance criteria and evidence checks pass | `handoff-pending` |
+| `handoff-pending` | `accept` | Required actor has accepted; for `both`, both checks pass | `complete` or next eligible state |
+| `working` / `evidence-required` / `handoff-pending` | `pause` | Actor is authorized or a policy stop condition exists | `blocked` or `approval-required` |
+| `blocked` / `approval-required` | `resume` | Blocking reason resolved, revision revalidated, contract still current | `ready` or prior active state |
+| `working` / `evidence-required` / `handoff-pending` | `fail` | Failure reason and preserved evidence recorded | `failed` |
+| `working` / `evidence-required` / `handoff-pending` / `failed` | `retry` | Retry budget and policy permit another attempt | `ready` |
+
+`complete` is terminal for an execution attempt. A changed objective, acceptance boundary, or semantic contract creates a new goal revision and execution attempt; it never reopens the completed attempt in place. A newly discovered cleanup failure does not downgrade completion. It updates the cleanup outcome and emits an operational event for retry or inspection.
+
+### Completion transaction
+
+`complete` is a two-phase application operation with one durable commit boundary:
+
+1. Validate the expected goal revision, execution attempt, current contract, predecessor states, evidence references, acceptance actor, budget, and all required gates.
+2. Write the final execution record, completion decision, evidence references, handoff result, and `goal.lifecycle.completed` event atomically. Set `durableRecordsVerified` and `finalEvidenceVerified` from the commit result, not caller claims.
+3. After the durable commit succeeds, invoke `cleanupGoalArtifacts` with the resolved user-data artifact root and the persisted verification results.
+4. Persist `goal.artifacts.cleanup` as a follow-up event and update `cleanupStatus`. A `skipped`, `blocked`, `invalid`, or `partial-failure` result is observable but does not undo the completed state.
+
+If step 2 fails, no cleanup is attempted. If the process exits between steps 2 and 3, a durable `cleanup pending` marker allows a later lifecycle reconciliation pass to retry the side effect idempotently. The reconciliation pass must never infer completion from the presence or absence of `project.md` or `roster.md`.
+
+### Commands and durable events
+
+The minimum command surface is `start`, `dispatch`, `submit-evidence`, `request-handoff`, `accept`, `pause`, `resume`, `retry`, `fail`, and `complete`. Each accepted command appends an event containing `eventId`, `eventType`, `goalId`, `goalRevision`, `executionAttemptId`, `actorId`, `occurredAt`, `previousStatus`, `nextStatus`, `commandId`, and typed reason/evidence fields. Replaying a command with the same idempotency key returns the original result without appending a second transition.
+
+The minimum completion evidence record must identify the acceptance criteria checked, the evidence references used, the verifier, verification time, and whether the evidence belongs to the current contract revision. Evidence may be preserved from earlier attempts only when the impact gate explicitly marks it reusable; otherwise it cannot satisfy completion.
+
+This proposal makes Omvra the owner of lifecycle truth while keeping the current prototype honest: until `GoalLifecycleService` exists, the Goals canvas can continue to edit and persist graph definitions, but it must not claim that those edits constitute an executable completion transition or trigger cleanup automatically.
+
 ## Responsibility boundaries
 
 | Responsibility | Owner |
@@ -252,7 +350,7 @@ Until the remaining decisions are resolved, the safe default is to pause at ambi
 
 ## Implementation handoff
 
-The next deliverable is an implementation-ready lifecycle and state-transition specification covering:
+The next deliverable is the implementation of the lifecycle boundary described above, covering:
 
 - the minimum goal/subgoal/contract/acknowledgement schema;
 - goal-to-task decomposition and persona recruitment;
@@ -262,3 +360,4 @@ The next deliverable is an implementation-ready lifecycle and state-transition s
 - MCP read/write operations and revision conflict behavior;
 - persistence and backup requirements;
 - acceptance tests for advancing, pausing, resuming, and failing a goal.
+- a durable completion commit followed by idempotent cleanup reconciliation.

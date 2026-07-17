@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { Check, ChevronLeft, ChevronRight, CircleDot, FileText, GitBranch, Link2, Minus, MousePointer2, Plus, ShieldCheck, Sparkles, Target, Trash2, ZoomIn } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, CircleDot, FileText, GitBranch, Minus, MousePointer2, Plus, ShieldCheck, Sparkles, Target, Trash2, ZoomIn } from 'lucide-react';
 import type { GoalAcceptanceActor, GoalBudgetMode, GoalConnectorSide, GoalElement, GoalElementType, GoalPolicy, GoalRecord, Person } from '../types.ts';
 import { safeReadJSON, persistJSONWithElectronMirror } from '../utils/storage.ts';
 import { AgentIcon as Bot } from './AgentIcon';
+import { LinkIcon as Link2 } from './LinkIcon';
 
 const STORAGE_KEY = 'omvra.goals.v1';
 const GOAL_ID = 'goal-lights-off-factory';

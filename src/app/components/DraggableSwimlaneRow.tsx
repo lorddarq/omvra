@@ -1,6 +1,6 @@
 import { useRef, useMemo, useState, useCallback, useEffect } from 'react';
 import { useDrag, useDragLayer, useDrop } from 'react-dnd';
-import { Edit2, GripVertical } from 'lucide-react';
+import { GripVertical } from 'lucide-react';
 import { Task, TimelineSwimlane } from '../types';
 import { Button } from '../components/ui/button';
 import { DraggableTimelineTask, TIMELINE_TASK_TYPE } from '../components/DraggableTimelineTask';

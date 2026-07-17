@@ -1,9 +1,11 @@
 import { useRef } from 'react';
 import type { CSSProperties } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
-import { Edit2, User } from 'lucide-react';
-import { TimelineSwimlane } from '../types';
+import { TimelineSwimlane, Person } from '../types';
 import { getProjectVisual } from '../utils/projectVisual';
+import { AgentIcon } from './AgentIcon';
+import { UserIcon } from './UserIcon';
+import { PenWritingIcon } from './PenWritingIcon';
 
 export const SWIMLANE_ROW_ITEM_TYPE = 'SWIMLANE_ROW';
 
@@ -30,6 +32,7 @@ interface DraggableSwimlaneLabelProps {
   onSwimlaneDragStart: (draggedId: string) => void;
   onSwimlaneDragEnd: () => void;
   mode?: 'projects' | 'people';
+  personKind?: Person['kind'];
   taskCount?: number;
 }
 
@@ -45,6 +48,7 @@ export function DraggableSwimlaneLabel({
   onSwimlaneDragStart,
   onSwimlaneDragEnd,
   mode = 'projects',
+  personKind,
   taskCount = 0,
 }: DraggableSwimlaneLabelProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -135,7 +139,7 @@ export function DraggableSwimlaneLabel({
           <>
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <div className="timeline-person-avatar w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0">
-                <User className="w-4 h-4 text-blue-600" />
+                {personKind === 'agentic' ? <AgentIcon className="w-4 h-4" /> : <UserIcon className="w-4 h-4" />}
               </div>
               <div className="min-w-0">
                 <div className="text-sm font-semibold text-gray-700 truncate">{swimlane.name}</div>
@@ -145,11 +149,7 @@ export function DraggableSwimlaneLabel({
           </>
         ) : (
           <>
-            <span className="timeline-project-icon" style={projectVisual.iconStyle} aria-hidden="true">
-              <span />
-              <span />
-              <span />
-            </span>
+            <ProjectIcon className="size-4 shrink-0" style={projectVisual.iconStyle} />
             <span className="min-w-0 flex-1 truncate pr-7 text-sm font-normal text-black">{swimlane.name}</span>
           </>
         )}
@@ -162,10 +162,24 @@ export function DraggableSwimlaneLabel({
             aria-label={`Edit project ${swimlane.name}`}
             title={`Edit ${swimlane.name}`}
           >
-            <Edit2 className="w-3 h-3" />
+            <PenWritingIcon className="w-3 h-3" />
           </button>
         )}
       </div>
     </div>
+  );
+}
+
+function ProjectIcon({ className, style }: { className?: string; style?: CSSProperties }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" className={className} style={style}>
+      <title>align-3-left</title>
+      <g fill="currentColor">
+        <path d="M15.25 5.75V4.25C15.25 3.42157 14.5784 2.75 13.75 2.75L4.25 2.75C3.42157 2.75 2.75 3.42157 2.75 4.25V5.75C2.75 6.57843 3.42157 7.25 4.25 7.25L13.75 7.25C14.5784 7.25 15.25 6.57843 15.25 5.75Z" fill="currentColor" fillOpacity="0.3" data-stroke="none" stroke="none" />
+        <path d="M9.25 13.75V12.25C9.25 11.4216 8.57843 10.75 7.75 10.75H4.25C3.42157 10.75 2.75 11.4216 2.75 12.25V13.75C2.75 14.5784 3.42157 15.25 4.25 15.25H7.75C8.57843 15.25 9.25 14.5784 9.25 13.75Z" fill="currentColor" fillOpacity="0.3" data-stroke="none" stroke="none" />
+        <path d="M15.25 5.75V4.25C15.25 3.42157 14.5784 2.75 13.75 2.75L4.25 2.75C3.42157 2.75 2.75 3.42157 2.75 4.25V5.75C2.75 6.57843 3.42157 7.25 4.25 7.25L13.75 7.25C14.5784 7.25 15.25 6.57843 15.25 5.75Z" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M9.25 13.75V12.25C9.25 11.4216 8.57843 10.75 7.75 10.75H4.25C3.42157 10.75 2.75 11.4216 2.75 12.25V13.75C2.75 14.5784 3.42157 15.25 4.25 15.25H7.75C8.57843 15.25 9.25 14.5784 9.25 13.75Z" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      </g>
+    </svg>
   );
 }

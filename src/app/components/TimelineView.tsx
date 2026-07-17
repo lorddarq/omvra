@@ -15,9 +15,10 @@ import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffe
 import { Task, TimelineSwimlane, TaskStatus, Person, StatusColumn } from '../types';
 import { DndProvider, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { CalendarDays, Plus, Users } from 'lucide-react';
+import { CalendarDays, Plus } from 'lucide-react';
 import { TimelineHeader } from './TimelineHeader';
 import { TimelineToolbar } from './TimelineToolbar';
+import { UsersIcon } from './UsersIcon';
 import { filterTimelineTasks } from '../utils/statusColumnSemantics';
 import { EmptyStateCard } from './EmptyStateCard';
 import {
@@ -941,7 +942,6 @@ export function TimelineView({
     if (event.deltaX) {
       rowsContainerRef.current.scrollLeft += event.deltaX;
     }
-    event.preventDefault();
   }, []);
 
   const handleRowsVerticalScroll = useCallback(() => {
@@ -1083,7 +1083,7 @@ export function TimelineView({
           <div className="flex flex-1 items-center justify-center px-6 py-10">
             <div className="w-full max-w-3xl">
               <EmptyStateCard
-                icon={mode === 'people' ? <Users className="size-5" /> : <CalendarDays className="size-5" />}
+                icon={mode === 'people' ? <UsersIcon className="size-5" /> : <CalendarDays className="size-5" />}
                 title={mode === 'people' ? 'No people on the timeline yet' : 'No timeline projects yet'}
                 description={mode === 'people'
                   ? 'Add people in Settings to plan work by assignee, then switch back here to schedule and review capacity.'
@@ -1160,6 +1160,7 @@ export function TimelineView({
                         onSwimlaneDragStart={setDraggingSwimlaneId}
                         onSwimlaneDragEnd={() => setDraggingSwimlaneId(null)}
                         mode={mode}
+                        personKind={mode === 'people' ? people.find(person => person.id === swimlane.id)?.kind : undefined}
                         taskCount={taskCount}
                       />
                     </div>

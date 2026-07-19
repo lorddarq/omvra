@@ -173,17 +173,19 @@ If a proposal could endanger the goal or subgoal, change the approved outcome, i
 
 Goals may require skills for business framing, product analysis, design, implementation, QA, or other specialized work. Skill availability is part of goal setup and agent preflight, not an implicit assumption in free-hand instructions.
 
-For the MVP, Omvra should ship a read-only bundled skills catalog and use those skills directly from their installed folder. A goal or subgoal references a skill by typed `skillId`, version, and required stage/persona. The orchestrator checks availability before dispatch and includes the resolved skill references in the contract packet.
+For the MVP, Omvra should ship a read-only bundled skills catalog and use those skills directly from their installed folder. A goal, workflow, subgoal, or agent node references a skill by typed `skillId`, optional version/source constraint, and required stage/persona. The orchestrator checks availability before dispatch and includes the resolved skill reference in the contract packet.
 
-The initial resolution order should be:
+Settings owns an ordered list of user-designated skill roots. These roots are the explicit extension surface for workflows and agents: users may point Omvra at workspace, repository, team, or personal folders without copying their contents into Omvra. Each root has enabled/disabled, validation, trust/integrity, and precedence metadata.
 
-1. Omvra-bundled skills, which are trusted and read-only.
-2. An explicitly configured workspace skills directory.
-3. An explicitly configured user skills directory.
+Skill resolution should follow this contract:
 
-External sources must not be downloaded, installed, or executed implicitly during goal setup. A local override may be used only when it is explicitly configured, has a valid manifest and version, and passes the applicable trust/integrity checks. If a required skill is unavailable or incompatible, setup pauses with a typed missing-skill result rather than silently substituting prose or a different skill.
+1. If one or more valid settings-designated roots are enabled, resolve the requested `skillId` from those roots in the user's configured order. A valid, trusted configured skill may intentionally override a bundled or fallback skill when the version/source constraint permits it.
+2. If the settings-designated root list is empty, use the fallback chain: Omvra-bundled skills → skills made available by the assigned agent/runtime → codebase/workspace-local skills.
+3. If configured roots exist but do not contain the requested skill, apply the declared fallback policy and record that fallback; do not silently substitute a different skill or prose.
 
-The settings surface should live under an Agents & Skills section, alongside agent/persona configuration. It should show the bundled read-only location, optional workspace and user directories, source precedence, discovered skill versions, integrity/trust status, and refresh/validation actions. Goal setup should show which skills will be used, which are missing, and whether a local override is taking precedence.
+The resolved source, root identifier, version, integrity hash, and fallback reason must be visible before dispatch and durable in execution history. External sources must not be downloaded, installed, or executed implicitly during goal setup. A required skill that is unavailable, ambiguous, invalid, or incompatible pauses setup with a typed missing-skill result.
+
+The settings surface should live under an Agents & Skills section, alongside agent/persona configuration. It should show the bundled read-only location, the ordered settings-designated roots, the empty-settings fallback chain, discovered skill versions, integrity/trust status, and refresh/validation actions. Goal setup and agent preflight should show which skill source will be used, which are missing, whether a local override is taking precedence, and why a fallback was selected.
 
 The skill manifest should be small and typed at minimum: `skillId`, `version`, `name`, `summary`, `supportedStages`, `supportedPersonas`, `entrypoint`, `source`, `integrityHash`, and `trustStatus`. Skill prose remains advisory content inside the generated contract; it cannot override system, safety, goal policy, or acceptance rules.
 
@@ -659,6 +661,7 @@ These are open Omvra tasks in project `omvra`:
 | `task-1c865bd1-182d-4a91-ae7e-e685308b4dba` | Bridge MCP execution progress into the Goals UI | Urgent |
 | `task-c00f270f-49e5-4810-8941-fe55ee3d457c` | Add terminal delivery-handoff contract and human preferences | High |
 | `task-e653e01c-071f-4c07-bf8d-735995375ae7` | Add the end-to-end execution-contract regression benchmark | High |
+| `task-d8208e1b-3986-4c00-9cbd-9c93f22197a4` | Resolve skills from settings-designated folders with agent/codebase fallback | Normal |
 
 The run must make the operating agent's current stage explicit, for example `received → acknowledged → worker assessed → eligible → started → evidence submitted → overseer validated → handoff pending → delivered`. A stage is not complete merely because the agent produced a response; the stage transition and its evidence must be durable.
 

@@ -46,3 +46,17 @@ test('parseUpdateReleaseNotes keeps prose summary when no bullets exist', () => 
   assert.equal(parsed.summary, 'This release improves update reliability across packaged Omvra builds.');
   assert.equal(parsed.hasMore, false);
 });
+
+test('parseUpdateReleaseNotes strips HTML without splitting one note across items', () => {
+  const parsed = parseUpdateReleaseNotes(`
+- <p>Public Preview Release for Goals functionality. Limited MCP availability.
+</p>
+- <p>Goal templates, availability and policies. v0.33.5</p>
+  `);
+
+  assert.deepEqual(parsed.items, [
+    'Public Preview Release for Goals functionality. Limited MCP availability.',
+    'Goal templates, availability and policies. v0.33.5',
+  ]);
+  assert.equal(parsed.rawLines.some(line => /<\/?p>/i.test(line)), false);
+});

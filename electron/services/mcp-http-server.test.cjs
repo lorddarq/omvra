@@ -266,6 +266,36 @@ test('initialize returns MCP server identity and capabilities', () => {
   assert.ok(response.result.capabilities.prompts);
 });
 
+test('initialize provenance persists across HTTP requests through the MCP session', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const dispatch = createRequestDispatcher(store);
+  const initializeReq = makeReq();
+  dispatch({
+    jsonrpc: '2.0',
+    id: 'provenance-initialize',
+    method: 'initialize',
+    params: {
+      protocolVersion: '2024-11-05',
+      clientInfo: { name: 'Codex', version: '1.2.3' },
+      capabilities: {},
+    },
+  }, initializeReq);
+
+  assert.equal(typeof initializeReq._mcpSessionId, 'string');
+  const toolReq = makeReq({ 'mcp-session-id': initializeReq._mcpSessionId });
+  dispatch({
+    jsonrpc: '2.0',
+    id: 'provenance-tool-call',
+    method: 'tools/call',
+    params: { name: 'agent_resolve_task_context', arguments: { taskId: 'task-1' } },
+  }, toolReq);
+
+  const audit = store.get('omvra.mcp.audit.v1').at(-1);
+  assert.equal(audit.agent, 'codex');
+  assert.equal(audit.clientName, 'Codex');
+  assert.equal(audit.clientVersion, '1.2.3');
+});
+
 test('notifications/initialized is accepted without a JSON-RPC response payload', () => {
   const dispatch = createRequestDispatcher(makeStoreFromFixture('workspace-basic'));
   const response = dispatch({

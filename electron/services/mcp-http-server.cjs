@@ -1,4 +1,5 @@
 const http = require('http');
+const { randomUUID } = require('crypto');
 const {
   isMcpAgentAccessEnabled,
   getMcpServerConfig,
@@ -52,7 +53,7 @@ const { listAvailableSkills, getAvailableSkill } = require('./skill-service.cjs'
 const { createGoalLifecycleService } = require('./goal-lifecycle-service.cjs');
 
 const MAX_BODY_BYTES = 1024 * 1024;
-const ALLOWED_CORS_HEADERS = 'Content-Type, Accept, Authorization, X-MCP-Token';
+const ALLOWED_CORS_HEADERS = 'Content-Type, Accept, Authorization, X-MCP-Token, Mcp-Session-Id';
 const ALLOWED_CORS_METHODS = 'POST, OPTIONS';
 
 const JSON_RPC_ERROR = {
@@ -2501,6 +2502,36 @@ function createAccessDisabledError(serverConfig, req) {
 }
 
 function createRequestDispatcher(store, { skillsRoot, userSkillsRoot } = {}) {
+  const clientProvenanceBySession = new Map();
+
+  function getSessionKey(req) {
+    const sessionId = normalizeAuditString(req?.headers?.['mcp-session-id']);
+    if (sessionId) return `http:${sessionId}`;
+    if (req?.transport === 'stdio') return 'stdio';
+    return null;
+  }
+
+  function hydrateClientProvenance(req) {
+    const sessionKey = getSessionKey(req);
+    if (!sessionKey) return;
+    const clientInfo = clientProvenanceBySession.get(sessionKey);
+    if (clientInfo) req.mcpClientInfo = clientInfo;
+  }
+
+  function rememberClientProvenance(req, clientInfo) {
+    let sessionId = normalizeAuditString(req?.headers?.['mcp-session-id']);
+    if (!sessionId && req?.transport !== 'stdio') {
+      sessionId = randomUUID();
+      req._mcpSessionId = sessionId;
+    }
+
+    const sessionKey = req?.transport === 'stdio' ? 'stdio' : `http:${sessionId}`;
+    clientProvenanceBySession.set(sessionKey, clientInfo);
+    if (clientProvenanceBySession.size > 100) {
+      clientProvenanceBySession.delete(clientProvenanceBySession.keys().next().value);
+    }
+  }
+
   return (request, req) => {
     if (!request || typeof request !== 'object' || Array.isArray(request)) {
       return makeJsonRpcResponse(
@@ -2527,6 +2558,7 @@ function createRequestDispatcher(store, { skillsRoot, userSkillsRoot } = {}) {
     const canRespond = hasResponseId(request);
     const respond = payload => (canRespond ? makeJsonRpcResponse(id, payload) : null);
     const normalizedMethod = method.trim();
+    hydrateClientProvenance(req);
     if (normalizedMethod === 'tools/call' && req && typeof req === 'object') {
       req._mcpTelemetryStartedAt = new Date().toISOString();
       req._mcpAuditRecorded = false;
@@ -2611,6 +2643,7 @@ function createRequestDispatcher(store, { skillsRoot, userSkillsRoot } = {}) {
           name: normalizeAuditString(clientInfo.name),
           version: normalizeAuditString(clientInfo.version),
         };
+        rememberClientProvenance(req, req.mcpClientInfo);
       }
       return respond({ result: buildMcpInitializeResult(store) });
     }
@@ -2772,6 +2805,7 @@ function applyCorsHeaders(req, res) {
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', ALLOWED_CORS_METHODS);
   res.setHeader('Access-Control-Allow-Headers', ALLOWED_CORS_HEADERS);
+  res.setHeader('Access-Control-Expose-Headers', 'Mcp-Session-Id');
   res.setHeader('Access-Control-Max-Age', '600');
 }
 
@@ -2876,6 +2910,10 @@ function startMcpHttpServer(store, { logger = console, onStatusChange, skillsRoo
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.end();
         return;
+      }
+
+      if (req._mcpSessionId) {
+        res.setHeader('Mcp-Session-Id', req._mcpSessionId);
       }
 
       const responseCode = responsePayload?.error?.code;

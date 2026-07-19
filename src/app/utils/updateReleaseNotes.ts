@@ -20,6 +20,8 @@ export function parseUpdateReleaseNotes(
 
   const maxItems = Number.isFinite(options.maxItems) ? Math.max(1, Number(options.maxItems)) : 3;
   const rawLines = releaseNotes
+    .replace(/<p\b[^>]*>([\s\S]*?)<\/p>/gi, '$1')
+    .replace(/<[^>]*>/g, '')
     .split('\n')
     .map(normalizeReleaseNoteLine)
     .filter(Boolean)
@@ -45,6 +47,11 @@ function normalizeReleaseNoteLine(line: string) {
     .replace(/^\d+\.\s*/, '')
     .replace(/^\[(.+)\]\(.+\)$/, '$1')
     .replace(/`/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
     .trim();
 }
 

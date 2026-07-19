@@ -4,6 +4,7 @@ const {
   EVIDENCE_KEY,
   migrateGoalRecords,
   normalizeGoal,
+  normalizeAgentConfiguration,
   createEvidenceRecord,
 } = require('./goal-state-service.cjs');
 
@@ -29,6 +30,42 @@ test('legacy goal migration preserves ids and only writes when normalization cha
   assert.equal(first.goals[0].id, 'goal-old');
   const second = migrateGoalRecords(store);
   assert.equal(second.changed, false);
+});
+
+test('control-flow nodes normalize as supported Goal elements and preserve their configuration', () => {
+  const goal = normalizeGoal({
+    id: 'goal-control-flow',
+    title: 'Control flow',
+    elements: [
+      { id: 'input-1', type: 'human-input', title: 'Ask user', humanInputPrompt: 'Which competitor should we add?', x: 0, y: 0 },
+      { id: 'retry-1', type: 'retry', title: 'Retry research', retryMaxAttempts: 3, retryExhaustionPolicy: 'human-review', x: 100, y: 0 },
+    ],
+  });
+
+  assert.equal(goal.elements[0].type, 'human-input');
+  assert.equal(goal.elements[0].humanInputPrompt, 'Which competitor should we add?');
+  assert.equal(goal.elements[1].type, 'retry');
+  assert.equal(goal.elements[1].retryMaxAttempts, 3);
+  assert.equal(goal.elements[1].retryExhaustionPolicy, 'human-review');
+});
+
+test('agent configuration migrates legacy assignees and rejects incomplete ephemeral nodes', () => {
+  const goal = normalizeGoal({
+    id: 'goal-agent-contract',
+    title: 'Agent contract',
+    elements: [
+      { id: 'legacy-agent', type: 'agent', title: 'Legacy', assigneeId: 'agent-1', body: 'Visible note' },
+      { id: 'invalid-agent', type: 'agent', title: 'Invalid', agentConfiguration: { version: 1, mode: 'ephemeral', instructions: 'Do work' } },
+      { id: 'ephemeral-agent', type: 'agent', title: 'Temporary', agentConfiguration: { mode: 'ephemeral', requestedName: 'Researcher', requestedType: 'researcher', instructions: 'Find evidence', spawnIfUnavailable: true } },
+      { id: 'generated-agent', type: 'agent', title: 'Generated', agentConfiguration: { mode: 'ephemeral', autoGenerateName: true, requestedType: 'researcher', instructions: 'Find evidence' } },
+    ],
+  });
+
+  assert.deepEqual(goal.elements[0].agentConfiguration, { version: 1, mode: 'existing', assigneeId: 'agent-1', instructions: '' });
+  assert.equal(goal.elements[1].agentConfiguration, undefined);
+  assert.deepEqual(goal.elements[2].agentConfiguration, { version: 1, mode: 'ephemeral', requestedName: 'Researcher', requestedType: 'researcher', instructions: 'Find evidence', spawnIfUnavailable: true });
+  assert.deepEqual(goal.elements[3].agentConfiguration, { version: 1, mode: 'ephemeral', requestedType: 'researcher', instructions: 'Find evidence', autoGenerateName: true });
+  assert.equal(normalizeAgentConfiguration({ mode: 'existing', assigneeId: 'agent-2', instructions: 'Ship it' }).version, 1);
 });
 
 test('evidence records are immutable, prefixed, and separate from execution state', () => {

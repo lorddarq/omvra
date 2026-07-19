@@ -6,9 +6,10 @@ const EXECUTIONS_KEY = 'omvra.goalExecutions.v1';
 const EVENTS_KEY = 'omvra.goalExecutionEvents.v1';
 const EVIDENCE_KEY = 'omvra.goalEvidence.v1';
 
-const GOAL_ELEMENT_TYPES = new Set(['goal', 'subgoal', 'agent', 'connector', 'instructions', 'condition', 'approval-gate']);
+const GOAL_ELEMENT_TYPES = new Set(['goal', 'subgoal', 'agent', 'connector', 'instructions', 'condition', 'approval-gate', 'human-input', 'retry']);
 const GOAL_STATUSES = new Set(['draft', 'working', 'blocked', 'complete']);
 const CONNECTOR_SIDES = new Set(['top', 'right', 'bottom', 'left']);
+const GOAL_AGENT_MODES = new Set(['existing', 'ephemeral']);
 
 function prefixedId(prefix) {
   return `${prefix}_${randomUUID()}`;
@@ -41,6 +42,28 @@ function normalizePolicy(policy) {
   return Object.keys(normalized).length ? normalized : undefined;
 }
 
+function normalizeAgentConfiguration(configuration, legacyAssigneeId) {
+  if (!configuration || typeof configuration !== 'object' || Array.isArray(configuration)) {
+    const assigneeId = normalizeString(legacyAssigneeId);
+    return assigneeId ? { version: 1, mode: 'existing', assigneeId, instructions: '' } : undefined;
+  }
+  const mode = GOAL_AGENT_MODES.has(configuration.mode) ? configuration.mode : 'existing';
+  const normalized = {
+    version: 1,
+    mode,
+    instructions: normalizeString(configuration.instructions),
+  };
+  for (const field of ['assigneeId', 'requestedName', 'requestedType']) {
+    const value = normalizeString(configuration[field]);
+    if (value) normalized[field] = value;
+  }
+  if (configuration.spawnIfUnavailable === true) normalized.spawnIfUnavailable = true;
+  if (configuration.autoGenerateName === true) normalized.autoGenerateName = true;
+  if (mode === 'existing' && !normalized.assigneeId) return undefined;
+  if (mode === 'ephemeral' && !normalized.requestedName && !normalized.autoGenerateName) return undefined;
+  return normalized;
+}
+
 function normalizeElement(element) {
   if (!element || typeof element !== 'object' || Array.isArray(element)) return null;
   const type = GOAL_ELEMENT_TYPES.has(element.type) ? element.type : 'subgoal';
@@ -55,6 +78,25 @@ function normalizeElement(element) {
   if (element.status !== undefined) normalized.status = GOAL_STATUSES.has(element.status) ? element.status : 'draft';
   if (element.sourceSide !== undefined) normalized.sourceSide = CONNECTOR_SIDES.has(element.sourceSide) ? element.sourceSide : undefined;
   if (element.targetSide !== undefined) normalized.targetSide = CONNECTOR_SIDES.has(element.targetSide) ? element.targetSide : undefined;
+  if (element.type === 'human-input') {
+    const prompt = normalizeString(element.humanInputPrompt);
+    if (prompt) normalized.humanInputPrompt = prompt;
+    else delete normalized.humanInputPrompt;
+  }
+  if (element.type === 'retry') {
+    const maxAttempts = Number(element.retryMaxAttempts);
+    if (Number.isFinite(maxAttempts) && maxAttempts >= 1) normalized.retryMaxAttempts = Math.floor(maxAttempts);
+    else delete normalized.retryMaxAttempts;
+    if (['human-review', 'fail-goal'].includes(element.retryExhaustionPolicy)) normalized.retryExhaustionPolicy = element.retryExhaustionPolicy;
+    else delete normalized.retryExhaustionPolicy;
+  }
+  if (element.type === 'agent') {
+    const agentConfiguration = normalizeAgentConfiguration(element.agentConfiguration, element.assigneeId);
+    if (agentConfiguration) normalized.agentConfiguration = agentConfiguration;
+    else delete normalized.agentConfiguration;
+    if (agentConfiguration?.mode === 'existing') normalized.assigneeId = agentConfiguration.assigneeId;
+    else delete normalized.assigneeId;
+  }
   const policy = normalizePolicy(element.policy);
   if (policy) normalized.policy = policy;
   else delete normalized.policy;
@@ -116,6 +158,7 @@ module.exports = {
   EVIDENCE_KEY,
   prefixedId,
   normalizePolicy,
+  normalizeAgentConfiguration,
   normalizeElement,
   normalizeGoal,
   readGoalRecords,

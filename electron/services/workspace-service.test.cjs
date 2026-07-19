@@ -12,6 +12,8 @@ const {
   buildMcpListenerStatus,
   appendMcpAuditLog,
   getWorkspaceSnapshot,
+  listGoals,
+  resolveGoalAgentDispatch,
   listMilestones,
   getMilestoneById,
   listTasks,
@@ -1044,4 +1046,25 @@ test('board watcher poll suppresses duplicates and persists watcher state', () =
   const watcherStoreValue = store.get(MCP_BOARD_WATCHERS_KEY);
   assert.ok(Array.isArray(watcherStoreValue));
   assert.equal(watcherStoreValue[0].watcherId, first.watcherState.watcherId);
+});
+
+test('Goal agent dispatch read model preserves canonical, ephemeral, and unavailable states', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  store.set('omvra.people.v1', [{ id: 'canonical-1', kind: 'agentic', name: 'Canonical', agentInstructions: 'Persona', agentOperationalInstructions: 'Method' }]);
+  store.set('omvra.goals.v1', [{ id: 'goal-agent-dispatch', title: 'Dispatch', elements: [
+    { id: 'existing', type: 'agent', title: 'Existing', x: 0, y: 0, agentConfiguration: { mode: 'existing', assigneeId: 'canonical-1', instructions: 'Node task' } },
+    { id: 'ephemeral', type: 'agent', title: 'Ephemeral', x: 0, y: 0, agentConfiguration: { mode: 'ephemeral', autoGenerateName: true, requestedType: 'researcher', instructions: 'Research this' } },
+    { id: 'missing', type: 'agent', title: 'Missing', x: 0, y: 0, agentConfiguration: { mode: 'existing', assigneeId: 'gone', instructions: 'Do not reassign', spawnIfUnavailable: true } },
+  ] }]);
+
+  assert.deepEqual(resolveGoalAgentDispatch(store, store.get('omvra.goals.v1')[0].elements[0]), {
+    status: 'resolved', mode: 'existing', assigneeId: 'canonical-1', profileSource: 'canonical',
+    personaInstructions: 'Persona', operationalInstructions: 'Method', instructions: 'Node task',
+  });
+  const agents = listGoals(store)[0].agents;
+  assert.equal(agents[1].agentDispatch.status, 'recruitment-requested');
+  assert.equal(agents[1].agentDispatch.autoGenerateName, true);
+  assert.equal(agents[1].agentDispatch.profileSource, 'none');
+  assert.equal(agents[2].agentDispatch.status, 'unavailable');
+  assert.equal(agents[2].agentDispatch.recruitmentFallback, 'overseer-managed-temporary-agent');
 });

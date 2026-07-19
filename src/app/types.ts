@@ -94,10 +94,12 @@ export interface ProjectMilestone {
   linkedTaskIds?: string[];
 }
 
-export type GoalElementType = 'goal' | 'subgoal' | 'agent' | 'connector' | 'instructions' | 'condition' | 'approval-gate';
+export type GoalElementType = 'goal' | 'subgoal' | 'agent' | 'connector' | 'instructions' | 'condition' | 'approval-gate' | 'human-input' | 'retry';
 export type GoalConnectorSide = 'top' | 'right' | 'bottom' | 'left';
 export type GoalConditionBranch = 'positive' | 'negative';
+export type GoalRetryExhaustionPolicy = 'human-review' | 'fail-goal';
 export type GoalElementReadiness = 'not-ready' | 'ready' | 'unavailable' | 'needs-review';
+export type GoalAgentMode = 'existing' | 'ephemeral';
 export type GoalAcceptanceActor = 'human' | 'agentic' | 'both';
 export type GoalBudgetMode = 'hard-cap' | 'goal-pool' | 'approval-required' | 'unbounded';
 export type GoalPolicyDimension = 'financial' | 'tokens' | 'concurrency' | 'attempts' | 'retries';
@@ -127,6 +129,17 @@ export interface GoalPolicy {
   agentMutationConfirmation?: 'required' | 'allowed';
 }
 
+export interface GoalAgentConfiguration {
+  version: 1;
+  mode: GoalAgentMode;
+  assigneeId?: string;
+  requestedName?: string;
+  requestedType?: string;
+  autoGenerateName?: boolean;
+  instructions: string;
+  spawnIfUnavailable?: boolean;
+}
+
 export interface GoalElement {
   id: string;
   type: GoalElementType;
@@ -140,6 +153,7 @@ export interface GoalElement {
   readiness?: GoalElementReadiness;
   readinessReason?: string;
   assigneeId?: string;
+  agentConfiguration?: GoalAgentConfiguration;
   sourceId?: string;
   targetId?: string;
   sourceSide?: GoalConnectorSide;
@@ -152,6 +166,9 @@ export interface GoalElement {
   /** Legacy aliases retained for older persisted condition records. */
   conditionTrueLabel?: string;
   conditionFalseLabel?: string;
+  humanInputPrompt?: string;
+  retryMaxAttempts?: number;
+  retryExhaustionPolicy?: GoalRetryExhaustionPolicy;
   handoffRequired?: boolean;
   handoffNotes?: string;
   approvalEvidenceRequired?: boolean;

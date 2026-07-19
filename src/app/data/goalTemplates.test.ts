@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { GOAL_TEMPLATES, instantiateGoalTemplate } from './goalTemplates.ts';
 
-test('ships fourteen valid goal templates with remapped graph references', () => {
-  assert.equal(GOAL_TEMPLATES.length, 14);
+test('ships fifteen valid goal templates with remapped graph references', () => {
+  assert.equal(GOAL_TEMPLATES.length, 15);
 
   GOAL_TEMPLATES.forEach((template, index) => {
     let id = 0;

@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleDot, ClipboardCheck, FileText, GitBranch, LoaderCircle, LockKeyhole, Minus, Plus, ShieldCheck, Sparkles, Target, Trash2, UserRoundCheck, ZoomIn } from 'lucide-react';
-import type { GoalAcceptanceActor, GoalBudgetMode, GoalConditionBranch, GoalConnectorSide, GoalElement, GoalElementReadiness, GoalElementType, GoalPolicy, GoalPolicyDimension, GoalPolicyDimensionOverride, GoalRecord, Person } from '../../types.ts';
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, CircleDot, ClipboardCheck, FileText, LoaderCircle, LockKeyhole, MessageSquareText, Minus, Plus, RotateCcw, ShieldCheck, Sparkles, Target, Trash2, UserRoundCheck, ZoomIn } from 'lucide-react';
+import type { GoalAcceptanceActor, GoalAgentConfiguration, GoalAgentMode, GoalBudgetMode, GoalConditionBranch, GoalConnectorSide, GoalElement, GoalElementReadiness, GoalElementType, GoalPolicy, GoalPolicyDimension, GoalPolicyDimensionOverride, GoalRecord, GoalRetryExhaustionPolicy, Person } from '../../types.ts';
 import type { GoalPolicyV1 } from '../../utils/goalPolicy.ts';
 import { GOAL_TEMPLATES, instantiateGoalTemplate, type GoalTemplate } from '../../data/goalTemplates.ts';
 import { getCanonicalJSON, safeReadJSON, setCanonicalJSON } from '../../utils/storage.ts';
-import { isGoalElementConnected, wouldCreateGoalCycle } from '../../utils/goalCanvas.ts';
+import { isGoalElementConnected, isValidRetryTarget, wouldCreateGoalCycle } from '../../utils/goalCanvas.ts';
 import { AgentIcon as Bot } from '../icons/AgentIcon';
+import { DropdownChevron } from '../icons/DropdownChevron';
+import { WorkflowsIcon } from '../icons/WorkflowsIcon';
 import { LinkIcon as Link2 } from '../icons/LinkIcon';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -113,6 +115,10 @@ const TOOL_ITEMS: Array<{ type: GoalElementType; label: string; icon: ReactNode 
   { type: 'approval-gate', label: 'Approval gate', icon: <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><title>thumbs-up</title><g fill="currentColor"><path d="M5.25 7.494C5.25 7.014 5.423 6.55 5.736 6.187L10 1.25C10.854 1.677 11.25 2.678 10.92 3.574L9.75 6.75H14.152C15.465 6.75 16.421 7.993 16.085 9.262L14.894 13.762C14.662 14.639 13.868 15.25 12.961 15.25H7.25C6.145 15.25 5.25 14.355 5.25 13.25" fill="currentColor" fillOpacity="0.3" data-stroke="none" stroke="none" /><path d="M5.25 7.494C5.25 7.014 5.423 6.55 5.736 6.187L10 1.25C10.854 1.677 11.25 2.678 10.92 3.574L9.75 6.75H14.152C15.465 6.75 16.421 7.993 16.085 9.262L14.894 13.762C14.662 14.639 13.868 15.25 12.961 15.25H7.25C6.145 15.25 5.25 14.355 5.25 13.25" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" /><path d="M4.25 6.75H2.75C2.19772 6.75 1.75 7.19772 1.75 7.75V14.25C1.75 14.8023 2.19772 15.25 2.75 15.25H4.25C4.80228 15.25 5.25 14.8023 5.25 14.25V7.75C5.25 7.19772 4.80228 6.75 4.25 6.75Z" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" /></g></svg> },
   { type: 'goal', label: 'Goal', icon: <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><title>flag-7</title><g fill="currentColor"><path d="M3.75 3.25H11.25C11.802 3.25 12.25 3.698 12.25 4.25V9.25H3.75" fill="currentColor" fillOpacity="0.3" data-stroke="none" stroke="none" /><path d="M3.75 3.25H11.25C11.802 3.25 12.25 3.698 12.25 4.25V9.25H3.75" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" /><path d="M12.25 5.75H14.25C14.802 5.75 15.25 6.198 15.25 6.75V10.75C15.25 11.302 14.802 11.75 14.25 11.75H10.75C10.198 11.75 9.75 11.302 9.75 10.75V9.25" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" /><path d="M10.043 11.457L12.25 9.25" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" /><path d="M3.75 1.75V16.25" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" /></g></svg> },
 ];
+const CONTROL_FLOW_ITEMS: Array<{ type: Extract<GoalElementType, 'human-input' | 'retry'>; label: string; icon: ReactNode }> = [
+  { type: 'human-input', label: 'Human input', icon: <MessageSquareText className="size-3.5" /> },
+  { type: 'retry', label: 'Retry', icon: <RotateCcw className="size-3.5" /> },
+];
 
 function readGoals(): GoalRecord[] {
   const stored = safeReadJSON<GoalRecord[]>(STORAGE_KEY, []);
@@ -127,6 +133,8 @@ function nodeClass(type: GoalElementType, connected = true): string {
   if (type === 'agent') return 'border-amber-200 bg-amber-50 text-slate-900';
   if (type === 'condition') return 'border-violet-200 bg-violet-50 text-slate-900';
   if (type === 'approval-gate') return 'border-orange-200 bg-orange-50 text-slate-900';
+  if (type === 'human-input') return 'border-sky-200 bg-sky-50 text-slate-900';
+  if (type === 'retry') return 'border-cyan-200 bg-cyan-50 text-slate-900';
   return 'border-slate-200 bg-white text-slate-700';
 }
 
@@ -173,8 +181,15 @@ function statusNextStep(status: GoalElement['status']): string | undefined {
 
 function readinessForElement(element: GoalElement, connected: boolean): GoalElementReadiness {
   if (element.readiness) return element.readiness;
-  if (element.type === 'agent') return element.assigneeId ? 'ready' : 'not-ready';
+  if (element.type === 'agent') {
+    const configuration = element.agentConfiguration;
+    if (!configuration) return element.assigneeId ? 'unavailable' : 'not-ready';
+    if (configuration.mode === 'existing') return configuration.assigneeId ? 'ready' : 'unavailable';
+    return configuration.requestedName || configuration.autoGenerateName ? (configuration.instructions.trim() ? 'ready' : 'needs-review') : 'not-ready';
+  }
   if (element.type === 'instructions') return connected ? 'ready' : 'not-ready';
+  if (element.type === 'human-input') return element.humanInputPrompt?.trim() && connected ? 'ready' : 'needs-review';
+  if (element.type === 'retry') return element.retryMaxAttempts && connected ? 'ready' : 'needs-review';
   if (element.type === 'condition') return element.conditionPositiveOutcome && element.conditionNegativeOutcome ? 'ready' : 'needs-review';
   if (element.type === 'approval-gate') return element.policy?.acceptanceActor ? 'ready' : 'needs-review';
   return 'ready';
@@ -202,8 +217,13 @@ function ReadyIcon() {
 function readinessDescription(element: GoalElement, readiness: GoalElementReadiness): string {
   if (element.readinessReason) return element.readinessReason;
   if (readiness === 'ready') return 'Configured and available for use in the workflow.';
-  if (element.type === 'agent') return 'Assign a canonical agent before this node can be dispatched.';
+  if (element.type === 'agent') {
+    if (element.agentConfiguration?.mode === 'ephemeral') return element.agentConfiguration.instructions.trim() ? 'Temporary-agent recruitment is overseer-managed.' : 'Add task-specific instructions before this node can be dispatched.';
+    return element.agentConfiguration?.spawnIfUnavailable ? 'The canonical agent is unavailable; the overseer may recruit a temporary agent.' : 'Select a canonical agent before this node can be dispatched.';
+  }
   if (element.type === 'instructions') return 'Connect this node to a workflow step before it can be used.';
+  if (element.type === 'human-input') return 'Define the prompt and connect this node before it can pause the workflow.';
+  if (element.type === 'retry') return 'Set a retry limit and connect this node to an earlier workflow step.';
   if (element.type === 'condition') return 'Define both branch outcomes before this condition can be evaluated.';
   if (element.type === 'approval-gate') return 'Configure the approval actor before this gate can be used.';
   return 'This node is not ready for use in the workflow.';
@@ -230,6 +250,14 @@ function StatusIcon({ status, className = 'size-3' }: { status: GoalElement['sta
   return <CircleDot className={className} />;
 }
 
+function elementIcon(type: GoalElementType) {
+  if (type === 'agent') return <Bot className="size-3.5" />;
+  if (type === 'goal') return <Sparkles className="size-3.5" />;
+  if (type === 'human-input') return <MessageSquareText className="size-3.5" />;
+  if (type === 'retry') return <RotateCcw className="size-3.5" />;
+  return <Target className="size-3.5" />;
+}
+
 export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirectory = '', onGoalAuditArchiveDirectoryChange }: { people?: Person[]; workspacePolicy?: GoalPolicyV1; goalAuditArchiveDirectory?: string; onGoalAuditArchiveDirectoryChange?: (directory: string) => void }) {
   const [goals, setGoals] = useState<GoalRecord[]>(readGoals);
   const [canonicalHydrated, setCanonicalHydrated] = useState(false);
@@ -242,8 +270,10 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [panMode, setPanMode] = useState(false);
   const [agentMenuOpen, setAgentMenuOpen] = useState(false);
+  const [controlFlowMenuOpen, setControlFlowMenuOpen] = useState(false);
   const [policyImpacts, setPolicyImpacts] = useState<Array<{ goalId?: string; status?: string; requiresUserConfirmation?: boolean }>>([]);
   const agentMenuRef = useRef<HTMLDivElement | null>(null);
+  const controlFlowMenuRef = useRef<HTMLDivElement | null>(null);
   const [connectorMode, setConnectorMode] = useState(false);
   const [connectorSourceId, setConnectorSourceId] = useState<string | null>(null);
   const [connectorSourceSide, setConnectorSourceSide] = useState<GoalConnectorSide>('right');
@@ -264,7 +294,14 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
   const activeGoal = goals.find(goal => goal.id === selectedGoalId) ?? goals[0];
   const selectedElement = activeGoal?.elements.find(element => element.id === selectedElementId) ?? activeGoal?.elements[0];
   const selectedAgent = selectedElement?.type === 'agent' ? people.find(person => person.id === selectedElement.assigneeId) : undefined;
-  const selectedAgentMissing = selectedElement?.type === 'agent' && (!selectedElement.assigneeId || !selectedAgent);
+  const selectedAgentMissing = selectedElement?.type === 'agent' && selectedElement.agentConfiguration?.mode === 'existing' && (!selectedElement.agentConfiguration.assigneeId || !selectedAgent);
+  const selectedAgentConfiguration = selectedElement?.type === 'agent' ? selectedElement.agentConfiguration : undefined;
+  const selectedAgentMode: GoalAgentMode | undefined = selectedElement?.type === 'agent'
+    ? selectedAgentConfiguration?.mode ?? (selectedElement.assigneeId ? 'existing' : 'ephemeral')
+    : undefined;
+  const selectedRetryTarget = selectedElement?.type === 'retry'
+    ? activeGoal?.elements.find(element => element.type === 'connector' && element.sourceId === selectedElement.id)?.targetId
+    : undefined;
   const selectedPolicyElement = selectedElement?.type === 'goal' || selectedElement?.type === 'subgoal' || selectedElement?.type === 'approval-gate' ? selectedElement : undefined;
   const selectedElementLocked = isExecutionLocked(selectedElement);
   const selectedEffectivePolicy = activeGoal && selectedPolicyElement
@@ -293,7 +330,9 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
         nodes.forEach((node, index) => {
           const element = elements[index];
           if (!element) return;
-          const height = Math.round(node.getBoundingClientRect().height);
+          // Connector geometry is expressed in the canvas coordinate system. Use
+          // the unscaled layout height so zoom cannot move the node endpoints.
+          const height = node.offsetHeight;
           if (next[element.id] !== height) {
             next[element.id] = height;
             changed = true;
@@ -367,17 +406,19 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
       setConnectorSourceBranch(undefined);
         setRewireConnectorId(null);
         setAgentMenuOpen(false);
+        setControlFlowMenuOpen(false);
         setNewGoalDialogOpen(false);
         return;
       }
       if (event.code === 'Space' && (event.target === document.body || event.target === canvasRef.current)) { event.preventDefault(); setSpacePressed(true); }
     };
     const up = (event: KeyboardEvent) => { if (event.code === 'Space') setSpacePressed(false); };
-    const closeAgentMenu = (event: PointerEvent) => {
+    const closeMenus = (event: PointerEvent) => {
       if (!agentMenuRef.current?.contains(event.target as Node)) setAgentMenuOpen(false);
+      if (!controlFlowMenuRef.current?.contains(event.target as Node)) setControlFlowMenuOpen(false);
     };
-    window.addEventListener('keydown', down); window.addEventListener('keyup', up); window.addEventListener('pointerdown', closeAgentMenu);
-    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); window.removeEventListener('pointerdown', closeAgentMenu); };
+    window.addEventListener('keydown', down); window.addEventListener('keyup', up); window.addEventListener('pointerdown', closeMenus);
+    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); window.removeEventListener('pointerdown', closeMenus); };
   }, []);
   useEffect(() => {
     if (!drag) return;
@@ -395,6 +436,18 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
   const updateElement = (updates: Partial<GoalElement>) => {
     if (selectedElementLocked) { setEditNotice('This node is locked while execution is active or committed. Pause, cancel, or amend the lifecycle before editing it.'); return; }
     setGoals(current => current.map(goal => goal.id !== selectedGoalId ? goal : ({ ...goal, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString(), elements: goal.elements.map(element => element.id === selectedElement?.id ? { ...element, ...updates } : element) })));
+  };
+  const updateAgentConfiguration = (updates: Partial<GoalAgentConfiguration>) => {
+    if (selectedElement?.type !== 'agent') return;
+    const current = selectedElement.agentConfiguration ?? { version: 1 as const, mode: selectedElement.assigneeId ? 'existing' as const : 'ephemeral' as const, assigneeId: selectedElement.assigneeId, instructions: '' };
+    const next = { ...current, ...updates, version: 1 as const };
+    if (next.mode === 'ephemeral' && !next.requestedName && !next.autoGenerateName) next.requestedName = selectedAgent?.name ?? selectedElement.title;
+    updateElement({ agentConfiguration: next, assigneeId: next.mode === 'existing' ? next.assigneeId : undefined });
+  };
+  const updateAgentName = (name: string) => {
+    if (selectedElement?.type !== 'agent') return;
+    const current = selectedElement.agentConfiguration ?? { version: 1 as const, mode: 'ephemeral' as const, instructions: '' };
+    updateElement({ title: name, agentConfiguration: { ...current, version: 1 as const, requestedName: name } });
   };
   const updateGoal = (updates: Partial<GoalRecord>) => {
     if (selectedElementLocked) { setEditNotice('This Goal is locked while execution is active or committed. Pause, cancel, or amend the lifecycle before editing it.'); return; }
@@ -416,9 +469,14 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
   const addElement = (type: GoalElementType) => {
     if (!activeGoal) return;
     const id = createStableId(type === 'connector' ? 'connector' : 'element');
-    const title = type === 'subgoal' ? 'New subgoal' : type === 'condition' ? 'New condition' : type === 'approval-gate' ? 'Approval gate' : `New ${type}`;
-    const body = type === 'condition' ? 'Define the condition to evaluate' : type === 'approval-gate' ? 'Define who must approve and what evidence is required' : 'Describe the outcome and handoff';
-    const element: GoalElement = { id, type, title, body, x: 260 + (activeGoal.elements.length % 3) * 260, y: 560, width: 220, height: 90, status: 'draft' };
+    const title = type === 'subgoal' ? 'New subgoal' : type === 'condition' ? 'New condition' : type === 'approval-gate' ? 'Approval gate' : type === 'human-input' ? 'Ask the user' : type === 'retry' ? 'Retry an earlier step' : `New ${type}`;
+    const body = type === 'condition' ? 'Define the condition to evaluate' : type === 'approval-gate' ? 'Define who must approve and what evidence is required' : type === 'human-input' ? 'Pause for overseer-mediated user input' : type === 'retry' ? 'Return to an earlier completed workflow step' : 'Describe the outcome and handoff';
+    const element: GoalElement = {
+      id, type, title, body, x: 260 + (activeGoal.elements.length % 3) * 260, y: 560,
+      width: 220, height: type === 'human-input' ? 120 : 90, status: 'draft',
+      ...(type === 'human-input' ? { humanInputPrompt: 'What input is needed to continue?' } : {}),
+      ...(type === 'retry' ? { retryMaxAttempts: 3, retryExhaustionPolicy: 'human-review' } : {}),
+    };
     setGoals(current => current.map(goal => goal.id === selectedGoalId ? { ...goal, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString(), elements: [...goal.elements, element] } : goal));
     setSelectedElementId(id);
   };
@@ -482,7 +540,7 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
     : [];
 
   const canvasElementHeight = (element: GoalElement) => canvasElementHeights[element.id]
-    ?? (element.type === 'condition' ? Math.max(element.height ?? 90, 150) : element.height ?? 90);
+    ?? (element.type === 'condition' ? Math.max(element.height ?? 90, 150) : element.type === 'human-input' ? Math.max(element.height ?? 90, 120) : element.height ?? 90);
 
   const moveCanvasSelection = (elementId: string, forward: boolean) => {
     const items = activeGoal?.elements ?? [];
@@ -498,7 +556,7 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
   const addAgent = (person: Person) => {
     if (!activeGoal) return;
     const id = createStableId('element');
-    const element: GoalElement = { id, type: 'agent', title: person.name, body: person.role, assigneeId: person.id, x: 260 + (activeGoal.elements.length % 3) * 260, y: 560, width: 220, height: 90, status: 'draft' };
+    const element: GoalElement = { id, type: 'agent', title: person.name, body: person.role, assigneeId: person.id, agentConfiguration: { version: 1, mode: 'existing', assigneeId: person.id, instructions: '' }, x: 260 + (activeGoal.elements.length % 3) * 260, y: 560, width: 220, height: 90, status: 'draft' };
     setGoals(current => current.map(goal => goal.id === selectedGoalId ? { ...goal, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString(), elements: [...goal.elements, element] } : goal));
     setSelectedElementId(id);
     setAgentMenuOpen(false);
@@ -531,7 +589,15 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
       setConnectorError('Active or committed nodes cannot be rewired. Pause, cancel, or amend the lifecycle first.');
       return;
     }
-    if (wouldCreateGoalCycle(activeGoal.elements, connectorSourceId, targetId, rewireConnectorId)) {
+    if (source?.type === 'retry' && !isValidRetryTarget(activeGoal.elements, source.id, targetId, rewireConnectorId)) {
+      setConnectorError('A retry must target an earlier connected workflow step.');
+      return;
+    }
+    if (source?.type === 'retry' && activeGoal.elements.some(element => element.type === 'connector' && element.id !== rewireConnectorId && element.sourceId === source.id)) {
+      setConnectorError('A retry node can target one earlier workflow step. Rewire its existing connector instead.');
+      return;
+    }
+    if (source?.type !== 'retry' && wouldCreateGoalCycle(activeGoal.elements, connectorSourceId, targetId, rewireConnectorId)) {
       setConnectorError('That connection would create a cycle.');
       return;
     }
@@ -617,13 +683,29 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
 
     <div className="absolute left-1/2 top-4 z-20 flex w-fit h-fit shrink -translate-x-1/2 items-center justify-center gap-1 rounded-full border border-slate-200 bg-white p-1 shadow-sm">
     <GoalTemplatesPopover templates={GOAL_TEMPLATES} onSelect={addTemplate} />
+    <div ref={controlFlowMenuRef} className="relative w-fit h-fit shrink-0">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button disabled={!activeGoal} onClick={() => setControlFlowMenuOpen(value => !value)} className="relative flex w-fit h-8 shrink-0 items-center justify-center gap-1 rounded-full px-2 text-xs text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Add control flow" aria-haspopup="menu" aria-expanded={controlFlowMenuOpen}>
+            <span className="flex items-center justify-center"><WorkflowsIcon className="size-3.5 text-[#71717a]" /></span>
+            <DropdownChevron />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={4}>Add control flow</TooltipContent>
+      </Tooltip>
+      {controlFlowMenuOpen && activeGoal && <div role="menu" aria-label="Add control flow" className="absolute left-0 top-full mt-1 w-48 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+        {CONTROL_FLOW_ITEMS.map(item => <button key={item.type} role="menuitem" onClick={() => { addElement(item.type); setControlFlowMenuOpen(false); }} className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs hover:bg-slate-100">
+          <span className="text-slate-600">{item.icon}</span><span><span className="block font-medium text-slate-800">{item.label}</span><span className="block text-[11px] text-slate-400">{item.type === 'human-input' ? 'Pause for user input' : 'Return to an earlier step'}</span></span>
+        </button>)}
+      </div>}
+    </div>
     {TOOL_ITEMS.map(tool => tool.type === 'agent' ?
       <div key={tool.type} ref={agentMenuRef} className="relative w-fit h-fit shrink-0">
         <Tooltip>
           <TooltipTrigger asChild>
-            <button disabled={!activeGoal} onClick={() => setAgentMenuOpen(value => !value)} className="relative flex w-12 h-8 shrink-0 items-center justify-center gap-1 rounded-full p-0 text-xs text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Add agent" aria-haspopup="menu" aria-expanded={agentMenuOpen}>
+            <button disabled={!activeGoal} onClick={() => setAgentMenuOpen(value => !value)} className="relative flex w-fit h-8 shrink-0 items-center justify-center gap-1 rounded-full px-2 text-xs text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Add agent" aria-haspopup="menu" aria-expanded={agentMenuOpen}>
               <span className="flex items-center justify-center">{tool.icon}</span>
-              <ChevronDown className="size-3 shrink-0" />
+              <DropdownChevron />
             </button>
           </TooltipTrigger>
           <TooltipContent side="bottom" sideOffset={4}>Add {tool.label}</TooltipContent>
@@ -651,9 +733,9 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
       <div className="goals-canvas-grid absolute inset-0" aria-hidden="true" />
       {!activeGoal && <div className="absolute inset-0 flex items-center justify-center p-6" role="status" aria-live="polite"><div className="max-w-sm rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm"><div className="mx-auto flex size-10 items-center justify-center rounded-full bg-blue-50 text-blue-600"><Sparkles className="size-5" /></div><h2 className="mt-3 text-sm font-semibold text-slate-900">Start with a Goal</h2><p className="mt-1 text-xs leading-5 text-slate-500">Create a Goal to shape its subgoals, agents, instructions, and approval gates on the canvas.</p><button type="button" onClick={openNewGoalDialog} className="mt-4 inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700"><Plus className="size-3.5" /> New goal</button></div></div>}
       <div className="absolute left-1/2 top-1/2" style={{ transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px)) scale(${zoom})`, transformOrigin: 'center' }}>
-        <svg className="pointer-events-auto absolute left-0 top-0 h-[1200px] w-[2000px] overflow-visible"><defs>{connections.map(connection => <linearGradient key={connection.id} id={`connector-gradient-${connection.id}`} x1="0%" x2="100%" y1="0%" y2="0%"><stop offset="0%" stopColor={connection.conditionBranch === 'positive' ? '#34d399' : '#fb7185'} /><stop offset="100%" stopColor="#60a5fa" /></linearGradient>)}</defs>{connections.map(connection => { const path = connectorPath(connection); const branchLabel = connection.conditionBranch ? ` via ${connection.conditionBranch} branch` : ''; return path ? <path key={connection.id} id={`goal-canvas-item-${connection.id}`} d={path} fill="none" stroke={connection.conditionBranch ? `url(#connector-gradient-${connection.id})` : selectedElement?.id === connection.id ? '#2563eb' : '#94a3b8'} strokeWidth={selectedElement?.id === connection.id ? '3' : '2'} strokeLinecap="round" className="cursor-pointer outline-none focus-visible:stroke-blue-600" onClick={event => { event.stopPropagation(); setSelectedElementId(connection.id); setConnectorMode(false); setConnectorSourceId(null); setConnectorSourceBranch(undefined); }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedElementId(connection.id); } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'ArrowRight' || event.key === 'ArrowDown') { event.preventDefault(); moveCanvasSelection(connection.id, event.key === 'ArrowRight' || event.key === 'ArrowDown'); } }} role="button" tabIndex={selectedElement?.id === connection.id ? 0 : -1} aria-label={`Connector from ${connection.sourceId} to ${connection.targetId}${branchLabel}`} /> : null; })}</svg>
+        <svg className="pointer-events-auto absolute left-0 top-0 h-[1200px] w-[2000px] overflow-visible"><defs>{connections.map(connection => <linearGradient key={connection.id} id={`connector-gradient-${connection.id}`} x1="0%" x2="100%" y1="0%" y2="0%"><stop offset="0%" stopColor={connection.conditionBranch === 'positive' ? '#34d399' : '#fb7185'} /><stop offset="100%" stopColor="#60a5fa" /></linearGradient>)}</defs>{connections.map(connection => { const path = connectorPath(connection); const branchLabel = connection.conditionBranch ? ` via ${connection.conditionBranch} branch` : ''; const source = activeGoal?.elements.find(element => element.id === connection.sourceId); const isRetryReturn = source?.type === 'retry'; return path ? <path key={connection.id} id={`goal-canvas-item-${connection.id}`} d={path} fill="none" stroke={connection.conditionBranch ? `url(#connector-gradient-${connection.id})` : isRetryReturn ? '#0891b2' : selectedElement?.id === connection.id ? '#2563eb' : '#94a3b8'} strokeWidth={selectedElement?.id === connection.id ? '3' : '2'} strokeDasharray={isRetryReturn ? '7 5' : undefined} strokeLinecap="round" className="cursor-pointer outline-none focus-visible:stroke-blue-600" onClick={event => { event.stopPropagation(); setSelectedElementId(connection.id); setConnectorMode(false); setConnectorSourceId(null); setConnectorSourceBranch(undefined); }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedElementId(connection.id); } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'ArrowRight' || event.key === 'ArrowDown') { event.preventDefault(); moveCanvasSelection(connection.id, event.key === 'ArrowRight' || event.key === 'ArrowDown'); } }} role="button" tabIndex={selectedElement?.id === connection.id ? 0 : -1} aria-label={`${isRetryReturn ? 'Retry return' : 'Connector'} from ${connection.sourceId} to ${connection.targetId}${branchLabel}`} /> : null; })}</svg>
         {connectorError && <div role="alert" className="absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 shadow-sm">{connectorError}</div>}
-        {activeGoal?.elements.filter(element => element.type !== 'connector').map(element => { const connected = isGoalElementConnected(activeGoal.elements, element.id); const locked = isExecutionLocked(element); const readiness = readinessForElement(element, connected); const readinessDisplay = readiness === 'ready' ? <span className="mt-3 inline-flex items-center" title="Ready for workflow use"><ReadyIcon /></span> : <span className={`mt-3 inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${readinessChipClass(readiness)}`}><CircleDot className="size-3" />{readinessLabel(readiness)}</span>; return <div key={element.id} id={`goal-canvas-item-${element.id}`} role="group" aria-label={`${element.type}: ${getElementTitle(element)}`} tabIndex={selectedElement?.id === element.id ? 0 : -1} onClick={() => { if (connectorMode) { if (connectorSourceId) connectNodes(element.id); else beginConnection(element.id, 'right'); } else setSelectedElementId(element.id); }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedElementId(element.id); } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'ArrowRight' || event.key === 'ArrowDown') { event.preventDefault(); moveCanvasSelection(element.id, event.key === 'ArrowRight' || event.key === 'ArrowDown'); } }} onPointerDown={event => { if (spacePressed || panMode || connectorMode || locked) return; setSelectedElementId(element.id); setDrag({ id: element.id, startX: event.clientX, startY: event.clientY, originX: element.x, originY: element.y }); }} className={`absolute flex flex-col rounded-lg border p-3 text-left shadow-sm transition-shadow hover:shadow-md ${nodeClass(element.type, connected)} ${locked ? 'cursor-not-allowed' : ''} ${selectedElement?.id === element.id ? 'ring-2 ring-blue-500 ring-offset-2' : ''}`} style={{ left: element.x, top: element.y, width: element.width ?? 220, height: canvasElementHeight(element) }}><span className="flex min-w-0 items-center gap-2 text-xs font-semibold"><span className="rounded bg-black/5 p-1">{element.type === 'agent' ? <Bot className="size-3.5" /> : element.type === 'goal' ? <Sparkles className="size-3.5" /> : <Target className="size-3.5" />}</span><span className="truncate">{getElementTitle(element)}</span></span>{getElementBody(element) && <span className={`mt-2 line-clamp-2 text-[11px] ${element.type === 'goal' ? 'text-slate-300' : 'text-slate-500'}`}>{getElementBody(element)}</span>}{element.type === 'condition' && <div className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold"><span className="rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-emerald-700">{conditionPositiveLabel(element)}</span><span className="rounded-full border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-rose-700">{conditionNegativeLabel(element)}</span></div>}{isCompletionElement(element) ? <span className={`mt-3 inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${compactChipClass(statusChipClass(element.status))}`}><StatusIcon status={element.status} />{statusLabel(element.status)}</span> : readinessDisplay}{locked && <span className="pointer-events-none absolute right-2 top-2 inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/95 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600 shadow-sm" title={element.status === 'working' ? 'In progress — editing locked' : 'Editing locked'}>{element.status === 'working' ? <LoaderCircle aria-hidden="true" className="size-3 animate-spin" /> : <LockKeyhole aria-hidden="true" className="size-3" />}</span>}{renderPorts(element)}</div>; })}
+        {activeGoal?.elements.filter(element => element.type !== 'connector').map(element => { const connected = isGoalElementConnected(activeGoal.elements, element.id); const locked = isExecutionLocked(element); const readiness = readinessForElement(element, connected); const readinessDisplay = readiness === 'ready' ? <span className="mt-3 inline-flex items-center" title="Ready for workflow use"><ReadyIcon /></span> : <span className={`mt-3 inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${readinessChipClass(readiness)}`}><CircleDot className="size-3" />{readinessLabel(readiness)}</span>; return <div key={element.id} id={`goal-canvas-item-${element.id}`} role="group" aria-label={`${element.type}: ${getElementTitle(element)}`} tabIndex={selectedElement?.id === element.id ? 0 : -1} onClick={() => { if (connectorMode) { if (connectorSourceId) connectNodes(element.id); else beginConnection(element.id, 'right'); } else setSelectedElementId(element.id); }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedElementId(element.id); } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'ArrowRight' || event.key === 'ArrowDown') { event.preventDefault(); moveCanvasSelection(element.id, event.key === 'ArrowRight' || event.key === 'ArrowDown'); } }} onPointerDown={event => { if (spacePressed || panMode || connectorMode || locked) return; setSelectedElementId(element.id); setDrag({ id: element.id, startX: event.clientX, startY: event.clientY, originX: element.x, originY: element.y }); }} className={`absolute flex flex-col rounded-lg border p-3 text-left shadow-sm transition-shadow hover:shadow-md ${nodeClass(element.type, connected)} ${locked ? 'cursor-not-allowed' : ''} ${selectedElement?.id === element.id ? 'ring-2 ring-blue-500 ring-offset-2' : ''}`} style={{ left: element.x, top: element.y, width: element.width ?? 220, height: canvasElementHeight(element) }}><span className="flex min-w-0 items-center gap-2 text-xs font-semibold"><span className="rounded bg-black/5 p-1">{elementIcon(element.type)}</span><span className="truncate">{getElementTitle(element)}</span></span>{getElementBody(element) && <span className={`mt-2 line-clamp-2 text-[11px] ${element.type === 'goal' ? 'text-slate-300' : 'text-slate-500'}`}>{getElementBody(element)}</span>}{element.type === 'condition' && <div className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold"><span className="rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-emerald-700">{conditionPositiveLabel(element)}</span><span className="rounded-full border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-rose-700">{conditionNegativeLabel(element)}</span></div>}{element.type === 'retry' && <span className="mt-2 inline-flex w-fit items-center gap-1 text-[10px] font-semibold text-cyan-700"><RotateCcw className="size-3" />Max {element.retryMaxAttempts ?? '—'} attempts</span>}{isCompletionElement(element) ? <span className={`mt-3 inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${compactChipClass(statusChipClass(element.status))}`}><StatusIcon status={element.status} />{statusLabel(element.status)}</span> : readinessDisplay}{locked && <span className="pointer-events-none absolute right-2 top-2 inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/95 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600 shadow-sm" title={element.status === 'working' ? 'In progress — editing locked' : 'Editing locked'}>{element.status === 'working' ? <LoaderCircle aria-hidden="true" className="size-3 animate-spin" /> : <LockKeyhole aria-hidden="true" className="size-3" />}</span>}{renderPorts(element)}</div>; })}
       </div>
     </div>
     {editNotice && <div role="status" className="absolute bottom-16 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 shadow-sm"><LockKeyhole className="size-3.5 shrink-0" />{editNotice}<button type="button" className="ml-1 font-semibold text-amber-900" onClick={() => setEditNotice(null)}>Dismiss</button></div>}
@@ -669,13 +751,15 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
         {selectedElementLocked && <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800"><LockKeyhole className="mt-0.5 size-3.5 shrink-0" /><span>{selectedElement.status === 'working' ? 'This node is already in progress. Its structure and execution contract are locked.' : 'This node is committed to execution and cannot be edited here.'}</span></div>}
         <fieldset disabled={selectedElementLocked} className="contents">
         <label className="mt-5 block text-xs font-medium text-slate-600">
-          Title
+          {selectedElement.type === 'agent' ? 'Name' : 'Title'}
           <Input
-            value={selectedAgent?.name ?? selectedElement.title}
-            readOnly={selectedElement.type === 'agent'}
-            onChange={selectedElement.type === 'agent' ? undefined : event => updateElement({ title: event.target.value })}
+            value={selectedElement.type === 'agent' ? selectedAgent?.name ?? (selectedAgentConfiguration?.autoGenerateName ? '' : selectedAgentConfiguration?.requestedName ?? selectedElement.title) : selectedElement.title}
+            placeholder={selectedElement.type === 'agent' && selectedAgentConfiguration?.autoGenerateName ? 'Generated at spawn' : undefined}
+            readOnly={selectedElement.type === 'agent' && (selectedAgentMode === 'existing' || selectedAgentConfiguration?.autoGenerateName === true)}
+            onChange={selectedElement.type === 'agent' ? event => updateAgentName(event.target.value) : event => updateElement({ title: event.target.value })}
             className="mt-1"
           />
+          {selectedElement.type === 'agent' && selectedAgentMode === 'ephemeral' && <span className="mt-1 block text-[11px] font-normal text-slate-400">{selectedAgentConfiguration?.autoGenerateName ? 'The overseer will generate a name when this agent is spawned.' : 'Required task-focused name.'}</span>}
           {selectedAgentMissing && <span role="alert" className="mt-2 flex items-start gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] font-normal text-amber-800"><AlertTriangle className="mt-0.5 size-3.5 shrink-0" />Assign a canonical agent before this node can be started or dispatched.</span>}
         </label>
         {selectedElement.type === 'goal' && (
@@ -707,16 +791,65 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
             </label>
           </>
         )}
-        <label className="mt-4 flex flex-wrap items-center gap-x-1 gap-y-1 text-xs font-medium text-slate-600">
+        {selectedElement.type !== 'agent' && <label className="mt-4 flex flex-wrap items-center gap-x-1 gap-y-1 text-xs font-medium text-slate-600">
           Notes
-          <textarea
-            value={selectedAgent?.role ?? selectedElement.body ?? ''}
-            readOnly={selectedElement.type === 'agent'}
-            onChange={selectedElement.type === 'agent' ? undefined : event => updateElement({ body: event.target.value })}
-            rows={4}
-            className="mt-1 w-full resize-none rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 read-only:bg-slate-50 read-only:text-slate-500"
-          />
-        </label>
+          <textarea value={selectedElement.body ?? ''} onChange={event => updateElement({ body: event.target.value })} rows={4} className="mt-1 w-full resize-none rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+        </label>}
+        {selectedElement.type === 'agent' && (
+          <section className="mt-5 border-t border-slate-100 pt-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Task instructions</p>
+            <label className="mt-3 block text-sm font-medium text-slate-700">What this agent must do
+              <textarea value={selectedAgentConfiguration?.instructions ?? ''} onChange={event => updateAgentConfiguration({ instructions: event.target.value })} rows={8} autoFocus={false} placeholder="Describe the concrete work, scope, and expected result for this agent node." className="mt-1 w-full resize-y rounded-md border border-blue-200 bg-blue-50/30 px-3 py-2.5 text-sm leading-5 text-slate-700 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+            </label>
+            <p className="mt-2 text-[11px] text-slate-400">These instructions are sent with the delegation contract. They are separate from the node label and canonical agent profile.</p>
+            <div className="mt-5 border-t border-slate-100 pt-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Agent setup</p>
+              <label className="mt-3 block text-xs font-medium text-slate-600">Agent mode
+              <Select value={selectedAgentMode} onValueChange={value => updateAgentConfiguration({ mode: value as GoalAgentMode, ...(value === 'existing' ? { requestedName: undefined, requestedType: undefined } : { assigneeId: undefined }) })}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="existing">Existing canonical agent</SelectItem><SelectItem value="ephemeral">Ephemeral temporary agent</SelectItem></SelectContent>
+              </Select>
+              </label>
+            {selectedAgentMode === 'existing' ? <>
+              <label className="mt-3 block text-xs font-medium text-slate-600">Canonical agent
+                <Select value={selectedAgentConfiguration?.assigneeId ?? selectedElement.assigneeId ?? '__none__'} onValueChange={value => updateAgentConfiguration({ assigneeId: value === '__none__' ? undefined : value })}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select an agent" /></SelectTrigger>
+                  <SelectContent><SelectItem value="__none__">Select an agent</SelectItem>{people.filter(person => person.kind === 'agentic').map(person => <SelectItem key={person.id} value={person.id}>{person.name} · {person.role}</SelectItem>)}</SelectContent>
+                </Select>
+              </label>
+              {selectedAgent && <p className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-500">Canonical profile is applied at dispatch: {selectedAgent.agentInstructions ? 'persona' : 'no persona'} + {selectedAgent.agentOperationalInstructions ? 'operational guidance' : 'no operational guidance'}.</p>}
+              <label className="mt-3 flex items-center gap-2 text-xs font-medium text-slate-600"><input type="checkbox" checked={selectedAgentConfiguration?.spawnIfUnavailable === true} onChange={event => updateAgentConfiguration({ spawnIfUnavailable: event.target.checked })} /> Recruit temporarily if unavailable</label>
+            </> : <>
+              <label className="mt-3 flex items-start gap-2 text-xs font-medium text-slate-600"><input type="checkbox" checked={selectedAgentConfiguration?.autoGenerateName === true} onChange={event => updateAgentConfiguration({ autoGenerateName: event.target.checked, ...(event.target.checked ? { requestedName: undefined } : {}) })} className="mt-0.5" /> <span>Generate name at spawn<span className="mt-1 block text-[11px] font-normal text-slate-400">Use this when the role is more important than a fixed name.</span></span></label>
+              <label className="mt-3 block text-xs font-medium text-slate-600">Requested capability / type<Input value={selectedAgentConfiguration?.requestedType ?? ''} onChange={event => updateAgentConfiguration({ requestedType: event.target.value || undefined })} className="mt-1" placeholder="e.g. accessibility researcher" /></label>
+            </>}
+            </div>
+            <p className="mt-3 text-[11px] text-slate-400">Ephemeral agents receive only the requested capability and these task instructions; existing agents additionally receive their canonical profile.</p>
+          </section>
+        )}
+        {selectedElement.type === 'human-input' && (
+          <section className="mt-5 border-t border-slate-100 pt-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Human input</p>
+            <label className="mt-3 block text-xs font-medium text-slate-600">Prompt for the user<textarea value={selectedElement.humanInputPrompt ?? ''} onChange={event => updateElement({ humanInputPrompt: event.target.value })} rows={4} placeholder="What should the overseer ask the user?" className="mt-1 w-full resize-y rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
+            <p className="mt-2 text-[11px] text-slate-400">The overseer will pause this workflow and persist the user's response before resuming.</p>
+          </section>
+        )}
+        {selectedElement.type === 'retry' && (
+          <section className="mt-5 border-t border-slate-100 pt-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Retry control</p>
+            <label className="mt-3 block text-xs font-medium text-slate-600">Maximum attempts
+              <Input type="number" min={1} step={1} value={selectedElement.retryMaxAttempts ?? ''} onChange={event => { const value = Number(event.target.value); updateElement({ retryMaxAttempts: Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined }); }} className="mt-1" aria-describedby="retry-attempts-help" />
+              <span id="retry-attempts-help" className="mt-1 block text-[11px] font-normal text-slate-400">Counts retries for the current execution. The return target is configured with a regular connector.</span>
+            </label>
+            <label className="mt-3 block text-xs font-medium text-slate-600">When attempts are exhausted
+              <Select value={selectedElement.retryExhaustionPolicy ?? 'human-review'} onValueChange={value => updateElement({ retryExhaustionPolicy: value as GoalRetryExhaustionPolicy })}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="human-review">Require human review</SelectItem><SelectItem value="fail-goal">Fail the Goal</SelectItem></SelectContent>
+              </Select>
+            </label>
+            <div className="mt-3 rounded-md border border-cyan-100 bg-cyan-50/60 px-2.5 py-2 text-[11px] text-cyan-800"><span className="font-semibold">Retry target:</span> {selectedRetryTarget ? activeGoal?.elements.find(element => element.id === selectedRetryTarget)?.title ?? 'Missing node' : 'Connect this node to an earlier step.'}</div>
+          </section>
+        )}
         {selectedElement.type === 'condition' && (
           <section className="mt-5 border-t border-slate-100 pt-4">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Branches</p>
@@ -912,19 +1045,19 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
           {spacePressed ? 'Release space to edit' : 'Pan mode · drag to move'}
         </div>
       )}
-      <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500 shadow-sm">
+      <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white p-2 text-xs text-slate-500 shadow-sm">
         <button
           onClick={() => setPanMode(value => !value)}
-          className={`rounded-md px-2 py-1.5 text-xs ${panMode ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`}
+          className={`size-8 rounded-full p-2 text-xs ${panMode ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`}
           aria-pressed={panMode}
           aria-label="Pan canvas"
         >
           Pan
         </button>
-        <div className="flex items-center gap-1 rounded-md border border-slate-200 bg-white px-1">
-          <button className="rounded p-1 hover:bg-slate-100" onClick={() => setZoom(value => Math.max(.6, value - .1))} aria-label="Zoom out"><Minus className="size-3" /></button>
+        <div className="flex h-8 items-center gap-1 rounded-full border border-slate-200 bg-white p-1">
+          <button className="rounded-full p-1 hover:bg-slate-100" onClick={() => setZoom(value => Math.max(.6, value - .1))} aria-label="Zoom out"><Minus className="size-3" /></button>
           <span className="min-w-9 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
-          <button className="rounded p-1 hover:bg-slate-100" onClick={() => setZoom(value => Math.min(1.4, value + .1))} aria-label="Zoom in"><ZoomIn className="size-3" /></button>
+          <button className="rounded-full p-1 hover:bg-slate-100" onClick={() => setZoom(value => Math.min(1.4, value + .1))} aria-label="Zoom in"><ZoomIn className="size-3" /></button>
         </div>
       </div>
     </div>

@@ -1,6 +1,8 @@
-import { ArrowUpRight, LayoutTemplate } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 import { useState } from 'react';
 import type { GoalTemplate } from '../data/goalTemplates.ts';
+import { AwardCertificateIcon } from './icons/AwardCertificateIcon';
+import { DropdownChevron } from './icons/DropdownChevron';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
@@ -15,22 +17,24 @@ export function GoalTemplatesPopover({ templates, disabled = false, onSelect }: 
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              disabled={disabled}
-              className="flex h-8 shrink-0 items-center justify-center gap-1 rounded-full px-2.5 text-xs text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Add a goal template"
-            >
-              <LayoutTemplate className="size-3.5" />
-              <span className="hidden sm:inline">Templates</span>
-            </button>
-          </PopoverTrigger>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" sideOffset={4}>Start from a goal template</TooltipContent>
-      </Tooltip>
+      <div className="relative w-fit h-fit shrink-0">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                disabled={disabled}
+                className="relative flex w-fit h-8 shrink-0 items-center justify-center gap-1 rounded-full px-2 text-xs text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="Add a goal template"
+              >
+                <span className="flex items-center justify-center"><AwardCertificateIcon className="size-3.5 text-[#71717a]" /></span>
+                <DropdownChevron />
+              </button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={4}>Start from a goal template</TooltipContent>
+        </Tooltip>
+      </div>
       <PopoverContent align="center" sideOffset={8} className="w-80 p-2">
         <div className="px-2.5 pb-2 pt-1">
           <p className="text-xs font-semibold text-slate-900">Start from a template</p>

@@ -1,5 +1,5 @@
 const { randomUUID } = require('crypto');
-const { migrateGoalRecords } = require('./goal-state-service.cjs');
+const { migrateGoalRecords, normalizeAgentConfiguration } = require('./goal-state-service.cjs');
 const { isAgentMutationAllowed } = require('./goal-policy.cjs');
 
 const PREFERENCES_KEY = 'omvra.preferences.v1';
@@ -880,6 +880,7 @@ function normalizeGoalForMcp(goal) {
     instructions: byType('instructions'),
     conditions: byType('condition'),
     approvalGates: byType('approval-gate'),
+    controlFlowNodes: elements.filter(element => element.type === 'human-input' || element.type === 'retry'),
     sequences: elements
       .filter(element => element.type === 'connector' && element.sourceId && element.targetId)
       .map(element => ({
@@ -893,8 +894,53 @@ function normalizeGoalForMcp(goal) {
   };
 }
 
+function resolveGoalAgentDispatch(store, element) {
+  if (!element || element.type !== 'agent') return undefined;
+  const configuration = normalizeAgentConfiguration(element.agentConfiguration, element.assigneeId);
+  if (!configuration) return { status: 'not-configured', mode: undefined, profileSource: 'none' };
+  if (configuration.mode === 'ephemeral') {
+    return {
+      status: configuration.requestedName || configuration.autoGenerateName ? 'recruitment-requested' : 'unavailable',
+      mode: 'ephemeral',
+      profileSource: 'none',
+      requestedName: configuration.requestedName,
+      requestedType: configuration.requestedType,
+      autoGenerateName: configuration.autoGenerateName,
+      instructions: configuration.instructions,
+      recruitmentFallback: 'overseer-managed-temporary-agent',
+    };
+  }
+  const person = readArray(store, PEOPLE_KEY).find(candidate => candidate?.id === configuration.assigneeId && candidate.kind === 'agentic');
+  if (person) {
+    return {
+      status: 'resolved',
+      mode: 'existing',
+      assigneeId: person.id,
+      profileSource: 'canonical',
+      personaInstructions: normalizeString(person.agentInstructions).trim() || undefined,
+      operationalInstructions: normalizeString(person.agentOperationalInstructions).trim() || undefined,
+      instructions: configuration.instructions,
+    };
+  }
+  return {
+    status: 'unavailable',
+    mode: 'existing',
+    assigneeId: configuration.assigneeId,
+    profileSource: 'none',
+    instructions: configuration.instructions,
+    recruitmentFallback: configuration.spawnIfUnavailable ? 'overseer-managed-temporary-agent' : undefined,
+    requestedType: configuration.requestedType,
+  };
+}
+
 function listGoals(store) {
-  return migrateGoalRecords(store).goals.map(goal => withGoalExecutionReadModel(store, normalizeGoalForMcp(goal)));
+  return migrateGoalRecords(store).goals.map(goal => {
+    const normalized = normalizeGoalForMcp(goal);
+    const elements = normalized.elements.map(element => element.type === 'agent'
+      ? { ...element, agentDispatch: resolveGoalAgentDispatch(store, element) }
+      : element);
+    return withGoalExecutionReadModel(store, { ...normalized, elements, agents: elements.filter(element => element.type === 'agent') });
+  });
 }
 
 function withGoalExecutionReadModel(store, goal) {
@@ -3606,6 +3652,7 @@ module.exports = {
   MCP_TASK_REV_FIELD,
   getWorkspaceSnapshot,
   listGoals,
+  resolveGoalAgentDispatch,
   getGoalById,
   updateGoal,
   updateGoalElement,

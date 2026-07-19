@@ -8,6 +8,7 @@ const {
   EVENTS_KEY,
   EVIDENCE_KEY,
   createEvidenceRecord,
+  normalizeAgentConfiguration,
 } = require('./goal-state-service.cjs');
 const { GOAL_POLICY_KEY, buildGoalContractPacket, getPendingGoalPolicyImpact, resolveGoalPolicy, resolveGoalPolicyImpact } = require('./goal-policy.cjs');
 
@@ -128,6 +129,83 @@ function getAuditArchiveDirectory(store, payload = {}) {
   return typeof configured === 'string' ? configured.trim() : '';
 }
 
+function buildAgentDelegations(store, goal) {
+  const people = readArray(store, 'omvra.people.v1');
+  return (goal?.elements || []).filter(element => element?.type === 'agent').map(element => {
+    const configuration = normalizeAgentConfiguration(element.agentConfiguration, element.assigneeId);
+    if (!configuration) return { elementId: element.id, title: element.title, status: 'not-configured', mode: null, profileSource: 'none' };
+    if (configuration.mode === 'ephemeral') {
+      return {
+        elementId: element.id,
+        title: element.title,
+        status: configuration.requestedName || configuration.autoGenerateName ? 'recruitment-requested' : 'unavailable',
+        mode: 'ephemeral',
+        profileSource: 'none',
+        requestedName: configuration.requestedName,
+        requestedType: configuration.requestedType,
+        autoGenerateName: configuration.autoGenerateName,
+        instructions: configuration.instructions,
+        recruitmentFallback: 'overseer-managed-temporary-agent',
+      };
+    }
+    const person = people.find(candidate => candidate?.id === configuration.assigneeId && candidate.kind === 'agentic');
+    if (!person) return {
+      elementId: element.id,
+      title: element.title,
+      status: 'unavailable',
+      mode: 'existing',
+      assigneeId: configuration.assigneeId,
+      profileSource: 'none',
+      instructions: configuration.instructions,
+      recruitmentFallback: configuration.spawnIfUnavailable ? 'overseer-managed-temporary-agent' : undefined,
+    };
+    return {
+      elementId: element.id,
+      title: element.title,
+      status: 'resolved',
+      mode: 'existing',
+      assigneeId: person.id,
+      profileSource: 'canonical',
+      personaInstructions: typeof person.agentInstructions === 'string' ? person.agentInstructions.trim() || undefined : undefined,
+      operationalInstructions: typeof person.agentOperationalInstructions === 'string' ? person.agentOperationalInstructions.trim() || undefined : undefined,
+      instructions: configuration.instructions,
+    };
+  });
+}
+
+function buildContractPacket(store, goal, effectivePolicy, executionAttempt, now) {
+  const packet = buildGoalContractPacket({ goal, effectivePolicy, executionAttempt, now });
+  const agentDelegations = buildAgentDelegations(store, goal);
+  return {
+    ...packet,
+    agentDelegations,
+    recruitmentRequests: agentDelegations.filter(item => item.status === 'recruitment-requested' || item.recruitmentFallback).map(item => ({
+      elementId: item.elementId,
+      mode: item.mode,
+      requestedName: item.requestedName,
+      requestedType: item.requestedType,
+      autoGenerateName: item.autoGenerateName,
+      rationale: item.mode === 'ephemeral' ? 'The node explicitly requests temporary capability-scoped recruitment.' : 'The configured canonical agent is unavailable and fallback is enabled.',
+    })),
+  };
+}
+
+function validateAgentDispatch({ store, goal, targetElementId }) {
+  if (!targetElementId) return { ok: true };
+  const element = goal?.elements?.find(item => item?.id === targetElementId);
+  if (element?.type !== 'agent') return { ok: true };
+  const configuration = normalizeAgentConfiguration(element.agentConfiguration, element.assigneeId);
+  if (!configuration) return failure('AGENT_CONFIGURATION_REQUIRED', 'The agent node has no valid delegation configuration.', { targetElementId });
+  if (configuration.mode === 'ephemeral') {
+    return configuration.requestedName || configuration.autoGenerateName
+      ? { ok: true }
+      : failure('AGENT_CONFIGURATION_INVALID', 'Ephemeral delegation requires a task-focused name or spawn-time name generation.', { targetElementId });
+  }
+  const available = readArray(store, 'omvra.people.v1').some(person => person?.id === configuration.assigneeId && person.kind === 'agentic');
+  if (available || configuration.spawnIfUnavailable === true) return { ok: true };
+  return failure('AGENT_UNAVAILABLE', 'The configured canonical agent is unavailable and temporary recruitment fallback is disabled.', { targetElementId, assigneeId: configuration.assigneeId });
+}
+
 function appendCleanupAudit(store, record, payload = {}) {
   const directory = getAuditArchiveDirectory(store, payload);
   if (!directory) return { status: 'unconfigured' };
@@ -172,6 +250,8 @@ function validateControlInputs({ store, goal, execution, command, payload }) {
     const target = goal.elements.find(element => element?.id === payload.targetElementId);
     if (target?.type === 'approval-gate' && payload.approvalGateStatus !== 'passed') return failure('APPROVAL_REQUIRED', 'The target approval gate has not passed.');
   }
+  const agentValidation = validateAgentDispatch({ store, goal, targetElementId: payload.targetElementId });
+  if (!agentValidation.ok) return agentValidation;
   return { ok: true };
 }
 
@@ -256,14 +336,14 @@ function createGoalLifecycleService({
           cleanupPending: false,
           commandResults: {},
           effectivePolicy,
-          contractPacket: buildGoalContractPacket({ goal, effectivePolicy, executionAttempt: 1, now }),
+          contractPacket: buildContractPacket(store, goal, effectivePolicy, 1, now),
           createdAt: now(),
         };
 
     const policyPayload = {
       ...payload,
       effectivePolicy,
-      contractPacket: buildGoalContractPacket({ goal, effectivePolicy, executionAttempt: execution.attempt, now }),
+      contractPacket: buildContractPacket(store, goal, effectivePolicy, execution.attempt, now),
     };
     const controlValidation = validateControlInputs({ store, goal, execution, command, payload: policyPayload });
     if (!controlValidation.ok) return controlValidation;

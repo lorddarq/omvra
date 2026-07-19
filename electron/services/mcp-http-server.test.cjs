@@ -228,7 +228,7 @@ test('revision conflicts record one failure event with a stable conflict class',
       name: 'tasks.update',
       arguments: { taskId: 'task-1', title: 'Rejected update', expectedRevision: 99 },
     },
-  }, makeReq({}, 'stdio'));
+  }, makeReq());
 
   assert.equal(response.error.code, -32602);
   const audits = store.get('omvra.mcp.audit.v1');
@@ -373,6 +373,8 @@ test('goals expose the complete graph through tools, resources, and workspace sn
         { id: 'instructions-1', type: 'instructions', title: 'Contract', body: 'Return evidence', x: 10, y: 230 },
         { id: 'condition-1', type: 'condition', title: 'Passing', x: 10, y: 340 },
         { id: 'approval-1', type: 'approval-gate', title: 'Approve', x: 10, y: 450 },
+        { id: 'human-input-1', type: 'human-input', title: 'Ask for input', humanInputPrompt: 'Which competitor should we add?', x: 10, y: 560 },
+        { id: 'retry-1', type: 'retry', title: 'Retry research', retryMaxAttempts: 3, retryExhaustionPolicy: 'human-review', x: 10, y: 670 },
         { id: 'sequence-1', type: 'connector', title: 'Sequence', sourceId: 'subgoal-1', targetId: 'agent-node-1' },
       ],
     }],
@@ -410,6 +412,9 @@ test('goals expose the complete graph through tools, resources, and workspace sn
   assert.equal(list[0].instructions[0].body, 'Return evidence');
   assert.equal(list[0].conditions.length, 1);
   assert.equal(list[0].approvalGates.length, 1);
+  assert.equal(list[0].controlFlowNodes.length, 2);
+  assert.equal(list[0].controlFlowNodes[0].humanInputPrompt, 'Which competitor should we add?');
+  assert.equal(list[0].controlFlowNodes[1].retryExhaustionPolicy, 'human-review');
   assert.equal(list[0].sequences[0].targetId, 'agent-node-1');
   assert.deepEqual(list[0].policy, { acceptanceActor: 'both', retryBudgetMode: 'goal-pool', maxRetries: 3, unsupportedField: 'discard me' });
   assert.deepEqual(list[0].subgoals[0].policy, { acceptanceActor: 'agentic', maxRetries: 2 });
@@ -506,6 +511,27 @@ test('goals.lifecycle exposes governed revision-checked and idempotent commands'
     'start', 'dispatch', 'acknowledge', 'submit-evidence', 'request-handoff',
     'accept', 'pause', 'resume', 'retry', 'delegate', 'wake', 'escalate', 'approve', 'reconcile', 'fail', 'complete', 'retry-cleanup',
   ]);
+});
+
+test('MCP Goal writes round-trip versioned agent configuration and dispatch metadata', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  store.set('omvra.goals.v1', [{ id: 'goal-agent-mcp', title: 'Agent MCP', revision: 0, elements: [{ id: 'agent-node', type: 'agent', title: 'Research', x: 0, y: 0 }] }]);
+  const dispatch = createRequestDispatcher(store);
+  const call = (name, argumentsValue) => dispatch({
+    jsonrpc: '2.0', id: `agent-mcp-${name}`, method: 'tools/call', params: { name, arguments: argumentsValue },
+  }, makeReq());
+  const configuration = { version: 1, mode: 'ephemeral', autoGenerateName: true, requestedType: 'researcher', instructions: 'Find evidence.' };
+  const updated = call('goals.update', {
+    goalId: 'goal-agent-mcp', expectedRevision: 0,
+    humanConfirmed: true,
+    title: 'Agent MCP',
+    elements: [{ id: 'agent-node', type: 'agent', title: 'Research', x: 0, y: 0, agentConfiguration: configuration }],
+  });
+  assert.equal(updated.result.structuredContent.goal.elements[0].agentConfiguration.mode, 'ephemeral');
+  const read = call('goals.get', { goalId: 'goal-agent-mcp' }).result.structuredContent;
+  assert.deepEqual(read.agents[0].agentConfiguration, configuration);
+  assert.equal(read.agents[0].agentDispatch.status, 'recruitment-requested');
+  assert.equal(read.agents[0].agentDispatch.profileSource, 'none');
 });
 
 test('focused Goal element and connector writes are revision-checked and idempotent', () => {

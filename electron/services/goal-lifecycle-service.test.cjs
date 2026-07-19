@@ -100,6 +100,42 @@ test('lifecycle execution carries the resolved policy into the contract packet a
   assert.equal(started.execution.contractPacket.effectivePolicy.acceptance.actor, 'human');
 });
 
+test('agent delegation contract packets resolve canonical profiles and keep ephemeral agents persona-free', () => {
+  const store = makeStore();
+  store.set('omvra.people.v1', [{ id: 'canonical-1', kind: 'agentic', agentInstructions: 'Persona', agentOperationalInstructions: 'Method' }]);
+  store.set('omvra.goals.v1', [{ id: 'goal-1', title: 'Delegate', elements: [
+    { id: 'existing', type: 'agent', title: 'Existing', agentConfiguration: { mode: 'existing', assigneeId: 'canonical-1', instructions: 'Node task' } },
+    { id: 'ephemeral', type: 'agent', title: 'Temporary', agentConfiguration: { mode: 'ephemeral', autoGenerateName: true, requestedType: 'researcher', instructions: 'Research task' } },
+  ] }]);
+  const lifecycle = createGoalLifecycleService({ store, now: makeClock(), cleanup: () => ({ status: 'skipped', ok: true }) });
+
+  const started = lifecycle.execute({ goalId: 'goal-1', command: 'start', expectedRevision: 0, commandId: 'start-agent-contract' });
+  const delegations = started.execution.contractPacket.agentDelegations;
+  assert.equal(delegations[0].profileSource, 'canonical');
+  assert.equal(delegations[0].personaInstructions, 'Persona');
+  assert.equal(delegations[0].instructions, 'Node task');
+  assert.equal(delegations[1].status, 'recruitment-requested');
+  assert.equal(delegations[1].autoGenerateName, true);
+  assert.equal(delegations[1].profileSource, 'none');
+  assert.equal('personaInstructions' in delegations[1], false);
+  assert.equal(started.execution.contractPacket.recruitmentRequests[0].rationale.includes('explicitly requests'), true);
+});
+
+test('dispatch rejects unavailable canonical agent references unless fallback is enabled', () => {
+  const store = makeStore();
+  store.set('omvra.goals.v1', [{ id: 'goal-1', title: 'Unavailable', elements: [{ id: 'agent-node', type: 'agent', title: 'Missing', agentConfiguration: { mode: 'existing', assigneeId: 'gone', instructions: 'Do not reassign' } }] }]);
+  const lifecycle = createGoalLifecycleService({ store, now: makeClock(), cleanup: () => ({ status: 'skipped', ok: true }) });
+  lifecycle.execute({ goalId: 'goal-1', command: 'start', expectedRevision: 0, commandId: 'start-unavailable' });
+  lifecycle.execute({ goalId: 'goal-1', command: 'acknowledge', expectedRevision: 1, commandId: 'ack-unavailable', payload: { contractRevision: 0 } });
+  const blocked = lifecycle.execute({ goalId: 'goal-1', command: 'dispatch', expectedRevision: 2, commandId: 'dispatch-unavailable', payload: { targetElementId: 'agent-node' } });
+  assert.equal(blocked.error, 'AGENT_UNAVAILABLE');
+
+  store.set('omvra.goals.v1', [{ id: 'goal-1', title: 'Fallback', elements: [{ id: 'agent-node', type: 'agent', title: 'Missing', agentConfiguration: { mode: 'existing', assigneeId: 'gone', instructions: 'Recruit if needed', spawnIfUnavailable: true } }] }]);
+  const allowed = lifecycle.execute({ goalId: 'goal-1', command: 'dispatch', expectedRevision: 2, commandId: 'dispatch-fallback', payload: { targetElementId: 'agent-node' } });
+  assert.equal(allowed.ok, true);
+  assert.equal(allowed.execution.contractPacket.recruitmentRequests[0].rationale.includes('unavailable'), true);
+});
+
 test('pending policy impact gate blocks continuation until pause and confirmation', () => {
   const store = makeStore();
   const lifecycle = createGoalLifecycleService({ store, now: makeClock(), cleanup: () => ({ status: 'skipped', ok: true }) });

@@ -52,6 +52,33 @@ test('full workspace backups keep Goal policy separate from general preferences'
   assert.notEqual(payload.preferences, payload.goalPolicy);
 });
 
+test('workspace backup preserves versioned Goal agent configuration through electron-store round trips', () => {
+  const goal = {
+    id: 'goal-agent-backup',
+    title: 'Backup delegation',
+    elements: [{
+      id: 'agent-node',
+      type: 'agent',
+      title: 'Temporary researcher',
+      x: 0,
+      y: 0,
+      agentConfiguration: { version: 1, mode: 'ephemeral', autoGenerateName: true, requestedType: 'researcher', instructions: 'Find evidence.' },
+    }],
+  };
+  const payload = buildWorkspaceBackupPayload({
+    tasks: [], milestones: [], projects: [], people: [], statusColumns: fallbackStatusColumns,
+    preferences: createDefaultWorkspacePreferences(fallbackStatusColumns),
+    electronStore: { 'omvra.goals.v1': [goal] },
+  });
+  const repaired = repairWorkspaceBackupPayload(payload, {
+    fallbackStatusColumns,
+    fallbackPreferences: createDefaultWorkspacePreferences(fallbackStatusColumns),
+  });
+
+  assert.equal(repaired.ok, true);
+  assert.deepEqual(repaired.electronStoreSnapshot['omvra.goals.v1'], [goal]);
+});
+
 test('legacy Plumy backup storage keys are restored under the Omvra namespace', () => {
   const tasksJson = JSON.stringify([{ id: 'task-1', title: 'Legacy task', status: 'open' }]);
   const snapshot = getPortableStorageSnapshotFromEntries({

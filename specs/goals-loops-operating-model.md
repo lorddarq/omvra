@@ -27,6 +27,12 @@ Execution state is overseer-managed and separate from editable Goal graph defini
 
 The first slice preserves missing dependency and persona references. A missing agent remains traceable as a degraded reference rather than being silently reassigned or deleted from workflow data. Available agent UI metadata may provide role context, but missing skills and instructions are shown explicitly and are not implied. Deleting an available agent requires confirmation that explains which workflows reference the agent and what degraded behavior will result.
 
+Agent nodes are executable delegation points. They carry task-specific instructions independently from the selected agent's persona and operational profile. The agent-node inspector exposes an `existing` or `ephemeral` mode, canonical agent selection for existing agents, requested capability/name/type for ephemeral recruitment, task-specific instructions, and an explicit `spawnIfUnavailable` fallback.
+
+When configured for an existing agent, the overseer resolves the canonical person and combines that person's behavior/persona guidance and operational instructions with the node's task-specific instructions. When configured for an ephemeral agent, the overseer must not attach a persona profile or invent behavior/operational instructions; it passes the requested capability and node instructions to temporary-agent recruitment. If a requested existing agent cannot be resolved and fallback is enabled, the overseer receives a typed unavailable-agent result and may spawn a temporary agent rather than silently assigning a different canonical person.
+
+Templates must not use agent-node bodies as a substitute for dispatch instructions or hard-code canonical assignee IDs that may not exist in another workspace. `instructions` nodes remain separate shared/scoped guidance and do not replace the agent node's delegation contract.
+
 ## Confirmed execution flow
 
 When a user asks an orchestrator to execute a goal by ID:
@@ -42,6 +48,34 @@ When a user asks an orchestrator to execute a goal by ID:
 9. The cycle continues until the goal reaches human acceptance, completion, failure, or an explicitly blocked state.
 
 The graph's spatial arrangement should communicate the user's intended workflow. Execution meaning must remain explicit in typed connectors and scoped relationships; coordinates must never be the sole source of ordering or authority.
+
+## Resolved control-flow node contract
+
+Goals / Loops includes executable control-flow nodes in addition to agent work and planning nodes. The first two are `human-input` and `retry`. They are visible on the canvas, persisted in Goal graphs, exposed through MCP, represented in inspectors and execution logs, and interpreted by the overseer/lifecycle layer.
+
+The canvas toolbar exposes them through an extensible **Control flow** selector, parallel to the agent selector. Only `human-input` and `retry` are in the initial implementation slice.
+
+### `human-input`
+
+`human-input` is an overseer-mediated pause primitive. The overseer prompts the user when execution reaches the node; the workflow becomes paused/blocked; the first version collects free text; and the durable response becomes reusable Goal execution context. Execution resumes only after the response is persisted. A new response appends to prior context rather than replacing it.
+
+### `retry`
+
+`retry` is a control-flow command that re-enters an earlier completed node. A regular persisted connector configures the target relationship and remains its source of truth. The lifecycle interprets that connector as a return route because its source is a `retry` node. Retry has a dedicated `maxAttempts` or `maxRetries` value scoped to the current execution, preserves previous findings/evidence/context, and renders its return path distinctly from ordinary dependencies.
+
+When the limit is reached, the node follows an explicit exhaustion policy: `human-review` pauses and asks whether to continue or fail, while `fail-goal` marks the Goal execution failed.
+
+Normal connectors remain DAG dependencies. Retry return routes are validated by control-flow rules rather than weakening ordinary cycle protection. The renderer edits and visualizes the graph; lifecycle/orchestration owns pause, resume, retry counting, context accumulation, exhaustion, and execution events. MCP read models expose the semantic node fields and retry target rather than flattening these nodes into generic sequences.
+
+The initial workflow shape is:
+
+```text
+Research competitors → Compare findings → Enough coverage?
+                                      ├─ yes → Synthesize recommendation
+                                      └─ no  → Ask for more competitors
+                                                    ↓
+                                              Retry research ──↺ Research competitors
+```
 
 ## Agreed scheduled Goal execution contract
 

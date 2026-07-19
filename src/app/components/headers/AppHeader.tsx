@@ -21,7 +21,7 @@ export function AppHeader({
   onOpenAgents,
 }: AppHeaderProps) {
   return (
-    <header className="bg-white border-b px-6 py-3 flex items-center justify-between">
+    <header className="relative z-[70] bg-white border-b px-6 py-3 flex items-center justify-between">
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
           <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">

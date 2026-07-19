@@ -645,3 +645,21 @@ The next deliverable is the implementation of the lifecycle boundary described a
 - persistence and backup requirements;
 - acceptance tests for advancing, pausing, resuming, and failing a goal.
 - a durable completion commit followed by idempotent cleanup reconciliation.
+
+## Open tasks from the first live Goal test run
+
+The first live run of `goal_d45c31ef-7f4b-4a71-b3b9-f74b9cd0c950` exposed execution-contract gaps. The workflow graph contained an ephemeral researcher node with `recruitment-requested`, but no subagent was spawned, no step-by-step acknowledgement conversation was visible, and no execution record made the skipped stages or active stage explicit. The Goals UI also did not reflect the executing state through the MCP/IPC path.
+
+These are open Omvra tasks in project `omvra`:
+
+| Task | Scope | Priority |
+| --- | --- | --- |
+| `task-4c05fab3-9f23-454c-998c-6835f6898ee2` | Enforce subagent spawn and ordered workflow-step execution | Urgent |
+| `task-078b0240-6892-437a-875d-973965d0576a` | Persist acknowledgement and explicit workflow stage events | Urgent |
+| `task-1c865bd1-182d-4a91-ae7e-e685308b4dba` | Bridge MCP execution progress into the Goals UI | Urgent |
+| `task-c00f270f-49e5-4810-8941-fe55ee3d457c` | Add terminal delivery-handoff contract and human preferences | High |
+| `task-e653e01c-071f-4c07-bf8d-735995375ae7` | Add the end-to-end execution-contract regression benchmark | High |
+
+The run must make the operating agent's current stage explicit, for example `received → acknowledged → worker assessed → eligible → started → evidence submitted → overseer validated → handoff pending → delivered`. A stage is not complete merely because the agent produced a response; the stage transition and its evidence must be durable.
+
+Delivery handoff is intentionally tracked separately from ordinary connectors. It is a terminal delivery contract that controls recipient, artifact format, channel, attachment/download preference, acceptance, and stop condition. It may be rendered near the end of the workflow, but it is not a normal dependency node.

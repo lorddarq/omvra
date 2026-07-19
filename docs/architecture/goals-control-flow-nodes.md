@@ -107,12 +107,47 @@ Do not add these in the initial implementation, but keep the category extensible
 - `parallel` and `join` for fan-out and synchronization;
 - `loop` for collection iteration;
 - `switch` for multi-way routing;
-- `handoff` for responsibility transfer;
+- `handoff` for responsibility transfer; delivery handoff is separately tracked as a terminal delivery contract, not an ordinary dependency node;
 - `timeout` and `escalation` for stalled execution;
 - `cancel` and `compensate` for intentional stop and cleanup;
 - `subworkflow` for reusable Goal invocation;
 - `break` and `continue` for loop control;
 - explicit `success` and `failure` terminal states.
+
+## Terminal delivery handoff
+
+The first live Goal test showed that execution completion and human delivery are different boundaries. A Goal may have valid evidence and still fail the user's requested outcome if the result is not delivered in the required format or channel.
+
+`delivery-handoff` is therefore a terminal execution contract rather than a normal control-flow node or DAG dependency. It should carry:
+
+- recipient and conversation/channel;
+- required deliverable references;
+- format, including downloadable PDF or other file preferences;
+- summary and naming requirements;
+- human or agent acceptance actor;
+- delivery status: `pending`, `delivered`, `rejected`, or `failed`;
+- a stop condition that prevents Goal completion until the required delivery outcome is recorded.
+
+The terminal handoff must be included in the worker contract where relevant, exposed through MCP/read models, persisted across reload and backup/restore, and visible in the UI as `handoff-pending` before delivery. It must not be flattened into an ordinary connector because delivery semantics are about the final human outcome, not execution ordering.
+
+## First-run execution gaps to close
+
+The first live run also showed that the graph's configured ephemeral agent and `recruitment-requested` state did not result in a spawned subagent, and that the UI remained unaware of active execution. The runtime must enforce the following observable sequence:
+
+```text
+validate graph
+  → recruit/spawn worker
+  → dispatch contract
+  → received / acknowledged
+  → worker assessed / eligible
+  → started / stage updates
+  → evidence submitted
+  → overseer validated
+  → terminal delivery handoff
+  → delivered / rejected / failed
+```
+
+Every transition needs an immutable typed event with the current node, execution attempt, actor, contract revision, timestamp, and reason. Missing telemetry must produce a visible degraded or blocked state; it must not leave the canvas looking like a draft workflow.
 
 ## Implementation boundaries
 

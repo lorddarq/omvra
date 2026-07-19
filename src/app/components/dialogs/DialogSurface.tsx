@@ -10,7 +10,7 @@ export function DialogSurface({
   return (
     <DialogContent
       className={cn(
-        'max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] overflow-x-hidden overflow-y-auto rounded-[28px] border-white/70 bg-[#f3f4f6] p-0 shadow-[0_24px_80px_rgba(15,23,42,0.18)]',
+        'fixed left-[50%] top-[50%] z-[80] translate-x-[-50%] translate-y-[-50%] max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2rem)] overflow-x-hidden overflow-y-auto rounded-[28px] border-white/70 bg-[#f3f4f6] p-0 shadow-[0_24px_80px_rgba(15,23,42,0.18)]',
         className,
       )}
       {...props}

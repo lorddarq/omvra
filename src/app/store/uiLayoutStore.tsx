@@ -138,7 +138,7 @@ export function UiLayoutStoreProvider({
   const [hydratedKanbanFilters, setHydratedKanbanFilters] = useState<KanbanTaskFilters>(EMPTY_KANBAN_TASK_FILTERS);
   const [hasHydratedUiState, setHasHydratedUiState] = useState(false);
   const [viewRefreshKey, setViewRefreshKey] = useState(0);
-  const [preferencesInitialAnchor, setPreferencesInitialAnchor] = useState('task-load');
+  const [preferencesInitialAnchor, setPreferencesInitialAnchor] = useState('general');
   const [selectedMilestone, setSelectedMilestone] = useState<ProjectMilestone | null>(null);
   const [detailsMilestoneId, setDetailsMilestoneId] = useState<string | null>(null);
   const [isMilestoneDialogOpen, setIsMilestoneDialogOpen] = useState(false);
@@ -153,7 +153,7 @@ export function UiLayoutStoreProvider({
     : null;
 
   const openPreferences = useCallback(() => {
-    setPreferencesInitialAnchor('task-load');
+    setPreferencesInitialAnchor('general');
     dialogs.setIsPreferencesOpen(true);
   }, [dialogs]);
 
@@ -324,7 +324,7 @@ export function UiLayoutStoreProvider({
     kanbanScrollStateRef.current = DEFAULT_SCROLL_STATE;
     viewState.resetViewState();
     viewState.switchView('timeline');
-    setPreferencesInitialAnchor('task-load');
+    setPreferencesInitialAnchor('general');
     setSelectedMilestone(null);
     setDetailsMilestoneId(null);
     setIsMilestoneDialogOpen(false);

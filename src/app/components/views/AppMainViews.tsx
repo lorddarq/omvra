@@ -25,6 +25,8 @@ export interface AppViewDataProps {
   statusColumns: StatusColumn[];
   milestones: ProjectMilestone[];
   goalPolicy: GoalPolicyV1;
+  goalAuditArchiveDirectory: string;
+  onGoalAuditArchiveDirectoryChange: (directory: string) => void;
   customScrollbarsEnabled: boolean;
   readModel: WorkspaceReadModel;
 }
@@ -159,7 +161,7 @@ export function AppMainViews({
         </div>
       )}
 
-      {currentView === 'loops' && <GoalsView people={data.people} workspacePolicy={data.goalPolicy} />}
+      {currentView === 'loops' && <GoalsView people={data.people} workspacePolicy={data.goalPolicy} goalAuditArchiveDirectory={data.goalAuditArchiveDirectory} onGoalAuditArchiveDirectoryChange={data.onGoalAuditArchiveDirectoryChange} />}
     </div>
   );
 }

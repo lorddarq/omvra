@@ -377,6 +377,25 @@ test('goals expose the complete graph through tools, resources, and workspace sn
       ],
     }],
   });
+  store.set('omvra.goalExecutions.v1', [{
+    id: 'execution-1',
+    goalId: 'goal-1',
+    state: 'complete',
+    revision: 4,
+    cleanupStatus: 'partial-failure',
+    cleanupPending: true,
+    updatedAt: '2026-07-18T00:00:00.000Z',
+  }]);
+  store.set('omvra.goalReconciliations.v1', [{
+    id: 'reconciliation-1',
+    goalId: 'goal-1',
+    executionId: 'execution-1',
+    kind: 'cleanup',
+    status: 'pending',
+    cleanupStatus: 'partial-failure',
+    attemptCount: 1,
+    reason: 'artifact locked',
+  }]);
   const dispatch = createRequestDispatcher(store);
   const call = (name, args = {}) => dispatch({
     jsonrpc: '2.0',
@@ -395,6 +414,9 @@ test('goals expose the complete graph through tools, resources, and workspace sn
   assert.deepEqual(list[0].policy, { acceptanceActor: 'both', retryBudgetMode: 'goal-pool', maxRetries: 3, unsupportedField: 'discard me' });
   assert.deepEqual(list[0].subgoals[0].policy, { acceptanceActor: 'agentic', maxRetries: 2 });
   assert.equal(call('goals.get', { goalId: 'goal-1' }).result.structuredContent.id, 'goal-1');
+  assert.equal(list[0].execution.cleanupStatus, 'partial-failure');
+  assert.equal(list[0].execution.cleanupPending, true);
+  assert.equal(call('goals.get', { goalId: 'goal-1' }).result.structuredContent.reconciliations[0].attemptCount, 1);
   assert.equal(call('workspace.get_snapshot').result.structuredContent.workspace.goals.length, 1);
   const resource = dispatch({
     jsonrpc: '2.0', id: 'goal-resource-test', method: 'resources/read',
@@ -482,7 +504,7 @@ test('goals.lifecycle exposes governed revision-checked and idempotent commands'
   }, makeReq()).result.tools.find(tool => tool.name === 'goals_lifecycle');
   assert.deepEqual(lifecycleTool.inputSchema.properties.command.enum, [
     'start', 'dispatch', 'acknowledge', 'submit-evidence', 'request-handoff',
-    'accept', 'pause', 'resume', 'retry', 'delegate', 'wake', 'escalate', 'approve', 'reconcile', 'fail', 'complete',
+    'accept', 'pause', 'resume', 'retry', 'delegate', 'wake', 'escalate', 'approve', 'reconcile', 'fail', 'complete', 'retry-cleanup',
   ]);
 });
 

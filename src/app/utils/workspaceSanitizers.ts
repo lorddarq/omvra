@@ -13,6 +13,7 @@ export interface AppPreferencesLike {
   executionLoadStatusIds: TaskStatus[];
   pipelineLoadStatusIds: TaskStatus[];
   cleanupGoalArtifacts: boolean;
+  goalAuditArchiveDirectory: string;
   customScrollbarsEnabled: boolean;
   executionLoadStatusId?: TaskStatus;
   pipelineLoadStatusId?: TaskStatus;
@@ -408,6 +409,7 @@ export function sanitizePreferences(
     executionLoadStatusIds,
     pipelineLoadStatusIds,
     cleanupGoalArtifacts: Boolean(preferences.cleanupGoalArtifacts),
+    goalAuditArchiveDirectory: typeof preferences.goalAuditArchiveDirectory === 'string' ? preferences.goalAuditArchiveDirectory.trim() : '',
     customScrollbarsEnabled: preferences.customScrollbarsEnabled !== false,
     updateChannel: preferences.updateChannel === 'rc' ? 'rc' : 'stable',
     markdownAppearance: sanitizeMarkdownAppearance(preferences.markdownAppearance, fallback.markdownAppearance || DEFAULT_MARKDOWN_APPEARANCE),

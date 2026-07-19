@@ -79,8 +79,8 @@
 }
 
 .view-toggle-button:focus-visible {
-  outline: 2px solid rgba(75, 85, 99, 0.35);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgba(75, 85, 99, 0.35);
 }
 
 /* Goals canvas texture: customize the variables to tune density and contrast. */
@@ -120,6 +120,11 @@
   height: 20px;
 }
 
+.goals-view button[aria-label="Add agent"] > svg:last-child {
+  width: 12px;
+  height: 12px;
+}
+
 .goals-view button[aria-label="Pan canvas"] svg {
   display: none;
 }
@@ -154,6 +159,7 @@
 
 /* Settings panel motion */
 .omvra-settings-overlay {
+  z-index: 70;
   transform: translateZ(0);
   transform-origin: center;
   backface-visibility: hidden;
@@ -169,6 +175,7 @@
 }
 
 .omvra-settings-sheet {
+  z-index: 80;
   transform-origin: top right;
   contain: layout paint;
   view-transition-name: omvra-settings-sheet;
@@ -648,6 +655,7 @@
 
 .kanban-toolbar {
   position: relative;
+  z-index: 60;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -657,11 +665,21 @@
   padding: 0.75rem 1rem;
 }
 
+.omvra-filter-select-content {
+  z-index: 1000;
+}
+
 .kanban-toolbar-search {
   position: relative;
   min-width: 220px;
   max-width: 320px;
   flex: 1 1 260px;
+}
+
+.kanban-toolbar-search > [data-slot="tooltip"] {
+  display: block;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .kanban-toolbar-search-icon {

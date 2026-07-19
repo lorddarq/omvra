@@ -9,6 +9,8 @@ const PEOPLE_KEY = 'omvra.people.v1';
 const SWIMLANES_KEY = 'omvra.swimlanes.v1';
 const STATUS_COLUMNS_KEY = 'omvra.statusColumns.v1';
 const GOALS_KEY = 'omvra.goals.v1';
+const GOAL_EXECUTIONS_KEY = 'omvra.goalExecutions.v1';
+const GOAL_RECONCILIATIONS_KEY = 'omvra.goalReconciliations.v1';
 const MCP_BOARD_WATCHERS_KEY = 'omvra.mcp.boardWatchers.v1';
 const REQUIRES_HUMAN_REVIEW_STATUS_ID = 'requires-human-review';
 const REQUIRES_HUMAN_REVIEW_STATUS_TITLE = 'Requires human review';
@@ -892,7 +894,35 @@ function normalizeGoalForMcp(goal) {
 }
 
 function listGoals(store) {
-  return migrateGoalRecords(store).goals.map(normalizeGoalForMcp);
+  return migrateGoalRecords(store).goals.map(goal => withGoalExecutionReadModel(store, normalizeGoalForMcp(goal)));
+}
+
+function withGoalExecutionReadModel(store, goal) {
+  const execution = readArray(store, GOAL_EXECUTIONS_KEY).find(item => item?.goalId === goal?.id);
+  const reconciliations = readArray(store, GOAL_RECONCILIATIONS_KEY)
+    .filter(item => item?.goalId === goal?.id)
+    .map(item => ({
+      id: item.id,
+      kind: item.kind,
+      status: item.status,
+      cleanupStatus: item.cleanupStatus,
+      attemptCount: item.attemptCount,
+      reason: item.reason,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+    }));
+  return {
+    ...goal,
+    execution: execution ? {
+      id: execution.id,
+      state: execution.state,
+      revision: execution.revision,
+      cleanupStatus: execution.cleanupStatus || 'not-requested',
+      cleanupPending: execution.cleanupPending === true,
+      updatedAt: execution.updatedAt,
+    } : null,
+    reconciliations,
+  };
 }
 
 function getGoalById(store, goalId) {

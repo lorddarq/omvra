@@ -1,16 +1,24 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
+
 interface TodayButtonProps {
   onClick: () => void;
   label?: string;
+  tooltip?: string;
 }
 
-export function TodayButton({ onClick, label = 'Today' }: TodayButtonProps) {
+export function TodayButton({ onClick, label = 'Today', tooltip = 'Scroll to today' }: TodayButtonProps) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="timeline-toolbar-button-primary"
-    >
-      {label}
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onClick}
+          className="timeline-toolbar-button-primary"
+        >
+          {label}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{tooltip}</TooltipContent>
+    </Tooltip>
   );
 }

@@ -9,7 +9,7 @@ type TooltipAlign = "start" | "center" | "end";
 
 interface TooltipContextValue {
   open: boolean;
-  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setOpen: (nextOpen: boolean) => void;
 }
 
 const TooltipContext = React.createContext<TooltipContextValue | null>(null);
@@ -28,10 +28,32 @@ function TooltipProvider({ children }: React.PropsWithChildren) {
 
 function Tooltip({ children }: React.PropsWithChildren) {
   const [open, setOpen] = React.useState(false);
+  const openTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearOpenTimer = React.useCallback(() => {
+    if (openTimerRef.current) {
+      clearTimeout(openTimerRef.current);
+      openTimerRef.current = null;
+    }
+  }, []);
+
+  const setTooltipOpen = React.useCallback((nextOpen: boolean) => {
+    clearOpenTimer();
+    if (nextOpen) {
+      openTimerRef.current = setTimeout(() => {
+        setOpen(true);
+        openTimerRef.current = null;
+      }, 800);
+    } else {
+      setOpen(false);
+    }
+  }, [clearOpenTimer]);
+
+  React.useEffect(() => clearOpenTimer, [clearOpenTimer]);
 
   return (
     <TooltipProvider>
-      <TooltipContext.Provider value={{ open, setOpen }}>
+      <TooltipContext.Provider value={{ open, setOpen: setTooltipOpen }}>
         <span data-slot="tooltip" className="relative inline-flex">
           {children}
         </span>
@@ -124,7 +146,7 @@ function TooltipContent({
       data-slot="tooltip-content"
       role="tooltip"
       className={cn(
-        "absolute z-50 w-fit max-w-[280px] rounded-xl bg-[#303038] px-3 py-2 text-xs leading-4 text-white shadow-lg",
+        "absolute z-50 flex w-fit max-w-[300px] items-center overflow-hidden text-ellipsis whitespace-nowrap rounded-xl bg-[#303038] px-3 py-2 text-xs leading-4 text-white shadow-lg",
         sideClassName,
         alignClassName,
         className,

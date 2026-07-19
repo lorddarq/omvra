@@ -3,6 +3,7 @@ import { ViewToggle } from '../ViewToggle';
 import { ViewType } from '../../hooks/useViewState';
 import { AgentIcon } from '../icons/AgentIcon';
 import { UsersIcon } from '../icons/UsersIcon';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 
 interface AppHeaderProps {
   currentView: ViewType;
@@ -46,15 +47,30 @@ export function AppHeader({
       </div>
 
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={onOpenPeople} aria-label="Open people settings" className="text-[#8B8B93]">
-          <UsersIcon />
-        </Button>
-        <Button variant="ghost" size="icon" onClick={onOpenAgents} aria-label="Open agents settings" className="text-[#8B8B93]">
-          <AgentIcon />
-        </Button>
-        <Button variant="ghost" size="icon" onClick={onOpenPreferences} aria-label="Open preferences" className="text-[#8B8B93]">
-          <GearIcon />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" onClick={onOpenPeople} aria-label="Open people settings" className="text-[#8B8B93]">
+              <UsersIcon />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Open people settings</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" onClick={onOpenAgents} aria-label="Open agents settings" className="text-[#8B8B93]">
+              <AgentIcon />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Open agents settings</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" onClick={onOpenPreferences} aria-label="Open preferences" className="text-[#8B8B93]">
+              <GearIcon />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Open preferences</TooltipContent>
+        </Tooltip>
       </div>
     </header>
   );

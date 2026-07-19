@@ -1,5 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const { createGoalLifecycleService, EVENTS_KEY, EXECUTIONS_KEY, EVIDENCE_KEY } = require('./goal-lifecycle-service.cjs');
 
 function makeStore() {
@@ -164,6 +167,47 @@ test('cleanup failure does not downgrade a completed execution', () => {
   assert.equal(result.execution.state, 'complete');
   assert.equal(result.cleanup.status, 'partial-failure');
   assert.equal(store.get(EXECUTIONS_KEY)[0].state, 'complete');
+});
+
+test('cleanup failure is pending, explicitly retryable, and archived externally', () => {
+  const store = makeStore();
+  const archiveDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'omvra-goal-audit-'));
+  store.set('omvra.preferences.v1', { goalAuditArchiveDirectory: archiveDirectory });
+  let cleanupCalls = 0;
+  const lifecycle = createGoalLifecycleService({
+    store,
+    now: makeClock(),
+    cleanup() {
+      cleanupCalls += 1;
+      return cleanupCalls === 1
+        ? { ok: false, status: 'partial-failure', reason: 'artifact locked', requestedFiles: ['project.md'], removedFiles: [] }
+        : { ok: true, status: 'cleaned', requestedFiles: ['project.md', 'roster.md'], removedFiles: ['project.md', 'roster.md'] };
+    },
+  });
+
+  lifecycle.execute({ goalId: 'goal-1', command: 'start', expectedRevision: 0, commandId: 'start' });
+  lifecycle.execute({ goalId: 'goal-1', command: 'acknowledge', expectedRevision: 1, commandId: 'ack', payload: { contractRevision: 0 } });
+  lifecycle.execute({ goalId: 'goal-1', command: 'dispatch', expectedRevision: 2, commandId: 'dispatch' });
+  lifecycle.execute({ goalId: 'goal-1', command: 'submit-evidence', expectedRevision: 3, commandId: 'evidence', payload: { evidenceRefs: ['final'] } });
+  lifecycle.execute({ goalId: 'goal-1', command: 'request-handoff', expectedRevision: 4, commandId: 'handoff' });
+  lifecycle.execute({ goalId: 'goal-1', command: 'accept', expectedRevision: 5, commandId: 'accept', payload: { finalEvidenceVerified: true } });
+  const completed = lifecycle.execute({ goalId: 'goal-1', command: 'complete', expectedRevision: 6, commandId: 'complete', payload: { finalEvidenceVerified: true } });
+
+  assert.equal(completed.execution.state, 'complete');
+  assert.equal(completed.execution.cleanupPending, true);
+  assert.equal(store.get('omvra.goalReconciliations.v1').at(-1).kind, 'cleanup');
+  assert.equal(lifecycle.reconcilePending().executions[0].cleanupPending, true);
+  assert.equal(lifecycle.execute({ goalId: 'goal-1', command: 'retry-cleanup', expectedRevision: completed.execution.revision, commandId: 'retry-without-confirmation' }).error, 'HUMAN_CONFIRMATION_REQUIRED');
+
+  const retried = lifecycle.execute({ goalId: 'goal-1', command: 'retry-cleanup', expectedRevision: completed.execution.revision, commandId: 'retry-cleanup', payload: { humanConfirmed: true } });
+  assert.equal(retried.execution.state, 'complete');
+  assert.equal(retried.execution.cleanupStatus, 'cleaned');
+  assert.equal(retried.execution.cleanupPending, false);
+  assert.equal(store.get('omvra.goalReconciliations.v1').some(item => item.status === 'pending'), false);
+
+  const auditLines = fs.readFileSync(path.join(archiveDirectory, 'goal-cleanup-audit.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
+  assert.equal(auditLines.length, 2);
+  assert.deepEqual(auditLines.map(item => item.attempt), [1, 2]);
 });
 
 test('dispatch enforces acknowledgement, conditions, approval gates, and dependencies', () => {

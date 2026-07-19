@@ -11,6 +11,7 @@ import {
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { UNASSIGNED_ASSIGNEE_FILTER_VALUE, type KanbanTaskFilterKey } from '../utils/taskFilters';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 const ALL_FILTER_VALUE = '__omvra_all__';
 
@@ -60,12 +61,12 @@ export function KanbanToolbar({
     <div className="kanban-toolbar">
       <div className="kanban-toolbar-search">
         <Search className="kanban-toolbar-search-icon" />
-        <Input
-          value={searchQuery}
-          onChange={(event) => onSearchQueryChange(event.target.value)}
-          placeholder="Search tasks..."
-          className="kanban-toolbar-search-input"
-        />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Input value={searchQuery} onChange={(event) => onSearchQueryChange(event.target.value)} placeholder="Search tasks..." className="kanban-toolbar-search-input" />
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Search tasks</TooltipContent>
+        </Tooltip>
       </div>
 
       <div className="kanban-toolbar-actions">
@@ -128,15 +129,15 @@ export function KanbanToolbar({
           </Button>
         )}
 
-        <button
-          type="button"
-          onClick={onAddColumn}
-          className="kanban-toolbar-add-board"
-          disabled={!onAddColumn}
-        >
-          <Plus className="size-4" />
-          <span>Add Board</span>
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button type="button" onClick={onAddColumn} className="kanban-toolbar-add-board" disabled={!onAddColumn}>
+              <Plus className="size-4" />
+              <span>Add Board</span>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Add board column</TooltipContent>
+        </Tooltip>
       </div>
     </div>
   );
@@ -162,22 +163,25 @@ function KanbanFilterSelect({
   return (
     <div className="kanban-filter-control">
       <Select value={value} onValueChange={onValueChange}>
-        <SelectTrigger size="sm" className={`kanban-filter-trigger ${active ? 'is-active' : ''}`}>
-          <SelectValue placeholder={placeholder} />
-        </SelectTrigger>
-        <SelectContent>{children}</SelectContent>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <SelectTrigger size="sm" className={`kanban-filter-trigger ${active ? 'is-active' : ''}`}>
+              <SelectValue placeholder={placeholder} />
+            </SelectTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Filter by {placeholder.toLowerCase()}</TooltipContent>
+        </Tooltip>
+        <SelectContent className="omvra-filter-select-content">{children}</SelectContent>
       </Select>
       {active && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={onClear}
-          className="kanban-filter-clear"
-          aria-label={`Clear ${placeholder.toLowerCase()} filter`}
-        >
-          <X className="size-4" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button type="button" variant="ghost" size="icon" onClick={onClear} className="kanban-filter-clear" aria-label={`Clear ${placeholder.toLowerCase()} filter`}>
+              <X className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Clear {placeholder.toLowerCase()} filter</TooltipContent>
+        </Tooltip>
       )}
     </div>
   );

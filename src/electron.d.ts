@@ -235,6 +235,9 @@ declare global {
         embed: (path: string) => Promise<any>;
         reveal: (path: string) => Promise<{ success: boolean; error?: string }>;
       };
+      goalAudit: {
+        pickDirectory: () => Promise<string | null>;
+      };
       openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
       tasks: {
         exportPdf: (payload: {

@@ -5,6 +5,7 @@ import { getMilestoneHealthVisual, getStatusVisual, type MilestoneHealth } from 
 import { ProjectBadge } from './ProjectBadge';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 interface RoadmapMilestoneSummary {
   health: MilestoneHealth;
@@ -54,15 +55,14 @@ export function RoadmapMilestoneSidebar({
           <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#a5a5ac]">
             Milestones
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={onAddMilestone}
-            className="h-auto rounded-full px-2 py-1 text-xs font-semibold text-[#1a60cb] hover:bg-[#1a60cb]/6 hover:text-[#1a60cb]"
-          >
-            Add
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button type="button" variant="ghost" size="sm" onClick={onAddMilestone} className="h-auto rounded-full px-2 py-1 text-xs font-semibold text-[#1a60cb] hover:bg-[#1a60cb]/6 hover:text-[#1a60cb]">
+                Add
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Add milestone</TooltipContent>
+          </Tooltip>
         </div>
         <div className="pointer-events-none absolute right-0 top-1/2 flex h-[89px] w-[13px] -translate-y-1/2 items-center justify-center gap-px px-[2px] py-3">
           <span className="h-[13px] w-px bg-[#b8b8b8]" />

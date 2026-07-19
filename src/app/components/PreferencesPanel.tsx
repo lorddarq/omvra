@@ -29,6 +29,7 @@ interface PreferencesPanelProps {
   statusColumns: StatusColumn[];
   showCompletedTimelineTasks: boolean;
   cleanupGoalArtifacts: boolean;
+  goalAuditArchiveDirectory: string;
   customScrollbarsEnabled: boolean;
   goalPolicy: GoalPolicyV1;
   executionLoadStatusIds: TaskStatus[];
@@ -43,6 +44,7 @@ interface PreferencesPanelProps {
   onMarkdownAppearanceChange: (updates: Partial<MarkdownAppearance>) => void;
   onShowCompletedTimelineTasksChange: (show: boolean) => void;
   onCleanupGoalArtifactsChange: (enabled: boolean) => void;
+  onGoalAuditArchiveDirectoryChange: (directory: string) => void;
   onCustomScrollbarsEnabledChange: (enabled: boolean) => void;
   onGoalPolicyChange: (updates: {
     currency?: string;
@@ -103,6 +105,7 @@ export function PreferencesPanel({
   statusColumns,
   showCompletedTimelineTasks,
   cleanupGoalArtifacts,
+  goalAuditArchiveDirectory,
   customScrollbarsEnabled,
   goalPolicy,
   executionLoadStatusIds,
@@ -117,6 +120,7 @@ export function PreferencesPanel({
   onMarkdownAppearanceChange,
   onShowCompletedTimelineTasksChange,
   onCleanupGoalArtifactsChange,
+  onGoalAuditArchiveDirectoryChange,
   onCustomScrollbarsEnabledChange,
   onGoalPolicyChange,
   onResetGoalPolicy,
@@ -337,6 +341,8 @@ export function PreferencesPanel({
 
       <WorkflowSettingsSection
         cleanupGoalArtifacts={cleanupGoalArtifacts}
+        goalAuditArchiveDirectory={goalAuditArchiveDirectory}
+        onGoalAuditArchiveDirectoryChange={onGoalAuditArchiveDirectoryChange}
         onCleanupGoalArtifactsChange={onCleanupGoalArtifactsChange}
         goalPolicy={goalPolicy}
         onGoalPolicyChange={onGoalPolicyChange}

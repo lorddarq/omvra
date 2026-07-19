@@ -20,6 +20,7 @@ import { TimelineHeader } from '../headers/TimelineHeader';
 import { TimelineToolbar } from '../TimelineToolbar';
 import { PlusIcon } from '../icons/PlusIcon';
 import { UsersIcon } from '../icons/UsersIcon';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 import { filterTimelineTasks } from '../../utils/statusColumnSemantics';
 import { EmptyStateCard } from '../EmptyStateCard';
 import {
@@ -1093,10 +1094,15 @@ export function TimelineView({
                   ? 'Add people in Settings to plan work by assignee, then switch back here to schedule and review capacity.'
                   : 'Create a project lane to start planning work on the timeline. Tasks placed into a project will show up here automatically.'}
                 action={mode === 'projects' ? (
-                  <button type="button" onClick={onAddSwimlane} className="timeline-left-header-button h-auto px-4 py-2">
-                    <PlusIcon className="size-4" />
-                    <span>Add first project</span>
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button type="button" onClick={onAddSwimlane} className="timeline-left-header-button h-auto px-4 py-2">
+                        <PlusIcon className="size-4" />
+                        <span>Add first project</span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Add first project</TooltipContent>
+                  </Tooltip>
                 ) : undefined}
               />
             </div>
@@ -1112,9 +1118,14 @@ export function TimelineView({
                 {mode === 'people' ? 'People' : 'Projects'}
               </span>
               {mode === 'projects' && (
-                <button onClick={onAddSwimlane} className="timeline-left-header-button">
-                  <PlusIcon className="size-4" />
-                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button onClick={onAddSwimlane} className="timeline-left-header-button" aria-label="Add project">
+                      <PlusIcon className="size-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Add project</TooltipContent>
+                </Tooltip>
               )}
               <div
                 role="separator"

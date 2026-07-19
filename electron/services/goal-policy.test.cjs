@@ -7,6 +7,18 @@ const {
   resolveGoalPolicy,
 } = require('./goal-policy.cjs');
 
+test('fresh policy resolution starts from safe defaults and records no override sources', () => {
+  const policy = resolveGoalPolicy({});
+
+  assert.equal(policy.policyRevision, 0);
+  assert.equal(policy.dimensions.financial.value, 10);
+  assert.equal(policy.dimensions.tokens.value, 100000);
+  assert.equal(policy.acceptance.actor, 'human');
+  assert.equal(policy.sources.workspace, 'safe-default');
+  assert.equal(policy.sources.goal, 'inherited');
+  assert.equal(policy.sources.target, 'inherited');
+});
+
 test('effective policy inherits and only narrows workspace, goal, subgoal, and gate scopes', () => {
   const goal = {
     id: 'goal-1',
@@ -67,4 +79,19 @@ test('active policy changes create durable impact-gate decisions', () => {
   assert.equal(result.impacts[0].decision, 'pause-and-review');
   assert.equal(result.impacts[0].priorPolicyRevision, 2);
   assert.equal(values.get('omvra.goalPolicyImpacts.v1')[0].status, 'pending');
+});
+
+test('widening an active policy requires explicit confirmation', () => {
+  const values = new Map([
+    ['omvra.goals.v1', [{ id: 'goal-1', title: 'Ship it', elements: [] }]],
+    ['omvra.goalExecutions.v1', [{ id: 'execution-1', goalId: 'goal-1', state: 'working' }]],
+  ]);
+  const store = { get: key => values.get(key), set: (key, value) => values.set(key, value) };
+  const result = recordGoalPolicyChangeImpact(store, {
+    previousPolicy: { policyRevision: 2, dimensions: { tokens: { constrained: true, mode: 'hard-cap', value: 50, unit: 'tokens' } }, acceptance: { actor: 'human' }, agentMutationConfirmation: 'required' },
+    nextPolicy: { policyRevision: 3, dimensions: { tokens: { constrained: false } }, acceptance: { actor: 'agentic' }, agentMutationConfirmation: 'allowed' },
+  });
+
+  assert.equal(result.impacts[0].decision, 'confirmation-required');
+  assert.equal(result.impacts[0].requiresUserConfirmation, true);
 });

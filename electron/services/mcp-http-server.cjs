@@ -301,7 +301,7 @@ const WRITE_TOOL_DEFINITIONS = [
       additionalProperties: false,
       properties: {
         goalId: { type: 'string' },
-        command: { type: 'string', enum: ['start', 'dispatch', 'acknowledge', 'submit-evidence', 'request-handoff', 'accept', 'pause', 'resume', 'retry', 'delegate', 'wake', 'escalate', 'approve', 'reconcile', 'fail', 'complete'] },
+        command: { type: 'string', enum: ['start', 'dispatch', 'acknowledge', 'submit-evidence', 'request-handoff', 'accept', 'pause', 'resume', 'retry', 'delegate', 'wake', 'escalate', 'approve', 'reconcile', 'fail', 'complete', 'retry-cleanup'] },
         expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
         commandId: { type: 'string' },
         actor: { type: 'string' },

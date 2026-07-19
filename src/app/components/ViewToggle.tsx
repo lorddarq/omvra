@@ -13,6 +13,7 @@
 
 import React from 'react';
 import { ViewType } from '@/app/hooks/useViewState';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 interface ViewToggleProps {
   currentView: ViewType;
@@ -89,17 +90,21 @@ export function ViewToggle({
     >
       <span className="view-toggle-indicator" aria-hidden="true" />
       {orderedViews.map(view => (
-        <button
-          key={view.value}
-          onClick={() => onViewChange(view.value)}
-          disabled={disabled}
-          className={`view-toggle-button ${currentView === view.value ? 'active' : ''}`}
-          aria-pressed={currentView === view.value}
-          aria-label={`Switch to ${view.label} view`}
-        >
-          {view.icon}
-          {view.label}
-        </button>
+        <Tooltip key={view.value}>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => onViewChange(view.value)}
+              disabled={disabled}
+              className={`view-toggle-button ${currentView === view.value ? 'active' : ''}`}
+              aria-pressed={currentView === view.value}
+              aria-label={`Switch to ${view.label} view`}
+            >
+              {view.icon}
+              {view.label}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Switch to {view.label} view</TooltipContent>
+        </Tooltip>
       ))}
     </div>
   );

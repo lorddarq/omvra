@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleDot, ClipboardCheck, FileText, GitBranch, LockKeyhole, Minus, Plus, ShieldCheck, Sparkles, Target, Trash2, UserRoundCheck, ZoomIn } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleDot, ClipboardCheck, FileText, GitBranch, LoaderCircle, LockKeyhole, Minus, Plus, ShieldCheck, Sparkles, Target, Trash2, UserRoundCheck, ZoomIn } from 'lucide-react';
 import type { GoalAcceptanceActor, GoalBudgetMode, GoalConditionBranch, GoalConnectorSide, GoalElement, GoalElementReadiness, GoalElementType, GoalPolicy, GoalPolicyDimension, GoalPolicyDimensionOverride, GoalRecord, Person } from '../../types.ts';
 import type { GoalPolicyV1 } from '../../utils/goalPolicy.ts';
+import { GOAL_TEMPLATES, instantiateGoalTemplate, type GoalTemplate } from '../../data/goalTemplates.ts';
 import { getCanonicalJSON, safeReadJSON, setCanonicalJSON } from '../../utils/storage.ts';
 import { isGoalElementConnected, wouldCreateGoalCycle } from '../../utils/goalCanvas.ts';
 import { AgentIcon as Bot } from '../icons/AgentIcon';
@@ -9,6 +10,7 @@ import { LinkIcon as Link2 } from '../icons/LinkIcon';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
+import { GoalTemplatesPopover } from '../GoalTemplatesPopover';
 
 const STORAGE_KEY = 'omvra.goals.v1';
 const GOAL_ID = 'goal-lights-off-factory';
@@ -20,6 +22,80 @@ const GOAL_POLICY_DIMENSIONS: Array<{ key: GoalPolicyDimension; label: string; u
   { key: 'retries', label: 'Retries / rework', unit: 'retries', legacyMode: 'retryBudgetMode', legacyValue: 'maxRetries' },
 ];
 const GOAL_POLICY_SAFE_VALUES: Record<GoalPolicyDimension, number> = { financial: 10, tokens: 100000, concurrency: 1, attempts: 10, retries: 2 };
+const EXECUTION_LOCKED_STATUSES = new Set(['working', 'blocked', 'evidence-required', 'approval-required', 'complete', 'permission-denied']);
+
+function isExecutionLocked(element: GoalElement | undefined): boolean {
+  return Boolean(element?.status && EXECUTION_LOCKED_STATUSES.has(element.status));
+}
+
+function goalRevision(goal: GoalRecord): number {
+  const revision = Number((goal as GoalRecord & { revision?: number; __mcpRevision?: number }).revision ?? (goal as GoalRecord & { __mcpRevision?: number }).__mcpRevision ?? 0);
+  return Number.isFinite(revision) ? Math.max(0, Math.floor(revision)) : 0;
+}
+
+function inspectorDefaultDimension(dimension: GoalPolicyDimension): { constrained: true; mode: Exclude<GoalBudgetMode, 'unbounded'>; value: number; unit: GoalPolicyDimensionOverride['unit'] } {
+  const metadata = GOAL_POLICY_DIMENSIONS.find(item => item.key === dimension)!;
+  return { constrained: true, mode: 'hard-cap', value: GOAL_POLICY_SAFE_VALUES[dimension], unit: metadata.unit };
+}
+
+function legacyDimensionOverride(policy: GoalPolicy | undefined, dimension: GoalPolicyDimension): GoalPolicyDimensionOverride | undefined {
+  if (!policy) return undefined;
+  const metadata = GOAL_POLICY_DIMENSIONS.find(item => item.key === dimension)!;
+  const mode = policy[metadata.legacyMode];
+  const value = policy[metadata.legacyValue];
+  if (mode === 'unbounded') return { constrained: false };
+  if (typeof mode === 'string' && typeof value === 'number' && value > 0) {
+    return { constrained: true, mode: mode as Exclude<GoalBudgetMode, 'unbounded'>, value, unit: metadata.unit };
+  }
+  return undefined;
+}
+
+function resolveInspectorPolicy(workspacePolicy: GoalPolicyV1 | undefined, goal: GoalRecord, target: GoalElement) {
+  const dimensions = { ...(workspacePolicy?.dimensions ?? {}) } as GoalPolicyV1['dimensions'];
+  const effective = {
+    dimensions: GOAL_POLICY_DIMENSIONS.reduce((result, dimension) => {
+      result[dimension.key] = dimensions[dimension.key] ?? inspectorDefaultDimension(dimension.key);
+      return result;
+    }, {} as GoalPolicyV1['dimensions']),
+    acceptance: workspacePolicy?.acceptance ?? { actor: 'human' as const },
+  };
+  const applyScope = (policy: GoalPolicy | undefined) => {
+    for (const dimension of GOAL_POLICY_DIMENSIONS) {
+      const override = policy?.dimensions?.[dimension.key] ?? legacyDimensionOverride(policy, dimension.key);
+      const current = effective.dimensions[dimension.key];
+      if (!override || override.constrained === false) continue;
+      if (!current.constrained || (override.value !== undefined && override.value <= current.value && override.unit === current.unit)) {
+        effective.dimensions[dimension.key] = { ...current, ...override, constrained: true, unit: dimension.unit } as typeof current;
+      }
+    }
+    const actor = policy?.acceptanceActor;
+    const rank = { agentic: 1, human: 2, both: 3 } as const;
+    if (actor && rank[actor] > rank[effective.acceptance.actor]) effective.acceptance = { actor };
+  };
+  applyScope(goal.policy);
+  const incoming = new Map<string, string[]>();
+  goal.elements.filter(element => element.type === 'connector' && element.sourceId && element.targetId).forEach(connection => {
+    const parents = incoming.get(connection.targetId!) ?? [];
+    parents.push(connection.sourceId!);
+    incoming.set(connection.targetId!, parents);
+  });
+  const visited = new Set<string>([target.id]);
+  const pending = [...(incoming.get(target.id) ?? [])];
+  const ancestors: GoalElement[] = [];
+  while (pending.length) {
+    const id = pending.shift()!;
+    if (visited.has(id)) continue;
+    visited.add(id);
+    const ancestor = goal.elements.find(element => element.id === id);
+    if (ancestor) {
+      if (ancestor.type === 'subgoal') ancestors.unshift(ancestor);
+      pending.push(...(incoming.get(id) ?? []));
+    }
+  }
+  ancestors.forEach(ancestor => applyScope(ancestor.policy));
+  applyScope(target.policy);
+  return effective;
+}
 
 function createStableId(prefix: string): string {
   const uuid = typeof globalThis.crypto?.randomUUID === 'function'
@@ -27,46 +103,6 @@ function createStableId(prefix: string): string {
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   return `${prefix}_${uuid}`;
 }
-
-const INITIAL_GOALS: GoalRecord[] = [{
-  id: GOAL_ID,
-  title: 'Deliver the roadmap',
-  color: '#2563eb',
-  overseerAgentId: '1781996246461',
-  updatedAt: new Date().toISOString(),
-  elements: [
-    { id: 'goal-root', type: 'goal', title: 'Deliver the roadmap', body: 'User-driven automation with boundaries', x: 40, y: 220, width: 250, height: 104, status: 'working' },
-    { id: 'subgoal-shaping', type: 'subgoal', title: 'Shaping', body: 'Architecture, PRD, and acceptance criteria', x: 360, y: 170, width: 220, height: 90, status: 'complete' },
-    { id: 'subgoal-design', type: 'subgoal', title: 'Design', body: 'UX/UI workflow and states', x: 660, y: 170, width: 220, height: 90, status: 'working' },
-    { id: 'subgoal-implementation', type: 'subgoal', title: 'Implementation', body: 'Build and integrate the working surface', x: 960, y: 170, width: 220, height: 90, status: 'draft' },
-    { id: 'subgoal-qa', type: 'subgoal', title: 'QA', body: 'Verify evidence against acceptance criteria', x: 1260, y: 170, width: 220, height: 90, status: 'draft' },
-    { id: 'subgoal-acceptance', type: 'subgoal', title: 'Human acceptance', body: 'Review the evidence and release decision', x: 1560, y: 170, width: 220, height: 90, status: 'draft' },
-    { id: 'agent-shaping', type: 'agent', title: 'Product architect', body: 'Architecture persona', assigneeId: '1781996246461', x: 360, y: 310, width: 220, height: 90, status: 'draft' },
-    { id: 'agent-design', type: 'agent', title: 'UX designer', body: 'Design persona', assigneeId: '1781994219643', x: 660, y: 310, width: 220, height: 90, status: 'draft' },
-    { id: 'agent-implementation', type: 'agent', title: 'Engineering agent', body: 'Implementation persona', assigneeId: '1773751429883', x: 960, y: 310, width: 220, height: 90, status: 'draft' },
-    { id: 'agent-qa', type: 'agent', title: 'QA agent', body: 'Testing persona', assigneeId: '1784111829560', x: 1260, y: 310, width: 220, height: 90, status: 'draft' },
-    { id: 'instructions-shaping', type: 'instructions', title: 'Shaping instructions', body: 'Scope: shaping subgoal. Produce a versioned brief and acceptance criteria.', x: 360, y: 450, width: 220, height: 90, status: 'draft' },
-    { id: 'instructions-design', type: 'instructions', title: 'Design instructions', body: 'Scope: design subgoal. Preserve the approved product contract.', x: 660, y: 450, width: 220, height: 90, status: 'draft' },
-    { id: 'instructions-implementation', type: 'instructions', title: 'Implementation instructions', body: 'Scope: implementation subgoal. Return code changes and evidence.', x: 960, y: 450, width: 220, height: 90, status: 'draft' },
-    { id: 'condition-qa', type: 'condition', title: 'QA passing requirements', body: 'All acceptance criteria have evidence and no blocking findings remain.', x: 1260, y: 450, width: 220, height: 90, status: 'draft' },
-    { id: 'approval-acceptance', type: 'approval-gate', title: 'Human acceptance gate', body: 'Pause before release until the selected human reviewer approves the evidence.', x: 1560, y: 310, width: 220, height: 90, status: 'draft' },
-    { id: 'connector-goal', type: 'connector', title: 'Goal → Shaping', x: 0, y: 0, sourceId: 'goal-root', targetId: 'subgoal-shaping', sourceSide: 'right', targetSide: 'left' },
-    { id: 'connector-shaping-design', type: 'connector', title: 'Sequence: Shaping → Design', x: 0, y: 0, sourceId: 'subgoal-shaping', targetId: 'subgoal-design', sourceSide: 'right', targetSide: 'left' },
-    { id: 'connector-design-implementation', type: 'connector', title: 'Sequence: Design → Implementation', x: 0, y: 0, sourceId: 'subgoal-design', targetId: 'subgoal-implementation', sourceSide: 'right', targetSide: 'left' },
-    { id: 'connector-implementation-qa', type: 'connector', title: 'Sequence: Implementation → QA', x: 0, y: 0, sourceId: 'subgoal-implementation', targetId: 'subgoal-qa', sourceSide: 'right', targetSide: 'left' },
-    { id: 'connector-qa-acceptance', type: 'connector', title: 'Sequence: QA → Acceptance', x: 0, y: 0, sourceId: 'subgoal-qa', targetId: 'subgoal-acceptance', sourceSide: 'right', targetSide: 'left' },
-    { id: 'connector-qa-condition', type: 'connector', title: 'Evaluate QA condition', x: 0, y: 0, sourceId: 'subgoal-qa', targetId: 'condition-qa', sourceSide: 'bottom', targetSide: 'top' },
-    { id: 'connector-acceptance-gate', type: 'connector', title: 'Pause for approval', x: 0, y: 0, sourceId: 'subgoal-acceptance', targetId: 'approval-acceptance', sourceSide: 'bottom', targetSide: 'top' },
-    { id: 'connector-shaping-agent', type: 'connector', title: 'Worker scope: Shaping', x: 0, y: 0, sourceId: 'subgoal-shaping', targetId: 'agent-shaping', sourceSide: 'bottom', targetSide: 'top' },
-    { id: 'connector-design-agent', type: 'connector', title: 'Worker scope: Design', x: 0, y: 0, sourceId: 'subgoal-design', targetId: 'agent-design', sourceSide: 'bottom', targetSide: 'top' },
-    { id: 'connector-implementation-agent', type: 'connector', title: 'Worker scope: Implementation', x: 0, y: 0, sourceId: 'subgoal-implementation', targetId: 'agent-implementation', sourceSide: 'bottom', targetSide: 'top' },
-    { id: 'connector-qa-agent', type: 'connector', title: 'Worker scope: QA', x: 0, y: 0, sourceId: 'subgoal-qa', targetId: 'agent-qa', sourceSide: 'bottom', targetSide: 'top' },
-    { id: 'connector-shaping-instructions', type: 'connector', title: 'Instructions scope: Shaping', x: 0, y: 0, sourceId: 'agent-shaping', targetId: 'instructions-shaping', sourceSide: 'bottom', targetSide: 'top' },
-    { id: 'connector-design-instructions', type: 'connector', title: 'Instructions scope: Design', x: 0, y: 0, sourceId: 'agent-design', targetId: 'instructions-design', sourceSide: 'bottom', targetSide: 'top' },
-    { id: 'connector-implementation-instructions', type: 'connector', title: 'Instructions scope: Implementation', x: 0, y: 0, sourceId: 'agent-implementation', targetId: 'instructions-implementation', sourceSide: 'bottom', targetSide: 'top' },
-    { id: 'connector-qa-condition-scope', type: 'connector', title: 'Condition scope: QA', x: 0, y: 0, sourceId: 'agent-qa', targetId: 'condition-qa', sourceSide: 'bottom', targetSide: 'top' },
-  ],
-}];
 
 const TOOL_ITEMS: Array<{ type: GoalElementType; label: string; icon: ReactNode }> = [
   { type: 'agent', label: 'Agent', icon: <Bot className="size-3.5" /> },
@@ -79,20 +115,9 @@ const TOOL_ITEMS: Array<{ type: GoalElementType; label: string; icon: ReactNode 
 ];
 
 function readGoals(): GoalRecord[] {
-  const stored = safeReadJSON<GoalRecord[]>(STORAGE_KEY, INITIAL_GOALS);
-  if (!Array.isArray(stored) || stored.length === 0) return INITIAL_GOALS;
-
-  // Migrate only the untouched demo graph. User-created graphs are preserved.
-  const sample = stored.find(goal => goal.id === GOAL_ID);
-  const hasLegacySample = sample
-    && sample.elements.some(element => element.id === 'goal-root')
-    && !sample.elements.some(element => element.id === 'connector-shaping-design')
-    && (sample.elements.some(element => element.title === 'New goal')
-      || !sample.elements.some(element => element.id === 'subgoal-acceptance'));
-  if (hasLegacySample) {
-    return stored.map(goal => goal.id === GOAL_ID ? INITIAL_GOALS[0] : goal);
-  }
-  return stored;
+  const stored = safeReadJSON<GoalRecord[]>(STORAGE_KEY, []);
+  if (!Array.isArray(stored)) return [];
+  return stored.filter(goal => goal.id !== GOAL_ID);
 }
 
 function nodeClass(type: GoalElementType, connected = true): string {
@@ -205,18 +230,19 @@ function StatusIcon({ status, className = 'size-3' }: { status: GoalElement['sta
   return <CircleDot className={className} />;
 }
 
-export function GoalsView({ people = [], workspacePolicy }: { people?: Person[]; workspacePolicy?: GoalPolicyV1 }) {
+export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirectory = '', onGoalAuditArchiveDirectoryChange }: { people?: Person[]; workspacePolicy?: GoalPolicyV1; goalAuditArchiveDirectory?: string; onGoalAuditArchiveDirectoryChange?: (directory: string) => void }) {
   const [goals, setGoals] = useState<GoalRecord[]>(readGoals);
   const [canonicalHydrated, setCanonicalHydrated] = useState(false);
   const canonicalWrite = useRef(Promise.resolve());
-  const [selectedGoalId, setSelectedGoalId] = useState(GOAL_ID);
-  const [selectedElementId, setSelectedElementId] = useState('goal-root');
+  const [selectedGoalId, setSelectedGoalId] = useState('');
+  const [selectedElementId, setSelectedElementId] = useState('');
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [spacePressed, setSpacePressed] = useState(false);
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [panMode, setPanMode] = useState(false);
   const [agentMenuOpen, setAgentMenuOpen] = useState(false);
+  const [policyImpacts, setPolicyImpacts] = useState<Array<{ goalId?: string; status?: string; requiresUserConfirmation?: boolean }>>([]);
   const agentMenuRef = useRef<HTMLDivElement | null>(null);
   const [connectorMode, setConnectorMode] = useState(false);
   const [connectorSourceId, setConnectorSourceId] = useState<string | null>(null);
@@ -230,12 +256,21 @@ export function GoalsView({ people = [], workspacePolicy }: { people?: Person[];
   const [newGoalBody, setNewGoalBody] = useState('');
   const [canvasElementHeights, setCanvasElementHeights] = useState<Record<string, number>>({});
   const [drag, setDrag] = useState<{ id: string; startX: number; startY: number; originX: number; originY: number } | null>(null);
+  const draggingRef = useRef(false);
+  const localMutationRef = useRef(false);
+  const rendererWritesPendingRef = useRef(0);
+  const [editNotice, setEditNotice] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const activeGoal = goals.find(goal => goal.id === selectedGoalId) ?? goals[0];
   const selectedElement = activeGoal?.elements.find(element => element.id === selectedElementId) ?? activeGoal?.elements[0];
   const selectedAgent = selectedElement?.type === 'agent' ? people.find(person => person.id === selectedElement.assigneeId) : undefined;
   const selectedAgentMissing = selectedElement?.type === 'agent' && (!selectedElement.assigneeId || !selectedAgent);
   const selectedPolicyElement = selectedElement?.type === 'goal' || selectedElement?.type === 'subgoal' || selectedElement?.type === 'approval-gate' ? selectedElement : undefined;
+  const selectedElementLocked = isExecutionLocked(selectedElement);
+  const selectedEffectivePolicy = activeGoal && selectedPolicyElement
+    ? resolveInspectorPolicy(workspacePolicy, activeGoal, selectedPolicyElement)
+    : undefined;
+  const selectedPolicyImpact = policyImpacts.find(impact => impact.goalId === activeGoal?.id && impact.status === 'pending');
 
   useEffect(() => {
     if (goals.length === 0) {
@@ -269,6 +304,15 @@ export function GoalsView({ people = [], workspacePolicy }: { people?: Person[];
     });
     return () => cancelAnimationFrame(frame);
   }, [activeGoal, selectedElementId, zoom]);
+  useEffect(() => {
+    let cancelled = false;
+    const storedImpacts = window.electron?.storeGet?.('omvra.goalPolicyImpacts.v1');
+    void storedImpacts?.then(value => {
+      if (cancelled) return;
+      setPolicyImpacts(Array.isArray(value) ? value : []);
+    });
+    return () => { cancelled = true; };
+  }, [workspacePolicy?.policyRevision]);
 
   const getAgentForElement = (element: GoalElement) => element.type === 'agent'
     ? people.find(person => person.id === element.assigneeId)
@@ -280,22 +324,37 @@ export function GoalsView({ people = [], workspacePolicy }: { people?: Person[];
   useEffect(() => {
     let cancelled = false;
     const refreshCanonicalGoals = () => getCanonicalJSON<GoalRecord[] | null>(STORAGE_KEY, null).then(stored => {
-      if (cancelled) return;
-      if (Array.isArray(stored) && stored.length > 0) setGoals(stored);
+      if (cancelled || localMutationRef.current) return;
+      if (Array.isArray(stored)) setGoals(stored.filter(goal => goal.id !== GOAL_ID));
     });
     void refreshCanonicalGoals().then(() => {
       setCanonicalHydrated(true);
     });
     window.addEventListener('focus', refreshCanonicalGoals);
-    return () => { cancelled = true; window.removeEventListener('focus', refreshCanonicalGoals); };
+    const unsubscribe = window.electron?.onStoreChanged?.(() => { if (!draggingRef.current && rendererWritesPendingRef.current === 0) void refreshCanonicalGoals(); });
+    return () => { cancelled = true; window.removeEventListener('focus', refreshCanonicalGoals); unsubscribe?.(); };
   }, []);
   useEffect(() => {
     if (!canonicalHydrated) return;
+    rendererWritesPendingRef.current += 1;
     canonicalWrite.current = canonicalWrite.current.then(async () => {
-      const stored = await setCanonicalJSON(STORAGE_KEY, goals);
-      if (!stored) {
+      const forceLocalWrite = localMutationRef.current;
+      try {
         const canonical = await getCanonicalJSON<GoalRecord[] | null>(STORAGE_KEY, null);
-        if (Array.isArray(canonical) && canonical.length > 0) setGoals(canonical);
+        const localRevision = Math.max(0, ...goals.map(goalRevision));
+        const canonicalRevision = Array.isArray(canonical) ? Math.max(0, ...canonical.map(goalRevision)) : 0;
+        if (!forceLocalWrite && canonicalRevision > localRevision && Array.isArray(canonical)) {
+          setGoals(canonical);
+          return;
+        }
+        const stored = await setCanonicalJSON(STORAGE_KEY, goals);
+        if (!stored) {
+          const fallback = await getCanonicalJSON<GoalRecord[] | null>(STORAGE_KEY, null);
+          if (Array.isArray(fallback) && !forceLocalWrite) setGoals(fallback);
+        }
+      } finally {
+        rendererWritesPendingRef.current = Math.max(0, rendererWritesPendingRef.current - 1);
+        if (forceLocalWrite) localMutationRef.current = false;
       }
     });
   }, [canonicalHydrated, goals]);
@@ -322,14 +381,25 @@ export function GoalsView({ people = [], workspacePolicy }: { people?: Person[];
   }, []);
   useEffect(() => {
     if (!drag) return;
+    draggingRef.current = true;
     const move = (event: PointerEvent) => setGoals(current => current.map(goal => goal.id !== selectedGoalId ? goal : ({ ...goal, elements: goal.elements.map(element => element.id !== drag.id ? element : { ...element, x: drag.originX + (event.clientX - drag.startX) / zoom, y: drag.originY + (event.clientY - drag.startY) / zoom }) })));
-    const up = () => setDrag(null);
+    const up = () => {
+      draggingRef.current = false;
+      setGoals(current => current.map(goal => goal.id !== selectedGoalId ? goal : ({ ...goal, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString() })));
+      setDrag(null);
+    };
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
     return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
   }, [drag, selectedGoalId, zoom]);
 
-  const updateElement = (updates: Partial<GoalElement>) => setGoals(current => current.map(goal => goal.id !== selectedGoalId ? goal : ({ ...goal, updatedAt: new Date().toISOString(), elements: goal.elements.map(element => element.id === selectedElement?.id ? { ...element, ...updates } : element) })));
-  const updateGoal = (updates: Partial<GoalRecord>) => setGoals(current => current.map(goal => goal.id === selectedGoalId ? { ...goal, ...updates, updatedAt: new Date().toISOString() } : goal));
+  const updateElement = (updates: Partial<GoalElement>) => {
+    if (selectedElementLocked) { setEditNotice('This node is locked while execution is active or committed. Pause, cancel, or amend the lifecycle before editing it.'); return; }
+    setGoals(current => current.map(goal => goal.id !== selectedGoalId ? goal : ({ ...goal, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString(), elements: goal.elements.map(element => element.id === selectedElement?.id ? { ...element, ...updates } : element) })));
+  };
+  const updateGoal = (updates: Partial<GoalRecord>) => {
+    if (selectedElementLocked) { setEditNotice('This Goal is locked while execution is active or committed. Pause, cancel, or amend the lifecycle before editing it.'); return; }
+    setGoals(current => current.map(goal => goal.id === selectedGoalId ? { ...goal, ...updates, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString() } : goal));
+  };
   const updatePolicy = (updates: Partial<GoalPolicy>) => {
     if (!selectedPolicyElement) return;
     const nextPolicy = { ...selectedPolicyElement.policy, ...updates };
@@ -349,11 +419,12 @@ export function GoalsView({ people = [], workspacePolicy }: { people?: Person[];
     const title = type === 'subgoal' ? 'New subgoal' : type === 'condition' ? 'New condition' : type === 'approval-gate' ? 'Approval gate' : `New ${type}`;
     const body = type === 'condition' ? 'Define the condition to evaluate' : type === 'approval-gate' ? 'Define who must approve and what evidence is required' : 'Describe the outcome and handoff';
     const element: GoalElement = { id, type, title, body, x: 260 + (activeGoal.elements.length % 3) * 260, y: 560, width: 220, height: 90, status: 'draft' };
-    setGoals(current => current.map(goal => goal.id === selectedGoalId ? { ...goal, updatedAt: new Date().toISOString(), elements: [...goal.elements, element] } : goal));
+    setGoals(current => current.map(goal => goal.id === selectedGoalId ? { ...goal, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString(), elements: [...goal.elements, element] } : goal));
     setSelectedElementId(id);
   };
   const deleteElement = () => {
     if (!selectedElement) return;
+    if (selectedElementLocked) { setEditNotice('This node cannot be deleted during active or committed execution.'); return; }
     if (selectedElement.type === 'goal') {
       setDeleteDialogOpen(true);
       return;
@@ -363,6 +434,7 @@ export function GoalsView({ people = [], workspacePolicy }: { people?: Person[];
   const performDeleteElement = () => {
     if (!selectedElement) return;
     if (selectedElement.type === 'goal') {
+      localMutationRef.current = true;
       const remainingGoals = goals.filter(goal => goal.id !== selectedGoalId);
       setGoals(remainingGoals);
       const nextGoal = remainingGoals[0];
@@ -371,7 +443,7 @@ export function GoalsView({ people = [], workspacePolicy }: { people?: Person[];
       setDeleteDialogOpen(false);
       return;
     }
-    setGoals(current => current.map(goal => goal.id === selectedGoalId ? { ...goal, elements: goal.elements.filter(element => element.id !== selectedElement.id && element.sourceId !== selectedElement.id && element.targetId !== selectedElement.id) } : goal));
+      setGoals(current => current.map(goal => goal.id === selectedGoalId ? { ...goal, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString(), elements: goal.elements.filter(element => element.id !== selectedElement.id && element.sourceId !== selectedElement.id && element.targetId !== selectedElement.id) } : goal));
     setSelectedElementId(activeGoal.elements.find(element => element.id !== selectedElement.id)?.id ?? '');
   };
   useEffect(() => {
@@ -397,6 +469,13 @@ export function GoalsView({ people = [], workspacePolicy }: { people?: Person[];
     setGoals(current => [...current, goal]); setSelectedGoalId(goal.id); setSelectedElementId(goal.elements[0].id); setNewGoalDialogOpen(false);
   };
 
+  const addTemplate = (template: GoalTemplate) => {
+    const goal = instantiateGoalTemplate(template, createStableId);
+    setGoals(current => [...current, goal]);
+    setSelectedGoalId(goal.id);
+    setSelectedElementId(goal.elements.find(element => element.type === 'goal')?.id ?? goal.elements[0]?.id ?? '');
+  };
+
   const connections = activeGoal?.elements.filter(element => element.type === 'connector') ?? [];
   const selectedConnections = selectedElement?.type !== 'connector'
     ? connections.filter(connection => connection.sourceId === selectedElement?.id || connection.targetId === selectedElement?.id)
@@ -420,14 +499,18 @@ export function GoalsView({ people = [], workspacePolicy }: { people?: Person[];
     if (!activeGoal) return;
     const id = createStableId('element');
     const element: GoalElement = { id, type: 'agent', title: person.name, body: person.role, assigneeId: person.id, x: 260 + (activeGoal.elements.length % 3) * 260, y: 560, width: 220, height: 90, status: 'draft' };
-    setGoals(current => current.map(goal => goal.id === selectedGoalId ? { ...goal, updatedAt: new Date().toISOString(), elements: [...goal.elements, element] } : goal));
+    setGoals(current => current.map(goal => goal.id === selectedGoalId ? { ...goal, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString(), elements: [...goal.elements, element] } : goal));
     setSelectedElementId(id);
     setAgentMenuOpen(false);
   };
 
   const deleteConnection = (connectionId: string) => {
+    const connection = activeGoal?.elements.find(element => element.id === connectionId);
+    const source = activeGoal?.elements.find(element => element.id === connection?.sourceId);
+    const target = activeGoal?.elements.find(element => element.id === connection?.targetId);
+    if (isExecutionLocked(connection) || isExecutionLocked(source) || isExecutionLocked(target)) { setEditNotice('This connection participates in active or committed execution and cannot be changed.'); return; }
     setGoals(current => current.map(goal => goal.id === selectedGoalId
-      ? { ...goal, updatedAt: new Date().toISOString(), elements: goal.elements.filter(element => element.id !== connectionId) }
+      ? { ...goal, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString(), elements: goal.elements.filter(element => element.id !== connectionId) }
       : goal));
     if (selectedElement?.id === connectionId) setSelectedElementId(activeGoal?.elements.find(element => element.id !== connectionId)?.id ?? '');
   };
@@ -442,6 +525,12 @@ export function GoalsView({ people = [], workspacePolicy }: { people?: Person[];
       setConnectorError('Both connector endpoints must be valid nodes.');
       return;
     }
+    const source = activeGoal.elements.find(element => element.id === connectorSourceId);
+    const target = activeGoal.elements.find(element => element.id === targetId);
+    if (isExecutionLocked(source) || isExecutionLocked(target)) {
+      setConnectorError('Active or committed nodes cannot be rewired. Pause, cancel, or amend the lifecycle first.');
+      return;
+    }
     if (wouldCreateGoalCycle(activeGoal.elements, connectorSourceId, targetId, rewireConnectorId)) {
       setConnectorError('That connection would create a cycle.');
       return;
@@ -451,7 +540,7 @@ export function GoalsView({ people = [], workspacePolicy }: { people?: Person[];
       const elements = rewireConnectorId
         ? goal.elements.map(element => element.id === rewireConnectorId ? { ...element, sourceId: connectorSourceId, targetId, sourceSide: element.sourceSide ?? connectorSourceSide, targetSide, conditionBranch: connectorSourceBranch } : element)
         : [...goal.elements, { id: createStableId('connector'), type: 'connector' as const, title: 'Node connection', x: 0, y: 0, sourceId: connectorSourceId, targetId, sourceSide: connectorSourceSide, targetSide, conditionBranch: connectorSourceBranch }];
-      return { ...goal, updatedAt: new Date().toISOString(), elements };
+      return { ...goal, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString(), elements };
     }));
     setConnectorMode(false);
     setConnectorSourceId(null);
@@ -492,6 +581,10 @@ export function GoalsView({ people = [], workspacePolicy }: { people?: Person[];
   };
 
   const beginConnection = (elementId: string, side: GoalConnectorSide, branch?: GoalConditionBranch) => {
+    if (isExecutionLocked(activeGoal?.elements.find(element => element.id === elementId))) {
+      setConnectorError('Active or committed nodes cannot be rewired. Pause, cancel, or amend the lifecycle first.');
+      return;
+    }
     setConnectorMode(true);
     setConnectorSourceId(elementId);
     setConnectorSourceSide(side);
@@ -513,7 +606,8 @@ export function GoalsView({ people = [], workspacePolicy }: { people?: Person[];
     ))}{element.type === 'condition' && <><button type="button" style={{ right: '-0.5rem', top: '32%', transform: 'translateY(-50%)' }} className={`absolute size-4 rounded-full border-2 border-white bg-emerald-400 shadow-sm ${connectorMode && connectorSourceId === element.id && connectorSourceBranch === 'positive' ? 'ring-2 ring-amber-400' : ''}`} onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); if (connectorMode && connectorSourceId) connectNodes(element.id, 'right'); else beginConnection(element.id, 'right', 'positive'); }} aria-label={`${connectorMode && connectorSourceId ? 'Connect to' : 'Connect from'} ${conditionPositiveLabel(element)} branch`} /><button type="button" style={{ right: '-0.5rem', top: '68%', transform: 'translateY(-50%)' }} className={`absolute size-4 rounded-full border-2 border-white bg-rose-400 shadow-sm ${connectorMode && connectorSourceId === element.id && connectorSourceBranch === 'negative' ? 'ring-2 ring-amber-400' : ''}`} onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); if (connectorMode && connectorSourceId) connectNodes(element.id, 'right'); else beginConnection(element.id, 'right', 'negative'); }} aria-label={`${connectorMode && connectorSourceId ? 'Connect to' : 'Connect from'} ${conditionNegativeLabel(element)} branch`} /></>}</>;
   };
 
-  return <section className="goals-view relative h-full min-h-0 overflow-hidden bg-slate-50 text-slate-700">
+  return (
+  <section className="goals-view relative h-full min-h-0 overflow-hidden bg-slate-50 text-slate-700">
     <aside className={`absolute left-4 top-4 bottom-4 z-20 flex flex-col rounded-xl border border-slate-200 bg-white shadow-sm transition-[width] duration-200 ${leftPanelCollapsed ? 'w-12' : 'w-64'}`}>
       <div className={`flex items-center border-b px-3 py-3 ${leftPanelCollapsed ? 'justify-center' : 'justify-between'}`}><div className={leftPanelCollapsed ? 'hidden' : ''}><h1 className="text-sm font-semibold text-slate-900">Goals</h1><p className="mt-0.5 text-xs text-slate-500">Shape work as a loop</p></div><button onClick={() => setLeftPanelCollapsed(value => !value)} className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label={leftPanelCollapsed ? 'Expand goals panel' : 'Collapse goals panel'}>{leftPanelCollapsed ? <ChevronRight className="size-4" /> : <ChevronLeft className="size-4" />}</button></div>
       <div className={`flex-1 space-y-1 overflow-auto p-2 ${leftPanelCollapsed ? 'hidden' : ''}`}>{goals.map(goal => { const goalStatus = goal.elements.find(element => element.type === 'goal')?.status ?? 'draft'; return <button key={goal.id} onClick={() => { setSelectedGoalId(goal.id); setSelectedElementId(goal.elements[0]?.id ?? ''); }} className={`w-full rounded-lg px-3 py-2 text-left text-sm ${goal.id === selectedGoalId ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-600 hover:bg-slate-50'}`}><span className="block truncate">{goal.title}</span><span className="mt-1 flex items-center justify-between gap-2 text-[11px] text-slate-400"><span>{goal.elements.filter(element => element.type === 'subgoal').length} subgoals · {goal.elements.length} nodes</span><span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 font-medium ${compactChipClass(statusChipClass(goalStatus))}`}><StatusIcon status={goalStatus} className="size-3" />{statusLabel(goalStatus)}</span></span></button>; })}</div>
@@ -521,7 +615,37 @@ export function GoalsView({ people = [], workspacePolicy }: { people?: Person[];
       <div className={`border-t p-3 ${leftPanelCollapsed ? 'hidden' : ''}`}><button onClick={openNewGoalDialog} className="flex w-full items-center justify-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700"><Plus className="size-3.5" /> New goal</button></div>
     </aside>
 
-    <div className="absolute left-1/2 top-4 z-20 flex w-fit -translate-x-1/2 items-center justify-center gap-1 rounded-full border border-slate-200 bg-white p-1 shadow-sm">{TOOL_ITEMS.map(tool => tool.type === 'agent' ? <div key={tool.type} ref={agentMenuRef} className="relative w-fit shrink-0"><Tooltip><TooltipTrigger asChild><button disabled={!activeGoal} onClick={() => setAgentMenuOpen(value => !value)} className="relative flex size-8 shrink-0 items-center justify-center rounded-full p-0 text-xs text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Add agent" aria-haspopup="menu" aria-expanded={agentMenuOpen}><span className="flex size-full items-center justify-center">{tool.icon}</span><ChevronDown className="absolute -right-1 size-3" /></button></TooltipTrigger><TooltipContent side="bottom" sideOffset={4}>Add {tool.label}</TooltipContent></Tooltip>{agentMenuOpen && activeGoal && <div role="menu" aria-label="Add agent" className="absolute left-0 top-full mt-1 w-56 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">{people.filter(person => person.kind === 'agentic').map(person => <button key={person.id} role="menuitem" onClick={() => addAgent(person)} className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs hover:bg-slate-100"><Bot className="size-3.5 text-amber-500" /><span><span className="block font-medium text-slate-800">{person.name}</span><span className="block text-[11px] text-slate-400">{person.role}</span></span></button>)}{people.filter(person => person.kind === 'agentic').length === 0 && <p className="px-2.5 py-2 text-xs text-slate-400">No agents configured</p>}</div>}</div> : <Tooltip key={tool.type}><TooltipTrigger asChild><button disabled={!activeGoal} onClick={() => tool.type === 'connector' ? (setConnectorMode(true), setConnectorSourceId(null), setConnectorSourceBranch(undefined)) : addElement(tool.type)} className={`flex size-8 shrink-0 items-center justify-center rounded-full p-0 text-xs disabled:cursor-not-allowed disabled:opacity-40 ${tool.type === 'connector' && connectorMode ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`} aria-label={`Add ${tool.label}`}>{tool.icon}</button></TooltipTrigger><TooltipContent side="bottom" sideOffset={4}>{tool.type === 'connector' && connectorMode ? 'Choose source' : `Add ${tool.label}`}</TooltipContent></Tooltip>)}</div>
+    <div className="absolute left-1/2 top-4 z-20 flex w-fit h-fit shrink -translate-x-1/2 items-center justify-center gap-1 rounded-full border border-slate-200 bg-white p-1 shadow-sm">
+    <GoalTemplatesPopover templates={GOAL_TEMPLATES} onSelect={addTemplate} />
+    {TOOL_ITEMS.map(tool => tool.type === 'agent' ?
+      <div key={tool.type} ref={agentMenuRef} className="relative w-fit h-fit shrink-0">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button disabled={!activeGoal} onClick={() => setAgentMenuOpen(value => !value)} className="relative flex w-12 h-8 shrink-0 items-center justify-center gap-1 rounded-full p-0 text-xs text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Add agent" aria-haspopup="menu" aria-expanded={agentMenuOpen}>
+              <span className="flex items-center justify-center">{tool.icon}</span>
+              <ChevronDown className="size-3 shrink-0" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={4}>Add {tool.label}</TooltipContent>
+          </Tooltip>
+            {agentMenuOpen && activeGoal &&
+            <div role="menu" aria-label="Add agent" className="absolute left-0 top-full mt-1 w-56 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+              {people.filter(person => person.kind === 'agentic').map(person =>
+                <button key={person.id} role="menuitem" onClick={() => addAgent(person)} className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs hover:bg-slate-100">
+                  <Bot className="size-3.5 text-amber-500" />
+                  <span>
+                    <span className="block font-medium text-slate-800">{person.name}</span>
+                    <span className="block text-[11px] text-slate-400">{person.role}</span>
+                  </span>
+                </button>)}
+                  {people.filter(person => person.kind === 'agentic').length === 0 &&
+                  <p className="px-2.5 py-2 text-xs text-slate-400">No agents configured</p>}
+                  </div>}
+                  </div> : <Tooltip key={tool.type}>
+                    <TooltipTrigger asChild>
+                      <button disabled={!activeGoal} onClick={() => tool.type === 'connector' ? (setConnectorMode(true), setConnectorSourceId(null), setConnectorSourceBranch(undefined)) : addElement(tool.type)} className={`flex size-8 shrink-0 items-center justify-center rounded-full p-0 text-xs disabled:cursor-not-allowed disabled:opacity-40 ${tool.type === 'connector' && connectorMode ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`} aria-label={`Add ${tool.label}`}>{tool.icon}</button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" sideOffset={4}>{tool.type === 'connector' && connectorMode ? 'Choose source' : `Add ${tool.label}`}</TooltipContent></Tooltip>)}</div>
 
     <div ref={canvasRef} tabIndex={0} role="application" aria-label="Goal canvas. Hold space and drag to pan." className={`h-full w-full outline-none ${spacePressed || panMode ? 'cursor-grab' : 'cursor-default'}`} onPointerDown={event => { setAgentMenuOpen(false); if (spacePressed || panMode) { const start = { x: event.clientX, y: event.clientY }; const origin = { ...pan }; const move = (next: PointerEvent) => setPan({ x: origin.x + next.clientX - start.x, y: origin.y + next.clientY - start.y }); const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); }; window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); } }}>
       <div className="goals-canvas-grid absolute inset-0" aria-hidden="true" />
@@ -529,9 +653,10 @@ export function GoalsView({ people = [], workspacePolicy }: { people?: Person[];
       <div className="absolute left-1/2 top-1/2" style={{ transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px)) scale(${zoom})`, transformOrigin: 'center' }}>
         <svg className="pointer-events-auto absolute left-0 top-0 h-[1200px] w-[2000px] overflow-visible"><defs>{connections.map(connection => <linearGradient key={connection.id} id={`connector-gradient-${connection.id}`} x1="0%" x2="100%" y1="0%" y2="0%"><stop offset="0%" stopColor={connection.conditionBranch === 'positive' ? '#34d399' : '#fb7185'} /><stop offset="100%" stopColor="#60a5fa" /></linearGradient>)}</defs>{connections.map(connection => { const path = connectorPath(connection); const branchLabel = connection.conditionBranch ? ` via ${connection.conditionBranch} branch` : ''; return path ? <path key={connection.id} id={`goal-canvas-item-${connection.id}`} d={path} fill="none" stroke={connection.conditionBranch ? `url(#connector-gradient-${connection.id})` : selectedElement?.id === connection.id ? '#2563eb' : '#94a3b8'} strokeWidth={selectedElement?.id === connection.id ? '3' : '2'} strokeLinecap="round" className="cursor-pointer outline-none focus-visible:stroke-blue-600" onClick={event => { event.stopPropagation(); setSelectedElementId(connection.id); setConnectorMode(false); setConnectorSourceId(null); setConnectorSourceBranch(undefined); }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedElementId(connection.id); } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'ArrowRight' || event.key === 'ArrowDown') { event.preventDefault(); moveCanvasSelection(connection.id, event.key === 'ArrowRight' || event.key === 'ArrowDown'); } }} role="button" tabIndex={selectedElement?.id === connection.id ? 0 : -1} aria-label={`Connector from ${connection.sourceId} to ${connection.targetId}${branchLabel}`} /> : null; })}</svg>
         {connectorError && <div role="alert" className="absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 shadow-sm">{connectorError}</div>}
-        {activeGoal?.elements.filter(element => element.type !== 'connector').map(element => { const connected = isGoalElementConnected(activeGoal.elements, element.id); const readiness = readinessForElement(element, connected); const readinessDisplay = readiness === 'ready' ? <span className="mt-3 inline-flex items-center" title="Ready for workflow use"><ReadyIcon /></span> : <span className={`mt-3 inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${readinessChipClass(readiness)}`}><CircleDot className="size-3" />{readinessLabel(readiness)}</span>; return <div key={element.id} id={`goal-canvas-item-${element.id}`} role="group" aria-label={`${element.type}: ${getElementTitle(element)}`} tabIndex={selectedElement?.id === element.id ? 0 : -1} onClick={() => { if (connectorMode) { if (connectorSourceId) connectNodes(element.id); else beginConnection(element.id, 'right'); } else setSelectedElementId(element.id); }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedElementId(element.id); } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'ArrowRight' || event.key === 'ArrowDown') { event.preventDefault(); moveCanvasSelection(element.id, event.key === 'ArrowRight' || event.key === 'ArrowDown'); } }} onPointerDown={event => { if (spacePressed || panMode || connectorMode) return; setSelectedElementId(element.id); setDrag({ id: element.id, startX: event.clientX, startY: event.clientY, originX: element.x, originY: element.y }); }} className={`absolute flex flex-col rounded-lg border p-3 text-left shadow-sm transition-shadow hover:shadow-md ${nodeClass(element.type, connected)} ${selectedElement?.id === element.id ? 'ring-2 ring-blue-500 ring-offset-2' : ''}`} style={{ left: element.x, top: element.y, width: element.width ?? 220, height: canvasElementHeight(element) }}><span className="flex min-w-0 items-center gap-2 text-xs font-semibold"><span className="rounded bg-black/5 p-1">{element.type === 'agent' ? <Bot className="size-3.5" /> : element.type === 'goal' ? <Sparkles className="size-3.5" /> : <Target className="size-3.5" />}</span><span className="truncate">{getElementTitle(element)}</span></span>{getElementBody(element) && <span className={`mt-2 line-clamp-2 text-[11px] ${element.type === 'goal' ? 'text-slate-300' : 'text-slate-500'}`}>{getElementBody(element)}</span>}{element.type === 'condition' && <div className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold"><span className="rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-emerald-700">{conditionPositiveLabel(element)}</span><span className="rounded-full border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-rose-700">{conditionNegativeLabel(element)}</span></div>}{isCompletionElement(element) ? <span className={`mt-3 inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${compactChipClass(statusChipClass(element.status))}`}><StatusIcon status={element.status} />{statusLabel(element.status)}</span> : readinessDisplay}{renderPorts(element)}</div>; })}
+        {activeGoal?.elements.filter(element => element.type !== 'connector').map(element => { const connected = isGoalElementConnected(activeGoal.elements, element.id); const locked = isExecutionLocked(element); const readiness = readinessForElement(element, connected); const readinessDisplay = readiness === 'ready' ? <span className="mt-3 inline-flex items-center" title="Ready for workflow use"><ReadyIcon /></span> : <span className={`mt-3 inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${readinessChipClass(readiness)}`}><CircleDot className="size-3" />{readinessLabel(readiness)}</span>; return <div key={element.id} id={`goal-canvas-item-${element.id}`} role="group" aria-label={`${element.type}: ${getElementTitle(element)}`} tabIndex={selectedElement?.id === element.id ? 0 : -1} onClick={() => { if (connectorMode) { if (connectorSourceId) connectNodes(element.id); else beginConnection(element.id, 'right'); } else setSelectedElementId(element.id); }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedElementId(element.id); } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'ArrowRight' || event.key === 'ArrowDown') { event.preventDefault(); moveCanvasSelection(element.id, event.key === 'ArrowRight' || event.key === 'ArrowDown'); } }} onPointerDown={event => { if (spacePressed || panMode || connectorMode || locked) return; setSelectedElementId(element.id); setDrag({ id: element.id, startX: event.clientX, startY: event.clientY, originX: element.x, originY: element.y }); }} className={`absolute flex flex-col rounded-lg border p-3 text-left shadow-sm transition-shadow hover:shadow-md ${nodeClass(element.type, connected)} ${locked ? 'cursor-not-allowed' : ''} ${selectedElement?.id === element.id ? 'ring-2 ring-blue-500 ring-offset-2' : ''}`} style={{ left: element.x, top: element.y, width: element.width ?? 220, height: canvasElementHeight(element) }}><span className="flex min-w-0 items-center gap-2 text-xs font-semibold"><span className="rounded bg-black/5 p-1">{element.type === 'agent' ? <Bot className="size-3.5" /> : element.type === 'goal' ? <Sparkles className="size-3.5" /> : <Target className="size-3.5" />}</span><span className="truncate">{getElementTitle(element)}</span></span>{getElementBody(element) && <span className={`mt-2 line-clamp-2 text-[11px] ${element.type === 'goal' ? 'text-slate-300' : 'text-slate-500'}`}>{getElementBody(element)}</span>}{element.type === 'condition' && <div className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold"><span className="rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-emerald-700">{conditionPositiveLabel(element)}</span><span className="rounded-full border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-rose-700">{conditionNegativeLabel(element)}</span></div>}{isCompletionElement(element) ? <span className={`mt-3 inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${compactChipClass(statusChipClass(element.status))}`}><StatusIcon status={element.status} />{statusLabel(element.status)}</span> : readinessDisplay}{locked && <span className="pointer-events-none absolute right-2 top-2 inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/95 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600 shadow-sm" title={element.status === 'working' ? 'In progress — editing locked' : 'Editing locked'}>{element.status === 'working' ? <LoaderCircle aria-hidden="true" className="size-3 animate-spin" /> : <LockKeyhole aria-hidden="true" className="size-3" />}</span>}{renderPorts(element)}</div>; })}
       </div>
     </div>
+    {editNotice && <div role="status" className="absolute bottom-16 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 shadow-sm"><LockKeyhole className="size-3.5 shrink-0" />{editNotice}<button type="button" className="ml-1 font-semibold text-amber-900" onClick={() => setEditNotice(null)}>Dismiss</button></div>}
 
     {selectedElement && (
       <aside className="absolute bottom-16 right-4 top-16 z-20 w-72 overflow-auto rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -541,6 +666,8 @@ export function GoalsView({ people = [], workspacePolicy }: { people?: Person[];
             <h2 className="mt-1 text-sm font-semibold text-slate-900">{selectedElement.type}</h2>
           </div>
         </div>
+        {selectedElementLocked && <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800"><LockKeyhole className="mt-0.5 size-3.5 shrink-0" /><span>{selectedElement.status === 'working' ? 'This node is already in progress. Its structure and execution contract are locked.' : 'This node is committed to execution and cannot be edited here.'}</span></div>}
+        <fieldset disabled={selectedElementLocked} className="contents">
         <label className="mt-5 block text-xs font-medium text-slate-600">
           Title
           <Input
@@ -596,12 +723,12 @@ export function GoalsView({ people = [], workspacePolicy }: { people?: Person[];
             <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
               <p className="text-[11px] font-semibold text-emerald-800">Positive branch</p>
               <label className="mt-2 block text-xs font-medium text-slate-600">Branch name<Input value={conditionPositiveLabel(selectedElement)} onChange={event => updateElement({ conditionPositiveLabel: event.target.value })} className="mt-1" /></label>
-              <label className="mt-2 block text-xs font-medium text-slate-600">Outcome<textarea value={selectedElement.conditionPositiveOutcome ?? ''} onChange={event => updateElement({ conditionPositiveOutcome: event.target.value })} rows={2} placeholder="What happens when the condition is positive?" className="mt-1 w-full resize-none rounded-md border border-slate-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
+              <label className="mt-2 block text-xs font-medium text-slate-600">Outcome<textarea value={selectedElement.conditionPositiveOutcome ?? ''} onChange={event => updateElement({ conditionPositiveOutcome: event.target.value })} rows={2} placeholder="What happens when the condition is positive?" className="mt-1 w-full resize-y rounded-md border border-slate-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
             </div>
             <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50/60 p-3">
               <p className="text-[11px] font-semibold text-rose-800">Negative branch</p>
               <label className="mt-2 block text-xs font-medium text-slate-600">Branch name<Input value={conditionNegativeLabel(selectedElement)} onChange={event => updateElement({ conditionNegativeLabel: event.target.value })} className="mt-1" /></label>
-              <label className="mt-2 block text-xs font-medium text-slate-600">Outcome<textarea value={selectedElement.conditionNegativeOutcome ?? ''} onChange={event => updateElement({ conditionNegativeOutcome: event.target.value })} rows={2} placeholder="What happens when the condition is negative?" className="mt-1 w-full resize-none rounded-md border border-slate-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
+              <label className="mt-2 block text-xs font-medium text-slate-600">Outcome<textarea value={selectedElement.conditionNegativeOutcome ?? ''} onChange={event => updateElement({ conditionNegativeOutcome: event.target.value })} rows={2} placeholder="What happens when the condition is negative?" className="mt-1 w-full resize-y rounded-md border border-slate-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
             </div>
             <p className="mt-2 text-[11px] font-normal text-slate-400">Each branch has its own name and outcome. Connect the positive and negative ports to different next steps.</p>
           </section>
@@ -618,6 +745,19 @@ export function GoalsView({ people = [], workspacePolicy }: { people?: Person[];
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Policy</p>
             <p className="mt-1 text-[11px] text-slate-400">Typed controls become part of the execution contract.</p>
             {workspacePolicy && <p className="mt-2 rounded-md border border-blue-100 bg-blue-50/60 px-2.5 py-2 text-[11px] text-blue-800">Workspace policy revision {workspacePolicy.policyRevision} is the inherited baseline. Goal and gate values can only narrow it.</p>}
+            {selectedPolicyImpact && <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800">Active execution has a pending policy impact. {selectedPolicyImpact.requiresUserConfirmation ? 'Confirmation is required before the widened policy can apply.' : 'Pause and review the affected execution before continuing.'}</p>}
+            {selectedEffectivePolicy && <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/70 p-2.5">
+              <p className="text-[11px] font-medium text-slate-600">Effective policy</p>
+              <div className="mt-2 space-y-1.5">
+                {GOAL_POLICY_DIMENSIONS.map(dimension => {
+                  const explicit = selectedPolicyElement.policy?.dimensions?.[dimension.key] ?? legacyDimensionOverride(selectedPolicyElement.policy, dimension.key);
+                  const effective = selectedEffectivePolicy.dimensions[dimension.key];
+                  const value = effective.constrained ? `${effective.mode} · ${effective.value} ${dimension.unit}` : 'Unbounded';
+                  return <div key={dimension.key} className="flex items-center justify-between gap-2 text-[11px]"><span className="text-slate-500">{dimension.label}</span><span className="text-right text-slate-700"><span>{value}</span><span className="ml-1 text-slate-400">· {explicit ? 'Explicit override' : 'Inherited'}</span></span></div>;
+                })}
+              </div>
+              <p className="mt-2 text-[11px] text-slate-500">Acceptance: <span className="font-medium text-slate-700">{selectedEffectivePolicy.acceptance.actor}</span><span className="ml-1 text-slate-400">· {selectedPolicyElement.policy?.acceptanceActor ? 'Explicit override' : 'Inherited'}</span></p>
+            </div>}
             {selectedPolicyElement.type === 'goal' && <div className="mt-3 space-y-3">
               <p className="text-[11px] font-medium text-slate-500">Goal budget overrides</p>
               {GOAL_POLICY_DIMENSIONS.map(dimension => {
@@ -739,6 +879,7 @@ export function GoalsView({ people = [], workspacePolicy }: { people?: Person[];
         <button onClick={deleteElement} className="mt-6 flex items-center gap-2 text-xs font-medium text-red-600 hover:text-red-700">
           <Trash2 className="size-3.5" /> Delete element
         </button>
+        </fieldset>
       </aside>
     )}
     {deleteDialogOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="presentation">
@@ -756,7 +897,12 @@ export function GoalsView({ people = [], workspacePolicy }: { people?: Person[];
         <h2 id="new-goal-title" className="text-base font-semibold text-slate-900">Create a Goal</h2>
         <p className="mt-1 text-sm text-slate-500">Start with the outcome. You can shape the workflow on the canvas afterward.</p>
         <label className="mt-5 block text-xs font-medium text-slate-600">Goal title<Input autoFocus value={newGoalTitle} onChange={event => setNewGoalTitle(event.target.value)} placeholder="e.g. Launch the workspace" className="mt-1" /></label>
-        <label className="mt-4 block text-xs font-medium text-slate-600">Outcome and context<textarea value={newGoalBody} onChange={event => setNewGoalBody(event.target.value)} rows={4} placeholder="What should be true when this Goal is complete?" className="mt-1 w-full resize-none rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
+        <label className="mt-4 block text-xs font-medium text-slate-600">Outcome and context<textarea value={newGoalBody} onChange={event => setNewGoalBody(event.target.value)} rows={4} placeholder="What should be true when this Goal is complete?" className="mt-1 w-full resize-y rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
+        {!goalAuditArchiveDirectory && !goals.length && <div className="mt-4 rounded-md border border-blue-100 bg-blue-50/60 p-3 text-xs text-slate-600">
+          <div className="font-semibold text-slate-700">Choose an audit history location</div>
+          <p className="mt-1 leading-4">Goal cleanup attempts are retained indefinitely in an external folder. You can also configure this later in Settings.</p>
+          <button type="button" className="mt-2 rounded-md border border-blue-200 bg-white px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50" onClick={async () => { const directory = await window.electron?.goalAudit?.pickDirectory?.(); if (directory) onGoalAuditArchiveDirectoryChange?.(directory); }}>Choose folder</button>
+        </div>}
         <div className="mt-6 flex justify-end gap-2"><button type="button" onClick={() => setNewGoalDialogOpen(false)} className="min-h-10 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button><button type="submit" className="min-h-10 rounded-md bg-slate-900 px-3 text-sm font-medium text-white hover:bg-slate-700">Create Goal</button></div>
       </form>
     </div>}
@@ -782,5 +928,6 @@ export function GoalsView({ people = [], workspacePolicy }: { people?: Person[];
         </div>
       </div>
     </div>
-  </section>;
+  </section>
+  );
 }

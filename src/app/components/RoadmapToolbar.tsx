@@ -6,6 +6,7 @@ import { MILESTONE_HEALTH_VISUALS } from '../utils/roadmap';
 import { TodayButton } from './TodayButton';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import {
   Select,
   SelectContent,
@@ -57,35 +58,33 @@ export function RoadmapToolbar({
     <div className="kanban-toolbar">
       <div className="kanban-toolbar-search">
         <Search className="kanban-toolbar-search-icon" />
-        <Input
-          value={searchQuery}
-          onChange={(event) => onSearchQueryChange(event.target.value)}
-          placeholder="Search milestones, projects, or linked tasks..."
-          className="kanban-toolbar-search-input"
-        />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Input value={searchQuery} onChange={(event) => onSearchQueryChange(event.target.value)} placeholder="Search milestones, projects, or linked tasks..." className="kanban-toolbar-search-input" />
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Search milestones, projects, or linked tasks</TooltipContent>
+        </Tooltip>
       </div>
       <div className="roadmap-toolbar-center" aria-label="Roadmap date navigation">
         {showTimelineNavigation ? (
           <div className="timeline-toolbar-controls" aria-label="Roadmap navigation">
-            <button
-              type="button"
-              onClick={onScrollTimelineLeft}
-              className="timeline-icon-button timeline-icon-button-left"
-              aria-label="Scroll roadmap left"
-              title="Scroll roadmap left"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button type="button" onClick={onScrollTimelineLeft} className="timeline-icon-button timeline-icon-button-left" aria-label="Scroll roadmap left">
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Scroll roadmap left</TooltipContent>
+            </Tooltip>
             <TodayButton onClick={onScrollToToday} />
-            <button
-              type="button"
-              onClick={onScrollTimelineRight}
-              className="timeline-icon-button timeline-icon-button-right"
-              aria-label="Scroll roadmap right"
-              title="Scroll roadmap right"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button type="button" onClick={onScrollTimelineRight} className="timeline-icon-button timeline-icon-button-right" aria-label="Scroll roadmap right">
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Scroll roadmap right</TooltipContent>
+            </Tooltip>
           </div>
         ) : null}
       </div>
@@ -149,14 +148,15 @@ export function RoadmapToolbar({
           </Button>
         ) : null}
 
-        <button
-          type="button"
-          onClick={onAddMilestone}
-          className="kanban-toolbar-add-board"
-        >
-          <Plus className="size-4" />
-          <span>Add milestone</span>
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button type="button" onClick={onAddMilestone} className="kanban-toolbar-add-board">
+              <Plus className="size-4" />
+              <span>Add milestone</span>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Add milestone</TooltipContent>
+        </Tooltip>
       </div>
     </div>
   );
@@ -184,22 +184,25 @@ function RoadmapFilterSelect({
   return (
     <div className="kanban-filter-control">
       <Select value={value} onValueChange={onValueChange}>
-        <SelectTrigger size="sm" className={`kanban-filter-trigger ${active ? 'is-active' : ''}`}>
-          <SelectValue placeholder={placeholder} />
-        </SelectTrigger>
-        <SelectContent>{children}</SelectContent>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <SelectTrigger size="sm" className={`kanban-filter-trigger ${active ? 'is-active' : ''}`}>
+              <SelectValue placeholder={placeholder} />
+            </SelectTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Filter by {placeholder.toLowerCase()}</TooltipContent>
+        </Tooltip>
+        <SelectContent className="omvra-filter-select-content">{children}</SelectContent>
       </Select>
       {active ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={onClear}
-          className="kanban-filter-clear"
-          aria-label={clearLabel}
-        >
-          <X className="h-4 w-4" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button type="button" variant="ghost" size="icon" onClick={onClear} className="kanban-filter-clear" aria-label={clearLabel}>
+              <X className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{clearLabel}</TooltipContent>
+        </Tooltip>
       ) : null}
     </div>
   );

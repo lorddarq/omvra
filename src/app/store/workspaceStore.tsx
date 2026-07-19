@@ -81,6 +81,7 @@ export interface AppPreferences {
   executionLoadStatusIds: TaskStatus[];
   pipelineLoadStatusIds: TaskStatus[];
   cleanupGoalArtifacts: boolean;
+  goalAuditArchiveDirectory: string;
   customScrollbarsEnabled: boolean;
   updateChannel: 'stable' | 'rc';
   markdownAppearance: MarkdownAppearance;
@@ -129,6 +130,7 @@ interface WorkspaceStoreValue {
   toggleExecutionLoadStatus: (statusId: TaskStatus) => void;
   togglePipelineLoadStatus: (statusId: TaskStatus) => void;
   setCleanupGoalArtifacts: (enabled: boolean) => void;
+  setGoalAuditArchiveDirectory: (directory: string) => void;
   setCustomScrollbarsEnabled: (enabled: boolean) => void;
   updateGoalPolicy: (updates: Parameters<typeof updateGoalPolicy>[1]) => void;
   resetGoalPolicy: () => void;
@@ -191,6 +193,7 @@ export function createDefaultAppPreferences(
     executionLoadStatusIds: [getDefaultStatusId(statusColumns, 'in-progress')],
     pipelineLoadStatusIds: [getDefaultStatusId(statusColumns, 'open')],
     cleanupGoalArtifacts: false,
+    goalAuditArchiveDirectory: '',
     customScrollbarsEnabled: true,
     updateChannel: 'stable',
     markdownAppearance: { ...DEFAULT_MARKDOWN_APPEARANCE },
@@ -260,6 +263,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
         defaultSwimlanes
       ),
       cleanupGoalArtifacts: Boolean(stored.cleanupGoalArtifacts),
+      goalAuditArchiveDirectory: typeof stored.goalAuditArchiveDirectory === 'string' ? stored.goalAuditArchiveDirectory : '',
       customScrollbarsEnabled: stored.customScrollbarsEnabled !== false,
       updateChannel: stored.updateChannel === 'rc' ? 'rc' : 'stable',
       markdownAppearance: sanitizeMarkdownAppearance(stored.markdownAppearance, DEFAULT_MARKDOWN_APPEARANCE),
@@ -627,6 +631,10 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     setPreferences(previous => ({ ...previous, cleanupGoalArtifacts: enabled }));
   }, []);
 
+  const setGoalAuditArchiveDirectory = useCallback((directory: string) => {
+    setPreferences(previous => ({ ...previous, goalAuditArchiveDirectory: directory.trim() }));
+  }, []);
+
   const setCustomScrollbarsEnabled = useCallback((enabled: boolean) => {
     setPreferences(previous => ({ ...previous, customScrollbarsEnabled: enabled }));
   }, []);
@@ -716,6 +724,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     toggleExecutionLoadStatus,
     togglePipelineLoadStatus,
     setCleanupGoalArtifacts,
+    setGoalAuditArchiveDirectory,
     setCustomScrollbarsEnabled,
     updateGoalPolicy: handleUpdateGoalPolicy,
     resetGoalPolicy,
@@ -754,6 +763,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     setUpdateChannel,
     setMarkdownAppearance,
     setCleanupGoalArtifacts,
+    setGoalAuditArchiveDirectory,
     setCustomScrollbarsEnabled,
     handleUpdateGoalPolicy,
     resetGoalPolicy,

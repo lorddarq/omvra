@@ -59,6 +59,10 @@ contextBridge.exposeInMainWorld('electron', {
     reveal: (filePath) => ipcRenderer.invoke('attachments/reveal', filePath),
   },
 
+  goalAudit: {
+    pickDirectory: () => ipcRenderer.invoke('goal-audit/pick-directory'),
+  },
+
   // Open external (validated in main)
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
 

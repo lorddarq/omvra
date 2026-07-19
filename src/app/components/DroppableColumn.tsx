@@ -10,6 +10,7 @@ import {
   type TaskDropIndicator,
 } from '../components/DraggableTaskCard';
 import { ColumnDialog } from '../components/dialogs/ColumnDialog';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 interface DroppableColumnProps {
   swimlane: StatusColumn;
@@ -75,14 +76,14 @@ function KanbanColumnHeader({
   return (
     <div className="kanban-column-header-ui">
       {columnDragHandleRef && (
-        <button
-          ref={columnDragHandleRef}
-          type="button"
-          className="kanban-column-drag-handle"
-          aria-label={`Drag ${swimlane.title || 'column'} column`}
-        >
-          <GripVertical className="size-4" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button ref={columnDragHandleRef} type="button" className="kanban-column-drag-handle" aria-label={`Drag ${swimlane.title || 'column'} column`}>
+              <GripVertical className="size-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Drag to reorder column</TooltipContent>
+        </Tooltip>
       )}
       <div className={`kanban-column-accent ${accentClassName || ''}`} style={accentStyle} aria-hidden="true" />
       <div className="min-w-0 flex-1">
@@ -91,14 +92,14 @@ function KanbanColumnHeader({
           <span className="kanban-column-count-pill">{taskCount}</span>
         </div>
       </div>
-      <button
-        className="kanban-column-edit-control"
-        onClick={onEdit}
-        aria-label={`Edit ${swimlane.title} column`}
-        type="button"
-      >
-        Edit
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button className="kanban-column-edit-control" onClick={onEdit} aria-label={`Edit ${swimlane.title} column`} type="button">
+            Edit
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">Edit {swimlane.title} column</TooltipContent>
+      </Tooltip>
     </div>
   );
 }
@@ -109,13 +110,14 @@ interface KanbanAddTaskRowProps {
 
 function KanbanAddTaskRow({ onAddTask }: KanbanAddTaskRowProps) {
   return (
-    <button
-      onClick={onAddTask}
-      className="kanban-add-task-row"
-      type="button"
-    >
-      <span>Add Task</span>
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button onClick={onAddTask} className="kanban-add-task-row" type="button">
+          <span>Add Task</span>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">Add task to this column</TooltipContent>
+    </Tooltip>
   );
 }
 

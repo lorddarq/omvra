@@ -10,6 +10,23 @@ Goals / Loops is a durable planning-and-orchestration surface exposed through MC
 
 Omvra is the durable system of record. The orchestrator is the overseer: it reads the goal, decomposes and delegates work, records evidence and decisions, and advances the workflow when its configured gates are satisfied.
 
+## Agreed Goals / Loops workspace-shell decisions
+
+The workspace shell uses a dedicated `GoalsService` boundary backed by Electron-store. `workspaceStore` owns UI-only state and preferences; it is not a competing workspace authority. The renderer and MCP use the canonical Goals service boundary for Goal graph and execution data.
+
+MCP-originated Goal writes publish an Electron IPC invalidation event. The renderer then reloads the canonical Goals read model rather than merging the remote change into stale local state. Revision-checked writes provide conflict detection; stale renderer edits must be rejected or reconciled instead of overwriting newer MCP changes.
+
+Execution state is overseer-managed and separate from editable Goal graph definitions:
+
+- Active or committed nodes are not ordinary canvas-editable objects. A running node shows a progress overlay and spinner.
+- While active, a node's structure, assigned agent, inputs, conditions, upstream dependencies, accepted evidence, and committed execution data are locked.
+- Unlocking active work requires pause, cancellation, rollback, or a lifecycle amendment.
+- Downstream nodes that have not started remain editable. Safe future edits, such as renaming, future instructions, future assignment, adding future nodes, and layout changes, apply to the future plan.
+- Future edits that affect the contract, such as evidence requirements, conditions consuming active output, handoff requirements, or future budgets, require explicit **Apply workflow change** confirmation and overseer recalculation.
+- Unsafe active edits, including changing a running agent, deleting the current subgoal, changing active inputs, editing evaluated conditions, editing accepted evidence, or rewiring upstream dependencies, are never ordinary canvas edits.
+
+The first slice preserves missing dependency and persona references. A missing agent remains traceable as a degraded reference rather than being silently reassigned or deleted from workflow data. Available agent UI metadata may provide role context, but missing skills and instructions are shown explicitly and are not implied. Deleting an available agent requires confirmation that explains which workflows reference the agent and what degraded behavior will result.
+
 ## Confirmed execution flow
 
 When a user asks an orchestrator to execute a goal by ID:
@@ -25,6 +42,29 @@ When a user asks an orchestrator to execute a goal by ID:
 9. The cycle continues until the goal reaches human acceptance, completion, failure, or an explicitly blocked state.
 
 The graph's spatial arrangement should communicate the user's intended workflow. Execution meaning must remain explicit in typed connectors and scoped relationships; coordinates must never be the sole source of ordering or authority.
+
+## Agreed scheduled Goal execution contract
+
+Scheduled Goal execution is a governed lifecycle capability. It is not an arbitrary canvas-side cron runner and must not bypass the GoalLifecycleService, contract validation, evidence, acceptance, budget, or audit boundaries.
+
+The following behavior is agreed:
+
+- Schedules use the local computer timezone as their initial timezone authority. Detailed timezone and DST behavior remains an implementation decision.
+- Each scheduled occurrence is a new execution attempt/job. A failed or blocked occurrence does not fail the parent Goal or future occurrences.
+- Every occurrence stores an immutable `scheduledFor`/run anchor so retries preserve the original occurrence context.
+- Historical-data jobs use anchored semantics by default: retries query the original requested data window rather than silently moving the window forward.
+- Jobs that explicitly opt into `latest` semantics may rebase to current data when retried.
+- If MCP or the assigned agentic connection is unavailable, the occurrence is blocked rather than treated as successful or as a parent-Goal failure.
+- An occurrence may retry until the next scheduled occurrence. After that boundary it is recorded as `missed` or `expired`, and the next occurrence remains independent.
+- Schedule edits are safe outside an active execution window. In-progress work remains locked; future scheduled work may be edited subject to the contract-impact rules.
+
+Schedules are stored as separate durable `omvra.goalSchedules.v1` records in a one-to-many relationship with Goals. Each record uses typed weekly, monthly, or one-time rule fields and explicitly stores enabled state, start/end boundaries, projectless scope, and the IANA timezone captured from the local computer when the schedule is created. The captured timezone remains authoritative if the user later travels; its IANA rules govern DST behavior.
+
+Users manage schedules. Edits outside an active execution window apply immediately. In-progress execution remains locked. Contract-impacting edits require explicit **Apply workflow change** confirmation and overseer recalculation.
+
+The Goal UI must provide a dedicated scheduling area during Goal setup and in the Goal inspector. It must clearly distinguish one-time and recurring Goals and expose the applicable rule, captured timezone, enabled state, start/end boundaries, and schedule status. Scheduling controls are not hidden inside general canvas layout controls.
+
+These choices are agreed. Implementation remains separately tracked from the workspace shell and must preserve the lifecycle, temporal-mode, retry, and missed/expired behavior above.
 
 ## Durable state and contracts
 

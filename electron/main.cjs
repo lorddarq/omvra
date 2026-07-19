@@ -23,6 +23,7 @@ const {
   isMcpAgentAccessEnabled,
   buildMcpListenerStatus,
 } = require('./services/workspace-service.cjs');
+const { recordGoalPolicyChangeImpact } = require('./services/goal-policy.cjs');
 const { getBundledSkillsRoot } = require('./services/skill-service.cjs');
 
 const APP_NAME = 'Omvra';
@@ -456,6 +457,7 @@ ipcMain.handle('store/get', (_, key) => store.get(key));
 ipcMain.handle('store/set', (_, key, value) => store.set(key, value));
 ipcMain.handle('store/delete', (_, key) => store.delete(key));
 ipcMain.handle('store/export', () => store.store);
+ipcMain.handle('goal-policy/record-impact', (_, payload) => recordGoalPolicyChangeImpact(store, payload));
 ipcMain.handle('app/get-runtime-info', () => ({
   name: app.getName(),
   version: app.getVersion(),

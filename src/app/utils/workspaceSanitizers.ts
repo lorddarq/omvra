@@ -13,6 +13,7 @@ export interface AppPreferencesLike {
   executionLoadStatusIds: TaskStatus[];
   pipelineLoadStatusIds: TaskStatus[];
   cleanupGoalArtifacts: boolean;
+  customScrollbarsEnabled: boolean;
   executionLoadStatusId?: TaskStatus;
   pipelineLoadStatusId?: TaskStatus;
   updateChannel: 'stable' | 'rc';
@@ -407,6 +408,7 @@ export function sanitizePreferences(
     executionLoadStatusIds,
     pipelineLoadStatusIds,
     cleanupGoalArtifacts: Boolean(preferences.cleanupGoalArtifacts),
+    customScrollbarsEnabled: preferences.customScrollbarsEnabled !== false,
     updateChannel: preferences.updateChannel === 'rc' ? 'rc' : 'stable',
     markdownAppearance: sanitizeMarkdownAppearance(preferences.markdownAppearance, fallback.markdownAppearance || DEFAULT_MARKDOWN_APPEARANCE),
     mcpAgentAccessEnabled: Boolean(preferences.mcpAgentAccessEnabled),

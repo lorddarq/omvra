@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, Download, Upload } from 'lucide-react';
+import { AlertTriangle, Check, CheckCircle2, Download, Upload } from 'lucide-react';
 import { Person, RoadmapStage, StatusColumn, StorageMeter } from '../types';
+import { getDefaultGoalBudgetDimension, type GoalPolicyBudgetMode, type GoalPolicyDimension, type GoalPolicyV1 } from '../utils/goalPolicy';
 import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import { AnchoredPanel, AnchoredPanelSection } from './AnchoredPanel';
@@ -10,6 +11,7 @@ import { UsersIcon } from './icons/UsersIcon';
 import { WorkflowsIcon } from './icons/WorkflowsIcon';
 import { EmptyStateCard } from './EmptyStateCard';
 import { Switch } from './ui/switch';
+import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { getDefaultColumnSemantics } from '../utils/statusColumnSemantics';
 import {
@@ -140,12 +142,53 @@ export function GeneralSettingsSection({ children }: McpSettingsSectionProps) {
 interface WorkflowSettingsSectionProps {
   cleanupGoalArtifacts: boolean;
   onCleanupGoalArtifactsChange: (enabled: boolean) => void;
+  goalPolicy: GoalPolicyV1;
+  onGoalPolicyChange: (updates: {
+    currency?: string;
+    acceptance?: GoalPolicyV1['acceptance'];
+    agentMutationConfirmation?: GoalPolicyV1['agentMutationConfirmation'];
+    dimensions?: Partial<GoalPolicyV1['dimensions']>;
+  }) => void;
+  onResetGoalPolicy: () => void;
+  onExportGoalPolicyBackup: () => Promise<boolean>;
+  onImportGoalPolicyBackup: (file: File) => void;
 }
 
 export function WorkflowSettingsSection({
   cleanupGoalArtifacts,
   onCleanupGoalArtifactsChange,
+  goalPolicy,
+  onGoalPolicyChange,
+  onResetGoalPolicy,
+  onExportGoalPolicyBackup,
+  onImportGoalPolicyBackup,
 }: WorkflowSettingsSectionProps) {
+  const [validationWarnings, setValidationWarnings] = useState<Partial<Record<GoalPolicyDimension, string>>>({});
+  const dimensionLabels: Record<GoalPolicyDimension, string> = {
+    financial: 'Financial cost',
+    tokens: 'Token count',
+    concurrency: 'Concurrent loops',
+    attempts: 'Total loop attempts',
+    retries: 'Retries / rework',
+  };
+
+  const updateDimension = (dimension: GoalPolicyDimension, updates: Partial<Extract<GoalPolicyV1['dimensions'][GoalPolicyDimension], { constrained: true }>>) => {
+    const current = goalPolicy.dimensions[dimension];
+    if (!current.constrained) return;
+    onGoalPolicyChange({ dimensions: { [dimension]: { ...current, ...updates } } });
+  };
+
+  const setDimensionConstrained = (dimension: GoalPolicyDimension, constrained: boolean) => {
+    setValidationWarnings(previous => ({ ...previous, [dimension]: undefined }));
+    onGoalPolicyChange({
+      dimensions: {
+        [dimension]: constrained
+          ? getDefaultGoalBudgetDimension(dimension)
+          : { constrained: false },
+      },
+    });
+  };
+
   return (
     <AnchoredPanelSection
       id="workflows"
@@ -165,6 +208,169 @@ export function WorkflowSettingsSection({
           checked={cleanupGoalArtifacts}
           onCheckedChange={onCleanupGoalArtifactsChange}
         />
+      </div>
+      <div className="mt-6 border-t border-[#ececf0] pt-5">
+        <div className="text-sm font-semibold leading-5 text-[#3f3f46]">Goals / Loops policy</div>
+        <p className="mt-1 max-w-[40rem] text-xs leading-4 text-[#6a7282]">
+          Configure bounded execution defaults. Goal and subgoal overrides may narrow these limits, but cannot weaken safety or required human review.
+        </p>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <label className="grid gap-1 text-xs font-medium text-[#52525b]">
+            Currency
+            <Select
+              value={goalPolicy.currency}
+              onValueChange={currency => onGoalPolicyChange({ currency })}
+            >
+              <SelectTrigger className="h-9 w-full rounded-xl border-[#e5e7eb] bg-white px-3 text-sm font-medium text-[#71717a] shadow-[0_1px_2px_rgba(0,0,0,0.04)] focus-visible:ring-gray-200">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="USD">USD</SelectItem>
+                <SelectItem value="EUR">EUR</SelectItem>
+                <SelectItem value="GBP">GBP</SelectItem>
+                <SelectItem value="RON">RON</SelectItem>
+              </SelectContent>
+            </Select>
+          </label>
+          <label className="grid gap-1 text-xs font-medium text-[#52525b]">
+            Default acceptance
+            <Select
+              value={goalPolicy.acceptance.actor}
+              onValueChange={actor => onGoalPolicyChange({ acceptance: { actor: actor as GoalPolicyV1['acceptance']['actor'] } })}
+            >
+              <SelectTrigger className="h-9 w-full rounded-xl border-[#e5e7eb] bg-white px-3 text-sm font-medium text-[#71717a] shadow-[0_1px_2px_rgba(0,0,0,0.04)] focus-visible:ring-gray-200">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="human">Human review</SelectItem>
+                <SelectItem value="agentic">Agent evidence</SelectItem>
+                <SelectItem value="both">Human + agent evidence</SelectItem>
+              </SelectContent>
+            </Select>
+          </label>
+        </div>
+
+        <div className="mt-4 grid gap-3">
+          {(Object.keys(dimensionLabels) as GoalPolicyDimension[]).map(dimension => {
+            const current = goalPolicy.dimensions[dimension];
+            const constrained = current.constrained;
+            return (
+              <div key={dimension} className="rounded-2xl bg-[#f7f7f8] px-3 py-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-sm font-semibold leading-5 text-[#71717a]">{dimensionLabels[dimension]}</div>
+                  <label className="flex items-center gap-2 text-sm text-[#71717a]">
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={constrained}
+                      aria-label={`${dimensionLabels[dimension]} bounded`}
+                      className={`flex size-4 shrink-0 items-center justify-center rounded-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 ${constrained ? 'border-[#2563eb] bg-[#2563eb] text-white' : 'border-[#d4d4d8] bg-white text-transparent'}`}
+                      onClick={() => setDimensionConstrained(dimension, !constrained)}
+                    >
+                      <Check className="size-3" strokeWidth={3} />
+                    </button>
+                    Bounded
+                  </label>
+                </div>
+                {constrained ? (
+                  <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_1fr]">
+                    <Input
+                      className="h-9 rounded-xl border-[#e5e7eb] bg-white px-3 text-sm font-medium text-[#71717a] shadow-[0_1px_2px_rgba(0,0,0,0.04)] focus-visible:ring-gray-200"
+                      type="number"
+                      min="0.01"
+                      step={dimension === 'financial' ? '0.01' : '1'}
+                      value={current.value}
+                      aria-label={`${dimensionLabels[dimension]} value`}
+                      onChange={event => {
+                        const value = Number(event.target.value);
+                        const valid = Number.isFinite(value) && value > 0 && (dimension === 'financial' || Number.isInteger(value));
+                        if (!valid) {
+                          setValidationWarnings(previous => ({
+                            ...previous,
+                            [dimension]: dimension === 'financial'
+                              ? 'Enter a positive amount.'
+                              : 'Enter a positive whole number.',
+                          }));
+                          return;
+                        }
+                        setValidationWarnings(previous => ({ ...previous, [dimension]: undefined }));
+                        updateDimension(dimension, { value });
+                      }}
+                    />
+                    <Select
+                      value={current.mode}
+                      onValueChange={mode => updateDimension(dimension, { mode: mode as GoalPolicyBudgetMode })}
+                    >
+                      <SelectTrigger className="h-9 w-full rounded-xl border-[#e5e7eb] bg-white px-3 text-sm font-medium text-[#71717a] shadow-[0_1px_2px_rgba(0,0,0,0.04)] focus-visible:ring-gray-200" aria-label={`${dimensionLabels[dimension]} allocation mode`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="hard-cap">Hard cap</SelectItem>
+                        <SelectItem value="goal-pool">Goal pool</SelectItem>
+                        <SelectItem value="approval-required">Approval required</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <div className="flex h-9 items-center rounded-xl border border-[#e5e7eb] bg-[#f4f4f5] px-3 text-sm font-medium text-[#71717a] shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                      {dimension === 'financial' ? goalPolicy.currency : current.unit}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-xs leading-5 text-[#7f8796]">Unbounded dimensions do not carry a value or allocation mode.</p>
+                )}
+                {validationWarnings[dimension] ? <p className="mt-2 text-xs text-red-600" role="alert">{validationWarnings[dimension]}</p> : null}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold leading-5 text-[#71717a]">Agent graph mutation</div>
+            <p className="text-xs leading-5 text-[#7f8796]">Require confirmation before an agent changes the Goal graph.</p>
+          </div>
+          <Switch
+            className="mt-0.5"
+            aria-label="Require confirmation for agent Goal graph mutations"
+            checked={goalPolicy.agentMutationConfirmation === 'required'}
+            onCheckedChange={required => onGoalPolicyChange({ agentMutationConfirmation: required ? 'required' : 'allowed' })}
+          />
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-[#71717a]">Dynamic rollover returns unused cycle budget to the parent Goal pool.</p>
+          <button
+            type="button"
+            className="rounded-md border border-[#d9d9df] px-3 py-2 text-xs font-medium text-[#52525b] hover:bg-[#f4f4f5]"
+            onClick={onResetGoalPolicy}
+          >
+            Reset to safe defaults
+          </button>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-md border border-[#d9d9df] px-3 py-2 text-xs font-medium text-[#52525b] hover:bg-[#f4f4f5]"
+            onClick={() => { void onExportGoalPolicyBackup(); }}
+          >
+            <Download className="size-3.5" />
+            Back up Policies
+          </button>
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-[#d9d9df] px-3 py-2 text-xs font-medium text-[#52525b] hover:bg-[#f4f4f5]">
+            <Upload className="size-3.5" />
+            Restore Policies
+            <input
+              type="file"
+              accept="application/json"
+              className="hidden"
+              onChange={event => {
+                const file = event.currentTarget.files?.[0];
+                if (file) onImportGoalPolicyBackup(file);
+                event.currentTarget.value = '';
+              }}
+            />
+          </label>
+        </div>
       </div>
     </AnchoredPanelSection>
   );

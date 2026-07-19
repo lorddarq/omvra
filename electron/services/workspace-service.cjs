@@ -1,5 +1,6 @@
 const { randomUUID } = require('crypto');
 const { migrateGoalRecords } = require('./goal-state-service.cjs');
+const { isAgentMutationAllowed } = require('./goal-policy.cjs');
 
 const PREFERENCES_KEY = 'omvra.preferences.v1';
 const TASKS_KEY = 'omvra.tasks.v1';
@@ -900,12 +901,16 @@ function getGoalById(store, goalId) {
   return listGoals(store).find(goal => goal && goal.id === normalizedId) || null;
 }
 
-function updateGoal(store, { goalId, title, elements, overseerAgentId, expectedRevision, actor = 'agent' } = {}) {
+function updateGoal(store, { goalId, title, elements, overseerAgentId, expectedRevision, actor = 'agent', humanConfirmed = false } = {}) {
   const normalizedGoalId = normalizeString(goalId).trim();
   if (!normalizedGoalId) return { ok: false, error: 'GOAL_ID_REQUIRED', message: 'goalId is required.' };
   const goals = readArray(store, GOALS_KEY);
   const goalIndex = goals.findIndex(goal => goal && goal.id === normalizedGoalId);
   if (goalIndex < 0) return { ok: false, error: 'GOAL_NOT_FOUND', message: `Goal "${normalizedGoalId}" not found.` };
+  if (actor === 'mcp-agent') {
+    const confirmation = isAgentMutationAllowed(store, humanConfirmed);
+    if (!confirmation.allowed) return confirmation;
+  }
 
   const currentGoal = normalizeGoalForMcp(goals[goalIndex]);
   const currentRevision = Number.isFinite(Number(currentGoal[MCP_TASK_REV_FIELD]))
@@ -947,6 +952,7 @@ function updateGoalElement(store, {
   actor = 'agent',
   idempotencyKey,
   connectorOnly = false,
+  humanConfirmed = false,
 } = {}) {
   const normalizedGoalId = normalizeString(goalId).trim();
   const normalizedElementId = normalizeString(elementId).trim();
@@ -970,6 +976,10 @@ function updateGoalElement(store, {
   const goals = readArray(store, GOALS_KEY);
   const goalIndex = goals.findIndex(goal => goal && goal.id === normalizedGoalId);
   if (goalIndex < 0) return { ok: false, error: 'GOAL_NOT_FOUND', message: `Goal "${normalizedGoalId}" not found.` };
+  if (actor === 'mcp-agent') {
+    const confirmation = isAgentMutationAllowed(store, humanConfirmed);
+    if (!confirmation.allowed) return confirmation;
+  }
   const currentGoal = normalizeGoalForMcp(goals[goalIndex]);
   const currentRevision = Number.isFinite(Number(currentGoal[MCP_TASK_REV_FIELD]))
     ? Math.max(0, Math.floor(Number(currentGoal[MCP_TASK_REV_FIELD])))

@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electron', {
   storeSet: (key, value) => ipcRenderer.invoke('store/set', key, value),
   storeDelete: (key) => ipcRenderer.invoke('store/delete', key),
   storeExport: () => ipcRenderer.invoke('store/export'),
+  recordGoalPolicyImpact: (payload) => ipcRenderer.invoke('goal-policy/record-impact', payload),
   onStoreChanged: (listener) => {
     if (typeof listener !== 'function') {
       return () => {};

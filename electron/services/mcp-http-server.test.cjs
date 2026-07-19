@@ -406,6 +406,7 @@ test('goals expose the complete graph through tools, resources, and workspace sn
     goalId: 'goal-1',
     expectedRevision: 0,
     title: 'Ship the feature safely',
+    humanConfirmed: true,
     elements: [
       { id: 'subgoal-1', type: 'subgoal', title: 'Build', x: 20, y: 20 },
     ],
@@ -481,7 +482,7 @@ test('goals.lifecycle exposes governed revision-checked and idempotent commands'
   }, makeReq()).result.tools.find(tool => tool.name === 'goals_lifecycle');
   assert.deepEqual(lifecycleTool.inputSchema.properties.command.enum, [
     'start', 'dispatch', 'acknowledge', 'submit-evidence', 'request-handoff',
-    'accept', 'pause', 'resume', 'retry', 'fail', 'complete',
+    'accept', 'pause', 'resume', 'retry', 'delegate', 'wake', 'escalate', 'approve', 'reconcile', 'fail', 'complete',
   ]);
 });
 
@@ -510,6 +511,7 @@ test('focused Goal element and connector writes are revision-checked and idempot
     updates: { title: 'Build safely', x: 20 },
     expectedRevision: 0,
     idempotencyKey: 'focused-element-1',
+    humanConfirmed: true,
   });
   assert.equal(elementWrite.structuredContent.revision, 1);
   assert.equal(elementWrite.structuredContent.goal.elements[0].title, 'Build safely');
@@ -531,6 +533,7 @@ test('focused Goal element and connector writes are revision-checked and idempot
     updates: { targetId: 'subgoal-focused', targetSide: 'bottom' },
     expectedRevision: 1,
     idempotencyKey: 'focused-connector-1',
+    humanConfirmed: true,
   });
   assert.equal(connectorWrite.structuredContent.revision, 2);
   assert.equal(connectorWrite.structuredContent.goal.elements[1].targetSide, 'bottom');

@@ -382,6 +382,10 @@
   background-color: #ffffff;
 }
 
+.timeline-native-horizontal-scrollbar-hidden::-webkit-scrollbar:horizontal {
+  display: none;
+}
+
 .timeline-grid-container {
   position: relative;
   display: flex;

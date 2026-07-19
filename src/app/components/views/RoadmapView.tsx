@@ -30,12 +30,14 @@ import {
 } from '../MilestoneSections';
 import { RoadmapMilestoneSidebar } from '../RoadmapMilestoneSidebar';
 import { RoadmapToolbar, type RoadmapDateWindow } from '../RoadmapToolbar';
+import { HorizontalScrollbar } from '../HorizontalScrollbar';
 
 interface RoadmapViewProps {
   milestones: ProjectMilestone[];
   tasks: Task[];
   projects: TimelineSwimlane[];
   statusColumns: StatusColumn[];
+  customScrollbarsEnabled?: boolean;
   readModel?: WorkspaceReadModel;
   showCompleted: boolean;
   onAddMilestone: () => void;
@@ -161,6 +163,7 @@ export function RoadmapView({
   tasks,
   projects,
   statusColumns,
+  customScrollbarsEnabled = true,
   readModel,
   showCompleted,
   onAddMilestone,
@@ -409,7 +412,7 @@ export function RoadmapView({
                 </div>
               </div>
 
-              <div ref={chartScrollRef} className="absolute bottom-0 right-0 top-0 overflow-auto" style={{ left: LEFT_WIDTH }} onScroll={navigation.handleScroll}>
+              <div ref={chartScrollRef} className={`${customScrollbarsEnabled ? 'roadmap-native-horizontal-scrollbar-hidden ' : ''}absolute bottom-0 right-0 top-0 overflow-auto`} style={{ left: LEFT_WIDTH }} onScroll={navigation.handleScroll}>
                 <div
                   className="relative"
                   style={{
@@ -555,8 +558,13 @@ export function RoadmapView({
                   );
                 })}
               </div>
+              </div>
             </div>
-            </div>
+            <HorizontalScrollbar
+              scrollContainerRef={chartScrollRef}
+              ariaLabel="Milestone timeline horizontal scroll"
+              enabled={customScrollbarsEnabled}
+            />
           </section>
         )}
       </div>

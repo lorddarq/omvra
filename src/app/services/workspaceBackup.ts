@@ -21,9 +21,25 @@ import { getTaskProjectIds } from '../utils/roadmap.ts';
 import { getDefaultStatusId, syncLocalMcpServerAddress } from '../utils/mcpPreferences.ts';
 import { flattenPortableStoreEntries, normalizePortableStorageKey } from '../utils/storage.ts';
 import { AI_ACTIONS, LOAD_CLASSIFICATIONS, ROADMAP_STAGES, getDefaultColumnSemantics } from '../utils/statusColumnSemantics.ts';
+import { createDefaultGoalPolicy, sanitizeGoalPolicy, type GoalPolicyV1 } from '../utils/goalPolicy.ts';
 
 export const WORKSPACE_BACKUP_SCHEMA_VERSION = 2;
+export const GOAL_POLICY_BACKUP_SCHEMA_VERSION = 1;
 const GOALS_STORE_KEY = 'omvra.goals.v1';
+
+export interface GoalPolicyBackupPayload {
+  kind: 'omvra-goal-policy';
+  version: typeof GOAL_POLICY_BACKUP_SCHEMA_VERSION;
+  exportedAt: string;
+  goalPolicy: GoalPolicyV1;
+}
+
+export interface GoalPolicyBackupRepairResult {
+  ok: boolean;
+  error?: string;
+  warnings: string[];
+  policy: GoalPolicyV1;
+}
 
 export interface WorkspacePreferences {
   executionLoadStatusIds: TaskStatus[];
@@ -77,6 +93,7 @@ export interface WorkspaceBackupPayload {
   people?: Person[];
   statusColumns?: WorkspaceStatusColumn[];
   preferences?: Partial<WorkspacePreferences>;
+  goalPolicy?: GoalPolicyV1;
   ui?: WorkspaceBackupUiState;
   storage?: Record<string, string>;
   electronStore?: Record<string, unknown>;
@@ -89,6 +106,7 @@ export interface WorkspaceBackupBuildInput {
   people: Person[];
   statusColumns: WorkspaceStatusColumn[];
   preferences: WorkspacePreferences;
+  goalPolicy?: GoalPolicyV1;
   ui?: WorkspaceBackupUiState;
   storage?: Record<string, string>;
   electronStore?: Record<string, unknown>;
@@ -101,6 +119,7 @@ export interface WorkspaceBackupRepairOptions {
   fallbackPeople?: Person[];
   fallbackStatusColumns?: WorkspaceStatusColumn[];
   fallbackPreferences: WorkspacePreferences;
+  fallbackGoalPolicy?: GoalPolicyV1;
   fallbackTasks?: Task[];
   fallbackMilestones?: ProjectMilestone[];
   allowFallbackForMissingArrays?: boolean;
@@ -118,6 +137,7 @@ export interface WorkspaceBackupRepairResult {
   people: Person[];
   statusColumns: WorkspaceStatusColumn[];
   preferences: WorkspacePreferences;
+  goalPolicy: GoalPolicyV1;
   ui?: WorkspaceBackupUiState;
   storageSnapshot: Record<string, string>;
   electronStoreSnapshot: Record<string, unknown>;
@@ -541,9 +561,43 @@ export function buildWorkspaceBackupPayload(input: WorkspaceBackupBuildInput): W
     people: input.people,
     statusColumns: input.statusColumns,
     preferences: input.preferences,
+    goalPolicy: input.goalPolicy || createDefaultGoalPolicy(input.exportedAt),
     ui: input.ui,
     storage: input.storage,
     electronStore: input.electronStore,
+  };
+}
+
+export function buildGoalPolicyBackupPayload(
+  goalPolicy: GoalPolicyV1,
+  exportedAt = new Date().toISOString(),
+): GoalPolicyBackupPayload {
+  return {
+    kind: 'omvra-goal-policy',
+    version: GOAL_POLICY_BACKUP_SCHEMA_VERSION,
+    exportedAt,
+    goalPolicy,
+  };
+}
+
+export function repairGoalPolicyBackupPayload(
+  payload: unknown,
+  fallbackGoalPolicy: GoalPolicyV1,
+): GoalPolicyBackupRepairResult {
+  if (!isRecord(payload) || payload.kind !== 'omvra-goal-policy') {
+    return {
+      ok: false,
+      error: 'Invalid policy backup format.',
+      warnings: [],
+      policy: fallbackGoalPolicy,
+    };
+  }
+
+  const repaired = sanitizeGoalPolicy(payload.goalPolicy, fallbackGoalPolicy);
+  return {
+    ok: true,
+    warnings: repaired.warnings.map(warning => `Goal policy: ${warning}`),
+    policy: repaired.policy,
   };
 }
 
@@ -595,6 +649,7 @@ export function repairWorkspaceBackupPayload(
   const fallbackPeople = options.fallbackPeople || [];
   const fallbackStatusColumns = options.fallbackStatusColumns || [];
   const fallbackPreferences = options.fallbackPreferences;
+  const fallbackGoalPolicy = options.fallbackGoalPolicy || createDefaultGoalPolicy();
   const fallbackTasks = options.fallbackTasks || [];
   const fallbackMilestones = options.fallbackMilestones || [];
 
@@ -610,6 +665,7 @@ export function repairWorkspaceBackupPayload(
       people: [],
       statusColumns: fallbackStatusColumns,
       preferences: fallbackPreferences,
+      goalPolicy: options.fallbackGoalPolicy || createDefaultGoalPolicy(),
       storageSnapshot: {},
       electronStoreSnapshot: {},
     };
@@ -691,6 +747,11 @@ export function repairWorkspaceBackupPayload(
     importedStatusColumns,
     fallbackPreferences
   );
+  const importedGoalPolicyResult = sanitizeGoalPolicy(
+    payload.goalPolicy,
+    options.fallbackGoalPolicy || createDefaultGoalPolicy(),
+  );
+  warnings.push(...importedGoalPolicyResult.warnings.map(warning => `Goal policy: ${warning}`));
 
   const ui: WorkspaceBackupUiState | undefined = isRecord(payload.ui)
     ? {
@@ -758,6 +819,7 @@ export function repairWorkspaceBackupPayload(
       people: importedPeople,
       statusColumns: importedStatusColumns,
       preferences: importedPreferences,
+      goalPolicy: importedGoalPolicyResult.policy,
       ui,
       storageSnapshot,
       electronStoreSnapshot,
@@ -779,6 +841,7 @@ export function repairWorkspaceBackupPayload(
     people: importedPeople,
     statusColumns: importedStatusColumns,
     preferences: importedPreferences,
+    goalPolicy: importedGoalPolicyResult.policy,
     ui,
     storageSnapshot,
     electronStoreSnapshot,

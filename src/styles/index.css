@@ -19,6 +19,17 @@
   display: none;
 }
 
+.roadmap-native-horizontal-scrollbar-hidden,
+.timeline-native-horizontal-scrollbar-hidden {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.roadmap-native-horizontal-scrollbar-hidden::-webkit-scrollbar,
+.timeline-native-horizontal-scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
 /* Fallback line-clamp utilities (used when Tailwind line-clamp plugin isn't enabled) */
 .line-clamp-3 {
   display: -webkit-box;

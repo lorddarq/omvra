@@ -2,6 +2,7 @@ import React, { type RefObject } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { Task, TimelineSwimlane, Person, TaskStatus, StatusColumn, ProjectMilestone } from '../../types';
+import type { GoalPolicyV1 } from '../../utils/goalPolicy';
 import { ViewType } from '../../hooks/useViewState';
 import type { KanbanTaskFilters } from '../../utils/taskFilters';
 import type { WorkspaceReadModel } from '../../domain/workspaceReadModel';
@@ -23,6 +24,8 @@ export interface AppViewDataProps {
   people: Person[];
   statusColumns: StatusColumn[];
   milestones: ProjectMilestone[];
+  goalPolicy: GoalPolicyV1;
+  customScrollbarsEnabled: boolean;
   readModel: WorkspaceReadModel;
 }
 
@@ -92,6 +95,7 @@ export function AppMainViews({
             swimlanes={data.timelineSwimlanes}
             people={data.people}
             statusColumns={data.statusColumns}
+            customScrollbarsEnabled={data.customScrollbarsEnabled}
             initialScrollLeft={timeline.timelineInitialScrollLeft}
             initialLayoutState={timeline.timelineInitialLayoutState}
             onLayoutStateChange={timeline.onTimelineLayoutStateChange}
@@ -119,6 +123,7 @@ export function AppMainViews({
               swimlanes={data.statusColumns}
               projects={data.timelineSwimlanes}
               people={data.people}
+              customScrollbarsEnabled={data.customScrollbarsEnabled}
               initialFilters={kanban.kanbanInitialFilters}
               scrollContainerRef={frame.kanbanContainerRef}
               initialScrollLeft={kanban.kanbanInitialScrollLeft}
@@ -144,6 +149,7 @@ export function AppMainViews({
             tasks={data.tasks}
             projects={data.timelineSwimlanes}
             statusColumns={data.statusColumns}
+            customScrollbarsEnabled={data.customScrollbarsEnabled}
             readModel={data.readModel}
             showCompleted={roadmap.showCompleted}
             onAddMilestone={roadmap.onRoadmapAddMilestone}
@@ -153,7 +159,7 @@ export function AppMainViews({
         </div>
       )}
 
-      {currentView === 'loops' && <GoalsView people={data.people} />}
+      {currentView === 'loops' && <GoalsView people={data.people} workspacePolicy={data.goalPolicy} />}
     </div>
   );
 }

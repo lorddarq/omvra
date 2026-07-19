@@ -12,6 +12,7 @@ import { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import type { WorkspaceReadModel } from '../domain/workspaceReadModel';
 import type { MarkdownAppearance } from '../utils/markdownAppearance';
+import type { GoalPolicyV1 } from '../utils/goalPolicy';
 import { MilestoneDialog } from './dialogs/MilestoneDialog';
 import { MilestoneDetailsDialog } from './dialogs/MilestoneDetailsDialog';
 import { SwimlaneDialog } from './dialogs/SwimlaneDialog';
@@ -50,6 +51,9 @@ export interface AppPanelWorkspaceState {
 }
 
 export interface PreferencesPanelState {
+  cleanupGoalArtifacts: boolean;
+  customScrollbarsEnabled: boolean;
+  goalPolicy: GoalPolicyV1;
   executionLoadStatusIds: TaskStatus[];
   pipelineLoadStatusIds: TaskStatus[];
   updateChannel: 'stable' | 'rc';
@@ -112,10 +116,21 @@ export interface WorkspaceAdminActions {
   onClosePreferences: () => void;
   onNukeLocalData: () => void;
   onExportWorkspaceBackup: () => Promise<boolean>;
+  onExportGoalPolicyBackup: () => Promise<boolean>;
   onImportTasksAndProjects: (file: File) => void;
+  onImportGoalPolicyBackup: (file: File) => void;
   onUpdateChannelChange: (channel: 'stable' | 'rc') => void;
   onMarkdownAppearanceChange: (updates: Partial<MarkdownAppearance>) => void;
   onShowCompletedTimelineTasksChange: (show: boolean) => void;
+  onCleanupGoalArtifactsChange: (enabled: boolean) => void;
+  onCustomScrollbarsEnabledChange: (enabled: boolean) => void;
+  onGoalPolicyChange: (updates: {
+    currency?: string;
+    acceptance?: GoalPolicyV1['acceptance'];
+    agentMutationConfirmation?: GoalPolicyV1['agentMutationConfirmation'];
+    dimensions?: Partial<GoalPolicyV1['dimensions']>;
+  }) => void;
+  onResetGoalPolicy: () => void;
   onUpdateStatusColumn: (columnId: string, updates: Partial<Omit<StatusColumn, 'id'>>) => void;
   onMcpAgentAccessToggle: (enabled: boolean) => void;
   onMcpAddressChange: (address: string) => void;
@@ -246,6 +261,9 @@ export function AppPanels({
         onClose={adminActions.onClosePreferences}
         initialAnchor={dialogs.preferencesInitialAnchor}
         statusColumns={workspace.statusColumns}
+        cleanupGoalArtifacts={preferences.cleanupGoalArtifacts}
+        customScrollbarsEnabled={preferences.customScrollbarsEnabled}
+        goalPolicy={preferences.goalPolicy}
         executionLoadStatusIds={preferences.executionLoadStatusIds}
         pipelineLoadStatusIds={preferences.pipelineLoadStatusIds}
         updateChannel={preferences.updateChannel}
@@ -260,10 +278,16 @@ export function AppPanels({
         importFeedback={preferences.importFeedback}
         onNukeLocalData={adminActions.onNukeLocalData}
         onExportWorkspaceBackup={adminActions.onExportWorkspaceBackup}
+        onExportGoalPolicyBackup={adminActions.onExportGoalPolicyBackup}
         onImportTasksAndProjects={adminActions.onImportTasksAndProjects}
+        onImportGoalPolicyBackup={adminActions.onImportGoalPolicyBackup}
         onUpdateChannelChange={adminActions.onUpdateChannelChange}
         onMarkdownAppearanceChange={adminActions.onMarkdownAppearanceChange}
         onShowCompletedTimelineTasksChange={adminActions.onShowCompletedTimelineTasksChange}
+        onCleanupGoalArtifactsChange={adminActions.onCleanupGoalArtifactsChange}
+        onCustomScrollbarsEnabledChange={adminActions.onCustomScrollbarsEnabledChange}
+        onGoalPolicyChange={adminActions.onGoalPolicyChange}
+        onResetGoalPolicy={adminActions.onResetGoalPolicy}
         onUpdateStatusColumn={adminActions.onUpdateStatusColumn}
         onAddPerson={adminActions.onAddPerson}
         onUpdatePerson={adminActions.onUpdatePerson}

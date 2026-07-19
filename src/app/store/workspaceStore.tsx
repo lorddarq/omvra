@@ -54,6 +54,14 @@ import {
   syncMilestoneTaskLinks,
   updateRoadmapTaskDependencies,
 } from './workspaceMutations.ts';
+import {
+  createDefaultGoalPolicy,
+  GOAL_POLICY_KEY,
+  resetGoalPolicy as resetGoalPolicyRecord,
+  sanitizeGoalPolicy,
+  updateGoalPolicy,
+  type GoalPolicyV1,
+} from '../utils/goalPolicy.ts';
 
 const TASKS_KEY = 'omvra.tasks.v1';
 const SWIMLANES_KEY = 'omvra.swimlanes.v1';
@@ -73,6 +81,7 @@ export interface AppPreferences {
   executionLoadStatusIds: TaskStatus[];
   pipelineLoadStatusIds: TaskStatus[];
   cleanupGoalArtifacts: boolean;
+  customScrollbarsEnabled: boolean;
   updateChannel: 'stable' | 'rc';
   markdownAppearance: MarkdownAppearance;
   mcpAgentAccessEnabled: boolean;
@@ -100,6 +109,8 @@ interface WorkspaceStoreValue {
   setAgentWatchConfigs: Dispatch<SetStateAction<AgentWatchConfig[]>>;
   preferences: AppPreferences;
   setPreferences: Dispatch<SetStateAction<AppPreferences>>;
+  goalPolicy: GoalPolicyV1;
+  setGoalPolicy: Dispatch<SetStateAction<GoalPolicyV1>>;
   replaceWorkspaceSnapshot: (snapshot: {
     tasks: Task[];
     timelineSwimlanes: TimelineSwimlane[];
@@ -107,6 +118,7 @@ interface WorkspaceStoreValue {
     milestones: ProjectMilestone[];
     statusColumns: StatusColumnState[];
     preferences: AppPreferences;
+    goalPolicy: GoalPolicyV1;
   }) => void;
   saveMilestone: (milestone: ProjectMilestone) => void;
   deleteMilestone: (milestoneId: string) => void;
@@ -117,6 +129,9 @@ interface WorkspaceStoreValue {
   toggleExecutionLoadStatus: (statusId: TaskStatus) => void;
   togglePipelineLoadStatus: (statusId: TaskStatus) => void;
   setCleanupGoalArtifacts: (enabled: boolean) => void;
+  setCustomScrollbarsEnabled: (enabled: boolean) => void;
+  updateGoalPolicy: (updates: Parameters<typeof updateGoalPolicy>[1]) => void;
+  resetGoalPolicy: () => void;
   setUpdateChannel: (channel: AppPreferences['updateChannel']) => void;
   setMarkdownAppearance: (updates: Partial<MarkdownAppearance>) => void;
   setMcpAgentAccessEnabled: (enabled: boolean) => void;
@@ -176,6 +191,7 @@ export function createDefaultAppPreferences(
     executionLoadStatusIds: [getDefaultStatusId(statusColumns, 'in-progress')],
     pipelineLoadStatusIds: [getDefaultStatusId(statusColumns, 'open')],
     cleanupGoalArtifacts: false,
+    customScrollbarsEnabled: true,
     updateChannel: 'stable',
     markdownAppearance: { ...DEFAULT_MARKDOWN_APPEARANCE },
     mcpAgentAccessEnabled: false,
@@ -244,6 +260,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
         defaultSwimlanes
       ),
       cleanupGoalArtifacts: Boolean(stored.cleanupGoalArtifacts),
+      customScrollbarsEnabled: stored.customScrollbarsEnabled !== false,
       updateChannel: stored.updateChannel === 'rc' ? 'rc' : 'stable',
       markdownAppearance: sanitizeMarkdownAppearance(stored.markdownAppearance, DEFAULT_MARKDOWN_APPEARANCE),
       mcpAgentAccessEnabled: Boolean(stored.mcpAgentAccessEnabled),
@@ -263,6 +280,10 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
         : 60,
     };
   });
+  const [goalPolicy, setGoalPolicy] = useState<GoalPolicyV1>(() => {
+    const stored = readInitialWorkspaceJSON<unknown>(GOAL_POLICY_KEY, undefined);
+    return sanitizeGoalPolicy(stored).policy;
+  });
   const [hasHydratedCanonicalWorkspace, setHasHydratedCanonicalWorkspace] = useState<boolean>(
     () => shouldBootstrapFromLocalStorage()
   );
@@ -272,6 +293,9 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
   const peopleRef = useRef(people);
   const statusColumnsRef = useRef(statusColumns);
   const preferencesRef = useRef(preferences);
+  const goalPolicyRef = useRef(goalPolicy);
+  const previousGoalPolicyForImpactRef = useRef(goalPolicy);
+  const goalPolicyImpactInitializedRef = useRef(false);
   const agentWatchConfigsRef = useRef(agentWatchConfigs);
 
   useEffect(() => { tasksRef.current = tasks; }, [tasks]);
@@ -279,6 +303,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
   useEffect(() => { peopleRef.current = people; }, [people]);
   useEffect(() => { statusColumnsRef.current = statusColumns; }, [statusColumns]);
   useEffect(() => { preferencesRef.current = preferences; }, [preferences]);
+  useEffect(() => { goalPolicyRef.current = goalPolicy; }, [goalPolicy]);
   useEffect(() => { agentWatchConfigsRef.current = agentWatchConfigs; }, [agentWatchConfigs]);
 
   useEffect(() => {
@@ -307,6 +332,26 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
   }, [hasHydratedCanonicalWorkspace, preferences]);
   useEffect(() => {
     if (!hasHydratedCanonicalWorkspace) return;
+    persistJSONWithElectronMirror(GOAL_POLICY_KEY, goalPolicy);
+  }, [goalPolicy, hasHydratedCanonicalWorkspace]);
+  useEffect(() => {
+    if (!hasHydratedCanonicalWorkspace) return;
+    if (!goalPolicyImpactInitializedRef.current) {
+      previousGoalPolicyForImpactRef.current = goalPolicy;
+      goalPolicyImpactInitializedRef.current = true;
+      return;
+    }
+    const previousPolicy = previousGoalPolicyForImpactRef.current;
+    if (areSerializedValuesEqual(previousPolicy, goalPolicy)) return;
+    previousGoalPolicyForImpactRef.current = goalPolicy;
+    void window.electron?.recordGoalPolicyImpact?.({
+      previousPolicy,
+      nextPolicy: goalPolicy,
+      actor: 'workspace-settings',
+    });
+  }, [goalPolicy, hasHydratedCanonicalWorkspace]);
+  useEffect(() => {
+    if (!hasHydratedCanonicalWorkspace) return;
     persistJSONWithElectronMirror(MCP_AGENT_WATCH_CONFIGS_KEY, agentWatchConfigs);
   }, [agentWatchConfigs, hasHydratedCanonicalWorkspace]);
 
@@ -317,6 +362,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     const exportedMilestones = getPortableStoreValue<ProjectMilestone[]>(exported, MILESTONES_KEY);
     const exportedStatusColumns = getPortableStoreValue<StatusColumnState[]>(exported, STATUS_COLUMNS_KEY);
     const exportedPreferences = getPortableStoreValue<Partial<AppPreferences>>(exported, PREFERENCES_KEY);
+    const exportedGoalPolicy = getPortableStoreValue<unknown>(exported, GOAL_POLICY_KEY);
     const exportedAgentWatchConfigs = getPortableStoreValue<AgentWatchConfig[]>(exported, MCP_AGENT_WATCH_CONFIGS_KEY);
 
     let nextProjects = timelineSwimlanesRef.current;
@@ -356,6 +402,12 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
       setPreferences(previous => areSerializedValuesEqual(previous, nextPreferences) ? previous : nextPreferences);
     }
 
+    if (exportedGoalPolicy !== undefined) {
+      const repairedGoalPolicy = sanitizeGoalPolicy(exportedGoalPolicy, goalPolicyRef.current).policy;
+      mirrorCanonicalJsonToLocalStorage(GOAL_POLICY_KEY, repairedGoalPolicy);
+      setGoalPolicy(previous => areSerializedValuesEqual(previous, repairedGoalPolicy) ? previous : repairedGoalPolicy);
+    }
+
     if (exportedAgentWatchConfigs !== undefined) {
       const nextAgentWatchConfigs = sanitizeAgentWatchConfigs(exportedAgentWatchConfigs, []);
       mirrorCanonicalJsonToLocalStorage(MCP_AGENT_WATCH_CONFIGS_KEY, nextAgentWatchConfigs);
@@ -386,6 +438,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
           const exportedMilestones = getPortableStoreValue<ProjectMilestone[]>(exported, MILESTONES_KEY);
           const exportedStatusColumns = getPortableStoreValue<StatusColumnState[]>(exported, STATUS_COLUMNS_KEY);
           const exportedPreferences = getPortableStoreValue<Partial<AppPreferences>>(exported, PREFERENCES_KEY);
+          const exportedGoalPolicy = getPortableStoreValue<unknown>(exported, GOAL_POLICY_KEY);
           const exportedAgentWatchConfigs = getPortableStoreValue<AgentWatchConfig[]>(exported, MCP_AGENT_WATCH_CONFIGS_KEY);
           const hasCanonicalWorkspaceData =
             exportedTasks !== undefined ||
@@ -394,6 +447,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
             exportedMilestones !== undefined ||
             exportedStatusColumns !== undefined ||
             exportedPreferences !== undefined ||
+            exportedGoalPolicy !== undefined ||
             exportedAgentWatchConfigs !== undefined;
 
           if (!hasCanonicalWorkspaceData && hasAnyPortableLocalStorageData()) {
@@ -421,6 +475,9 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
               migratedStatusColumns,
               preferencesRef.current
             );
+            const migratedGoalPolicy = sanitizeGoalPolicy(
+              safeReadLocalStorageJSON<unknown>(GOAL_POLICY_KEY, undefined),
+            ).policy;
             const migratedAgentWatchConfigs = sanitizeAgentWatchConfigs(
               storedAgentWatchConfigs,
               []
@@ -441,6 +498,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
             setMilestones(migratedMilestones);
             setStatusColumns(migratedStatusColumns);
             setPreferences(migratedPreferences);
+            setGoalPolicy(migratedGoalPolicy);
             setAgentWatchConfigs(migratedAgentWatchConfigs);
             setTasks(migratedTasks);
             return;
@@ -488,6 +546,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     milestones: ProjectMilestone[];
     statusColumns: StatusColumnState[];
     preferences: AppPreferences;
+    goalPolicy: GoalPolicyV1;
   }) => {
     setTimelineSwimlanes(snapshot.timelineSwimlanes);
     setTasks(snapshot.tasks);
@@ -495,6 +554,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     setPeople(snapshot.people);
     setStatusColumns(snapshot.statusColumns);
     setPreferences(snapshot.preferences);
+    setGoalPolicy(snapshot.goalPolicy);
   }, []);
 
   const applyMilestoneTaskLinks = useCallback((milestone: ProjectMilestone) => {
@@ -567,6 +627,18 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     setPreferences(previous => ({ ...previous, cleanupGoalArtifacts: enabled }));
   }, []);
 
+  const setCustomScrollbarsEnabled = useCallback((enabled: boolean) => {
+    setPreferences(previous => ({ ...previous, customScrollbarsEnabled: enabled }));
+  }, []);
+
+  const handleUpdateGoalPolicy = useCallback((updates: Parameters<typeof updateGoalPolicy>[1]) => {
+    setGoalPolicy(previous => updateGoalPolicy(previous, updates));
+  }, []);
+
+  const resetGoalPolicy = useCallback(() => {
+    setGoalPolicy(previous => resetGoalPolicyRecord(previous));
+  }, []);
+
   const setMcpServerAddress = useCallback((address: string) => {
     setPreferences(previous => ({ ...previous, mcpServerAddress: address }));
   }, []);
@@ -614,6 +686,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     setStatusColumns(defaultSwimlanes);
     setAgentWatchConfigs([]);
     setPreferences(createDefaultAppPreferences(defaultSwimlanes));
+    setGoalPolicy(createDefaultGoalPolicy());
   }, []);
 
   const value = useMemo<WorkspaceStoreValue>(() => ({
@@ -631,6 +704,8 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     setAgentWatchConfigs,
     preferences,
     setPreferences,
+    goalPolicy,
+    setGoalPolicy,
     replaceWorkspaceSnapshot,
     saveMilestone: upsertMilestone,
     deleteMilestone: removeMilestone,
@@ -641,6 +716,9 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     toggleExecutionLoadStatus,
     togglePipelineLoadStatus,
     setCleanupGoalArtifacts,
+    setCustomScrollbarsEnabled,
+    updateGoalPolicy: handleUpdateGoalPolicy,
+    resetGoalPolicy,
     setUpdateChannel,
     setMarkdownAppearance,
     setMcpAgentAccessEnabled,
@@ -661,6 +739,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     milestones,
     people,
     preferences,
+    goalPolicy,
     removeMilestone,
     removeTaskMilestoneLinks,
     replaceWorkspaceSnapshot,
@@ -675,6 +754,9 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     setUpdateChannel,
     setMarkdownAppearance,
     setCleanupGoalArtifacts,
+    setCustomScrollbarsEnabled,
+    handleUpdateGoalPolicy,
+    resetGoalPolicy,
     statusColumns,
     tasks,
     timelineSwimlanes,

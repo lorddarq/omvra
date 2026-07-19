@@ -4,6 +4,7 @@ import type { AgentWatchRuntimeState } from '../hooks/useAgentWatchRuntime';
 import type { AgentWatchConfig } from '../utils/workspaceSanitizers';
 import { McpHealthCheckResult } from '../services/mcp/types';
 import type { MarkdownAppearance } from '../utils/markdownAppearance';
+import type { GoalPolicyV1 } from '../utils/goalPolicy';
 import {
   DataSettingsSection,
   GeneralSettingsSection,
@@ -19,6 +20,7 @@ import { McpAccessSettingsSection } from './settings/McpAccessSettingsSection';
 import { McpCommandSettingsSection } from './settings/McpCommandSettingsSection';
 import { McpActivityLogSection } from './settings/McpDiagnosticsSections';
 import { PeopleManagementSections } from './settings/PeopleSettingsSections';
+import { Switch } from './ui/switch';
 
 interface PreferencesPanelProps {
   isOpen: boolean;
@@ -27,6 +29,8 @@ interface PreferencesPanelProps {
   statusColumns: StatusColumn[];
   showCompletedTimelineTasks: boolean;
   cleanupGoalArtifacts: boolean;
+  customScrollbarsEnabled: boolean;
+  goalPolicy: GoalPolicyV1;
   executionLoadStatusIds: TaskStatus[];
   pipelineLoadStatusIds: TaskStatus[];
   updateChannel: 'stable' | 'rc';
@@ -39,6 +43,14 @@ interface PreferencesPanelProps {
   onMarkdownAppearanceChange: (updates: Partial<MarkdownAppearance>) => void;
   onShowCompletedTimelineTasksChange: (show: boolean) => void;
   onCleanupGoalArtifactsChange: (enabled: boolean) => void;
+  onCustomScrollbarsEnabledChange: (enabled: boolean) => void;
+  onGoalPolicyChange: (updates: {
+    currency?: string;
+    acceptance?: GoalPolicyV1['acceptance'];
+    agentMutationConfirmation?: GoalPolicyV1['agentMutationConfirmation'];
+    dimensions?: Partial<GoalPolicyV1['dimensions']>;
+  }) => void;
+  onResetGoalPolicy: () => void;
   onUpdateStatusColumn: (columnId: string, updates: Partial<Omit<StatusColumn, 'id'>>) => void;
   onAddPerson: (person: Omit<Person, 'id'>) => void;
   onUpdatePerson: (personId: string, updates: Pick<Person, 'name' | 'role' | 'kind' | 'agentInstructions' | 'agentOperationalInstructions'>) => void;
@@ -48,7 +60,9 @@ interface PreferencesPanelProps {
   onPollAgentWatch: (personId: string) => void;
   onNukeLocalData: () => void;
   onExportWorkspaceBackup: () => Promise<boolean>;
+  onExportGoalPolicyBackup: () => Promise<boolean>;
   onImportTasksAndProjects: (file: File) => void;
+  onImportGoalPolicyBackup: (file: File) => void;
   importFeedback?: {
     type: 'success' | 'error';
     message: string;
@@ -89,6 +103,8 @@ export function PreferencesPanel({
   statusColumns,
   showCompletedTimelineTasks,
   cleanupGoalArtifacts,
+  customScrollbarsEnabled,
+  goalPolicy,
   executionLoadStatusIds,
   pipelineLoadStatusIds,
   updateChannel,
@@ -101,6 +117,9 @@ export function PreferencesPanel({
   onMarkdownAppearanceChange,
   onShowCompletedTimelineTasksChange,
   onCleanupGoalArtifactsChange,
+  onCustomScrollbarsEnabledChange,
+  onGoalPolicyChange,
+  onResetGoalPolicy,
   onUpdateStatusColumn,
   onAddPerson,
   onUpdatePerson,
@@ -110,7 +129,9 @@ export function PreferencesPanel({
   onPollAgentWatch,
   onNukeLocalData,
   onExportWorkspaceBackup,
+  onExportGoalPolicyBackup,
   onImportTasksAndProjects,
+  onImportGoalPolicyBackup,
   importFeedback,
   mcpAgentAccessEnabled,
   mcpAddress,
@@ -295,6 +316,19 @@ export function PreferencesPanel({
   return (
     <SettingsPanel isOpen={isOpen} onClose={onClose} initialAnchor={initialAnchor}>
       <GeneralSettingsSection>
+        <div className="flex items-center justify-between gap-4 border-b border-black/5 pb-4">
+          <div>
+            <div className="text-sm font-semibold leading-5 text-[#71717a]">Custom horizontal scrollbars</div>
+            <p className="mt-1 text-xs leading-4 text-[#6a7282]">
+              Use Omvra&apos;s persistent scrollbar in Timeline and Milestones. Disable to use Chromium&apos;s standard scrollbar.
+            </p>
+          </div>
+          <Switch
+            aria-label="Use custom horizontal scrollbars"
+            checked={customScrollbarsEnabled}
+            onCheckedChange={onCustomScrollbarsEnabledChange}
+          />
+        </div>
         <MarkdownAppearanceSettings
           value={markdownAppearance}
           onChange={onMarkdownAppearanceChange}
@@ -304,6 +338,11 @@ export function PreferencesPanel({
       <WorkflowSettingsSection
         cleanupGoalArtifacts={cleanupGoalArtifacts}
         onCleanupGoalArtifactsChange={onCleanupGoalArtifactsChange}
+        goalPolicy={goalPolicy}
+        onGoalPolicyChange={onGoalPolicyChange}
+        onResetGoalPolicy={onResetGoalPolicy}
+        onExportGoalPolicyBackup={onExportGoalPolicyBackup}
+        onImportGoalPolicyBackup={onImportGoalPolicyBackup}
       />
 
       <TasksSettingsSection

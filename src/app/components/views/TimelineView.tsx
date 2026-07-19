@@ -50,6 +50,7 @@ import {
 import type { TimelineLayoutState } from '../../services/uiState';
 import { persistTimelineLayoutState } from '../../services/uiState';
 import { isPointerReleased } from '../../utils/pointerInteraction';
+import { HorizontalScrollbar } from '../HorizontalScrollbar';
 
 const DEFAULT_ROW_HEIGHT = 48;
 const HEADER_HEIGHT = 89;
@@ -148,6 +149,7 @@ interface TimelineViewProps {
   swimlanes: TimelineSwimlane[];
   people?: Person[];
   statusColumns?: StatusColumn[];
+  customScrollbarsEnabled?: boolean;
   initialScrollLeft?: number;
   initialLayoutState?: TimelineLayoutState;
   onLayoutStateChange?: (layout: TimelineLayoutState) => void;
@@ -170,6 +172,7 @@ export function TimelineView({
   swimlanes,
   people = [],
   statusColumns,
+  customScrollbarsEnabled = true,
   initialScrollLeft,
   initialLayoutState,
   onLayoutStateChange,
@@ -1099,6 +1102,7 @@ export function TimelineView({
             </div>
           </div>
         ) : (
+        <>
         <div className="timeline-main-content">
           {/* Left column: swimlane labels */}
           <div className="timeline-left-column" style={{ width: `${leftColWidth}px` }}>
@@ -1188,7 +1192,7 @@ export function TimelineView({
           </div>
 
           {/* Right column: timeline */}
-          <div ref={rowsContainerRef} className="timeline-right-column">
+          <div ref={rowsContainerRef} className={`timeline-right-column ${customScrollbarsEnabled ? 'timeline-native-horizontal-scrollbar-hidden' : ''}`}>
             <div className="timeline-grid-container" style={{ minWidth: `${totalTimelineWidth + endPadding}px` }}>
               {/* Header: months and days - sticky at top */}
               <div
@@ -1382,6 +1386,12 @@ export function TimelineView({
             </div>
           </div>
         </div>
+        <HorizontalScrollbar
+          scrollContainerRef={rowsContainerRef}
+          ariaLabel="Timeline horizontal scroll"
+          enabled={customScrollbarsEnabled}
+        />
+        </>
         )}
 
       </div>

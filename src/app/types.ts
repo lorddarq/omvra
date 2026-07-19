@@ -100,6 +100,15 @@ export type GoalConditionBranch = 'positive' | 'negative';
 export type GoalElementReadiness = 'not-ready' | 'ready' | 'unavailable' | 'needs-review';
 export type GoalAcceptanceActor = 'human' | 'agentic' | 'both';
 export type GoalBudgetMode = 'hard-cap' | 'goal-pool' | 'approval-required' | 'unbounded';
+export type GoalPolicyDimension = 'financial' | 'tokens' | 'concurrency' | 'attempts' | 'retries';
+export type GoalPolicyUnit = 'USD' | 'tokens' | 'loops' | 'attempts' | 'retries';
+
+export interface GoalPolicyDimensionOverride {
+  constrained?: boolean;
+  mode?: Exclude<GoalBudgetMode, 'unbounded'>;
+  value?: number;
+  unit?: GoalPolicyUnit;
+}
 
 export interface GoalPolicy {
   acceptanceActor?: GoalAcceptanceActor;
@@ -111,6 +120,11 @@ export interface GoalPolicy {
   maxRetries?: number;
   maxLoopAttempts?: number;
   maxConcurrentLoops?: number;
+  maxFinancialCost?: number;
+  maxTokens?: number;
+  loopAttemptsBudgetMode?: GoalBudgetMode;
+  dimensions?: Partial<Record<GoalPolicyDimension, GoalPolicyDimensionOverride>>;
+  agentMutationConfirmation?: 'required' | 'allowed';
 }
 
 export interface GoalElement {

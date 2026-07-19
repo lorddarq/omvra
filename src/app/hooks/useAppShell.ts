@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { Task, TaskStatus } from '../types.ts';
+import type { GoalPolicyV1 } from '../utils/goalPolicy.ts';
 import { useWorkspaceStore } from '../store/workspaceStore.tsx';
 import { useUiLayoutStore } from '../store/uiLayoutStore.tsx';
 import { useStorageMeter } from './useStorageMeter.ts';
@@ -16,8 +17,10 @@ import { getStatusIdsForLoad } from '../utils/statusColumnSemantics.ts';
 import { usePeopleActions } from './usePeopleActions.ts';
 import {
   buildWorkspaceBackupPayload,
+  buildGoalPolicyBackupPayload,
   downloadWorkspaceBackupPayload,
   parseWorkspaceBackupJson,
+  repairGoalPolicyBackupPayload,
   repairWorkspaceBackupPayload,
   WORKSPACE_BACKUP_SCHEMA_VERSION,
 } from '../services/workspaceBackup.ts';
@@ -89,9 +92,14 @@ export function useAppShell(): AppShellState {
     setAgentWatchConfigs,
     preferences,
     setPreferences,
+    goalPolicy,
+    setGoalPolicy,
+    updateGoalPolicy,
+    resetGoalPolicy,
     setUpdateChannel,
     setMarkdownAppearance,
     setCleanupGoalArtifacts,
+    setCustomScrollbarsEnabled,
     replaceWorkspaceSnapshot,
     saveMilestone,
     deleteMilestone,
@@ -186,6 +194,7 @@ export function useAppShell(): AppShellState {
       milestones,
       statusColumns,
       preferences,
+      goalPolicy,
     ],
   });
 
@@ -363,6 +372,15 @@ export function useAppShell(): AppShellState {
     setTasks(reorderedTasks);
   }, [setTasks]);
 
+  const handleGoalPolicyChange = useCallback((updates: {
+    currency?: string;
+    acceptance?: GoalPolicyV1['acceptance'];
+    agentMutationConfirmation?: GoalPolicyV1['agentMutationConfirmation'];
+    dimensions?: Partial<GoalPolicyV1['dimensions']>;
+  }) => {
+    updateGoalPolicy(updates);
+  }, [updateGoalPolicy]);
+
   const handleConfirmNukeLocalData = useCallback(async () => {
     try {
       window.localStorage.clear();
@@ -388,6 +406,7 @@ export function useAppShell(): AppShellState {
       people,
       statusColumns,
       preferences,
+      goalPolicy,
       ui: buildBackupUiState(),
       storage: getPortableStorageSnapshot(),
       electronStore: await getPortableElectronStoreSnapshot(),
@@ -404,7 +423,41 @@ export function useAppShell(): AppShellState {
     statusColumns,
     tasks,
     timelineSwimlanes,
+    goalPolicy,
   ]);
+
+  const handleExportGoalPolicyBackup = useCallback(async () => (
+    downloadWorkspaceBackupPayload(
+      buildGoalPolicyBackupPayload(goalPolicy),
+      { fileNamePrefix: 'omvra-goal-policy' },
+    )
+  ), [goalPolicy]);
+
+  const handleImportGoalPolicyBackup = useCallback(async (file: File) => {
+    try {
+      const parsed = parseWorkspaceBackupJson(await file.text());
+      if (!parsed.ok || !parsed.payload) {
+        setImportFeedback({ type: 'error', message: parsed.error || 'Could not import policy backup.' });
+        return;
+      }
+
+      const repaired = repairGoalPolicyBackupPayload(parsed.payload, goalPolicy);
+      if (!repaired.ok) {
+        setImportFeedback({ type: 'error', message: repaired.error || 'Could not import policy backup.' });
+        return;
+      }
+
+      setGoalPolicy(repaired.policy);
+      setImportFeedback({
+        type: 'success',
+        message: repaired.warnings.length > 0
+          ? `Policy restored with warnings: ${repaired.warnings.join(' ')}`
+          : `Policy restored (revision ${repaired.policy.policyRevision}).`,
+      });
+    } catch {
+      setImportFeedback({ type: 'error', message: 'Could not import policy backup.' });
+    }
+  }, [goalPolicy, setGoalPolicy, setImportFeedback]);
 
   const handleImportTasksAndProjects = useCallback(async (file: File) => {
     try {
@@ -434,6 +487,7 @@ export function useAppShell(): AppShellState {
         fallbackPeople: people,
         fallbackStatusColumns: statusColumns,
         fallbackPreferences: preferences,
+        fallbackGoalPolicy: goalPolicy,
         fallbackTasks: tasks,
         fallbackMilestones: milestones,
         allowFallbackForMissingArrays: false,
@@ -455,12 +509,18 @@ export function useAppShell(): AppShellState {
         milestones: repaired.milestones,
         people: repaired.people,
         statusColumns: repaired.statusColumns,
-        preferences: repaired.preferences,
+        preferences: {
+          ...repaired.preferences,
+          cleanupGoalArtifacts: preferences.cleanupGoalArtifacts,
+        },
+        goalPolicy: repaired.goalPolicy,
       });
       await restoreImportedUiState(repaired.ui, repaired.projects, repaired.people);
       setImportFeedback({
         type: 'success',
-        message: `Restored ${repaired.tasks.length} tasks, ${repaired.projects.length} projects, ${repaired.people.length} people, and ${repaired.milestones.length} milestones from backup.`,
+        message: repaired.warnings.length > 0
+          ? `Restored workspace with warnings: ${repaired.warnings.join(' ')}`
+          : `Restored ${repaired.tasks.length} tasks, ${repaired.projects.length} projects, ${repaired.people.length} people, and ${repaired.milestones.length} milestones from backup.`,
       });
       bumpViewRefreshKey();
     } catch {
@@ -480,6 +540,7 @@ export function useAppShell(): AppShellState {
     statusColumns,
     tasks,
     timelineSwimlanes,
+    goalPolicy,
   ]);
 
   useEffect(() => {
@@ -545,6 +606,8 @@ export function useAppShell(): AppShellState {
         people,
         statusColumns,
         milestones,
+        goalPolicy,
+        customScrollbarsEnabled: preferences.customScrollbarsEnabled,
         readModel: workspaceReadModel,
       },
       timeline: {
@@ -629,6 +692,8 @@ export function useAppShell(): AppShellState {
         markdownAppearance: preferences.markdownAppearance,
         showCompletedTimelineTasks: timelineLayoutState.showCompleted,
         cleanupGoalArtifacts: preferences.cleanupGoalArtifacts,
+        customScrollbarsEnabled: preferences.customScrollbarsEnabled,
+        goalPolicy,
         agentWatchConfigs,
         agentWatchRuntime,
         storageMeter,
@@ -680,11 +745,16 @@ export function useAppShell(): AppShellState {
         onClosePreferences: closePreferences,
         onNukeLocalData: handleNukeLocalData,
         onExportWorkspaceBackup: handleExportWorkspaceBackup,
+        onExportGoalPolicyBackup: handleExportGoalPolicyBackup,
         onImportTasksAndProjects: handleImportTasksAndProjects,
+        onImportGoalPolicyBackup: handleImportGoalPolicyBackup,
         onUpdateChannelChange: setUpdateChannel,
         onMarkdownAppearanceChange: setMarkdownAppearance,
         onShowCompletedTimelineTasksChange: (show) => setTimelineLayoutState(current => ({ ...current, showCompleted: show })),
         onCleanupGoalArtifactsChange: setCleanupGoalArtifacts,
+        onCustomScrollbarsEnabledChange: setCustomScrollbarsEnabled,
+        onGoalPolicyChange: handleGoalPolicyChange,
+        onResetGoalPolicy: resetGoalPolicy,
         onUpdateStatusColumn: handleUpdateStatusColumn,
         onMcpAgentAccessToggle: setMcpAgentAccessEnabled,
         onMcpAddressChange: (address) => setMcpServerAddress(normalizeMcpServerAddress(address)),

@@ -253,6 +253,7 @@ const WRITE_TOOL_DEFINITIONS = [
         title: { type: 'string' },
         elements: { type: 'array', items: { type: 'object' } },
         overseerAgentId: { type: 'string' },
+        humanConfirmed: { type: 'boolean' },
         expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
       },
       required: ['goalId', 'elements', 'expectedRevision'],
@@ -270,6 +271,7 @@ const WRITE_TOOL_DEFINITIONS = [
         updates: { type: 'object' },
         expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
         idempotencyKey: { type: 'string' },
+        humanConfirmed: { type: 'boolean' },
       },
       required: ['goalId', 'elementId', 'updates', 'expectedRevision', 'idempotencyKey'],
     },
@@ -286,6 +288,7 @@ const WRITE_TOOL_DEFINITIONS = [
         updates: { type: 'object' },
         expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
         idempotencyKey: { type: 'string' },
+        humanConfirmed: { type: 'boolean' },
       },
       required: ['goalId', 'connectorId', 'updates', 'expectedRevision', 'idempotencyKey'],
     },
@@ -298,7 +301,7 @@ const WRITE_TOOL_DEFINITIONS = [
       additionalProperties: false,
       properties: {
         goalId: { type: 'string' },
-        command: { type: 'string', enum: ['start', 'dispatch', 'acknowledge', 'submit-evidence', 'request-handoff', 'accept', 'pause', 'resume', 'retry', 'fail', 'complete'] },
+        command: { type: 'string', enum: ['start', 'dispatch', 'acknowledge', 'submit-evidence', 'request-handoff', 'accept', 'pause', 'resume', 'retry', 'delegate', 'wake', 'escalate', 'approve', 'reconcile', 'fail', 'complete'] },
         expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
         commandId: { type: 'string' },
         actor: { type: 'string' },
@@ -1569,6 +1572,7 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot } = {})
         overseerAgentId: args.overseerAgentId,
         expectedRevision: args.expectedRevision,
         actor: 'mcp-agent',
+        humanConfirmed: args.humanConfirmed === true,
       });
       if (!result.ok) {
         recordWriteAttempt(store, req, {
@@ -1610,6 +1614,7 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot } = {})
         idempotencyKey: args.idempotencyKey,
         connectorOnly: name === 'goals.update_connector',
         actor: 'mcp-agent',
+        humanConfirmed: args.humanConfirmed === true,
       });
       if (!result.ok) {
         recordWriteAttempt(store, req, {

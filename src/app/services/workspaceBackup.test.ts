@@ -1,17 +1,56 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  buildGoalPolicyBackupPayload,
+  buildWorkspaceBackupPayload,
   buildWorkspaceBackupFileName,
   createDefaultWorkspacePreferences,
   getPortableElectronStoreSnapshotFromExport,
   getPortableStorageSnapshotFromEntries,
+  repairGoalPolicyBackupPayload,
   repairWorkspaceBackupPayload,
 } from './workspaceBackup.ts';
+import { createDefaultGoalPolicy } from '../utils/goalPolicy.ts';
 
 const fallbackStatusColumns = [
   { id: 'open', title: 'Open Tasks', color: '#999999' },
   { id: 'in-progress', title: 'In Progress', color: '#2563eb' },
 ];
+
+test('policy-only backup round-trips the Goal policy and reports repaired fields', () => {
+  const policy = createDefaultGoalPolicy('2026-07-19T00:00:00.000Z');
+  policy.currency = 'EUR';
+  const payload = buildGoalPolicyBackupPayload(policy, '2026-07-19T01:00:00.000Z');
+  const repaired = repairGoalPolicyBackupPayload(payload, createDefaultGoalPolicy());
+
+  assert.equal(repaired.ok, true);
+  assert.equal(repaired.policy.currency, 'EUR');
+  assert.equal(repaired.warnings.length, 0);
+
+  const malformed = repairGoalPolicyBackupPayload({
+    ...payload,
+    goalPolicy: { ...policy, dimensions: { tokens: { constrained: true, value: -1 } } },
+  }, createDefaultGoalPolicy());
+  assert.equal(malformed.ok, true);
+  assert.equal(malformed.policy.dimensions.tokens.value, 100000);
+  assert.ok(malformed.warnings.length > 0);
+});
+
+test('full workspace backups keep Goal policy separate from general preferences', () => {
+  const policy = createDefaultGoalPolicy('2026-07-19T00:00:00.000Z');
+  const payload = buildWorkspaceBackupPayload({
+    tasks: [],
+    milestones: [],
+    projects: [],
+    people: [],
+    statusColumns: fallbackStatusColumns,
+    preferences: createDefaultWorkspacePreferences(fallbackStatusColumns),
+    goalPolicy: policy,
+  });
+
+  assert.deepEqual(payload.goalPolicy, policy);
+  assert.notEqual(payload.preferences, payload.goalPolicy);
+});
 
 test('legacy Plumy backup storage keys are restored under the Omvra namespace', () => {
   const tasksJson = JSON.stringify([{ id: 'task-1', title: 'Legacy task', status: 'open' }]);

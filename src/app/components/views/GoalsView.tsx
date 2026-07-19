@@ -1,15 +1,25 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, CircleDot, ClipboardCheck, FileText, GitBranch, LockKeyhole, Minus, Plus, ShieldCheck, Sparkles, Target, Trash2, UserRoundCheck, ZoomIn } from 'lucide-react';
-import type { GoalAcceptanceActor, GoalBudgetMode, GoalConditionBranch, GoalConnectorSide, GoalElement, GoalElementReadiness, GoalElementType, GoalPolicy, GoalRecord, Person } from '../../types.ts';
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleDot, ClipboardCheck, FileText, GitBranch, LockKeyhole, Minus, Plus, ShieldCheck, Sparkles, Target, Trash2, UserRoundCheck, ZoomIn } from 'lucide-react';
+import type { GoalAcceptanceActor, GoalBudgetMode, GoalConditionBranch, GoalConnectorSide, GoalElement, GoalElementReadiness, GoalElementType, GoalPolicy, GoalPolicyDimension, GoalPolicyDimensionOverride, GoalRecord, Person } from '../../types.ts';
+import type { GoalPolicyV1 } from '../../utils/goalPolicy.ts';
 import { getCanonicalJSON, safeReadJSON, setCanonicalJSON } from '../../utils/storage.ts';
 import { isGoalElementConnected, wouldCreateGoalCycle } from '../../utils/goalCanvas.ts';
 import { AgentIcon as Bot } from '../icons/AgentIcon';
 import { LinkIcon as Link2 } from '../icons/LinkIcon';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 
 const STORAGE_KEY = 'omvra.goals.v1';
 const GOAL_ID = 'goal-lights-off-factory';
+const GOAL_POLICY_DIMENSIONS: Array<{ key: GoalPolicyDimension; label: string; unit: GoalPolicyDimensionOverride['unit']; legacyMode: keyof GoalPolicy; legacyValue: keyof GoalPolicy }> = [
+  { key: 'financial', label: 'Financial cost', unit: 'USD', legacyMode: 'financialBudgetMode', legacyValue: 'maxFinancialCost' },
+  { key: 'tokens', label: 'Tokens', unit: 'tokens', legacyMode: 'tokenBudgetMode', legacyValue: 'maxTokens' },
+  { key: 'concurrency', label: 'Concurrent loops', unit: 'loops', legacyMode: 'concurrencyBudgetMode', legacyValue: 'maxConcurrentLoops' },
+  { key: 'attempts', label: 'Total loop attempts', unit: 'attempts', legacyMode: 'loopAttemptsBudgetMode', legacyValue: 'maxLoopAttempts' },
+  { key: 'retries', label: 'Retries / rework', unit: 'retries', legacyMode: 'retryBudgetMode', legacyValue: 'maxRetries' },
+];
+const GOAL_POLICY_SAFE_VALUES: Record<GoalPolicyDimension, number> = { financial: 10, tokens: 100000, concurrency: 1, attempts: 10, retries: 2 };
 
 function createStableId(prefix: string): string {
   const uuid = typeof globalThis.crypto?.randomUUID === 'function'
@@ -106,6 +116,10 @@ function statusChipClass(status: GoalElement['status']): string {
   return 'border-slate-200 bg-slate-100 text-slate-600';
 }
 
+function compactChipClass(colorClass: string): string {
+  return `${colorClass} !gap-0.5 !rounded-full !border !px-1.5 !py-0 !text-[10px] [&>svg]:!mr-0 [&>svg]:!size-2.5`;
+}
+
 function statusLabel(status: GoalElement['status']): string {
   return status === 'evidence-required' ? 'Evidence required'
     : status === 'approval-required' ? 'Approval required'
@@ -149,10 +163,11 @@ function readinessLabel(readiness: GoalElementReadiness): string {
 }
 
 function readinessChipClass(readiness: GoalElementReadiness): string {
-  return readiness === 'ready' ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  const colorClass = readiness === 'ready' ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
     : readiness === 'unavailable' ? 'border-red-200 bg-red-50 text-red-700'
       : readiness === 'needs-review' ? 'border-amber-200 bg-amber-50 text-amber-800'
         : 'border-slate-200 bg-slate-100 text-slate-600';
+  return compactChipClass(colorClass);
 }
 
 function ReadyIcon() {
@@ -190,7 +205,7 @@ function StatusIcon({ status, className = 'size-3' }: { status: GoalElement['sta
   return <CircleDot className={className} />;
 }
 
-export function GoalsView({ people = [] }: { people?: Person[] }) {
+export function GoalsView({ people = [], workspacePolicy }: { people?: Person[]; workspacePolicy?: GoalPolicyV1 }) {
   const [goals, setGoals] = useState<GoalRecord[]>(readGoals);
   const [canonicalHydrated, setCanonicalHydrated] = useState(false);
   const canonicalWrite = useRef(Promise.resolve());
@@ -202,6 +217,7 @@ export function GoalsView({ people = [] }: { people?: Person[] }) {
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [panMode, setPanMode] = useState(false);
   const [agentMenuOpen, setAgentMenuOpen] = useState(false);
+  const agentMenuRef = useRef<HTMLDivElement | null>(null);
   const [connectorMode, setConnectorMode] = useState(false);
   const [connectorSourceId, setConnectorSourceId] = useState<string | null>(null);
   const [connectorSourceSide, setConnectorSourceSide] = useState<GoalConnectorSide>('right');
@@ -219,7 +235,7 @@ export function GoalsView({ people = [] }: { people?: Person[] }) {
   const selectedElement = activeGoal?.elements.find(element => element.id === selectedElementId) ?? activeGoal?.elements[0];
   const selectedAgent = selectedElement?.type === 'agent' ? people.find(person => person.id === selectedElement.assigneeId) : undefined;
   const selectedAgentMissing = selectedElement?.type === 'agent' && (!selectedElement.assigneeId || !selectedAgent);
-  const selectedPolicyElement = selectedElement?.type === 'subgoal' || selectedElement?.type === 'approval-gate' ? selectedElement : undefined;
+  const selectedPolicyElement = selectedElement?.type === 'goal' || selectedElement?.type === 'subgoal' || selectedElement?.type === 'approval-gate' ? selectedElement : undefined;
 
   useEffect(() => {
     if (goals.length === 0) {
@@ -298,8 +314,11 @@ export function GoalsView({ people = [] }: { people?: Person[] }) {
       if (event.code === 'Space' && (event.target === document.body || event.target === canvasRef.current)) { event.preventDefault(); setSpacePressed(true); }
     };
     const up = (event: KeyboardEvent) => { if (event.code === 'Space') setSpacePressed(false); };
-    window.addEventListener('keydown', down); window.addEventListener('keyup', up);
-    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
+    const closeAgentMenu = (event: PointerEvent) => {
+      if (!agentMenuRef.current?.contains(event.target as Node)) setAgentMenuOpen(false);
+    };
+    window.addEventListener('keydown', down); window.addEventListener('keyup', up); window.addEventListener('pointerdown', closeAgentMenu);
+    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); window.removeEventListener('pointerdown', closeAgentMenu); };
   }, []);
   useEffect(() => {
     if (!drag) return;
@@ -315,7 +334,14 @@ export function GoalsView({ people = [] }: { people?: Person[] }) {
     if (!selectedPolicyElement) return;
     const nextPolicy = { ...selectedPolicyElement.policy, ...updates };
     if (updates.retryBudgetMode === 'unbounded') delete nextPolicy.maxRetries;
-    updateElement({ policy: nextPolicy });
+    if (selectedPolicyElement.type === 'goal') updateGoal({ policy: nextPolicy });
+    else updateElement({ policy: nextPolicy });
+  };
+  const updatePolicyDimension = (dimension: GoalPolicyDimension, updates: GoalPolicyDimensionOverride | undefined) => {
+    const dimensions = { ...selectedPolicyElement?.policy?.dimensions };
+    if (updates) dimensions[dimension] = updates;
+    else delete dimensions[dimension];
+    updatePolicy({ dimensions });
   };
   const addElement = (type: GoalElementType) => {
     if (!activeGoal) return;
@@ -490,20 +516,20 @@ export function GoalsView({ people = [] }: { people?: Person[] }) {
   return <section className="goals-view relative h-full min-h-0 overflow-hidden bg-slate-50 text-slate-700">
     <aside className={`absolute left-4 top-4 bottom-4 z-20 flex flex-col rounded-xl border border-slate-200 bg-white shadow-sm transition-[width] duration-200 ${leftPanelCollapsed ? 'w-12' : 'w-64'}`}>
       <div className={`flex items-center border-b px-3 py-3 ${leftPanelCollapsed ? 'justify-center' : 'justify-between'}`}><div className={leftPanelCollapsed ? 'hidden' : ''}><h1 className="text-sm font-semibold text-slate-900">Goals</h1><p className="mt-0.5 text-xs text-slate-500">Shape work as a loop</p></div><button onClick={() => setLeftPanelCollapsed(value => !value)} className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label={leftPanelCollapsed ? 'Expand goals panel' : 'Collapse goals panel'}>{leftPanelCollapsed ? <ChevronRight className="size-4" /> : <ChevronLeft className="size-4" />}</button></div>
-      <div className={`flex-1 space-y-1 overflow-auto p-2 ${leftPanelCollapsed ? 'hidden' : ''}`}>{goals.map(goal => { const goalStatus = goal.elements.find(element => element.type === 'goal')?.status ?? 'draft'; return <button key={goal.id} onClick={() => { setSelectedGoalId(goal.id); setSelectedElementId(goal.elements[0]?.id ?? ''); }} className={`w-full rounded-lg px-3 py-2 text-left text-sm ${goal.id === selectedGoalId ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-600 hover:bg-slate-50'}`}><span className="block truncate">{goal.title}</span><span className="mt-1 flex items-center justify-between gap-2 text-[11px] text-slate-400"><span>{goal.elements.filter(element => element.type === 'subgoal').length} subgoals · {goal.elements.length} nodes</span><span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 font-medium ${statusChipClass(goalStatus)}`}><StatusIcon status={goalStatus} className="size-3" />{statusLabel(goalStatus)}</span></span></button>; })}</div>
+      <div className={`flex-1 space-y-1 overflow-auto p-2 ${leftPanelCollapsed ? 'hidden' : ''}`}>{goals.map(goal => { const goalStatus = goal.elements.find(element => element.type === 'goal')?.status ?? 'draft'; return <button key={goal.id} onClick={() => { setSelectedGoalId(goal.id); setSelectedElementId(goal.elements[0]?.id ?? ''); }} className={`w-full rounded-lg px-3 py-2 text-left text-sm ${goal.id === selectedGoalId ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-600 hover:bg-slate-50'}`}><span className="block truncate">{goal.title}</span><span className="mt-1 flex items-center justify-between gap-2 text-[11px] text-slate-400"><span>{goal.elements.filter(element => element.type === 'subgoal').length} subgoals · {goal.elements.length} nodes</span><span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 font-medium ${compactChipClass(statusChipClass(goalStatus))}`}><StatusIcon status={goalStatus} className="size-3" />{statusLabel(goalStatus)}</span></span></button>; })}</div>
       <div className={`flex-1 flex-col items-center gap-2 overflow-auto p-2 ${leftPanelCollapsed ? 'flex' : 'hidden'}`}>{goals.map(goal => <button key={goal.id} onClick={() => { setSelectedGoalId(goal.id); setSelectedElementId(goal.elements[0]?.id ?? ''); }} className={`rounded-lg p-2 ${goal.id === selectedGoalId ? 'bg-slate-100' : 'hover:bg-slate-50'}`} aria-label={goal.title} title={goal.title}><Sparkles className="size-4" style={{ color: goal.color ?? '#2563eb' }} /></button>)}</div>
       <div className={`border-t p-3 ${leftPanelCollapsed ? 'hidden' : ''}`}><button onClick={openNewGoalDialog} className="flex w-full items-center justify-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700"><Plus className="size-3.5" /> New goal</button></div>
     </aside>
 
-    <div className="absolute left-1/2 top-4 z-20 flex -translate-x-1/2 items-center gap-1 rounded-full border border-slate-200 bg-white p-1 shadow-sm">{TOOL_ITEMS.map(tool => tool.type === 'agent' ? <div key={tool.type} className="relative"><button disabled={!activeGoal} onClick={() => setAgentMenuOpen(value => !value)} className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Add agent">{tool.icon}{tool.label}</button>{agentMenuOpen && activeGoal && <div className="absolute left-0 top-full mt-1 w-56 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">{people.filter(person => person.kind === 'agentic').map(person => <button key={person.id} onClick={() => addAgent(person)} className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs hover:bg-slate-100"><Bot className="size-3.5 text-amber-500" /><span><span className="block font-medium text-slate-800">{person.name}</span><span className="block text-[11px] text-slate-400">{person.role}</span></span></button>)}{people.filter(person => person.kind === 'agentic').length === 0 && <p className="px-2.5 py-2 text-xs text-slate-400">No agents configured</p>}</div>}</div> : <button key={tool.type} disabled={!activeGoal} onClick={() => tool.type === 'connector' ? (setConnectorMode(true), setConnectorSourceId(null), setConnectorSourceBranch(undefined)) : addElement(tool.type)} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-40 ${tool.type === 'connector' && connectorMode ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`} aria-label={`Add ${tool.label}`}>{tool.icon}{tool.type === 'connector' && connectorMode ? 'Choose source' : tool.label}</button>)}</div>
+    <div className="absolute left-1/2 top-4 z-20 flex w-fit -translate-x-1/2 items-center justify-center gap-1 rounded-full border border-slate-200 bg-white p-1 shadow-sm">{TOOL_ITEMS.map(tool => tool.type === 'agent' ? <div key={tool.type} ref={agentMenuRef} className="relative w-fit shrink-0"><Tooltip><TooltipTrigger asChild><button disabled={!activeGoal} onClick={() => setAgentMenuOpen(value => !value)} className="relative flex size-8 shrink-0 items-center justify-center rounded-full p-0 text-xs text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Add agent" aria-haspopup="menu" aria-expanded={agentMenuOpen}><span className="flex size-full items-center justify-center">{tool.icon}</span><ChevronDown className="absolute -right-1 size-3" /></button></TooltipTrigger><TooltipContent side="bottom" sideOffset={4}>Add {tool.label}</TooltipContent></Tooltip>{agentMenuOpen && activeGoal && <div role="menu" aria-label="Add agent" className="absolute left-0 top-full mt-1 w-56 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">{people.filter(person => person.kind === 'agentic').map(person => <button key={person.id} role="menuitem" onClick={() => addAgent(person)} className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs hover:bg-slate-100"><Bot className="size-3.5 text-amber-500" /><span><span className="block font-medium text-slate-800">{person.name}</span><span className="block text-[11px] text-slate-400">{person.role}</span></span></button>)}{people.filter(person => person.kind === 'agentic').length === 0 && <p className="px-2.5 py-2 text-xs text-slate-400">No agents configured</p>}</div>}</div> : <Tooltip key={tool.type}><TooltipTrigger asChild><button disabled={!activeGoal} onClick={() => tool.type === 'connector' ? (setConnectorMode(true), setConnectorSourceId(null), setConnectorSourceBranch(undefined)) : addElement(tool.type)} className={`flex size-8 shrink-0 items-center justify-center rounded-full p-0 text-xs disabled:cursor-not-allowed disabled:opacity-40 ${tool.type === 'connector' && connectorMode ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`} aria-label={`Add ${tool.label}`}>{tool.icon}</button></TooltipTrigger><TooltipContent side="bottom" sideOffset={4}>{tool.type === 'connector' && connectorMode ? 'Choose source' : `Add ${tool.label}`}</TooltipContent></Tooltip>)}</div>
 
-    <div ref={canvasRef} tabIndex={0} role="application" aria-label="Goal canvas. Hold space and drag to pan." className={`h-full w-full outline-none ${spacePressed || panMode ? 'cursor-grab' : 'cursor-default'}`} onPointerDown={event => { if (spacePressed || panMode) { const start = { x: event.clientX, y: event.clientY }; const origin = { ...pan }; const move = (next: PointerEvent) => setPan({ x: origin.x + next.clientX - start.x, y: origin.y + next.clientY - start.y }); const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); }; window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); } }}>
+    <div ref={canvasRef} tabIndex={0} role="application" aria-label="Goal canvas. Hold space and drag to pan." className={`h-full w-full outline-none ${spacePressed || panMode ? 'cursor-grab' : 'cursor-default'}`} onPointerDown={event => { setAgentMenuOpen(false); if (spacePressed || panMode) { const start = { x: event.clientX, y: event.clientY }; const origin = { ...pan }; const move = (next: PointerEvent) => setPan({ x: origin.x + next.clientX - start.x, y: origin.y + next.clientY - start.y }); const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); }; window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); } }}>
       <div className="goals-canvas-grid absolute inset-0" aria-hidden="true" />
       {!activeGoal && <div className="absolute inset-0 flex items-center justify-center p-6" role="status" aria-live="polite"><div className="max-w-sm rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm"><div className="mx-auto flex size-10 items-center justify-center rounded-full bg-blue-50 text-blue-600"><Sparkles className="size-5" /></div><h2 className="mt-3 text-sm font-semibold text-slate-900">Start with a Goal</h2><p className="mt-1 text-xs leading-5 text-slate-500">Create a Goal to shape its subgoals, agents, instructions, and approval gates on the canvas.</p><button type="button" onClick={openNewGoalDialog} className="mt-4 inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700"><Plus className="size-3.5" /> New goal</button></div></div>}
       <div className="absolute left-1/2 top-1/2" style={{ transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px)) scale(${zoom})`, transformOrigin: 'center' }}>
         <svg className="pointer-events-auto absolute left-0 top-0 h-[1200px] w-[2000px] overflow-visible"><defs>{connections.map(connection => <linearGradient key={connection.id} id={`connector-gradient-${connection.id}`} x1="0%" x2="100%" y1="0%" y2="0%"><stop offset="0%" stopColor={connection.conditionBranch === 'positive' ? '#34d399' : '#fb7185'} /><stop offset="100%" stopColor="#60a5fa" /></linearGradient>)}</defs>{connections.map(connection => { const path = connectorPath(connection); const branchLabel = connection.conditionBranch ? ` via ${connection.conditionBranch} branch` : ''; return path ? <path key={connection.id} id={`goal-canvas-item-${connection.id}`} d={path} fill="none" stroke={connection.conditionBranch ? `url(#connector-gradient-${connection.id})` : selectedElement?.id === connection.id ? '#2563eb' : '#94a3b8'} strokeWidth={selectedElement?.id === connection.id ? '3' : '2'} strokeLinecap="round" className="cursor-pointer outline-none focus-visible:stroke-blue-600" onClick={event => { event.stopPropagation(); setSelectedElementId(connection.id); setConnectorMode(false); setConnectorSourceId(null); setConnectorSourceBranch(undefined); }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedElementId(connection.id); } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'ArrowRight' || event.key === 'ArrowDown') { event.preventDefault(); moveCanvasSelection(connection.id, event.key === 'ArrowRight' || event.key === 'ArrowDown'); } }} role="button" tabIndex={selectedElement?.id === connection.id ? 0 : -1} aria-label={`Connector from ${connection.sourceId} to ${connection.targetId}${branchLabel}`} /> : null; })}</svg>
         {connectorError && <div role="alert" className="absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 shadow-sm">{connectorError}</div>}
-        {activeGoal?.elements.filter(element => element.type !== 'connector').map(element => { const connected = isGoalElementConnected(activeGoal.elements, element.id); const readiness = readinessForElement(element, connected); const readinessDisplay = readiness === 'ready' ? <span className="mt-3 inline-flex items-center" title="Ready for workflow use"><ReadyIcon /></span> : <span className={`mt-3 inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${readinessChipClass(readiness)}`}><CircleDot className="size-3" />{readinessLabel(readiness)}</span>; return <div key={element.id} id={`goal-canvas-item-${element.id}`} role="group" aria-label={`${element.type}: ${getElementTitle(element)}`} tabIndex={selectedElement?.id === element.id ? 0 : -1} onClick={() => { if (connectorMode) { if (connectorSourceId) connectNodes(element.id); else beginConnection(element.id, 'right'); } else setSelectedElementId(element.id); }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedElementId(element.id); } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'ArrowRight' || event.key === 'ArrowDown') { event.preventDefault(); moveCanvasSelection(element.id, event.key === 'ArrowRight' || event.key === 'ArrowDown'); } }} onPointerDown={event => { if (spacePressed || panMode || connectorMode) return; setSelectedElementId(element.id); setDrag({ id: element.id, startX: event.clientX, startY: event.clientY, originX: element.x, originY: element.y }); }} className={`absolute flex flex-col rounded-lg border p-3 text-left shadow-sm transition-shadow hover:shadow-md ${nodeClass(element.type, connected)} ${selectedElement?.id === element.id ? 'ring-2 ring-blue-500 ring-offset-2' : ''}`} style={{ left: element.x, top: element.y, width: element.width ?? 220, height: canvasElementHeight(element) }}><span className="flex min-w-0 items-center gap-2 text-xs font-semibold"><span className="rounded bg-black/5 p-1">{element.type === 'agent' ? <Bot className="size-3.5" /> : element.type === 'goal' ? <Sparkles className="size-3.5" /> : <Target className="size-3.5" />}</span><span className="truncate">{getElementTitle(element)}</span></span>{getElementBody(element) && <span className={`mt-2 line-clamp-2 text-[11px] ${element.type === 'goal' ? 'text-slate-300' : 'text-slate-500'}`}>{getElementBody(element)}</span>}{element.type === 'condition' && <div className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold"><span className="rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-emerald-700">{conditionPositiveLabel(element)}</span><span className="rounded-full border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-rose-700">{conditionNegativeLabel(element)}</span></div>}{isCompletionElement(element) ? <span className={`mt-3 inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${statusChipClass(element.status)}`}><StatusIcon status={element.status} />{statusLabel(element.status)}</span> : readinessDisplay}{renderPorts(element)}</div>; })}
+        {activeGoal?.elements.filter(element => element.type !== 'connector').map(element => { const connected = isGoalElementConnected(activeGoal.elements, element.id); const readiness = readinessForElement(element, connected); const readinessDisplay = readiness === 'ready' ? <span className="mt-3 inline-flex items-center" title="Ready for workflow use"><ReadyIcon /></span> : <span className={`mt-3 inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${readinessChipClass(readiness)}`}><CircleDot className="size-3" />{readinessLabel(readiness)}</span>; return <div key={element.id} id={`goal-canvas-item-${element.id}`} role="group" aria-label={`${element.type}: ${getElementTitle(element)}`} tabIndex={selectedElement?.id === element.id ? 0 : -1} onClick={() => { if (connectorMode) { if (connectorSourceId) connectNodes(element.id); else beginConnection(element.id, 'right'); } else setSelectedElementId(element.id); }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedElementId(element.id); } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'ArrowRight' || event.key === 'ArrowDown') { event.preventDefault(); moveCanvasSelection(element.id, event.key === 'ArrowRight' || event.key === 'ArrowDown'); } }} onPointerDown={event => { if (spacePressed || panMode || connectorMode) return; setSelectedElementId(element.id); setDrag({ id: element.id, startX: event.clientX, startY: event.clientY, originX: element.x, originY: element.y }); }} className={`absolute flex flex-col rounded-lg border p-3 text-left shadow-sm transition-shadow hover:shadow-md ${nodeClass(element.type, connected)} ${selectedElement?.id === element.id ? 'ring-2 ring-blue-500 ring-offset-2' : ''}`} style={{ left: element.x, top: element.y, width: element.width ?? 220, height: canvasElementHeight(element) }}><span className="flex min-w-0 items-center gap-2 text-xs font-semibold"><span className="rounded bg-black/5 p-1">{element.type === 'agent' ? <Bot className="size-3.5" /> : element.type === 'goal' ? <Sparkles className="size-3.5" /> : <Target className="size-3.5" />}</span><span className="truncate">{getElementTitle(element)}</span></span>{getElementBody(element) && <span className={`mt-2 line-clamp-2 text-[11px] ${element.type === 'goal' ? 'text-slate-300' : 'text-slate-500'}`}>{getElementBody(element)}</span>}{element.type === 'condition' && <div className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold"><span className="rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-emerald-700">{conditionPositiveLabel(element)}</span><span className="rounded-full border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-rose-700">{conditionNegativeLabel(element)}</span></div>}{isCompletionElement(element) ? <span className={`mt-3 inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${compactChipClass(statusChipClass(element.status))}`}><StatusIcon status={element.status} />{statusLabel(element.status)}</span> : readinessDisplay}{renderPorts(element)}</div>; })}
       </div>
     </div>
 
@@ -554,7 +580,7 @@ export function GoalsView({ people = [] }: { people?: Person[] }) {
             </label>
           </>
         )}
-        <label className="mt-4 block text-xs font-medium text-slate-600">
+        <label className="mt-4 flex flex-wrap items-center gap-x-1 gap-y-1 text-xs font-medium text-slate-600">
           Notes
           <textarea
             value={selectedAgent?.role ?? selectedElement.body ?? ''}
@@ -591,6 +617,38 @@ export function GoalsView({ people = [] }: { people?: Person[] }) {
           <section className="mt-5 border-t border-slate-100 pt-4">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Policy</p>
             <p className="mt-1 text-[11px] text-slate-400">Typed controls become part of the execution contract.</p>
+            {workspacePolicy && <p className="mt-2 rounded-md border border-blue-100 bg-blue-50/60 px-2.5 py-2 text-[11px] text-blue-800">Workspace policy revision {workspacePolicy.policyRevision} is the inherited baseline. Goal and gate values can only narrow it.</p>}
+            {selectedPolicyElement.type === 'goal' && <div className="mt-3 space-y-3">
+              <p className="text-[11px] font-medium text-slate-500">Goal budget overrides</p>
+              {GOAL_POLICY_DIMENSIONS.map(dimension => {
+                const explicit = selectedPolicyElement.policy?.dimensions?.[dimension.key];
+                const mode = explicit?.constrained === false ? 'unbounded' : explicit?.mode ?? '__default__';
+                const value = explicit?.constrained === true ? explicit.value : '';
+                return <div key={dimension.key} className="rounded-lg border border-slate-200 p-2.5">
+                  <label className="block text-xs font-medium text-slate-600">{dimension.label}
+                    <Select value={mode} onValueChange={nextMode => {
+                      if (nextMode === '__default__') updatePolicyDimension(dimension.key, undefined);
+                      else if (nextMode === 'unbounded') updatePolicyDimension(dimension.key, { constrained: false });
+                      else updatePolicyDimension(dimension.key, { constrained: true, mode: nextMode as Exclude<GoalBudgetMode, 'unbounded'>, value: explicit?.constrained === true ? explicit.value : GOAL_POLICY_SAFE_VALUES[dimension.key], unit: dimension.unit });
+                    }}>
+                      <SelectTrigger className="mt-1"><SelectValue placeholder="Use workspace default" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__default__">Use workspace default</SelectItem>
+                        <SelectItem value="hard-cap">Hard cap</SelectItem>
+                        <SelectItem value="goal-pool">Goal pool</SelectItem>
+                        <SelectItem value="approval-required">Approval required</SelectItem>
+                        <SelectItem value="unbounded">Unbounded</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </label>
+                  {explicit?.constrained === true && <div className="mt-2 flex items-center gap-2">
+                    <Input type="number" min="0.01" step={dimension.key === 'financial' ? '0.01' : '1'} value={value} onChange={event => { const next = Number(event.target.value); if (Number.isFinite(next) && next > 0 && (dimension.key === 'financial' || Number.isInteger(next))) updatePolicyDimension(dimension.key, { ...explicit, value: next, unit: dimension.unit }); }} aria-label={`${dimension.label} override value`} />
+                    <span className="text-[11px] text-slate-400">{dimension.unit}</span>
+                  </div>}
+                  <span className="mt-1 block text-[11px] text-slate-400">Missing or cleared values inherit the workspace policy.</span>
+                </div>;
+              })}
+            </div>}
             <label className="mt-3 block text-xs font-medium text-slate-600">
               {selectedElement.type === 'approval-gate' ? 'Required approver' : 'Acceptance actor'}
               <Select value={selectedPolicyElement.policy?.acceptanceActor ?? '__default__'} onValueChange={value => updatePolicy({ acceptanceActor: value === '__default__' ? undefined : value as GoalAcceptanceActor })}>
@@ -646,16 +704,24 @@ export function GoalsView({ people = [] }: { people?: Person[] }) {
             return <div key={connection.id} className="flex items-center justify-between gap-2 rounded-md border border-slate-200 px-2.5 py-2"><span className="min-w-0"><span className="block truncate text-xs font-medium text-slate-700">{isSource ? 'To' : 'From'} · {other?.title ?? 'Missing node'}</span><span className="block truncate text-[11px] capitalize text-slate-400">{connection.title}{branch}</span></span><button type="button" onClick={() => deleteConnection(connection.id)} className="shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label={`Remove connection ${connection.title}`} title="Remove connection"><Link2 className="size-3.5 rotate-45" /></button></div>;
           })}</div>}
         </section>}
-        <label className="mt-4 block text-xs font-medium text-slate-600">
-          {isCompletionElement(selectedElement) ? 'Completion' : 'Readiness'}
+        <div className="mt-4 text-xs font-medium text-slate-600">
           {isCompletionElement(selectedElement) ? <>
-            <span className={`mt-1 inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-xs font-semibold capitalize ${statusChipClass(selectedElement.status)}`}>
-              <StatusIcon status={selectedElement.status} className="mr-1 size-3.5" />{statusLabel(selectedElement.status)}
-            </span>
+            <div className="flex items-center gap-1">
+              <span>Completion</span>
+              <span className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-xs font-semibold capitalize ${compactChipClass(statusChipClass(selectedElement.status))}`}>
+                <StatusIcon status={selectedElement.status} className="mr-1 size-3.5" />{statusLabel(selectedElement.status)}
+              </span>
+            </div>
             <span className="mt-1 block text-[11px] text-slate-400">{statusDescription(selectedElement.status)}</span>
             {statusNextStep(selectedElement.status) && <span className="mt-2 block rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] font-normal text-slate-600"><span className="font-semibold text-slate-700">Next step: </span>{statusNextStep(selectedElement.status)}</span>}
-          </> : (() => { const readiness = readinessForElement(selectedElement, isGoalElementConnected(activeGoal?.elements ?? [], selectedElement.id)); return <>{readiness === 'ready' ? <span className="mt-1 inline-flex" title="Ready for workflow use"><ReadyIcon /></span> : <span className={`mt-1 inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-xs font-semibold capitalize ${readinessChipClass(readiness)}`}><CircleDot className="mr-1 size-3.5" />{readinessLabel(readiness)}</span>}<span className="mt-1 block text-[11px] text-slate-400">{readinessDescription(selectedElement, readiness)}</span></>; })()}
-        </label>
+          </> : (() => { const readiness = readinessForElement(selectedElement, isGoalElementConnected(activeGoal?.elements ?? [], selectedElement.id)); return <>
+            <div className="flex items-center gap-1">
+              <span>Readiness</span>
+              {readiness === 'ready' ? <span className="inline-flex items-center" title="Ready for workflow use"><ReadyIcon /></span> : <span className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-xs font-semibold capitalize ${readinessChipClass(readiness)}`}><CircleDot className="mr-1 size-3.5" />{readinessLabel(readiness)}</span>}
+            </div>
+            <span className="mt-1 block text-[11px] text-slate-400">{readinessDescription(selectedElement, readiness)}</span>
+          </>; })()}
+        </div>
         {selectedElement.type === 'connector' && (
           <section className="mt-5 border-t border-slate-100 pt-4">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Connection</p>

@@ -212,6 +212,7 @@ export function GoalsView({ people = [] }: { people?: Person[] }) {
   const [newGoalDialogOpen, setNewGoalDialogOpen] = useState(false);
   const [newGoalTitle, setNewGoalTitle] = useState('');
   const [newGoalBody, setNewGoalBody] = useState('');
+  const [canvasElementHeights, setCanvasElementHeights] = useState<Record<string, number>>({});
   const [drag, setDrag] = useState<{ id: string; startX: number; startY: number; originX: number; originY: number } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const activeGoal = goals.find(goal => goal.id === selectedGoalId) ?? goals[0];
@@ -230,6 +231,28 @@ export function GoalsView({ people = [] }: { people?: Person[] }) {
     if (nextGoal.id !== selectedGoalId) setSelectedGoalId(nextGoal.id);
     if (!nextGoal.elements.some(element => element.id === selectedElementId)) setSelectedElementId(nextGoal.elements[0]?.id ?? '');
   }, [goals, selectedElementId, selectedGoalId]);
+  useEffect(() => {
+    if (!activeGoal || !canvasRef.current) return;
+    const frame = requestAnimationFrame(() => {
+      const nodes = Array.from(canvasRef.current?.querySelectorAll<HTMLElement>('[role="group"]') ?? []);
+      const elements = activeGoal.elements.filter(element => element.type !== 'connector');
+      setCanvasElementHeights(current => {
+        let changed = false;
+        const next = { ...current };
+        nodes.forEach((node, index) => {
+          const element = elements[index];
+          if (!element) return;
+          const height = Math.round(node.getBoundingClientRect().height);
+          if (next[element.id] !== height) {
+            next[element.id] = height;
+            changed = true;
+          }
+        });
+        return changed ? next : current;
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeGoal, selectedElementId, zoom]);
 
   const getAgentForElement = (element: GoalElement) => element.type === 'agent'
     ? people.find(person => person.id === element.assigneeId)
@@ -295,6 +318,7 @@ export function GoalsView({ people = [] }: { people?: Person[] }) {
     updateElement({ policy: nextPolicy });
   };
   const addElement = (type: GoalElementType) => {
+    if (!activeGoal) return;
     const id = createStableId(type === 'connector' ? 'connector' : 'element');
     const title = type === 'subgoal' ? 'New subgoal' : type === 'condition' ? 'New condition' : type === 'approval-gate' ? 'Approval gate' : `New ${type}`;
     const body = type === 'condition' ? 'Define the condition to evaluate' : type === 'approval-gate' ? 'Define who must approve and what evidence is required' : 'Describe the outcome and handoff';
@@ -352,9 +376,8 @@ export function GoalsView({ people = [] }: { people?: Person[] }) {
     ? connections.filter(connection => connection.sourceId === selectedElement?.id || connection.targetId === selectedElement?.id)
     : [];
 
-  const canvasElementHeight = (element: GoalElement) => element.type === 'condition'
-    ? Math.max(element.height ?? 90, 150)
-    : element.height ?? 90;
+  const canvasElementHeight = (element: GoalElement) => canvasElementHeights[element.id]
+    ?? (element.type === 'condition' ? Math.max(element.height ?? 90, 150) : element.height ?? 90);
 
   const moveCanvasSelection = (elementId: string, forward: boolean) => {
     const items = activeGoal?.elements ?? [];
@@ -368,6 +391,7 @@ export function GoalsView({ people = [] }: { people?: Person[] }) {
 
 
   const addAgent = (person: Person) => {
+    if (!activeGoal) return;
     const id = createStableId('element');
     const element: GoalElement = { id, type: 'agent', title: person.name, body: person.role, assigneeId: person.id, x: 260 + (activeGoal.elements.length % 3) * 260, y: 560, width: 220, height: 90, status: 'draft' };
     setGoals(current => current.map(goal => goal.id === selectedGoalId ? { ...goal, updatedAt: new Date().toISOString(), elements: [...goal.elements, element] } : goal));
@@ -471,7 +495,7 @@ export function GoalsView({ people = [] }: { people?: Person[] }) {
       <div className={`border-t p-3 ${leftPanelCollapsed ? 'hidden' : ''}`}><button onClick={openNewGoalDialog} className="flex w-full items-center justify-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700"><Plus className="size-3.5" /> New goal</button></div>
     </aside>
 
-    <div className="absolute left-1/2 top-4 z-20 flex -translate-x-1/2 items-center gap-1 rounded-full border border-slate-200 bg-white p-1 shadow-sm">{TOOL_ITEMS.map(tool => tool.type === 'agent' ? <div key={tool.type} className="relative"><button onClick={() => setAgentMenuOpen(value => !value)} className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-100" aria-label="Add agent">{tool.icon}{tool.label}</button>{agentMenuOpen && <div className="absolute left-0 top-full mt-1 w-56 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">{people.filter(person => person.kind === 'agentic').map(person => <button key={person.id} onClick={() => addAgent(person)} className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs hover:bg-slate-100"><Bot className="size-3.5 text-amber-500" /><span><span className="block font-medium text-slate-800">{person.name}</span><span className="block text-[11px] text-slate-400">{person.role}</span></span></button>)}{people.filter(person => person.kind === 'agentic').length === 0 && <p className="px-2.5 py-2 text-xs text-slate-400">No agents configured</p>}</div>}</div> : <button key={tool.type} onClick={() => tool.type === 'connector' ? (setConnectorMode(true), setConnectorSourceId(null), setConnectorSourceBranch(undefined)) : addElement(tool.type)} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs ${tool.type === 'connector' && connectorMode ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`} aria-label={`Add ${tool.label}`}>{tool.icon}{tool.type === 'connector' && connectorMode ? 'Choose source' : tool.label}</button>)}</div>
+    <div className="absolute left-1/2 top-4 z-20 flex -translate-x-1/2 items-center gap-1 rounded-full border border-slate-200 bg-white p-1 shadow-sm">{TOOL_ITEMS.map(tool => tool.type === 'agent' ? <div key={tool.type} className="relative"><button disabled={!activeGoal} onClick={() => setAgentMenuOpen(value => !value)} className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Add agent">{tool.icon}{tool.label}</button>{agentMenuOpen && activeGoal && <div className="absolute left-0 top-full mt-1 w-56 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">{people.filter(person => person.kind === 'agentic').map(person => <button key={person.id} onClick={() => addAgent(person)} className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs hover:bg-slate-100"><Bot className="size-3.5 text-amber-500" /><span><span className="block font-medium text-slate-800">{person.name}</span><span className="block text-[11px] text-slate-400">{person.role}</span></span></button>)}{people.filter(person => person.kind === 'agentic').length === 0 && <p className="px-2.5 py-2 text-xs text-slate-400">No agents configured</p>}</div>}</div> : <button key={tool.type} disabled={!activeGoal} onClick={() => tool.type === 'connector' ? (setConnectorMode(true), setConnectorSourceId(null), setConnectorSourceBranch(undefined)) : addElement(tool.type)} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-40 ${tool.type === 'connector' && connectorMode ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`} aria-label={`Add ${tool.label}`}>{tool.icon}{tool.type === 'connector' && connectorMode ? 'Choose source' : tool.label}</button>)}</div>
 
     <div ref={canvasRef} tabIndex={0} role="application" aria-label="Goal canvas. Hold space and drag to pan." className={`h-full w-full outline-none ${spacePressed || panMode ? 'cursor-grab' : 'cursor-default'}`} onPointerDown={event => { if (spacePressed || panMode) { const start = { x: event.clientX, y: event.clientY }; const origin = { ...pan }; const move = (next: PointerEvent) => setPan({ x: origin.x + next.clientX - start.x, y: origin.y + next.clientY - start.y }); const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); }; window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); } }}>
       <div className="goals-canvas-grid absolute inset-0" aria-hidden="true" />

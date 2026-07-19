@@ -23,6 +23,7 @@ import { flattenPortableStoreEntries, normalizePortableStorageKey } from '../uti
 import { AI_ACTIONS, LOAD_CLASSIFICATIONS, ROADMAP_STAGES, getDefaultColumnSemantics } from '../utils/statusColumnSemantics.ts';
 
 export const WORKSPACE_BACKUP_SCHEMA_VERSION = 2;
+const GOALS_STORE_KEY = 'omvra.goals.v1';
 
 export interface WorkspacePreferences {
   executionLoadStatusIds: TaskStatus[];
@@ -145,6 +146,29 @@ function normalizeOptionalText(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
   return trimmed || undefined;
+}
+
+function validateGoalSnapshot(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return 'Backup contains an invalid Goal snapshot.';
+
+  const ids = new Set<string>();
+  for (const goal of value) {
+    if (!isRecord(goal) || typeof goal.id !== 'string' || !goal.id.trim()) {
+      return 'Backup contains a Goal without a valid id.';
+    }
+    if (ids.has(goal.id)) return `Backup contains a duplicate Goal id: ${goal.id}.`;
+    ids.add(goal.id);
+    if (!Array.isArray(goal.elements)) return `Backup Goal ${goal.id} has no valid elements array.`;
+    for (const element of goal.elements) {
+      if (!isRecord(element) || typeof element.id !== 'string' || !element.id.trim()) {
+        return `Backup Goal ${goal.id} contains an element without a valid id.`;
+      }
+      if (ids.has(element.id)) return `Backup contains a duplicate Goal or element id: ${element.id}.`;
+      ids.add(element.id);
+    }
+  }
+
+  return undefined;
 }
 
 function toFileUri(filePath: string): string {
@@ -717,6 +741,28 @@ export function repairWorkspaceBackupPayload(
   const electronStoreSnapshot = isRecord(payload.electronStore)
     ? getPortableElectronStoreSnapshotFromExport(payload.electronStore)
     : {};
+  const goalSnapshotError = Object.prototype.hasOwnProperty.call(electronStoreSnapshot, GOALS_STORE_KEY)
+    ? validateGoalSnapshot(electronStoreSnapshot[GOALS_STORE_KEY])
+    : undefined;
+
+  if (goalSnapshotError) {
+    return {
+      ok: false,
+      error: goalSnapshotError,
+      warnings,
+      version: parsedVersion,
+      exportedAt,
+      tasks: repairedTasks,
+      milestones: importedMilestones,
+      projects: importedProjects,
+      people: importedPeople,
+      statusColumns: importedStatusColumns,
+      preferences: importedPreferences,
+      ui,
+      storageSnapshot,
+      electronStoreSnapshot,
+    };
+  }
 
   if (!Array.isArray(payload.statusColumns)) {
     warnings.push('Backup was missing statusColumns; derived columns from tasks and fallback columns.');

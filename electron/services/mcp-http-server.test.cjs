@@ -392,7 +392,7 @@ test('goals expose the complete graph through tools, resources, and workspace sn
   assert.equal(list[0].conditions.length, 1);
   assert.equal(list[0].approvalGates.length, 1);
   assert.equal(list[0].sequences[0].targetId, 'agent-node-1');
-  assert.deepEqual(list[0].policy, { acceptanceActor: 'both', retryBudgetMode: 'goal-pool', maxRetries: 3 });
+  assert.deepEqual(list[0].policy, { acceptanceActor: 'both', retryBudgetMode: 'goal-pool', maxRetries: 3, unsupportedField: 'discard me' });
   assert.deepEqual(list[0].subgoals[0].policy, { acceptanceActor: 'agentic', maxRetries: 2 });
   assert.equal(call('goals.get', { goalId: 'goal-1' }).result.structuredContent.id, 'goal-1');
   assert.equal(call('workspace.get_snapshot').result.structuredContent.workspace.goals.length, 1);
@@ -413,6 +413,144 @@ test('goals expose the complete graph through tools, resources, and workspace sn
   assert.equal(update.result.structuredContent.goal.title, 'Ship the feature safely');
   assert.equal(update.result.structuredContent.revision, 1);
   assert.equal(call('goals.update', { goalId: 'goal-1', expectedRevision: 0, elements: [] }).error.code, -32602);
+});
+
+test('goals.lifecycle exposes governed revision-checked and idempotent commands', () => {
+  const store = makeStoreFromFixture('workspace-basic', {
+    [GOALS_KEY]: [{ id: 'goal-lifecycle', title: 'Run safely', elements: [] }],
+  });
+  const dispatch = createRequestDispatcher(store);
+  const call = (args) => dispatch({
+    jsonrpc: '2.0',
+    id: `goals-lifecycle-${args.commandId}`,
+    method: 'tools/call',
+    params: { name: 'goals.lifecycle', arguments: args },
+  }, makeReq()).result;
+
+  const started = call({
+    goalId: 'goal-lifecycle',
+    command: 'start',
+    expectedRevision: 0,
+    commandId: 'start-1',
+  });
+  assert.equal(started.structuredContent.execution.state, 'ready');
+  assert.equal(started.structuredContent.execution.revision, 1);
+
+  const acknowledged = call({
+    goalId: 'goal-lifecycle',
+    command: 'acknowledge',
+    expectedRevision: 1,
+    commandId: 'ack-1',
+    payload: { contractRevision: 1 },
+  });
+  assert.equal(acknowledged.structuredContent.execution.state, 'ready');
+  assert.equal(acknowledged.structuredContent.execution.acknowledged, true);
+
+  const duplicate = call({
+    goalId: 'goal-lifecycle',
+    command: 'acknowledge',
+    expectedRevision: 99,
+    commandId: 'ack-1',
+    payload: { contractRevision: 999 },
+  });
+  assert.equal(duplicate.structuredContent.idempotent, true);
+  assert.equal(duplicate.structuredContent.execution.revision, 2);
+
+  const stale = dispatch({
+    jsonrpc: '2.0',
+    id: 'goals-lifecycle-dispatch-stale',
+    method: 'tools/call',
+    params: {
+      name: 'goals.lifecycle',
+      arguments: {
+        goalId: 'goal-lifecycle',
+        command: 'dispatch',
+        expectedRevision: 1,
+        commandId: 'dispatch-stale',
+      },
+    },
+  }, makeReq());
+  assert.equal(stale.error.code, -32602);
+  assert.match(stale.error.message, /revision mismatch/i);
+
+  const lifecycleTool = dispatch({
+    jsonrpc: '2.0',
+    id: 'goals-lifecycle-schema',
+    method: 'tools/list',
+    params: {},
+  }, makeReq()).result.tools.find(tool => tool.name === 'goals_lifecycle');
+  assert.deepEqual(lifecycleTool.inputSchema.properties.command.enum, [
+    'start', 'dispatch', 'acknowledge', 'submit-evidence', 'request-handoff',
+    'accept', 'pause', 'resume', 'retry', 'fail', 'complete',
+  ]);
+});
+
+test('focused Goal element and connector writes are revision-checked and idempotent', () => {
+  const store = makeStoreFromFixture('workspace-basic', {
+    [GOALS_KEY]: [{
+      id: 'goal-focused',
+      title: 'Focused writes',
+      elements: [
+        { id: 'subgoal-focused', type: 'subgoal', title: 'Build', x: 0, y: 0 },
+        { id: 'connector-focused', type: 'connector', title: 'Sequence', sourceId: 'subgoal-focused', targetId: 'subgoal-focused' },
+      ],
+    }],
+  });
+  const dispatch = createRequestDispatcher(store);
+  const call = (name, args) => dispatch({
+    jsonrpc: '2.0',
+    id: `${name}-${args.idempotencyKey || 'request'}`,
+    method: 'tools/call',
+    params: { name, arguments: args },
+  }, makeReq()).result;
+
+  const elementWrite = call('goals.update_element', {
+    goalId: 'goal-focused',
+    elementId: 'subgoal-focused',
+    updates: { title: 'Build safely', x: 20 },
+    expectedRevision: 0,
+    idempotencyKey: 'focused-element-1',
+  });
+  assert.equal(elementWrite.structuredContent.revision, 1);
+  assert.equal(elementWrite.structuredContent.goal.elements[0].title, 'Build safely');
+
+  const duplicate = call('goals.update_element', {
+    goalId: 'goal-focused',
+    elementId: 'subgoal-focused',
+    updates: { title: 'Different retry payload' },
+    expectedRevision: 0,
+    idempotencyKey: 'focused-element-1',
+  });
+  assert.equal(duplicate.structuredContent.idempotent, true);
+  assert.equal(duplicate.structuredContent.revision, 1);
+  assert.equal(duplicate.structuredContent.goal.elements[0].title, 'Build safely');
+
+  const connectorWrite = call('goals.update_connector', {
+    goalId: 'goal-focused',
+    connectorId: 'connector-focused',
+    updates: { targetId: 'subgoal-focused', targetSide: 'bottom' },
+    expectedRevision: 1,
+    idempotencyKey: 'focused-connector-1',
+  });
+  assert.equal(connectorWrite.structuredContent.revision, 2);
+  assert.equal(connectorWrite.structuredContent.goal.elements[1].targetSide, 'bottom');
+
+  const stale = dispatch({
+    jsonrpc: '2.0',
+    id: 'goals.update_element-stale',
+    method: 'tools/call',
+    params: {
+      name: 'goals.update_element',
+      arguments: {
+        goalId: 'goal-focused',
+        elementId: 'subgoal-focused',
+        updates: { title: 'Stale' },
+        expectedRevision: 1,
+        idempotencyKey: 'focused-element-stale',
+      },
+    },
+  }, makeReq());
+  assert.equal(stale.error.code, -32602);
 });
 
 test('task_write creates a new task through the MCP write surface with metadata', () => {

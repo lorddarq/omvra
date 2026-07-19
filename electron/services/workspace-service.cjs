@@ -1,4 +1,5 @@
 const { randomUUID } = require('crypto');
+const { migrateGoalRecords } = require('./goal-state-service.cjs');
 
 const PREFERENCES_KEY = 'omvra.preferences.v1';
 const TASKS_KEY = 'omvra.tasks.v1';
@@ -19,6 +20,7 @@ const DEFAULT_MCP_PATH = '/mcp';
 const DEFAULT_MCP_CAPABILITY_PROFILE = 'read_only';
 const MCP_CAPABILITY_PROFILES = ['read_only', 'task_write', 'admin'];
 const MCP_AUDIT_LOG_KEY = 'omvra.mcp.audit.v1';
+const GOAL_MUTATION_COMMANDS_KEY = 'omvra.goalMutationCommands.v1';
 const MCP_AUDIT_LOG_MAX_ENTRIES = 200;
 const MCP_TASK_REV_FIELD = '__mcpRevision';
 const TASK_ACTIVITY_LOG_MAX_ENTRIES = 50;
@@ -830,16 +832,21 @@ const GOAL_BUDGET_MODES = ['hard-cap', 'goal-pool', 'approval-required', 'unboun
 
 function normalizeGoalPolicy(policy) {
   if (!policy || typeof policy !== 'object' || Array.isArray(policy)) return undefined;
-  const normalized = {};
+  // Preserve fields introduced by newer clients so older MCP/runtime versions
+  // can round-trip them without interpreting or rejecting them.
+  const normalized = { ...policy };
   const acceptanceActor = normalizeOptionalEnum(policy.acceptanceActor, GOAL_ACCEPTANCE_ACTORS);
   if (acceptanceActor) normalized.acceptanceActor = acceptanceActor;
+  else if (Object.prototype.hasOwnProperty.call(policy, 'acceptanceActor')) delete normalized.acceptanceActor;
   for (const field of ['financialBudgetMode', 'tokenBudgetMode', 'timeBudgetMode', 'concurrencyBudgetMode', 'retryBudgetMode']) {
     const mode = normalizeOptionalEnum(policy[field], GOAL_BUDGET_MODES);
     if (mode) normalized[field] = mode;
+    else if (Object.prototype.hasOwnProperty.call(policy, field)) delete normalized[field];
   }
   for (const field of ['maxRetries', 'maxLoopAttempts', 'maxConcurrentLoops']) {
     const value = Number(policy[field]);
     if (Number.isFinite(value) && value >= 0) normalized[field] = Math.floor(value);
+    else if (Object.prototype.hasOwnProperty.call(policy, field)) delete normalized[field];
   }
   return Object.keys(normalized).length > 0 ? normalized : undefined;
 }
@@ -856,8 +863,13 @@ function normalizeGoalForMcp(goal) {
     })
     : [];
   const byType = type => elements.filter(element => element.type === type);
+  const revision = Number.isFinite(Number(goal[MCP_TASK_REV_FIELD]))
+    ? Math.max(0, Math.floor(Number(goal[MCP_TASK_REV_FIELD])))
+    : (Number.isFinite(Number(goal.revision)) ? Math.max(0, Math.floor(Number(goal.revision))) : 0);
   return {
     ...goal,
+    revision,
+    [MCP_TASK_REV_FIELD]: revision,
     policy: normalizeGoalPolicy(goal.policy),
     elements,
     subgoals: byType('subgoal'),
@@ -879,7 +891,7 @@ function normalizeGoalForMcp(goal) {
 }
 
 function listGoals(store) {
-  return readArray(store, GOALS_KEY).map(normalizeGoalForMcp);
+  return migrateGoalRecords(store).goals.map(normalizeGoalForMcp);
 }
 
 function getGoalById(store, goalId) {
@@ -925,6 +937,85 @@ function updateGoal(store, { goalId, title, elements, overseerAgentId, expectedR
   goals[goalIndex] = nextGoal;
   store.set(GOALS_KEY, goals);
   return { ok: true, changed: true, goal: nextGoal, revision: nextGoal[MCP_TASK_REV_FIELD] };
+}
+
+function updateGoalElement(store, {
+  goalId,
+  elementId,
+  updates,
+  expectedRevision,
+  actor = 'agent',
+  idempotencyKey,
+  connectorOnly = false,
+} = {}) {
+  const normalizedGoalId = normalizeString(goalId).trim();
+  const normalizedElementId = normalizeString(elementId).trim();
+  const normalizedKey = normalizeString(idempotencyKey).trim();
+  if (!normalizedGoalId) return { ok: false, error: 'GOAL_ID_REQUIRED', message: 'goalId is required.' };
+  if (!normalizedElementId) return { ok: false, error: 'ELEMENT_ID_REQUIRED', message: 'elementId is required.' };
+  if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
+    return { ok: false, error: 'INVALID_UPDATES', message: 'updates must be an object.' };
+  }
+  if (!normalizedKey) return { ok: false, error: 'IDEMPOTENCY_KEY_REQUIRED', message: 'idempotencyKey is required.' };
+
+  const commands = readArray(store, GOAL_MUTATION_COMMANDS_KEY);
+  const prior = commands.find(command => command && command.idempotencyKey === normalizedKey);
+  if (prior) {
+    if (prior.goalId !== normalizedGoalId || prior.elementId !== normalizedElementId || prior.connectorOnly !== connectorOnly) {
+      return { ok: false, error: 'IDEMPOTENCY_KEY_CONFLICT', message: 'idempotencyKey is already associated with another Goal mutation.' };
+    }
+    return { ...prior.result, idempotent: true };
+  }
+
+  const goals = readArray(store, GOALS_KEY);
+  const goalIndex = goals.findIndex(goal => goal && goal.id === normalizedGoalId);
+  if (goalIndex < 0) return { ok: false, error: 'GOAL_NOT_FOUND', message: `Goal "${normalizedGoalId}" not found.` };
+  const currentGoal = normalizeGoalForMcp(goals[goalIndex]);
+  const currentRevision = Number.isFinite(Number(currentGoal[MCP_TASK_REV_FIELD]))
+    ? Math.max(0, Math.floor(Number(currentGoal[MCP_TASK_REV_FIELD])))
+    : 0;
+  if (!Number.isFinite(Number(expectedRevision))) {
+    return { ok: false, error: 'EXPECTED_REVISION_REQUIRED', message: 'expectedRevision is required and must be a finite number.', currentRevision };
+  }
+  const expected = Math.max(0, Math.floor(Number(expectedRevision)));
+  if (expected !== currentRevision) {
+    return { ok: false, error: 'REVISION_MISMATCH', message: 'Goal revision mismatch.', currentRevision, expectedRevision: expected };
+  }
+
+  const elementIndex = currentGoal.elements.findIndex(element => element && element.id === normalizedElementId);
+  if (elementIndex < 0) return { ok: false, error: 'ELEMENT_NOT_FOUND', message: `Element "${normalizedElementId}" not found.` };
+  const currentElement = currentGoal.elements[elementIndex];
+  if (connectorOnly && currentElement.type !== 'connector') {
+    return { ok: false, error: 'NOT_CONNECTOR', message: `Element "${normalizedElementId}" is not a connector.` };
+  }
+  if (!connectorOnly && currentElement.type === 'connector') {
+    return { ok: false, error: 'CONNECTOR_REQUIRES_CONNECTOR_WRITE', message: 'Use the connector mutation for connector elements.' };
+  }
+  if (Object.prototype.hasOwnProperty.call(updates, 'id') && updates.id !== normalizedElementId) {
+    return { ok: false, error: 'ELEMENT_ID_IMMUTABLE', message: 'Element ids cannot be changed.' };
+  }
+  if (Object.prototype.hasOwnProperty.call(updates, 'type') && updates.type !== currentElement.type) {
+    return { ok: false, error: 'ELEMENT_TYPE_IMMUTABLE', message: 'Element types cannot be changed by focused writes.' };
+  }
+
+  const nextGoal = normalizeGoalForMcp({
+    ...currentGoal,
+    elements: currentGoal.elements.map((element, index) => index === elementIndex ? { ...element, ...updates } : element),
+    [MCP_TASK_REV_FIELD]: currentRevision + 1,
+    mcpUpdatedAt: new Date().toISOString(),
+    mcpLastActor: actor,
+  });
+  goals[goalIndex] = nextGoal;
+  store.set(GOALS_KEY, goals);
+  const result = { ok: true, changed: true, goal: nextGoal, revision: nextGoal[MCP_TASK_REV_FIELD] };
+  store.set(GOAL_MUTATION_COMMANDS_KEY, commands.concat({
+    idempotencyKey: normalizedKey,
+    goalId: normalizedGoalId,
+    elementId: normalizedElementId,
+    connectorOnly,
+    result,
+  }).slice(-MCP_AUDIT_LOG_MAX_ENTRIES));
+  return result;
 }
 
 function getWorkspaceSnapshot(store) {
@@ -3459,6 +3550,7 @@ module.exports = {
   DEFAULT_MCP_CAPABILITY_PROFILE,
   MCP_CAPABILITY_PROFILES,
   MCP_AUDIT_LOG_KEY,
+  GOAL_MUTATION_COMMANDS_KEY,
   MCP_BOARD_WATCHERS_KEY,
   isMcpAgentAccessEnabled,
   getMcpServerConfig,
@@ -3476,6 +3568,7 @@ module.exports = {
   listGoals,
   getGoalById,
   updateGoal,
+  updateGoalElement,
   listMilestones,
   getMilestoneById,
   listTasks,

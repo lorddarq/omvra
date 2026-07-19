@@ -96,6 +96,8 @@ export interface ProjectMilestone {
 
 export type GoalElementType = 'goal' | 'subgoal' | 'agent' | 'connector' | 'instructions' | 'condition' | 'approval-gate';
 export type GoalConnectorSide = 'top' | 'right' | 'bottom' | 'left';
+export type GoalConditionBranch = 'positive' | 'negative';
+export type GoalElementReadiness = 'not-ready' | 'ready' | 'unavailable' | 'needs-review';
 export type GoalAcceptanceActor = 'human' | 'agentic' | 'both';
 export type GoalBudgetMode = 'hard-cap' | 'goal-pool' | 'approval-required' | 'unbounded';
 
@@ -120,12 +122,25 @@ export interface GoalElement {
   y: number;
   width?: number;
   height?: number;
-  status?: 'draft' | 'working' | 'blocked' | 'complete';
+  status?: 'draft' | 'working' | 'blocked' | 'complete' | 'evidence-required' | 'approval-required' | 'permission-denied' | 'human-review';
+  readiness?: GoalElementReadiness;
+  readinessReason?: string;
   assigneeId?: string;
   sourceId?: string;
   targetId?: string;
   sourceSide?: GoalConnectorSide;
   targetSide?: GoalConnectorSide;
+  conditionBranch?: GoalConditionBranch;
+  conditionPositiveLabel?: string;
+  conditionNegativeLabel?: string;
+  conditionPositiveOutcome?: string;
+  conditionNegativeOutcome?: string;
+  /** Legacy aliases retained for older persisted condition records. */
+  conditionTrueLabel?: string;
+  conditionFalseLabel?: string;
+  handoffRequired?: boolean;
+  handoffNotes?: string;
+  approvalEvidenceRequired?: boolean;
   policy?: GoalPolicy;
 }
 

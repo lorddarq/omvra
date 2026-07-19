@@ -16,6 +16,7 @@ Use this skill for Omvra Goals / Loops work in the Plumy repository and its live
 - Keep the UI responsible for shaping/editing definitions and presenting state. It must not directly invent durable execution truth.
 - Keep lifecycle ownership in a dedicated `GoalLifecycleService` boundary. It validates revision-protected transitions, commits durable lifecycle events, and invokes cleanup only after a successful completion commit.
 - Keep cleanup as a post-completion, fail-closed side effect. It may remove only verified goal-scoped `project.md` and `roster.md` files under Electron `<userData>/goal-artifacts/<goalId>`; retention is the default.
+- Treat Electron-store as the sole source of truth for packaged-app workspace, Goal, execution, event, and evidence data. localStorage may hold disposable UI-only state but is not a workspace fallback, mirror, or conflict participant.
 
 ## Layered task tracking rule
 
@@ -106,12 +107,15 @@ Prompt the human when the answer is not discoverable and could materially affect
 
 - **Resolved — runtime boundary:** Loops is a governed planning/orchestration surface, not a first-class workflow runtime. Do not add cron-like scheduling, worker-loop ownership, or model-invocation control to Omvra as part of the core product.
 - **Resolved — action authority:** observation, bounded execution control, evidence/handoff, and project mutations require no confirmation by default; planning, workflow mutation, subgoal redefinition, budget overruns, release approval, gate bypass, artifact removal, and project-critical deletion require human confirmation. External writes, MCP calls, and repository changes follow the responsible agent's configured approvals. Lifecycle actions require human decision unless expressly prompted or assigned within the accepted contract.
-- how goals link across projects, tasks, milestones, MCP capabilities, and approval gates;
+- **Resolved — goal/project relationship:** Goals are workspace-level and project membership is optional. A Goal may coordinate multiple project-owned artifacts or remain projectless for outcomes such as recurring, multi-source user briefings.
+- **Resolved — configurable budget and acceptance policy:** Workflows settings provide independently configurable defaults for time, tokens, financial cost, concurrency, total attempts, and retries/rework, including each dimension's cap/reallocation mode. Goals inherit or override those defaults; acceptance defaults are also configurable at workspace level, with goal overrides and gate-level narrowing allowed. A lower-level policy may not weaken a higher-level human-confirmation requirement.
+- **Resolved — MCP and backup baseline:** `goals.get` includes the complete graph plus current execution state; graph writes support focused element/connector updates and full replacement, both revision-checked and idempotent. Agent graph mutation requires human confirmation by default but is user-configurable. Backup is a compact, compressed, versioned JSON envelope with unknown-field preservation, replace-only restore, fail-fast collision handling, and read-only imported execution history. MCP history and evidence may use optional user-configured local archive directories.
+- how goals link across projects, tasks, milestones, MCP capabilities, and approval gates when a cross-project or projectless Goal requires additional relationship semantics;
 - who owns lifecycle truth and whether execution state is separate from graph definitions;
 - stable IDs, revision scope, migration strategy, and Electron-store/localStorage precedence;
 - link cardinality and authority when goal, task, or milestone revisions disagree;
-- evidence ownership, acceptance boundaries, and test-environment authority;
-- default autonomy budgets and cleanup retention policy.
+- evidence ownership and test-environment authority;
+- cleanup retention policy.
 
 Park the operational policy editor as a separate future product idea. Do not add a policy-file editor to the current canvas or lifecycle implementation without a dedicated discovery and architecture task.
 

@@ -93,6 +93,20 @@
   background-size: var(--goals-grid-size) var(--goals-grid-size);
 }
 
+.goals-view [role="group"] {
+  height: fit-content !important;
+  min-height: 90px;
+}
+
+.goals-view [role="group"][aria-label^="condition:"] {
+  min-height: 150px;
+}
+
+.goals-view svg[aria-label="Ready"] {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
 /* Keep the canvas toolbar compact while preserving aria-labels for assistive technology. */
 .goals-view button[aria-label="Pan canvas"],
 .goals-view button[aria-label="Add agent"],

@@ -42,6 +42,28 @@ export async function setJSON<T = any>(key: string, value: T): Promise<void> {
   }
 }
 
+export async function getCanonicalJSON<T = any>(key: string, fallback: T | null = null): Promise<T | null> {
+  try {
+    const storeGet = window.electron?.storeGet;
+    if (typeof storeGet !== 'function') return fallback;
+    const value = await storeGet(key);
+    return value === undefined ? fallback : value as T;
+  } catch {
+    return fallback;
+  }
+}
+
+export async function setCanonicalJSON<T = any>(key: string, value: T): Promise<boolean> {
+  try {
+    const storeSet = window.electron?.storeSet;
+    if (typeof storeSet !== 'function') return false;
+    await storeSet(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function deleteStoredValue(key: string): Promise<void> {
   try {
     // @ts-ignore

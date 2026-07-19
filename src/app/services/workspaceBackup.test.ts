@@ -173,3 +173,50 @@ test('workspace backup preserves shared MCP and UI task relationships and agent 
   assert.equal(repaired.people[0].agentInstructions, 'Protect the shared contract.');
   assert.equal(repaired.people[0].agentOperationalInstructions, 'Run the smallest complete verification.');
 });
+
+test('workspace backup preserves Goal graphs and rejects duplicate Goal or element ids', () => {
+  const goal = {
+    id: 'goal_1',
+    title: 'Preserve graph',
+    elements: [{ id: 'element_1', type: 'goal', title: 'Preserve graph', unknownField: { keep: true } }],
+  };
+  const repaired = repairWorkspaceBackupPayload(
+    {
+      version: 2,
+      projects: [],
+      people: [],
+      tasks: [],
+      milestones: [],
+      statusColumns: fallbackStatusColumns,
+      preferences: {},
+      electronStore: {
+        'omvra.goals.v1': [goal],
+        'omvra.goalExecutions.v1': [{ id: 'execution_1', goalId: 'goal_1', status: 'completed' }],
+        'omvra.goalEvidence.v1': [{ id: 'evidence_1', goalId: 'goal_1', immutable: true }],
+      },
+    },
+    { fallbackStatusColumns, fallbackPreferences: createDefaultWorkspacePreferences(fallbackStatusColumns) }
+  );
+
+  assert.equal(repaired.ok, true);
+  assert.deepEqual(repaired.electronStoreSnapshot['omvra.goals.v1'], [goal]);
+  assert.deepEqual(repaired.electronStoreSnapshot['omvra.goalExecutions.v1'], [{ id: 'execution_1', goalId: 'goal_1', status: 'completed' }]);
+  assert.deepEqual(repaired.electronStoreSnapshot['omvra.goalEvidence.v1'], [{ id: 'evidence_1', goalId: 'goal_1', immutable: true }]);
+
+  const invalid = repairWorkspaceBackupPayload(
+    {
+      version: 2,
+      projects: [],
+      people: [],
+      tasks: [],
+      milestones: [],
+      statusColumns: fallbackStatusColumns,
+      preferences: {},
+      electronStore: { 'omvra.goals.v1': [{ ...goal }, { ...goal }] },
+    },
+    { fallbackStatusColumns, fallbackPreferences: createDefaultWorkspacePreferences(fallbackStatusColumns) }
+  );
+
+  assert.equal(invalid.ok, false);
+  assert.match(invalid.error || '', /duplicate Goal id/);
+});

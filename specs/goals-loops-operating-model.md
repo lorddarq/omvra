@@ -131,9 +131,77 @@ The effective policy is resolved in this order:
 
 Lower-level policy may narrow higher-level authority but may not silently weaken a higher-level interdiction or safety rule. A conflict, missing required field, or ambiguous promotion from prose to policy pauses execution and enters `approval required`.
 
-Acceptance gates should support an explicit actor mode: `human`, `agentic`, or `both`. `agentic` requires the overseer's evidence checks; `human` requires the designated human decision; `both` requires both checks to pass. Gate-specific policy may define evidence, approvers, budget behavior, and failure handling without overriding goal-level safety rules.
+Acceptance gates should support an explicit actor mode: `human`, `agentic`, or `both`. `agentic` requires the overseer's evidence checks; `human` requires the designated human decision; `both` requires both checks to pass. Gate-specific policy may define evidence, approvers, budget behavior, and failure handling without overriding goal-level safety rules. The user configures the default acceptance boundary in settings; a goal may inherit that setting or override it, and an individual gate may narrow it further. A gate may not silently weaken a goal-level human-confirmation requirement.
 
 Free-hand text can be promoted into an authoritative contract instruction only through an explicit user action or a shaping decision that records its scope, owner, effective revision, and acceptance impact. The overseer must not infer binding policy from ordinary prose.
+
+## Resolved configurable Goals / Loops policy
+
+The workspace policy is a dedicated, versioned record under `omvra.goalPolicy.v1`. It is separate from general workspace preferences and must have independent **Back up Policies** and **Restore Policies** actions. Policy backup and restore use the workspace backup envelope when included in a full backup, and may also be exported or imported as a policy-only file.
+
+The policy dimensions are intentionally limited to:
+
+- financial cost;
+- token count;
+- concurrent loops;
+- total loop attempts; and
+- retries/rework cycles.
+
+Time budgets are not part of the policy. Runtime/model response latency is not treated as a Goal or subgoal execution budget because it would make strict policies unreliable for commercial model providers. A loop means one complete execution cycle for a Goal or subgoal: dispatch, work, evidence, review, and any resulting retry or rework decision. `maxLoopAttempts` limits complete cycles; retries are tracked separately for failed or blocked cycles.
+
+Every dimension uses the same discriminated representation:
+
+```ts
+type GoalBudgetDimension =
+  | { constrained: false }
+  | {
+      constrained: true;
+      mode: 'hard-cap' | 'goal-pool' | 'approval-required';
+      value: number;
+      unit: 'USD' | 'tokens' | 'loops' | 'attempts' | 'retries';
+  };
+```
+
+The persisted workspace record has the following v1 shape. `schemaVersion` governs migrations; `policyRevision` increments for every accepted settings change and is copied into active Goal contract history for forensic reconstruction.
+
+```ts
+type GoalPolicyV1 = {
+  schemaVersion: 1;
+  policyRevision: number;
+  currency: string; // defaults to 'USD'
+  dimensions: {
+    financial: GoalBudgetDimension;
+    tokens: GoalBudgetDimension;
+    concurrency: GoalBudgetDimension;
+    attempts: GoalBudgetDimension;
+    retries: GoalBudgetDimension;
+  };
+  acceptance: { actor: 'human' | 'agentic' | 'both' };
+  agentMutationConfirmation: 'required' | 'allowed';
+  rollover: 'dynamic';
+  updatedAt: string;
+};
+```
+
+Budget modes are selected independently per dimension. The safe reset defaults are: financial `10 USD`, tokens `100000`, concurrency `1 loop`, attempts `10`, retries `2`; all are constrained with `hard-cap` except consumable dimensions may use dynamic Goal-pool rollover when explicitly selected. Agent-originated graph mutation requires confirmation, and acceptance defaults to human review.
+
+`constrained: false` is the explicit unbounded representation. An unconstrained dimension must not contain `mode`, `value`, or `unit`. A constrained dimension must contain a supported mode, a positive value, and its dimension-specific unit. Zero, negative, fractional count values, missing values, and incompatible mode/value combinations are invalid. Financial settings use whole units for now; supplier metering may still report fractional actual usage, but the configured constraint does not.
+
+The default currency is USD. Settings may offer a supported currency list, and the effective budget is evaluated by the responsible AI agent against the supplier account's currency. The Workflows UI should recommend using the same currency as the account operating the selected model; Omvra does not add a second hidden currency-conversion policy.
+
+The effective policy resolves as:
+
+`workspace default → Goal override → subgoal override → acceptance-gate narrowing`
+
+Missing fields inherit. A lower scope may narrow a limit or strengthen an acceptance requirement but may not widen a parent limit, remove a required human confirmation, or weaken a safety/interdiction rule. Widening a policy means increasing a budget, increasing concurrency/retries/attempts, or changing a constrained dimension to unbounded. If an existing policy blocks Goal accomplishment, widening it requires user confirmation through the impact gate.
+
+The overseer owns allocation across subgoals. The default allocation strategy is dynamic with rollover: each subgoal receives an overseer-assigned allocation for the current cycle, unused budget returns to the parent Goal pool when that cycle completes, and the overseer may redistribute it before the next cycle. The receiving subgoal may receive all remaining budget when it is the last active subgoal; no artificial hoarding ceiling applies by default. The total Goal budget remains the absolute upper bound, and redistribution cannot enlarge an already-running cycle retroactively. User settings may override the overseer's allocation choices.
+
+Policy changes are enforced immediately for active Goals. Every accepted change increments the workspace `policyRevision`; affected active Goal contract revisions record the prior and effective policy revisions. A stricter or otherwise blocking change pauses affected work and enters the contract-change impact gate. A widening change does not silently alter active work; when it is needed to unblock completion, it requires user confirmation. Effective policy, allocation decisions, transfers, balances, and the resulting contract revision must be visible in execution state and durable history.
+
+Workflows settings must expose workspace defaults, the supported currency, each dimension's constrained/unbounded state, value, unit, allocation mode, dynamic rollover behavior, validation warnings, reset-to-safe-default behavior, and policy-only backup/restore. Goal and subgoal inspectors must show inherited values distinctly from explicit overrides and must identify when an active Goal is affected by a policy change.
+
+Malformed or incompatible imported policy data fails closed to safe defaults and presents a validation warning. Safe defaults must remain bounded, require human acceptance where applicable, and never silently turn an invalid constraint into unbounded execution.
 
 ## Contract-change impact gate
 
@@ -174,22 +242,24 @@ Every executable goal must have a bounded autonomy budget. At minimum, the budge
 - maximum concurrently running loops;
 - maximum total loop attempts for the goal;
 - maximum retries or rework cycles per subgoal;
-- maximum escalation-free time or token/cost budget, when the runtime exposes those measurements.
+- token and financial-cost limits when configured.
+
+Budget defaults are settings, not hard-coded product assumptions. The Workflows settings expose each dimension independently—tokens, financial cost, concurrency, total attempts, and retries/rework—using the resolved policy schema above. New goals inherit the configured workspace defaults and may override them explicitly; subgoals and acceptance gates may only narrow or allocate from an explicitly permitted goal budget.
 
 Starting a loop, retrying a failed handoff, requesting rework, or reassigning an active subgoal consumes budget. A reassignment must not reset the attempt count. When a limit is reached, the overseer must stop dispatching work, preserve the current evidence and state, and transition the goal to `approval required` or `blocked` with a human-readable reason. The human may extend the budget, change the policy, or abandon the goal; the overseer must not silently continue.
 
 The budget is a safety boundary, not a target. The overseer should stop earlier when it detects a repeated failure signature, no meaningful evidence delta, an unsatisfied prerequisite, or a contract/policy conflict.
 
-Budget reallocation is a configurable policy, not a universal overseer behavior. The goal settings must define the policy for each budget dimension—financial cost, tokens, elapsed time, concurrent loops, and retries/rework—and may provide tighter subgoal-level overrides.
+Budget reallocation is a configurable policy, not a universal overseer behavior. The goal settings must define the policy for each budget dimension—financial cost, tokens, concurrent loops, total attempts, and retries/rework—and may provide tighter subgoal-level overrides.
 
 For each dimension, the user may choose a policy such as:
 
-- **Hard cap:** never exceed or reallocate beyond the assigned amount; pause for approval.
+- **Hard cap:** do not exceed the current cycle allocation; unused budget may roll back to the parent pool for overseer redistribution at the next cycle.
 - **Goal pool:** allow the overseer to move unused budget from another subgoal within the explicit goal-level pool.
 - **Approval to reallocate:** allow the overseer to propose a transfer, but require user approval before consuming it.
-- **Unbounded by this dimension:** explicitly permit continued work for that dimension, subject to other budgets and stop conditions.
+- **Unbounded by this dimension:** represent the dimension with `constrained: false`; no numeric value or mode is permitted, subject to other budgets and stop conditions.
 
-The policy must record who authorized it, when it was set, which subgoals may donate or receive budget, and whether the rule applies to the current execution attempt or future attempts. Financial authorization is independent from token authorization: a user may permit a large token budget while retaining a hard monetary cap, or explicitly permit both. A subgoal-specific hard cap overrides a flexible goal pool unless the user explicitly permits that subgoal to receive reallocated budget.
+The policy must record who authorized it, when it was set, which subgoals may donate or receive budget, and whether the rule applies to the current execution attempt or future attempts. Financial authorization is independent from token authorization: a user may permit a large token budget while retaining a hard monetary cap, or explicitly permit both. The overseer dynamically assigns current-cycle allocations, returns unused budget to the parent pool after the cycle, and may give all remaining budget to the final active subgoal. User settings may override those allocations.
 
 When a transfer is permitted, the overseer records the donor, recipient, dimension, amount, reason, policy setting, and resulting balances before dispatching more work. If no applicable policy permits the transfer, the subgoal pauses in `approval required` rather than assuming permission.
 
@@ -233,6 +303,35 @@ The first implementation exposes this hook as a side-effect service. The goal-co
 ## Proposed goal lifecycle owner and transition protocol
 
 The lifecycle owner should be a dedicated `GoalLifecycleService` in the Omvra durable-state boundary. It owns validation, state transitions, revision checks, durable lifecycle events, and the post-commit cleanup invocation. It must not be the cleanup runner itself: cleanup is a narrow side effect of a successful completion transition.
+
+### Identity, ownership, and revision scope
+
+All durable Goal entities use locally generated, prefixed opaque UUIDs. The prefix makes logs and MCP payloads identifiable without making the identifier semantically meaningful:
+
+```ts
+type GoalId = `goal_${string}`;
+type GoalElementId = `element_${string}`;
+type GoalConnectorId = `connector_${string}`;
+type GoalExecutionId = `execution_${string}`;
+type GoalEvidenceId = `evidence_${string}`;
+```
+
+Goals own their editable graph subtree: elements and connectors are deleted with the Goal. Tasks and milestones remain owned by their existing project records; Goal links are references and are not source-record copies. Execution records, lifecycle events, and evidence references are separate durable records and survive Goal deletion for now. A running Goal requires confirmation before deletion. Once confirmed, the overseer is notified to kill all agents and actions for that Goal; this is an immediate stop, not a graceful recovery or handoff flow.
+
+Revision scope is intentionally aggregate at the current product scale:
+
+- The Goal revision covers the Goal definition, graph elements, connectors, goal-level instructions, policy, and relationship references.
+- The execution revision covers runtime state, commands, evidence verification, handoffs, and lifecycle events for one execution attempt.
+- Evidence references are immutable append-only records. Their source content remains owned by the source system; content snapshots are not required yet.
+- The canonical evidence records remain in Omvra's durable store. Users may optionally configure a separate evidence archive location for analysis and export. The archive is additive, append-oriented, and never the authority for lifecycle decisions; archive write failures must not erase or invalidate canonical records.
+- A semantic change is reviewed at the immediate affected subgoal. Goal-level working instructions remain unchanged unless the change explicitly targets them. Completed subgoals are immutable and cannot be edited in place.
+- If the immediate subgoal's output contract, dependency, or acceptance boundary invalidates downstream work, the overseer must stop at the affected boundary and request a new decision rather than silently re-estimating or rewriting completed work.
+
+Goal deletion is a subtree deletion for editable graph state, but not a destructive purge of execution history. The deletion event must retain the deleted Goal id, execution ids, actor, confirmation, and forced-stop outcome so the historical record remains inspectable.
+
+Backup/import processing must preserve unknown fields for forward compatibility while treating them as inert data when the current application does not understand them. Unknown fields must not cause validation exceptions or block an otherwise valid import; only known fields participate in current runtime behavior. Backup format compatibility and execution-history portability across workspaces remain separate policy decisions.
+
+Omvra is a packaged Electron application, so Electron-store is the sole source of truth for workspace, Goal, execution, event, and evidence data. localStorage is not a workspace fallback, mirror, migration source, or conflict participant in the packaged app. It may be used for disposable UI-only state such as view layout or filters. Renderer state must hydrate from Electron-store and write through the main-process store boundary; stale renderer state loses to the canonical store rather than being merged automatically.
 
 The ownership boundary is:
 
@@ -278,7 +377,7 @@ interface GoalExecutionRecord {
 
 ### Allowed transitions
 
-Every command includes `goalId`, `expectedGoalRevision`, `executionAttemptId`, `actorId`, `requestedAt`, and an idempotency key. The service rejects stale revisions before evaluating the command. It returns the current revision and conflict reason; callers must re-read and reconcile rather than overwrite.
+Every command includes `commandId`, `goalId`, `expectedGoalRevision`, `executionAttemptId`, `actorId`, `requestedAt`, typed payload, and an idempotency key; commands that act on a contract also include its revision/hash. The service rejects stale revisions before evaluating the command. It returns the current revision and conflict reason; callers must re-read and reconcile rather than overwrite.
 
 | From | Command | Preconditions | To |
 | --- | --- | --- | --- |
@@ -286,7 +385,8 @@ Every command includes `goalId`, `expectedGoalRevision`, `executionAttemptId`, `
 | `ready` | `dispatch` | Predecessors complete, contract acknowledged, no gate or budget block | `working` |
 | `working` | `submit-evidence` | Evidence references are durable and scoped to the attempt | `evidence-required` |
 | `evidence-required` | `request-handoff` | Acceptance criteria and evidence checks pass | `handoff-pending` |
-| `handoff-pending` | `accept` | Required actor has accepted; for `both`, both checks pass | `complete` or next eligible state |
+| `handoff-pending` | `accept` | Required actor has accepted; for `both`, both checks pass | acceptance recorded; remains `handoff-pending` |
+| `handoff-pending` | `complete` | Acceptance recorded, final evidence verified, and all completion checks pass | `complete` |
 | `working` / `evidence-required` / `handoff-pending` | `pause` | Actor is authorized or a policy stop condition exists | `blocked` or `approval-required` |
 | `blocked` / `approval-required` | `resume` | Blocking reason resolved, revision revalidated, contract still current | `ready` or prior active state |
 | `working` / `evidence-required` / `handoff-pending` | `fail` | Failure reason and preserved evidence recorded | `failed` |
@@ -299,17 +399,46 @@ Every command includes `goalId`, `expectedGoalRevision`, `executionAttemptId`, `
 `complete` is a two-phase application operation with one durable commit boundary:
 
 1. Validate the expected goal revision, execution attempt, current contract, predecessor states, evidence references, acceptance actor, budget, and all required gates.
-2. Write the final execution record, completion decision, evidence references, handoff result, and `goal.lifecycle.completed` event atomically. Set `durableRecordsVerified` and `finalEvidenceVerified` from the commit result, not caller claims.
+2. Write the final execution record, completion decision, evidence references, handoff result, and `goal.lifecycle.completed` event through one durable lifecycle commit/journal boundary. Set `durableRecordsVerified` and `finalEvidenceVerified` from the commit result, not caller claims.
 3. After the durable commit succeeds, invoke `cleanupGoalArtifacts` with the resolved user-data artifact root and the persisted verification results.
 4. Persist `goal.artifacts.cleanup` as a follow-up event and update `cleanupStatus`. A `skipped`, `blocked`, `invalid`, or `partial-failure` result is observable but does not undo the completed state.
 
-If step 2 fails, no cleanup is attempted. If the process exits between steps 2 and 3, a durable `cleanup pending` marker allows a later lifecycle reconciliation pass to retry the side effect idempotently. The reconciliation pass must never infer completion from the presence or absence of `project.md` or `roster.md`.
+If step 2 fails, no cleanup is attempted. If the process exits between steps 2 and 3, or cleanup returns an ambiguous, timed-out, partial, permission, or verification result, persist a durable `reconciliation-required` marker containing Goal/execution ids, requested/removed/unresolved files, reason, error, attempt count, and timestamps. Completion remains complete; the marker is visible to the overseer and user, and the overseer proposes idempotent retry or reconciliation. The reconciliation pass must never infer completion from the presence or absence of `project.md` or `roster.md`.
 
 ### Commands and durable events
 
-The minimum command surface is `start`, `dispatch`, `submit-evidence`, `request-handoff`, `accept`, `pause`, `resume`, `retry`, `fail`, and `complete`. Each accepted command appends an event containing `eventId`, `eventType`, `goalId`, `goalRevision`, `executionAttemptId`, `actorId`, `occurredAt`, `previousStatus`, `nextStatus`, `commandId`, and typed reason/evidence fields. Replaying a command with the same idempotency key returns the original result without appending a second transition.
+The minimum command surface is `start`, `dispatch`, `acknowledge`, `submit-evidence`, `request-handoff`, `accept`, `pause`, `resume`, `retry`, `fail`, and `complete`. `acknowledge` is receipt-only; `accept` records acceptance; `complete` performs the terminal transition. Each accepted command appends an event containing `eventId`, `eventType`, `goalId`, `goalRevision`, `executionAttemptId`, `actorId`, `occurredAt`, `previousStatus`, `nextStatus`, `commandId`, and typed reason/evidence fields. Replaying a command with the same idempotency key returns the original result without appending a second transition. Stale acknowledgements are rejected and recorded.
+
+The `GoalLifecycleService` is the sole validator and durable lifecycle committer. An `OverseerAdapter` performs delegation, wake, retry, escalation, and configured approval handling; it returns typed outcomes or intents to the lifecycle service, which validates budget and policy boundaries before reflecting them in durable execution state. It cannot mutate lifecycle state directly.
+
+Synchronous lifecycle checks include revisions, command transitions, predecessor/dependency state, budget availability, evidence-reference existence, already-recorded gate state, and required acceptance actor. Semantic conditions, evidence quality, external checks, budget reallocation, gate bypass or widening, and human acceptance are proposals for overseer or human action. Interrupted executions never resume automatically: budget-caused interruptions require approval, while other interruptions become `interrupted` and are handed to the overseer for a budget-safe continuation decision.
 
 The minimum completion evidence record must identify the acceptance criteria checked, the evidence references used, the verifier, verification time, and whether the evidence belongs to the current contract revision. Evidence may be preserved from earlier attempts only when the impact gate explicitly marks it reusable; otherwise it cannot satisfy completion.
+
+The optional evidence archive should use a stable, analysis-friendly append format such as JSONL, with one normalized execution event or evidence record per line. It may live outside the app's user-data directory, but its configured path must be validated and its status must be observable. Exporting or archiving records must not move, delete, or rewrite the canonical lifecycle history.
+
+## MCP goal resources and writes
+
+`goals.get` returns the complete Goal resource: editable graph definition, typed elements and connectors, relationships, policy, and the current execution summary/state. Detailed lifecycle events remain available through a separate goal-scoped resource so normal reads do not need to carry the full event history.
+
+Graph writes support both granular and full-resource operations:
+
+- focused element/connector updates are the normal path for token-efficient edits and finer-grained history;
+- full Goal replacement remains available for bulk edits, migrations, backup restore, and administrative repair.
+
+Both paths use the aggregate Goal revision, preserve unknown fields, and require an idempotency key for mutating operations. Lifecycle state is changed only through lifecycle commands, never by ordinary graph writes.
+
+Agent-originated Goal graph mutation is controlled by a user-configurable preference. The default requires human confirmation; users may explicitly relax that policy for their workspace. The preference itself is versioned policy and is included in the effective Goal contract.
+
+MCP audit history keeps a bounded in-app fallback of the most recent 200 metadata-only records. Users may configure a separate local archive directory for longer-term MCP history and analysis. Archive records use an append-oriented format such as JSONL, exclude credentials and raw sensitive payloads, and do not replace the canonical audit state.
+
+## Backup and restore compatibility
+
+Backup refers to workspace backup and restore, not an independent content-import workflow. The backup uses a versioned `omvra-backup` JSON envelope, serialized compactly and compressed for storage efficiency. Unknown fields are preserved through round trips and ignored by older runtimes.
+
+Restore replaces the current workspace. The package is fully validated before any write; any ID collision or incompatible record fails the restore without partially applying it. Selective import can be added later as an explicit user-controlled workflow.
+
+Execution history is imported as read-only historical/foreign data. It is never resumable by default because referenced agents, capabilities, artifacts, or external files may no longer exist. If an external history/evidence archive is configured, the backup includes an archive manifest, location metadata, and the selected archive files. Restore extracts the archive to a user-approved destination or re-points to an already available directory, then uses the restored metadata as the archive locator. An absolute source path is only a hint and must not be trusted as a portable destination. If archive files are unavailable or corrupt, the workspace restore may still proceed while the archive is marked unavailable; the default fallback is the most recent 200 canonical executions. File attachment URLs remain references inside the records; the archive location itself is a configured directory, not an attachment URL.
 
 This proposal makes Omvra the owner of lifecycle truth while keeping the current prototype honest: until `GoalLifecycleService` exists, the Goals canvas can continue to edit and persist graph definitions, but it must not claim that those edits constitute an executable completion transition or trigger cleanup automatically.
 
@@ -326,7 +455,7 @@ This proposal makes Omvra the owner of lifecycle truth while keeping the current
 
 ## Acceptance policy
 
-Acceptance is configured per goal. The default is human acceptance for every completed subgoal, which gives the user a review point at each handoff. The user may change the goal setting to require acceptance only at configured human-acceptance gates or at final goal completion. The selected policy must be included in the goal contract and visible in the execution state; changing it during active work passes through the contract-change impact gate.
+Acceptance is configured through Workflows settings and resolved per goal. The safe fallback is human acceptance for every completed subgoal, which gives the user a review point at each handoff. The user may configure a workspace default and choose whether a goal inherits it or overrides it with acceptance at every subgoal, selected human-acceptance gates, or final goal completion. Gates may further narrow the inherited policy. The selected policy must be included in the goal contract and visible in the execution state; changing it during active work passes through the contract-change impact gate.
 
 The overseer may perform its own evidence and completion checks regardless of the configured human-acceptance policy. It must not mark a subgoal fully complete when the selected policy still requires human acceptance.
 
@@ -334,16 +463,15 @@ The overseer may perform its own evidence and completion checks regardless of th
 
 The overseer should first use canonical agents from the existing pool, matching the required competency, persona, instructions, and destination scope. If no sufficiently close match exists, and the goal permissions allow it, the overseer may create a temporary specialized agent for the subgoal. Recruitment must be justified, bounded by the goal autonomy budget, and recorded in `roster.md` plus durable structured events. Temporary agents should be dismissed or put to sleep when no longer needed; retention requires an explicit reason.
 
-## Open policy decisions
+## Policy decisions and remaining questions
 
-These decisions remain intentionally unresolved and must be agreed before the operating model is implementation-ready:
+The following policy and operating-model decisions are resolved:
 
-- **Approval scope:** whether every subgoal handoff requires user approval, or only explicit gates such as release, destructive actions, and major scope changes.
-- **Autonomy budget defaults:** the default concurrent-loop, total-attempt, retry, and cost/time limits for a new goal.
-- **Contract changes:** whether affected work resumes from preserved evidence after re-acknowledgement, or starts a new execution attempt.
-- **Contract changes:** use the impact gate above; resume locally when valid, otherwise create a new execution attempt from the earliest affected stage. Full restart is reserved for goal-defining changes.
-- **Acceptance boundary:** whether the user must accept every subgoal, or only the final goal and configured human-acceptance gates.
-- **Agent recruitment:** whether the orchestrator creates an agent only when no matching canonical persona exists, or may proactively create specialized agents.
+- **Approval scope:** not every subgoal handoff requires user approval. The overseer may perform bounded execution control, evidence/handoff, and project mutations when authorized by the accepted contract. Human confirmation is required for explicit approval gates, planning/workflow mutation, subgoal redefinition, budget overruns or blocking policy widening, release approval, gate bypass, artifact removal, and project-critical deletion.
+- **Autonomy budget defaults:** resolved through the dedicated `omvra.goalPolicy.v1` record and user-configurable Workflows settings. Dimensions are tokens, financial cost, concurrency, total loop attempts, and retries/rework; time budgets are intentionally excluded. Each dimension uses the shared constrained/unbounded schema, positive values only, and supports dynamic rollover allocation.
+- **Contract changes:** use the impact gate above. Resume locally after re-acknowledgement when the change is operational or local corrective and the affected contract remains valid; create a new execution attempt from the earliest affected stage when scope, acceptance, architecture, dependencies, or downstream work are invalidated. Full restart is reserved for goal-defining changes.
+- **Acceptance boundary:** resolved through user-configurable Workflows settings. The workspace sets the default; goals may inherit or override it, and gates may narrow it but not weaken a higher-level human-confirmation requirement.
+- **Agent recruitment:** use canonical agents first. The overseer may create a temporary specialized agent only when no sufficiently close competency/persona match exists, the goal policy permits it, and the recruitment rationale is recorded.
 - **Resolved — working-context retention:** completed goals retain `project.md` and `roster.md` by default. The `Cleanup goal artefacts` workflow setting opts into deletion after durable records and final evidence are verified.
 
 ## Resolved architecture boundary: governor, not runtime
@@ -382,11 +510,53 @@ The action pool is the set of control-plane actions Omvra can recognize, authori
 
 The overseer may execute an action autonomously only when the action category and current contract authorize it. A conflict, missing authority, material scope change, or operational-instruction change pauses the action and creates an exception for human review. This policy governs Omvra's control-plane decisions; it does not constrain an agent's internal technical approach.
 
-### Parked product idea: operational policy editor
+### Policy settings surface
 
-An operational policy editor is a future product feature, not part of the current Goals / Loops implementation. It would provide a typed UI backed by a policy file or durable policy record, with scoped rules, approval defaults, agent configuration references, and audit history. Park it for separate discovery and architecture work rather than adding an ad hoc policy editor to the current canvas or lifecycle slice.
+The policy settings surface is part of the current Goals / Loops implementation. It belongs under Workflows, uses the dedicated `omvra.goalPolicy.v1` record, supports policy-only backup and restore, and shows inherited versus explicit Goal/subgoal overrides. A future broader operational-policy editor may still be discovered separately, but it must not replace or obscure this concrete policy settings contract.
 
-Until the remaining decisions are resolved, the safe default is to pause at ambiguity, approval, stale-contract, missing-evidence, and failed-gate states; preserve evidence; and request a human decision.
+## Resolved goal/project relationship
+
+A Goal is a workspace-level outcome object and does not require a project. A goal may coordinate work across one or more projects, or may remain projectless when its outcome is personal, recurring, informational, or otherwise not owned by a project—for example, providing the user with a daily summary assembled from several sources.
+
+Projects are optional contributor bindings, not the canonical owner of the Goal:
+
+- tasks and milestones remain owned by their canonical projects;
+- a Goal may reference tasks, milestones, evidence, and dependencies from multiple projects;
+- a Goal may have no project bindings at all;
+- project bindings describe contribution or dependency and must not duplicate source records;
+- Goal-level approval, policy, and lifecycle state remain distinct from project-level task state.
+
+The first relationship model should support an optional `primaryProjectId` plus zero or more explicit project bindings. These binding/reference collections are empty for a projectless Goal; they must not contain synthetic project ids.
+
+```ts
+interface GoalRecord {
+  id: string;
+  title: string;
+  primaryProjectId?: string;
+  projectBindings: GoalProjectBinding[];
+  artifactReferences: GoalArtifactReference[];
+  // Inputs, capabilities, and evidence may exist without project ownership.
+}
+
+interface GoalProjectBinding {
+  goalId: string;
+  projectId: string;
+  role?: 'primary' | 'contributor' | 'dependency';
+  status?: 'active' | 'blocked' | 'complete';
+}
+
+interface GoalArtifactReference {
+  goalId: string;
+  projectId: string; // Required because tasks and milestones are project-owned.
+  artifactType: 'task' | 'milestone';
+  artifactId: string;
+  contribution?: 'deliverable' | 'dependency' | 'evidence';
+}
+```
+
+A projectless Goal must still be executable when its inputs, capabilities, acceptance policy, and evidence requirements are defined. A recurring multi-source briefing may reference sources or MCP capabilities directly without creating project bindings or project-owned artifact references.
+
+Until the remaining implementation boundaries are available at runtime, the safe default is to pause at ambiguity, approval, stale-contract, missing-evidence, and failed-gate states; preserve evidence; and request a human decision.
 
 ## Implementation handoff
 

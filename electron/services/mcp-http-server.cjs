@@ -11,6 +11,7 @@ const {
   listGoals,
   getGoalById,
   updateGoal,
+  updateGoalElement,
   listMilestones,
   getMilestoneById,
   buildMcpAgentGuide,
@@ -48,6 +49,7 @@ const {
   isMcpAccessTokenExpired,
 } = require('./workspace-service.cjs');
 const { listAvailableSkills, getAvailableSkill } = require('./skill-service.cjs');
+const { createGoalLifecycleService } = require('./goal-lifecycle-service.cjs');
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const ALLOWED_CORS_HEADERS = 'Content-Type, Accept, Authorization, X-MCP-Token';
@@ -254,6 +256,55 @@ const WRITE_TOOL_DEFINITIONS = [
         expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
       },
       required: ['goalId', 'elements', 'expectedRevision'],
+    },
+  },
+  {
+    name: 'goals.update_element',
+    description: 'Updates one non-connector Goal canvas element with optimistic Goal revision and idempotency protection.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        goalId: { type: 'string' },
+        elementId: { type: 'string' },
+        updates: { type: 'object' },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+        idempotencyKey: { type: 'string' },
+      },
+      required: ['goalId', 'elementId', 'updates', 'expectedRevision', 'idempotencyKey'],
+    },
+  },
+  {
+    name: 'goals.update_connector',
+    description: 'Updates one typed connector in a Goal graph with optimistic Goal revision and idempotency protection.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        goalId: { type: 'string' },
+        connectorId: { type: 'string' },
+        updates: { type: 'object' },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+        idempotencyKey: { type: 'string' },
+      },
+      required: ['goalId', 'connectorId', 'updates', 'expectedRevision', 'idempotencyKey'],
+    },
+  },
+  {
+    name: 'goals.lifecycle',
+    description: 'Executes one governed Goal lifecycle command with revision and idempotency protection. Lifecycle state is owned by GoalLifecycleService; this does not invoke agents directly.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        goalId: { type: 'string' },
+        command: { type: 'string', enum: ['start', 'dispatch', 'acknowledge', 'submit-evidence', 'request-handoff', 'accept', 'pause', 'resume', 'retry', 'fail', 'complete'] },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+        commandId: { type: 'string' },
+        actor: { type: 'string' },
+        payload: { type: 'object' },
+      },
+      required: ['goalId', 'command', 'expectedRevision', 'commandId'],
     },
   },
   {
@@ -693,6 +744,9 @@ const TOOL_NAME_ALIASES = new Map([
   ['goals_list', 'goals.list'],
   ['goals_get', 'goals.get'],
   ['goals_update', 'goals.update'],
+  ['goals_update_element', 'goals.update_element'],
+  ['goals_update_connector', 'goals.update_connector'],
+  ['goals_lifecycle', 'goals.lifecycle'],
   ['tasks_list', 'tasks.list'],
   ['tasks_get', 'tasks.get'],
   ['agent_resolve_task_context', 'agent.resolve_task_context'],
@@ -875,6 +929,10 @@ function makeWriteToolResult(action, payload = {}) {
     structuredContent.revision = payload.revision;
   }
 
+  if (Object.prototype.hasOwnProperty.call(payload, 'idempotent')) {
+    structuredContent.idempotent = payload.idempotent === true;
+  }
+
   if (Object.prototype.hasOwnProperty.call(payload, 'task')) {
     structuredContent.task = payload.task;
     if (!Object.prototype.hasOwnProperty.call(structuredContent, 'revision')) {
@@ -895,6 +953,12 @@ function makeWriteToolResult(action, payload = {}) {
 
   if (Object.prototype.hasOwnProperty.call(payload, 'result')) {
     structuredContent.result = payload.result;
+  }
+
+  for (const field of ['execution', 'event', 'cleanup']) {
+    if (Object.prototype.hasOwnProperty.call(payload, field)) {
+      structuredContent[field] = payload[field];
+    }
   }
 
   if (Object.prototype.hasOwnProperty.call(payload, 'statusId')) {
@@ -1152,7 +1216,7 @@ function isKnownWriteToolName(name) {
   if (WRITE_TOOL_DEFINITIONS.some(tool => tool.name === name)) {
     return true;
   }
-  return /^(goals\.update|tasks\.(create|update|delete|write|set|transition|complete|log_time)|milestones\.(create|update|delete))/.test(name);
+  return /^(goals\.(update|update_element|update_connector|lifecycle)|tasks\.(create|update|delete|write|set|transition|complete|log_time)|milestones\.(create|update|delete))/.test(name);
 }
 
 function getResourceForUri(store, uri, requestParams) {
@@ -1441,6 +1505,49 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot } = {})
       return { result: makeToolResult(getGoalById(store, goalId)) };
     }
 
+    case 'goals.lifecycle': {
+      const goalId = parseGoalId(args);
+      if (!goalId) return { error: invalidParams('Invalid params: "goalId" (or "id") is required.') };
+      const lifecycle = createGoalLifecycleService({ store });
+      const result = lifecycle.execute({
+        goalId,
+        command: args.command,
+        expectedRevision: args.expectedRevision,
+        commandId: args.commandId,
+        actor: args.actor || 'mcp-agent',
+        payload: args.payload,
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, {
+          outcome: 'denied',
+          reason: result.error,
+          toolName: name,
+          entityId: goalId,
+          command: args.command,
+        });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        entityId: goalId,
+        command: args.command,
+        nextRevision: result.execution?.revision,
+        idempotent: result.idempotent === true,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: !result.idempotent,
+          idempotent: result.idempotent === true,
+          auditId: audit?.auditId,
+          execution: result.execution,
+          event: result.event,
+          cleanup: result.cleanup,
+          revision: result.execution?.revision,
+        }),
+      };
+    }
+
     case 'skills.list':
       return { result: makeToolResult(listAvailableSkills({ skillsRoot, userDataPath: userSkillsRoot })) };
 
@@ -1483,6 +1590,49 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot } = {})
       return {
         result: makeWriteToolResult(name, {
           changed: true,
+          auditId: audit?.auditId,
+          goal: result.goal,
+          revision: result.revision,
+        }),
+      };
+    }
+
+    case 'goals.update_element':
+    case 'goals.update_connector': {
+      const goalId = parseGoalId(args);
+      const elementId = typeof args.elementId === 'string' ? args.elementId : args.connectorId;
+      if (!goalId) return { error: invalidParams('Invalid params: "goalId" (or "id") is required.') };
+      const result = updateGoalElement(store, {
+        goalId,
+        elementId,
+        updates: args.updates,
+        expectedRevision: args.expectedRevision,
+        idempotencyKey: args.idempotencyKey,
+        connectorOnly: name === 'goals.update_connector',
+        actor: 'mcp-agent',
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, {
+          outcome: 'denied',
+          reason: result.error,
+          toolName: name,
+          entityId: goalId,
+          fields: Object.keys(args).filter(key => !['expectedRevision', 'idempotencyKey', 'updates'].includes(key)),
+        });
+        return { error: invalidParams(result.message, result) };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        entityId: goalId,
+        fields: Object.keys(args).filter(key => !['expectedRevision', 'idempotencyKey', 'updates'].includes(key)),
+        nextRevision: result.revision,
+        idempotent: result.idempotent === true,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: result.changed,
+          idempotent: result.idempotent === true,
           auditId: audit?.auditId,
           goal: result.goal,
           revision: result.revision,

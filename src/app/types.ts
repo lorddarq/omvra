@@ -185,6 +185,30 @@ export interface GoalRecord {
   policy?: GoalPolicy;
 }
 
+export type GoalScheduleMode = 'one-time' | 'recurring';
+export type GoalScheduleFrequency = 'weekly' | 'monthly';
+
+export interface GoalScheduleRule {
+  mode: GoalScheduleMode;
+  frequency?: GoalScheduleFrequency;
+  time: string;
+  date?: string;
+  dayOfWeek?: number;
+  dayOfMonth?: number;
+}
+
+export interface GoalSchedule {
+  id: string;
+  goalId: string;
+  enabled: boolean;
+  rule: GoalScheduleRule;
+  timezone: string;
+  startsAt?: string;
+  endsAt?: string;
+  temporalMode: 'anchored' | 'latest';
+  updatedAt: string;
+}
+
 export type Swimlane = StatusColumn;
 
 export interface TimelineSwimlane {

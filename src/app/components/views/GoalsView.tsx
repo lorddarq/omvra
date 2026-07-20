@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, CircleDot, ClipboardCheck, FileText, LoaderCircle, LockKeyhole, MessageSquareText, Minus, Plus, RotateCcw, ShieldCheck, Sparkles, Target, Trash2, UserRoundCheck, ZoomIn } from 'lucide-react';
-import type { GoalAcceptanceActor, GoalAgentConfiguration, GoalAgentMode, GoalBudgetMode, GoalConditionBranch, GoalConnectorSide, GoalElement, GoalElementReadiness, GoalElementType, GoalPolicy, GoalPolicyDimension, GoalPolicyDimensionOverride, GoalRecord, GoalRetryExhaustionPolicy, Person } from '../../types.ts';
+import type { GoalAcceptanceActor, GoalAgentConfiguration, GoalAgentMode, GoalBudgetMode, GoalConditionBranch, GoalConnectorSide, GoalElement, GoalElementReadiness, GoalElementType, GoalPolicy, GoalPolicyDimension, GoalPolicyDimensionOverride, GoalRecord, GoalRetryExhaustionPolicy, GoalSchedule, Person } from '../../types.ts';
 import type { GoalPolicyV1 } from '../../utils/goalPolicy.ts';
 import { GOAL_TEMPLATES, instantiateGoalTemplate, type GoalTemplate } from '../../data/goalTemplates.ts';
 import { getCanonicalJSON, safeReadJSON, setCanonicalJSON } from '../../utils/storage.ts';
@@ -13,6 +13,7 @@ import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 import { GoalTemplatesPopover } from '../GoalTemplatesPopover';
+import { GOAL_SCHEDULES_STORAGE_KEY, normalizeGoalSchedules, scheduleStatus } from '../../utils/goalSchedules.ts';
 
 const STORAGE_KEY = 'omvra.goals.v1';
 const GOAL_ID = 'goal-lights-off-factory';
@@ -260,6 +261,8 @@ function elementIcon(type: GoalElementType) {
 
 export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirectory = '', onGoalAuditArchiveDirectoryChange }: { people?: Person[]; workspacePolicy?: GoalPolicyV1; goalAuditArchiveDirectory?: string; onGoalAuditArchiveDirectoryChange?: (directory: string) => void }) {
   const [goals, setGoals] = useState<GoalRecord[]>(readGoals);
+  const [schedules, setSchedules] = useState<GoalSchedule[]>(() => normalizeGoalSchedules(safeReadJSON<unknown>(GOAL_SCHEDULES_STORAGE_KEY, [])));
+  const [schedulesHydrated, setSchedulesHydrated] = useState(false);
   const [canonicalHydrated, setCanonicalHydrated] = useState(false);
   const canonicalWrite = useRef(Promise.resolve());
   const [selectedGoalId, setSelectedGoalId] = useState('');
@@ -292,6 +295,7 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
   const [editNotice, setEditNotice] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const activeGoal = goals.find(goal => goal.id === selectedGoalId) ?? goals[0];
+  const activeSchedule = activeGoal ? schedules.find(schedule => schedule.goalId === activeGoal.id) : undefined;
   const selectedElement = activeGoal?.elements.find(element => element.id === selectedElementId) ?? activeGoal?.elements[0];
   const selectedAgent = selectedElement?.type === 'agent' ? people.find(person => person.id === selectedElement.assigneeId) : undefined;
   const selectedAgentMissing = selectedElement?.type === 'agent' && selectedElement.agentConfiguration?.mode === 'existing' && (!selectedElement.agentConfiguration.assigneeId || !selectedAgent);
@@ -374,6 +378,21 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
     return () => { cancelled = true; window.removeEventListener('focus', refreshCanonicalGoals); unsubscribe?.(); };
   }, []);
   useEffect(() => {
+    let cancelled = false;
+    const refreshSchedules = () => getCanonicalJSON<unknown>(GOAL_SCHEDULES_STORAGE_KEY, null).then(value => {
+      if (!cancelled && value !== null) setSchedules(normalizeGoalSchedules(value));
+    });
+    void refreshSchedules().then(() => {
+      if (!cancelled) setSchedulesHydrated(true);
+    });
+    const unsubscribe = window.electron?.onStoreChanged?.(() => { if (!draggingRef.current && rendererWritesPendingRef.current === 0) void refreshSchedules(); });
+    return () => { cancelled = true; unsubscribe?.(); };
+  }, []);
+  useEffect(() => {
+    if (!schedulesHydrated) return;
+    void setCanonicalJSON(GOAL_SCHEDULES_STORAGE_KEY, schedules);
+  }, [schedulesHydrated, schedules]);
+  useEffect(() => {
     if (!canonicalHydrated) return;
     rendererWritesPendingRef.current += 1;
     canonicalWrite.current = canonicalWrite.current.then(async () => {
@@ -452,6 +471,31 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
   const updateGoal = (updates: Partial<GoalRecord>) => {
     if (selectedElementLocked) { setEditNotice('This Goal is locked while execution is active or committed. Pause, cancel, or amend the lifecycle before editing it.'); return; }
     setGoals(current => current.map(goal => goal.id === selectedGoalId ? { ...goal, ...updates, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString() } : goal));
+  };
+  const createSchedule = () => {
+    if (!activeGoal || activeSchedule) return;
+    const schedule: GoalSchedule = {
+      id: createStableId('schedule'),
+      goalId: activeGoal.id,
+      enabled: true,
+      rule: { mode: 'one-time', date: new Date().toISOString().slice(0, 10), time: '09:00' },
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      temporalMode: 'anchored',
+      updatedAt: new Date().toISOString(),
+    };
+    setSchedules(current => [...current, schedule]);
+  };
+  const updateSchedule = (updates: Partial<GoalSchedule> | { rule: Partial<GoalSchedule['rule']> }) => {
+    if (!activeGoal || !activeSchedule) return;
+    setSchedules(current => current.map(schedule => {
+      if (schedule.id !== activeSchedule.id) return schedule;
+      const next = 'rule' in updates ? { ...schedule, rule: { ...schedule.rule, ...updates.rule } } : { ...schedule, ...updates };
+      return { ...next, updatedAt: new Date().toISOString() };
+    }));
+  };
+  const deleteSchedule = () => {
+    if (!activeSchedule) return;
+    setSchedules(current => current.filter(schedule => schedule.id !== activeSchedule.id));
   };
   const updatePolicy = (updates: Partial<GoalPolicy>) => {
     if (!selectedPolicyElement) return;
@@ -871,6 +915,46 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Handoff</p>
             <label className="mt-3 flex items-center gap-2 text-xs font-medium text-slate-600"><input type="checkbox" checked={selectedElement.handoffRequired === true} onChange={event => updateElement({ handoffRequired: event.target.checked })} /> Require handoff before the next step</label>
             <label className="mt-3 block text-xs font-medium text-slate-600">Handoff notes<textarea value={selectedElement.handoffNotes ?? ''} onChange={event => updateElement({ handoffNotes: event.target.value })} rows={3} placeholder="What must be passed to the next step?" className="mt-1 w-full resize-none rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
+          </section>
+        )}
+        {selectedElement.type === 'goal' && (
+          <section className="mt-5 border-t border-slate-100 pt-4">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Schedule</p>
+                <p className="mt-1 text-[11px] text-slate-400">Runs create independent lifecycle attempts in the captured timezone.</p>
+              </div>
+              {!activeSchedule && <button type="button" onClick={createSchedule} className="rounded-md border border-blue-200 px-2 py-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-50">Add</button>}
+            </div>
+            {activeSchedule ? <div className="mt-3 space-y-3">
+              <label className="flex items-center gap-2 text-xs font-medium text-slate-600"><input type="checkbox" checked={activeSchedule.enabled} onChange={event => updateSchedule({ enabled: event.target.checked })} /> Enabled</label>
+              <label className="block text-xs font-medium text-slate-600">Run type
+                <select value={activeSchedule.rule.mode} onChange={event => updateSchedule({ rule: { mode: event.target.value as GoalSchedule['rule']['mode'] } })} className="mt-1 h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs">
+                  <option value="one-time">One-time</option><option value="recurring">Recurring</option>
+                </select>
+              </label>
+              {activeSchedule.rule.mode === 'recurring' && <label className="block text-xs font-medium text-slate-600">Frequency
+                <select value={activeSchedule.rule.frequency ?? 'weekly'} onChange={event => updateSchedule({ rule: { frequency: event.target.value as 'weekly' | 'monthly' } })} className="mt-1 h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs">
+                  <option value="weekly">Weekly</option><option value="monthly">Monthly</option>
+                </select>
+              </label>}
+              {activeSchedule.rule.mode === 'recurring' && activeSchedule.rule.frequency === 'weekly' && <label className="block text-xs font-medium text-slate-600">Day of week
+                <select value={activeSchedule.rule.dayOfWeek ?? 1} onChange={event => updateSchedule({ rule: { dayOfWeek: Number(event.target.value) } })} className="mt-1 h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs">
+                  {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day, index) => <option key={day} value={index}>{day}</option>)}
+                </select>
+              </label>}
+              {activeSchedule.rule.mode === 'recurring' && activeSchedule.rule.frequency === 'monthly' && <label className="block text-xs font-medium text-slate-600">Day of month
+                <Input type="number" min={1} max={31} value={activeSchedule.rule.dayOfMonth ?? 1} onChange={event => updateSchedule({ rule: { dayOfMonth: Math.min(31, Math.max(1, Number(event.target.value) || 1)) } })} className="mt-1" />
+              </label>}
+              {activeSchedule.rule.mode === 'one-time' && <label className="block text-xs font-medium text-slate-600">Date<Input type="date" value={activeSchedule.rule.date ?? ''} onChange={event => updateSchedule({ rule: { date: event.target.value } })} className="mt-1" /></label>}
+              <label className="block text-xs font-medium text-slate-600">Time<Input type="time" value={activeSchedule.rule.time} onChange={event => updateSchedule({ rule: { time: event.target.value } })} className="mt-1" /></label>
+              <label className="block text-xs font-medium text-slate-600">Temporal mode
+                <select value={activeSchedule.temporalMode} onChange={event => updateSchedule({ temporalMode: event.target.value as GoalSchedule['temporalMode'] })} className="mt-1 h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs"><option value="anchored">Anchored data window</option><option value="latest">Latest data on retry</option></select>
+              </label>
+              <div className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-500"><span className="font-semibold text-slate-700">Timezone:</span> {activeSchedule.timezone}<br /><span className="font-semibold text-slate-700">Status:</span> {scheduleStatus(activeSchedule)}</div>
+              <div className="grid grid-cols-2 gap-2"><label className="block text-xs font-medium text-slate-600">Starts<input type="date" value={activeSchedule.startsAt?.slice(0, 10) ?? ''} onChange={event => updateSchedule({ startsAt: event.target.value || undefined })} className="mt-1 h-8 w-full rounded-md border border-slate-200 px-2 text-xs" /></label><label className="block text-xs font-medium text-slate-600">Ends<input type="date" value={activeSchedule.endsAt?.slice(0, 10) ?? ''} onChange={event => updateSchedule({ endsAt: event.target.value || undefined })} className="mt-1 h-8 w-full rounded-md border border-slate-200 px-2 text-xs" /></label></div>
+              <button type="button" onClick={deleteSchedule} className="text-xs font-medium text-red-600 hover:text-red-700">Remove schedule</button>
+            </div> : <p className="mt-3 rounded-md border border-dashed border-slate-200 px-2.5 py-2 text-[11px] text-slate-400">No schedule configured. Add one to distinguish one-time and recurring execution.</p>}
           </section>
         )}
         {selectedPolicyElement && (

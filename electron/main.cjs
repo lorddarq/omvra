@@ -24,6 +24,8 @@ const {
   buildMcpListenerStatus,
 } = require('./services/workspace-service.cjs');
 const { recordGoalPolicyChangeImpact } = require('./services/goal-policy.cjs');
+const { createGoalLifecycleService } = require('./services/goal-lifecycle-service.cjs');
+const { runDueSchedules } = require('./services/goal-schedule-service.cjs');
 const { getBundledSkillsRoot } = require('./services/skill-service.cjs');
 
 const APP_NAME = 'Omvra';
@@ -44,6 +46,7 @@ const UPDATE_STATE_CHANNEL = 'updates/state-changed';
 const PREFERENCES_KEY = 'omvra.preferences.v1';
 let mcpHttpServer = null;
 let updateController = null;
+let goalScheduleTimer = null;
 let mcpRuntimeState = {
   status: 'stopped',
   listening: false,
@@ -99,6 +102,21 @@ function restartMcpServer() {
     }),
     userSkillsRoot: app.getPath('userData'),
   });
+}
+
+function startGoalScheduleRuntime() {
+  if (goalScheduleTimer) clearInterval(goalScheduleTimer);
+  const lifecycle = createGoalLifecycleService({ store });
+  const tick = () => {
+    try {
+      const result = runDueSchedules({ store, lifecycle });
+      if (result.occurrences.length) console.log(`[goals] scheduled ${result.occurrences.length} occurrence(s)`);
+    } catch (error) {
+      console.error('[goals] schedule runtime failed:', error?.message || error);
+    }
+  };
+  tick();
+  goalScheduleTimer = setInterval(tick, 30_000);
 }
 
 function broadcastStoreDidChange() {
@@ -425,6 +443,7 @@ app.whenReady().then(() => {
   });
   syncUpdateChannelFromStore();
   restartMcpServer();
+  startGoalScheduleRuntime();
   createWindow();
   if (updateController && app.isPackaged) {
     void updateController.checkForUpdates();
@@ -440,6 +459,10 @@ app.on('activate', () => {
 });
 
 app.on('before-quit', () => {
+  if (goalScheduleTimer) {
+    clearInterval(goalScheduleTimer);
+    goalScheduleTimer = null;
+  }
   if (mcpHttpServer) {
     mcpHttpServer.close();
     mcpHttpServer = null;

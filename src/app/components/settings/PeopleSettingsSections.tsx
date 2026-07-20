@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { DesktopArrowDownIcon } from '../icons/DesktopArrowDownIcon';
-import type { Person, PersonKind, StatusColumn, Task, TaskStatus, TimelineSwimlane } from '../../types';
+import type { GoalRecord, Person, PersonKind, StatusColumn, Task, TaskStatus, TimelineSwimlane } from '../../types';
 import { getStatusLabel, getTaskProjectIds } from '../../utils/roadmap';
 import { getLoadPercentageForTasks, getTaskLoadPoints, PERSON_CAPACITY_POINTS } from '../../utils/taskLoad';
 import { AnchoredPanelSection } from '../AnchoredPanel';
@@ -62,6 +62,7 @@ export function PeopleManagementSections({
   const [editAgentInstructions, setEditAgentInstructions] = useState('');
   const [editAgentOperationalInstructions, setEditAgentOperationalInstructions] = useState('');
   const [pendingDeletePerson, setPendingDeletePerson] = useState<Person | null>(null);
+  const [pendingDeleteImpact, setPendingDeleteImpact] = useState<{ taskCount: number; goalCount: number; goalNodeCount: number; goalTitles: string[]; loading: boolean } | null>(null);
   const [activeActionPersonId, setActiveActionPersonId] = useState<string | null>(null);
   const [exportingPersonId, setExportingPersonId] = useState<string | null>(null);
 
@@ -206,6 +207,31 @@ export function PeopleManagementSections({
     cancelEditPerson();
   }
 
+  async function requestDeletePerson(person: Person) {
+    setPendingDeletePerson(person);
+    setPendingDeleteImpact({ taskCount: getTaskCountForPerson(person.id), goalCount: 0, goalNodeCount: 0, goalTitles: [], loading: true });
+
+    try {
+      const storedGoals = await window.electron?.storeGet?.('omvra.goals.v1');
+      const goals = Array.isArray(storedGoals) ? storedGoals as GoalRecord[] : [];
+      const linkedGoals = goals.filter(goal => goal.elements?.some(element => element.assigneeId === person.id));
+      setPendingDeleteImpact({
+        taskCount: getTaskCountForPerson(person.id),
+        goalCount: linkedGoals.length,
+        goalNodeCount: linkedGoals.reduce((count, goal) => count + goal.elements.filter(element => element.assigneeId === person.id).length, 0),
+        goalTitles: linkedGoals.slice(0, 3).map(goal => goal.title),
+        loading: false,
+      });
+    } catch {
+      setPendingDeleteImpact(current => current ? { ...current, loading: false } : current);
+    }
+  }
+
+  function cancelDeletePerson() {
+    setPendingDeletePerson(null);
+    setPendingDeleteImpact(null);
+  }
+
   const humanPeople = people.filter(person => person.kind !== 'agentic');
   const agenticPeople = people.filter(person => person.kind === 'agentic');
 
@@ -253,7 +279,7 @@ export function PeopleManagementSections({
         onCancel={cancelEditPerson}
         onSubmit={() => saveEditedPerson(person.id)}
         onDelete={() => {
-          setPendingDeletePerson(person);
+          void requestDeletePerson(person);
           setActiveActionPersonId(current => (current === person.id ? null : current));
         }}
         onExportPdf={() => {
@@ -338,18 +364,20 @@ export function PeopleManagementSections({
         title={pendingDeletePerson?.kind === 'agentic' ? 'Delete agent?' : 'Delete person?'}
         description={
           pendingDeletePerson?.kind === 'agentic'
-            ? 'This removes the agent from your workspace and unassigns any work currently linked to it.'
-            : 'This removes the person from your workspace and unassigns any work currently linked to them.'
+            ? pendingDeleteImpact?.loading
+              ? 'Checking assigned work and Goal workflows…'
+              : `This removes the agent and unassigns ${pendingDeleteImpact?.taskCount ?? getTaskCountForPerson(pendingDeletePerson.id)} task${(pendingDeleteImpact?.taskCount ?? 0) === 1 ? '' : 's'}. ${pendingDeleteImpact?.goalNodeCount ? `${pendingDeleteImpact.goalNodeCount} Goal node${pendingDeleteImpact.goalNodeCount === 1 ? '' : 's'} across ${pendingDeleteImpact.goalCount} workflow${pendingDeleteImpact.goalCount === 1 ? '' : 's'} will remain as missing-agent references${pendingDeleteImpact.goalTitles.length ? ` (${pendingDeleteImpact.goalTitles.join(', ')}${pendingDeleteImpact.goalCount > pendingDeleteImpact.goalTitles.length ? ', …' : ''})` : ''}.` : 'Existing Goal workflow references will be preserved as missing-agent references.'}`
+            : `This removes the person and unassigns ${pendingDeleteImpact?.taskCount ?? getTaskCountForPerson(pendingDeletePerson.id)} task${(pendingDeleteImpact?.taskCount ?? 0) === 1 ? '' : 's'}.`
         }
         confirmLabel={pendingDeletePerson?.kind === 'agentic' ? 'Delete agent' : 'Delete person'}
         onOpenChange={(open) => {
-          if (!open) setPendingDeletePerson(null);
+          if (!open) cancelDeletePerson();
         }}
-        onCancel={() => setPendingDeletePerson(null)}
+        onCancel={cancelDeletePerson}
         onConfirm={() => {
           if (!pendingDeletePerson) return;
           onDeletePerson(pendingDeletePerson.id);
-          setPendingDeletePerson(null);
+          cancelDeletePerson();
         }}
       />
     </>

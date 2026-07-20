@@ -56,6 +56,17 @@ test('contract packets carry the effective policy and revision', () => {
   assert.equal(packet.contractRevision, 3);
   assert.equal(packet.policyRevision, 9);
   assert.equal(packet.effectivePolicy.acceptance.actor, 'human');
+  assert.deepEqual(Object.keys(packet.references), ['objective', 'scope', 'instructions', 'outputs', 'constraints', 'permissions', 'acceptance', 'evidence', 'handoff', 'sequence', 'budget', 'project', 'roster']);
+  assert.match(packet.contractHash, /^sha256-/);
+});
+
+test('semantic contract changes invalidate the stable packet hash', () => {
+  const base = { id: 'goal-1', title: 'Ship it', revision: 3, scope: 'repo' };
+  const first = buildGoalContractPacket({ goal: base, effectivePolicy: { sourceRevision: 9 }, executionAttempt: 1 });
+  const changed = buildGoalContractPacket({ goal: { ...base, scope: 'repo and release' }, effectivePolicy: { sourceRevision: 9 }, executionAttempt: 1 });
+  const cosmetic = buildGoalContractPacket({ goal: { ...base, label: 'A different label' }, effectivePolicy: { sourceRevision: 9 }, executionAttempt: 1 });
+  assert.notEqual(first.contractHash, changed.contractHash);
+  assert.equal(first.contractHash, cosmetic.contractHash);
 });
 
 test('agent graph mutation is confirmation-gated by default and configurable', () => {

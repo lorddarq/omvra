@@ -100,6 +100,44 @@ test('lifecycle execution carries the resolved policy into the contract packet a
   assert.equal(started.execution.contractPacket.effectivePolicy.acceptance.actor, 'human');
 });
 
+test('Goal setup blocks before persistence when a required skill is missing', () => {
+  const store = makeStore();
+  store.set('omvra.goals.v1', [{ id: 'goal-1', title: 'Needs skill', requiredSkills: [{ skillId: 'does-not-exist', stage: 'implementation', persona: 'backend-engineer' }] }]);
+  const lifecycle = createGoalLifecycleService({ store, now: makeClock(), cleanup: () => ({ status: 'skipped', ok: true }) });
+  const blocked = lifecycle.execute({ goalId: 'goal-1', command: 'start', expectedRevision: 0, commandId: 'start-missing-skill' });
+  assert.equal(blocked.error, 'SKILL_PREFLIGHT_BLOCKED');
+  assert.equal(blocked.skillResolution.blockingResults[0].code, 'MISSING_SKILL');
+  assert.equal(store.get(EXECUTIONS_KEY), undefined);
+});
+
+test('Goal skill preflight uses explicitly configured roots from persisted preferences', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omvra-skills-'));
+  fs.writeFileSync(path.join(root, 'local.md'), '# Local\n');
+  fs.writeFileSync(path.join(root, 'manifest.json'), JSON.stringify({ schemaVersion: 1, skills: [{
+    skillId: 'local-skill', version: '1.0.0', entrypoint: 'local.md', supportedStages: ['implementation'], supportedPersonas: ['backend-engineer'], trustStatus: 'trusted',
+  }] }));
+  const store = makeStore();
+  store.set('omvra.preferences.v1', { skillRoots: [{ root }] });
+  store.set('omvra.goals.v1', [{ id: 'goal-1', title: 'Configured skill', requiredSkills: [{ skillId: 'local-skill', stage: 'implementation', persona: 'backend-engineer' }] }]);
+  const lifecycle = createGoalLifecycleService({ store, now: makeClock(), cleanup: () => ({ status: 'skipped', ok: true }) });
+  const started = lifecycle.execute({ goalId: 'goal-1', command: 'start', expectedRevision: 0, commandId: 'start-configured-skill' });
+  assert.equal(started.ok, true);
+  assert.equal(started.execution.contractPacket.skillReferences[0].source, 'omvra-configured');
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('acknowledgement carries contract hash, policy revision, and resolved skill references', () => {
+  const store = makeStore();
+  store.set('omvra.goals.v1', [{ id: 'goal-1', title: 'Use skill', requiredSkills: [{ skillId: 'process-modeler', stage: 'qa', persona: 'qa' }] }]);
+  const lifecycle = createGoalLifecycleService({ store, now: makeClock(), cleanup: () => ({ status: 'skipped', ok: true }) });
+  const started = lifecycle.execute({ goalId: 'goal-1', command: 'start', expectedRevision: 0, commandId: 'start-skill' });
+  const packet = started.execution.contractPacket;
+  const acknowledged = lifecycle.execute({ goalId: 'goal-1', command: 'acknowledge', expectedRevision: 1, commandId: 'ack-skill', payload: { contractRevision: packet.contractRevision, contractHash: packet.contractHash } });
+  assert.equal(acknowledged.execution.acknowledgedContractHash, packet.contractHash);
+  assert.deepEqual(acknowledged.execution.acknowledgedSkillReferences, packet.skillReferences);
+  assert.equal(acknowledged.event.payload.policyRevision, packet.policyRevision);
+});
+
 test('agent delegation contract packets resolve canonical profiles and keep ephemeral agents persona-free', () => {
   const store = makeStore();
   store.set('omvra.people.v1', [{ id: 'canonical-1', kind: 'agentic', agentInstructions: 'Persona', agentOperationalInstructions: 'Method' }]);

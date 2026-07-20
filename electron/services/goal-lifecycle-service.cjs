@@ -11,6 +11,7 @@ const {
   normalizeAgentConfiguration,
 } = require('./goal-state-service.cjs');
 const { GOAL_POLICY_KEY, buildGoalContractPacket, getPendingGoalPolicyImpact, resolveGoalPolicy, resolveGoalPolicyImpact } = require('./goal-policy.cjs');
+const { collectSkillRequirements, resolveRequiredSkills } = require('./skill-service.cjs');
 
 const RECONCILIATIONS_KEY = 'omvra.goalReconciliations.v1';
 const PREFERENCES_KEY = 'omvra.preferences.v1';
@@ -173,11 +174,20 @@ function buildAgentDelegations(store, goal) {
   });
 }
 
-function buildContractPacket(store, goal, effectivePolicy, executionAttempt, now) {
+function buildContractPacket(store, goal, effectivePolicy, executionAttempt, now, options = {}) {
   const packet = buildGoalContractPacket({ goal, effectivePolicy, executionAttempt, now });
   const agentDelegations = buildAgentDelegations(store, goal);
+  const skillRequirements = collectSkillRequirements(goal);
+  const preferences = store.get(PREFERENCES_KEY) || {};
+  const skillResolution = resolveRequiredSkills(skillRequirements, {
+    skillsRoot: options.skillsRoot || preferences.skillsRoot,
+    skillRoots: options.skillRoots || preferences.skillRoots,
+  });
   return {
     ...packet,
+    skillRequirements,
+    skillReferences: skillResolution.skills,
+    skillResolution: { ok: skillResolution.ok, blockingResults: skillResolution.blockingResults },
     agentDelegations,
     recruitmentRequests: agentDelegations.filter(item => item.status === 'recruitment-requested' || item.recruitmentFallback).map(item => ({
       elementId: item.elementId,
@@ -220,6 +230,11 @@ function appendCleanupAudit(store, record, payload = {}) {
 }
 
 function validateControlInputs({ store, goal, execution, command, payload }) {
+  if (['start', 'dispatch'].includes(command) && payload.contractPacket?.skillResolution?.ok === false) {
+    return failure('SKILL_PREFLIGHT_BLOCKED', 'Required skills must resolve before Goal setup or dispatch.', {
+      skillResolution: payload.contractPacket.skillResolution,
+    });
+  }
   if (command === 'dispatch') {
     if (!execution.acknowledged && payload.requireAcknowledgement !== false) {
       return failure('ACKNOWLEDGEMENT_REQUIRED', 'The current contract must be acknowledged before dispatch.');
@@ -228,6 +243,13 @@ function validateControlInputs({ store, goal, execution, command, payload }) {
     if (payload.conditionPending === true) return failure('APPROVAL_REQUIRED', 'A lifecycle condition requires overseer or human review.');
     if (payload.approvalGateStatus && payload.approvalGateStatus !== 'passed') {
       return failure('APPROVAL_REQUIRED', 'The configured approval gate has not passed.');
+    }
+    if (execution.acknowledgedContractRevision !== payload.contractPacket?.contractRevision
+      || (execution.acknowledgedContractHash && execution.acknowledgedContractHash !== payload.contractPacket?.contractHash)) {
+      return failure('CONTRACT_STALE', 'The acknowledged contract no longer matches the current Goal contract packet.', {
+        contractRevision: payload.contractPacket?.contractRevision,
+        contractHash: payload.contractPacket?.contractHash,
+      });
     }
     const predecessors = Array.isArray(payload.predecessorStates) ? payload.predecessorStates : payload.predecessors;
     if (Array.isArray(predecessors) && predecessors.some(item => (item?.state || item) !== 'complete')) {
@@ -344,7 +366,7 @@ function createGoalLifecycleService({
           effectivePolicy,
           policyRevision: effectivePolicy.sourceRevision,
           executionAttemptId: executionId,
-          contractPacket: buildContractPacket(store, goal, effectivePolicy, 1, now),
+          contractPacket: buildContractPacket(store, goal, effectivePolicy, 1, now, payload),
           createdAt: now(),
         };
 
@@ -353,7 +375,7 @@ function createGoalLifecycleService({
       effectivePolicy,
       policyRevision: effectivePolicy.sourceRevision,
       executionAttemptId: execution.id,
-      contractPacket: buildContractPacket(store, goal, effectivePolicy, execution.attempt, now),
+      contractPacket: buildContractPacket(store, goal, effectivePolicy, execution.attempt, now, payload),
     };
     const controlValidation = validateControlInputs({ store, goal, execution, command, payload: policyPayload });
     if (!controlValidation.ok) return controlValidation;
@@ -644,9 +666,16 @@ function transitionExecution(execution, command, payload) {
           acknowledged: true,
           acknowledgedContractRevision: payload.contractRevision,
           acknowledgedContractHash: payload.contractHash,
+          acknowledgedPolicyRevision: payload.policyRevision,
+          acknowledgedSkillReferences: payload.contractPacket?.skillReferences || [],
           acknowledgedAt: payload.acknowledgedAt,
         },
-        eventPayload: { contractRevision: payload.contractRevision, contractHash: payload.contractHash },
+        eventPayload: {
+          contractRevision: payload.contractRevision,
+          contractHash: payload.contractHash,
+          policyRevision: payload.policyRevision,
+          skillReferences: payload.contractPacket?.skillReferences || [],
+        },
       };
     case 'submit-evidence': {
       if (!['working', 'evidence-required'].includes(state)) return failure('INVALID_TRANSITION', `Cannot submit evidence in state "${state}".`);

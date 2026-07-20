@@ -1,7 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const { getBundledSkillsRoot, getUserSkillsRoot, listBundledSkills, listAvailableSkills, getAvailableSkill } = require('./skill-service.cjs');
+const fs = require('node:fs');
+const os = require('node:os');
+const { getBundledSkillsRoot, getUserSkillsRoot, listBundledSkills, listAvailableSkills, getAvailableSkill, resolveRequiredSkills } = require('./skill-service.cjs');
 
 const skillsRoot = path.resolve(__dirname, '../../src/skills');
 
@@ -29,4 +31,46 @@ test('user-local skills are discovered outside the packaged bundle', () => {
   const skills = listAvailableSkills({ skillsRoot, userDataPath });
   assert.ok(skills.some(skill => skill.skillId === 'release-readiness' && skill.source === 'omvra-user'));
   fs.rmSync(path.resolve(__dirname, '../../.tmp-skill-user-data'), { recursive: true, force: true });
+});
+
+test('required skills resolve bundled metadata and explicit local overrides in order', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omvra-skills-'));
+  const entrypoint = path.join(root, 'override.md');
+  fs.writeFileSync(entrypoint, '# Override\n');
+  fs.writeFileSync(path.join(root, 'manifest.json'), JSON.stringify({ schemaVersion: 1, skills: [{
+    skillId: 'process-modeler', version: '1.2.0', name: 'Override', summary: 'Local override',
+    supportedStages: ['qa'], supportedPersonas: ['qa'], entrypoint: 'override.md', trustStatus: 'trusted',
+  }] }));
+  const resolved = resolveRequiredSkills([{ skillId: 'process-modeler', version: '^1.0.0', stage: 'qa', persona: 'qa' }], { skillsRoot, skillRoots: [{ root }] });
+  assert.equal(resolved.ok, true);
+  assert.equal(resolved.skills[0].source, 'omvra-configured');
+  assert.equal(resolved.skills[0].version, '1.2.0');
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('required skill failures are typed and block setup without installation', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omvra-skills-'));
+  fs.writeFileSync(path.join(root, 'manifest.json'), '{"schemaVersion": 9}');
+  const invalid = resolveRequiredSkills([{ skillId: 'missing-skill' }], { skillsRoot, skillRoots: [{ root }] });
+  assert.equal(invalid.ok, false);
+  assert.equal(invalid.blockingResults[0].code, 'INVALID_MANIFEST');
+
+  fs.writeFileSync(path.join(root, 'manifest.json'), JSON.stringify({ schemaVersion: 1, skills: [{
+    skillId: 'untrusted', version: '1.0.0', entrypoint: 'untrusted.md', trustStatus: 'untrusted',
+  }, { skillId: 'tampered', version: '1.0.0', entrypoint: 'tampered.md', trustStatus: 'trusted', integrityHash: 'sha256-invalid' }] }));
+  fs.writeFileSync(path.join(root, 'untrusted.md'), '# Untrusted\n');
+  fs.writeFileSync(path.join(root, 'tampered.md'), '# Tampered\n');
+  const failed = resolveRequiredSkills([{ skillId: 'untrusted' }, { skillId: 'tampered' }, { skillId: 'not-there' }], { skillsRoot, skillRoots: [{ root }] });
+  assert.equal(failed.ok, false);
+  assert.deepEqual(failed.blockingResults.map(item => item.code), ['UNTRUSTED_SKILL', 'INTEGRITY_FAILURE', 'MISSING_SKILL']);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('malformed bundled manifests produce a typed resolver result', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omvra-skills-'));
+  fs.writeFileSync(path.join(root, 'manifest.json'), '{"schemaVersion": 9}');
+  const result = resolveRequiredSkills([{ skillId: 'process-modeler' }], { skillsRoot: root });
+  assert.equal(result.ok, false);
+  assert.equal(result.blockingResults[0].code, 'INVALID_MANIFEST');
+  fs.rmSync(root, { recursive: true, force: true });
 });

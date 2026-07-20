@@ -1,3 +1,5 @@
+const crypto = require('node:crypto');
+
 const GOAL_POLICY_KEY = 'omvra.goalPolicy.v1';
 const GOAL_POLICY_IMPACTS_KEY = 'omvra.goalPolicyImpacts.v1';
 
@@ -117,14 +119,42 @@ function resolveGoalPolicy({ workspacePolicy, goal, targetElementId } = {}) {
 }
 
 function buildGoalContractPacket({ goal, effectivePolicy, executionAttempt = 1, now = () => new Date().toISOString() } = {}) {
-  return {
-    contractId: `contract_${goal?.id || 'unknown'}_${executionAttempt}`,
-    contractRevision: Number(goal?.revision || goal?.__mcpRevision || 0),
-    goalId: goal?.id,
+  const elements = Array.isArray(goal?.elements) ? goal.elements : [];
+  const references = {
     objective: goal?.title,
+    scope: goal?.scope ?? goal?.scopedInstructions ?? goal?.description,
+    instructions: goal?.instructions ?? elements.filter(item => item?.type === 'instructions').map(item => item.instructions || item.content || item.title).filter(Boolean),
+    outputs: goal?.outputs ?? goal?.expectedOutputs,
+    constraints: goal?.constraints,
+    permissions: effectivePolicy?.permissions ?? goal?.permissions,
+    acceptance: goal?.acceptance ?? effectivePolicy?.acceptance,
+    evidence: goal?.evidenceRequirements ?? goal?.evidence,
+    handoff: goal?.handoff,
+    sequence: goal?.sequence ?? goal?.dependencies,
+    budget: goal?.budget ?? effectivePolicy?.dimensions,
+    project: goal?.project ?? goal?.projectId,
+    roster: goal?.roster ?? goal?.rosterContext ?? elements.filter(item => item?.type === 'agent').map(item => ({ id: item.id, title: item.title, assigneeId: item.assigneeId, agentConfiguration: item.agentConfiguration })),
+  };
+  const stable = {
+    goalId: goal?.id,
+    contractRevision: Number(goal?.revision || goal?.__mcpRevision || 0),
+    objective: goal?.title,
+    references,
     effectivePolicy,
     policyRevision: effectivePolicy?.sourceRevision ?? effectivePolicy?.policyRevision ?? 0,
     executionAttempt,
+  };
+  const contractHash = `sha256-${crypto.createHash('sha256').update(JSON.stringify(stable)).digest('hex')}`;
+  return {
+    contractId: `contract_${goal?.id || 'unknown'}_${executionAttempt}`,
+    contractRevision: stable.contractRevision,
+    goalId: goal?.id,
+    objective: goal?.title,
+    references,
+    effectivePolicy,
+    policyRevision: stable.policyRevision,
+    executionAttempt,
+    contractHash,
     generatedAt: now(),
   };
 }

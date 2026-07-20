@@ -142,8 +142,10 @@ export function GeneralSettingsSection({ children }: McpSettingsSectionProps) {
 interface WorkflowSettingsSectionProps {
   cleanupGoalArtifacts: boolean;
   goalAuditArchiveDirectory: string;
+  externalSkillsDirectory: string;
   onCleanupGoalArtifactsChange: (enabled: boolean) => void;
   onGoalAuditArchiveDirectoryChange: (directory: string) => void;
+  onExternalSkillsDirectoryChange: (directory: string) => void;
   goalPolicy: GoalPolicyV1;
   onGoalPolicyChange: (updates: {
     currency?: string;
@@ -159,9 +161,11 @@ interface WorkflowSettingsSectionProps {
 export function WorkflowSettingsSection({
   cleanupGoalArtifacts,
   goalAuditArchiveDirectory,
+  externalSkillsDirectory,
   onCleanupGoalArtifactsChange,
   onGoalPolicyChange,
   onGoalAuditArchiveDirectoryChange,
+  onExternalSkillsDirectoryChange,
   goalPolicy,
   onResetGoalPolicy,
   onExportGoalPolicyBackup,
@@ -232,6 +236,32 @@ export function WorkflowSettingsSection({
             onClick={async () => {
               const directory = await window.electron?.goalAudit?.pickDirectory?.();
               if (directory) onGoalAuditArchiveDirectoryChange(directory);
+            }}
+          >
+            <FolderOpen className="h-3.5 w-3.5" aria-hidden="true" />
+            Choose folder
+          </button>
+        </div>
+      </div>
+      <div className="mt-5 border-t border-[#ececf0] pt-5">
+        <div className="text-sm font-semibold leading-5 text-[#71717a]">External skills location</div>
+        <p className="mt-1 max-w-[40rem] text-xs leading-4 text-[#6a7282]">
+          Use a local folder for skills that are not bundled with Omvra. Required skills are resolved from this folder before bundled fallbacks.
+        </p>
+        <div className="mt-3 flex items-center gap-2">
+          <Input
+            value={externalSkillsDirectory}
+            readOnly
+            placeholder="Not configured"
+            aria-label="External skills location"
+            className="h-9 min-w-0 flex-1 rounded-xl border-[#e5e7eb] bg-white px-3 text-sm text-[#71717a]"
+          />
+          <button
+            type="button"
+            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-[#e5e7eb] bg-white px-3 text-xs font-semibold text-[#52525b] transition hover:bg-[#fafafa] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4d4d8]"
+            onClick={async () => {
+              const directory = await window.electron?.skills?.pickDirectory?.();
+              if (directory) onExternalSkillsDirectoryChange(directory);
             }}
           >
             <FolderOpen className="h-3.5 w-3.5" aria-hidden="true" />

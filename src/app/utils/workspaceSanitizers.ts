@@ -14,6 +14,7 @@ export interface AppPreferencesLike {
   pipelineLoadStatusIds: TaskStatus[];
   cleanupGoalArtifacts: boolean;
   goalAuditArchiveDirectory: string;
+  skillRoots?: Array<{ root: string; source?: string }>;
   customScrollbarsEnabled: boolean;
   executionLoadStatusId?: TaskStatus;
   pipelineLoadStatusId?: TaskStatus;
@@ -410,6 +411,11 @@ export function sanitizePreferences(
     pipelineLoadStatusIds,
     cleanupGoalArtifacts: Boolean(preferences.cleanupGoalArtifacts),
     goalAuditArchiveDirectory: typeof preferences.goalAuditArchiveDirectory === 'string' ? preferences.goalAuditArchiveDirectory.trim() : '',
+    skillRoots: Array.isArray(preferences.skillRoots)
+      ? preferences.skillRoots
+          .filter(item => item && typeof item.root === 'string' && item.root.trim())
+          .map(item => ({ root: item.root.trim(), source: typeof item.source === 'string' ? item.source : 'omvra-configured' }))
+      : (fallback.skillRoots || []),
     customScrollbarsEnabled: preferences.customScrollbarsEnabled !== false,
     updateChannel: preferences.updateChannel === 'rc' ? 'rc' : 'stable',
     markdownAppearance: sanitizeMarkdownAppearance(preferences.markdownAppearance, fallback.markdownAppearance || DEFAULT_MARKDOWN_APPEARANCE),

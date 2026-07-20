@@ -53,6 +53,7 @@ export interface AppPanelWorkspaceState {
 export interface PreferencesPanelState {
   cleanupGoalArtifacts: boolean;
   goalAuditArchiveDirectory: string;
+  externalSkillsDirectory: string;
   customScrollbarsEnabled: boolean;
   goalPolicy: GoalPolicyV1;
   executionLoadStatusIds: TaskStatus[];
@@ -125,6 +126,7 @@ export interface WorkspaceAdminActions {
   onShowCompletedTimelineTasksChange: (show: boolean) => void;
   onCleanupGoalArtifactsChange: (enabled: boolean) => void;
   onGoalAuditArchiveDirectoryChange: (directory: string) => void;
+  onExternalSkillsDirectoryChange: (directory: string) => void;
   onCustomScrollbarsEnabledChange: (enabled: boolean) => void;
   onGoalPolicyChange: (updates: {
     currency?: string;
@@ -265,6 +267,7 @@ export function AppPanels({
         statusColumns={workspace.statusColumns}
         cleanupGoalArtifacts={preferences.cleanupGoalArtifacts}
         goalAuditArchiveDirectory={preferences.goalAuditArchiveDirectory}
+        externalSkillsDirectory={preferences.externalSkillsDirectory}
         customScrollbarsEnabled={preferences.customScrollbarsEnabled}
         goalPolicy={preferences.goalPolicy}
         executionLoadStatusIds={preferences.executionLoadStatusIds}
@@ -289,6 +292,7 @@ export function AppPanels({
         onShowCompletedTimelineTasksChange={adminActions.onShowCompletedTimelineTasksChange}
         onCleanupGoalArtifactsChange={adminActions.onCleanupGoalArtifactsChange}
         onGoalAuditArchiveDirectoryChange={adminActions.onGoalAuditArchiveDirectoryChange}
+        onExternalSkillsDirectoryChange={adminActions.onExternalSkillsDirectoryChange}
         onCustomScrollbarsEnabledChange={adminActions.onCustomScrollbarsEnabledChange}
         onGoalPolicyChange={adminActions.onGoalPolicyChange}
         onResetGoalPolicy={adminActions.onResetGoalPolicy}

@@ -120,6 +120,19 @@ export const GOAL_TEMPLATES: GoalTemplate[] = [
   ], [
     link('inventory-link', 'Map the system', 'goal', 'inventory'), link('audit-link', 'Inspect the product', 'inventory', 'audit'), link('evidence-link', 'Capture findings', 'audit', 'evidence'), link('condition-link', 'Check evidence quality', 'evidence', 'condition'), link('review-link', 'Accept baseline', 'condition', 'review', 'right', 'left', { conditionBranch: 'positive' }),
   ]),
+  template('audit-process', 'Run a process audit', 'Evaluate a process from source evidence to prioritized findings, improvement opportunities, and an accepted audit baseline.', '#0f766e', [
+    node('goal', 'goal', 'Audit the process', 'Build an evidence-based view of how the process works, where it breaks down, and what should change.', 80, 220),
+    node('source', 'human-input', 'Provide the audit source', 'Supply a Confluence page URL or the process document that should be audited.', 390, 150, {
+      humanInputPrompt: 'Provide a Confluence page URL, or identify the source document. If the source is a document or other file artifact, ask the user to attach it before continuing.',
+    }),
+    node('scope', 'subgoal', 'Frame the audit scope', 'Confirm the process owner, participants, trigger, expected outcome, boundaries, time period, and evidence standard.', 680, 150),
+    node('inspect', 'agent', 'Inspect the process', 'Map the current process, compare stated and observed practice, and collect concrete evidence of friction, risk, waste, and control gaps.', 970, 150, ephemeralAgent('process auditor', 'Audit the supplied Confluence page or attached document. Map the process end to end, distinguish documented policy from observed practice, cite evidence for every finding, and flag missing source material instead of inventing details.')),
+    node('findings', 'instructions', 'Structure the findings', 'Classify findings by impact, frequency, control risk, owner, confidence, and recommended next step. Separate evidence, interpretation, and proposal.', 1260, 150),
+    node('condition', 'condition', 'Is the audit evidence sufficient?', 'Check source coverage, traceability, contradictions, and whether the recommendations follow from the evidence.', 1550, 140, { conditionPositiveLabel: 'Ready', conditionNegativeLabel: 'Needs evidence', conditionPositiveOutcome: 'The audit is traceable enough to prioritize improvements.', conditionNegativeOutcome: 'Request the missing attachment or source access, resolve contradictions, and continue the audit.' }),
+    node('review', 'approval-gate', 'Accept the audit baseline', 'A process owner reviews the evidence, findings, and prioritized improvements before the audit becomes an accepted baseline.', 1840, 150, { policy: { acceptanceActor: 'human' }, approvalEvidenceRequired: true }),
+  ], [
+    link('source-link', 'Start with source material', 'goal', 'source'), link('scope-link', 'Frame the audit', 'source', 'scope'), link('inspect-link', 'Inspect the process', 'scope', 'inspect'), link('findings-link', 'Structure evidence and findings', 'inspect', 'findings'), link('condition-link', 'Check audit readiness', 'findings', 'condition'), link('review-link', 'Accept the baseline', 'condition', 'review', 'right', 'left', { conditionBranch: 'positive' }),
+  ]),
   template('propose-design-system-changes', 'Propose design system changes', 'Turn audit evidence into a coherent, prioritized change proposal rather than a list of disconnected improvements.', '#be123c', [
     node('goal', 'goal', 'Improve the design system', 'Choose changes that make the product more coherent without creating migration chaos.', 80, 220),
     node('prioritize', 'subgoal', 'Prioritize the change set', 'Rank findings by user impact, repetition, accessibility risk, and implementation leverage.', 390, 150),

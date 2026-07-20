@@ -243,6 +243,9 @@ declare global {
       goalAudit: {
         pickDirectory: () => Promise<string | null>;
       };
+      skills: {
+        pickDirectory: () => Promise<string | null>;
+      };
       openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
       tasks: {
         exportPdf: (payload: {

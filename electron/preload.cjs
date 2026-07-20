@@ -74,6 +74,10 @@ contextBridge.exposeInMainWorld('electron', {
     pickDirectory: () => ipcRenderer.invoke('goal-audit/pick-directory'),
   },
 
+  skills: {
+    pickDirectory: () => ipcRenderer.invoke('skills/pick-directory'),
+  },
+
   // Open external (validated in main)
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
 

@@ -553,6 +553,11 @@ ipcMain.handle('goal-audit/pick-directory', async () => {
   return result.canceled ? null : result.filePaths[0] || null;
 });
 
+ipcMain.handle('skills/pick-directory', async () => {
+  const result = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] });
+  return result.canceled ? null : result.filePaths[0] || null;
+});
+
 ipcMain.handle('attachments/pick', async () => {
   const result = await dialog.showOpenDialog({
     properties: ['openFile', 'multiSelections'],

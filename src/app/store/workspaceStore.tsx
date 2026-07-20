@@ -82,6 +82,7 @@ export interface AppPreferences {
   pipelineLoadStatusIds: TaskStatus[];
   cleanupGoalArtifacts: boolean;
   goalAuditArchiveDirectory: string;
+  skillRoots: Array<{ root: string; source?: string }>;
   customScrollbarsEnabled: boolean;
   updateChannel: 'stable' | 'rc';
   markdownAppearance: MarkdownAppearance;
@@ -131,6 +132,7 @@ interface WorkspaceStoreValue {
   togglePipelineLoadStatus: (statusId: TaskStatus) => void;
   setCleanupGoalArtifacts: (enabled: boolean) => void;
   setGoalAuditArchiveDirectory: (directory: string) => void;
+  setExternalSkillsDirectory: (directory: string) => void;
   setCustomScrollbarsEnabled: (enabled: boolean) => void;
   updateGoalPolicy: (updates: Parameters<typeof updateGoalPolicy>[1]) => void;
   resetGoalPolicy: () => void;
@@ -194,6 +196,7 @@ export function createDefaultAppPreferences(
     pipelineLoadStatusIds: [getDefaultStatusId(statusColumns, 'open')],
     cleanupGoalArtifacts: false,
     goalAuditArchiveDirectory: '',
+    skillRoots: [],
     customScrollbarsEnabled: true,
     updateChannel: 'stable',
     markdownAppearance: { ...DEFAULT_MARKDOWN_APPEARANCE },
@@ -264,6 +267,9 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
       ),
       cleanupGoalArtifacts: Boolean(stored.cleanupGoalArtifacts),
       goalAuditArchiveDirectory: typeof stored.goalAuditArchiveDirectory === 'string' ? stored.goalAuditArchiveDirectory : '',
+      skillRoots: Array.isArray(stored.skillRoots)
+        ? stored.skillRoots.filter(item => item && typeof item.root === 'string' && item.root.trim()).map(item => ({ root: item.root.trim(), source: typeof item.source === 'string' ? item.source : 'omvra-configured' }))
+        : [],
       customScrollbarsEnabled: stored.customScrollbarsEnabled !== false,
       updateChannel: stored.updateChannel === 'rc' ? 'rc' : 'stable',
       markdownAppearance: sanitizeMarkdownAppearance(stored.markdownAppearance, DEFAULT_MARKDOWN_APPEARANCE),
@@ -635,6 +641,14 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     setPreferences(previous => ({ ...previous, goalAuditArchiveDirectory: directory.trim() }));
   }, []);
 
+  const setExternalSkillsDirectory = useCallback((directory: string) => {
+    const root = directory.trim();
+    setPreferences(previous => ({
+      ...previous,
+      skillRoots: root ? [{ root, source: 'omvra-configured' }] : [],
+    }));
+  }, []);
+
   const setCustomScrollbarsEnabled = useCallback((enabled: boolean) => {
     setPreferences(previous => ({ ...previous, customScrollbarsEnabled: enabled }));
   }, []);
@@ -725,6 +739,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     togglePipelineLoadStatus,
     setCleanupGoalArtifacts,
     setGoalAuditArchiveDirectory,
+    setExternalSkillsDirectory,
     setCustomScrollbarsEnabled,
     updateGoalPolicy: handleUpdateGoalPolicy,
     resetGoalPolicy,
@@ -758,6 +773,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     setMcpAgentAccessEnabled,
     setMcpBindHost,
     setMcpCapabilityProfile,
+    setExternalSkillsDirectory,
     setMcpPort,
     setMcpServerAddress,
     setUpdateChannel,

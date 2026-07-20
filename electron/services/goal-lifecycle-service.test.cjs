@@ -58,6 +58,25 @@ test('lifecycle transitions require evidence, acceptance, and revisions', () => 
   assert.equal(store.get(EXECUTIONS_KEY)[0].state, 'complete');
 });
 
+test('acknowledgement remains valid for the following dispatch', () => {
+  const store = makeStore();
+  const lifecycle = createGoalLifecycleService({ store, now: makeClock(), cleanup: () => ({ status: 'skipped', ok: true }) });
+  const started = lifecycle.execute({ goalId: 'goal-1', command: 'start', expectedRevision: 0, commandId: 'contract-start' });
+  const packet = started.execution.contractPacket;
+  const acknowledged = lifecycle.execute({
+    goalId: 'goal-1',
+    command: 'acknowledge',
+    expectedRevision: 1,
+    commandId: 'contract-ack',
+    payload: { contractRevision: packet.contractRevision, contractHash: packet.contractHash },
+  });
+  assert.equal(acknowledged.ok, true);
+  assert.equal(acknowledged.execution.acknowledgedContractHash, packet.contractHash);
+  const dispatched = lifecycle.execute({ goalId: 'goal-1', command: 'dispatch', expectedRevision: 2, commandId: 'contract-dispatch' });
+  assert.equal(dispatched.ok, true);
+  assert.equal(dispatched.execution.state, 'working');
+});
+
 test('terminal handoff records produced outputs as immutable runtime evidence', () => {
   const store = makeStore();
   const lifecycle = createGoalLifecycleService({ store, now: makeClock(), cleanup: () => ({ status: 'skipped', ok: true }) });
@@ -108,11 +127,11 @@ test('acknowledgement records receipt without completing or changing execution s
   const store = makeStore();
   const lifecycle = createGoalLifecycleService({ store, now: makeClock(), cleanup: () => ({ status: 'skipped', ok: true }) });
 
-  lifecycle.execute({ goalId: 'goal-1', command: 'start', expectedRevision: 0, commandId: 'start' });
-  const acknowledged = lifecycle.execute({ goalId: 'goal-1', command: 'acknowledge', expectedRevision: 1, commandId: 'ack', payload: { contractRevision: 3, contractHash: 'hash-3' } });
+  const started = lifecycle.execute({ goalId: 'goal-1', command: 'start', expectedRevision: 0, commandId: 'start' });
+  const acknowledged = lifecycle.execute({ goalId: 'goal-1', command: 'acknowledge', expectedRevision: 1, commandId: 'ack', payload: { contractRevision: started.execution.contractPacket.contractRevision, contractHash: started.execution.contractPacket.contractHash } });
   assert.equal(acknowledged.execution.state, 'ready');
   assert.equal(acknowledged.execution.acknowledged, true);
-  assert.equal(acknowledged.execution.acknowledgedContractRevision, 3);
+  assert.equal(acknowledged.execution.acknowledgedContractRevision, started.execution.contractPacket.contractRevision);
 });
 
 test('lifecycle execution carries the resolved policy into the contract packet and validation inputs', () => {

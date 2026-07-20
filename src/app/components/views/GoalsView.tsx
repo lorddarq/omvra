@@ -56,6 +56,7 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
   const [artifactMenuOpen, setArtifactMenuOpen] = useState(false);
   const [policyImpacts, setPolicyImpacts] = useState<Array<{ goalId?: string; status?: string; requiresUserConfirmation?: boolean }>>([]);
   const [runtimeProjection, setRuntimeProjection] = useState<GoalRuntimeProjection | null>(null);
+  const activeGoalIdRef = useRef('');
   const agentMenuRef = useRef<HTMLDivElement | null>(null);
   const controlFlowMenuRef = useRef<HTMLDivElement | null>(null);
   const artifactMenuRef = useRef<HTMLDivElement | null>(null);
@@ -88,6 +89,7 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
     selectedRetryTarget, selectedPolicyElement, selectedEffectivePolicy, selectedPolicyImpact, selectedArtifactReferences,
     artifactOptions, supportingSourceOptions, connections, selectedConnections,
   } = useGoalsInspectorSelection({ goals, selectedGoalId, selectedElementId, schedules, people, tasks, milestones, workspacePolicy, runtimeProjection, policyImpacts, supportingArtifactType, supportingSourceSearch });
+  activeGoalIdRef.current = activeGoal?.id ?? '';
   const selectedElementLocked = isExecutionLocked(selectedElement);
 
   useEffect(() => {
@@ -159,7 +161,7 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
     const unsubscribe = window.electron?.onStoreChanged?.(() => { if (!draggingRef.current && rendererWritesPendingRef.current === 0) void refreshCanonicalGoals(); });
     const unsubscribeRuntime = window.electron?.goals?.onRuntimeChanged?.((event) => {
       if (cancelled) return;
-      if (event.goalId === activeGoal?.id) {
+      if (event.goalId === activeGoalIdRef.current) {
         void window.electron?.goals?.getRuntime?.(event.goalId).then(value => { if (!cancelled && value && typeof value === 'object') setRuntimeProjection(value as GoalRuntimeProjection); });
       }
       if (event.scope !== 'graph' || draggingRef.current || rendererWritesPendingRef.current > 0) return;
@@ -660,6 +662,7 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
       onStartConnector={() => { setConnectorMode(true); setConnectorSourceId(null); setConnectorSourceBranch(undefined); }}
     />
     <GoalsCanvasSurface canvasRef={canvasRef} spacePressed={spacePressed} panMode={panMode} pan={pan} zoom={zoom} emptyState={!activeGoal ? <GoalsCanvasEmptyState onNewGoal={openNewGoalDialog} /> : undefined} onPointerDown={beginCanvasPan} onPointerMove={moveCanvasPan} onPointerUp={endCanvasPan} onPointerCancel={endCanvasPan} onLostPointerCapture={event => { if (panSessionRef.current?.pointerId === event.pointerId) panSessionRef.current = null; }}>
+        {runtimeProjection?.execution?.state && <div role="status" className="absolute left-4 top-4 z-10 rounded-md border border-blue-200 bg-white/95 px-3 py-2 text-xs text-slate-600 shadow-sm"><span className="font-semibold text-slate-800">Execution:</span> <span className="capitalize">{runtimeProjection.execution.state.replaceAll('-', ' ')}</span>{runtimeProjection.execution.state === 'working' && <span className="ml-1 text-blue-700">· Agent is working</span>}</div>}
         <GoalsConnectorLayer connections={connections} elements={activeGoal?.elements ?? []} selectedElementId={selectedElement?.id} connectorPath={connection => goalConnectorPath(activeGoal?.elements ?? [], connection, canvasElementHeights)} onSelectConnector={connectionId => { setSelectedElementId(connectionId); setConnectorMode(false); setConnectorSourceId(null); setConnectorSourceBranch(undefined); }} onMoveSelection={moveCanvasSelection} />
         {connectorError && <div role="alert" className="absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 shadow-sm">{connectorError}</div>}
         <GoalsCanvasNodes elements={activeGoal?.elements ?? []} selectedElementId={selectedElement?.id} connectorMode={connectorMode} connectorSourceId={connectorSourceId} connectorSourceSide={connectorSourceSide} connectorSourceBranch={connectorSourceBranch} panMode={panMode} spaceHeld={spaceHeldRef.current} canvasElementHeight={element => goalCanvasElementHeight(element, canvasElementHeights)} getElementTitle={element => getElementTitle(element, people)} getElementBody={element => getElementBody(element, people)} isConnected={elementId => isGoalElementConnected(activeGoal?.elements ?? [], elementId)} isExecutionLocked={isExecutionLocked} nodeClass={nodeClass} elementIcon={elementIcon} conditionPositiveLabel={conditionPositiveLabel} conditionNegativeLabel={conditionNegativeLabel} readinessForElement={readinessForElement} readinessLabel={readinessLabel} readinessChipClass={readinessChipClass} isCompletionElement={isCompletionElement} compactChipClass={compactChipClass} statusChipClass={statusChipClass} statusLabel={statusLabel} StatusIcon={StatusIcon} onSelectElement={setSelectedElementId} onNodeClick={element => { if (connectorMode) { if (connectorSourceId) connectNodes(element.id); else beginConnection(element.id, 'right'); } else setSelectedElementId(element.id); }} onMoveSelection={moveCanvasSelection} onStartDrag={(element, event) => { if (spaceHeldRef.current || panMode || connectorMode || isExecutionLocked(element)) return; setSelectedElementId(element.id); setDrag({ id: element.id, startX: event.clientX, startY: event.clientY, originX: element.x, originY: element.y }); }} onConnectNode={connectNodes} onBeginConnection={beginConnection} />
@@ -716,7 +719,7 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
         {selectedPolicyElement && <GoalsPolicyEditor element={selectedElement} policyElement={selectedPolicyElement} effectivePolicy={selectedEffectivePolicy} runtimeProjection={runtimeProjection} workspacePolicy={workspacePolicy} policyImpact={selectedPolicyImpact} onUpdateElement={updateElement} onUpdatePolicy={updatePolicy} onUpdatePolicyDimension={updatePolicyDimension} />}
         {(selectedElement.type === 'goal' || selectedElement.type === 'subgoal' || selectedElement.type === 'artifact') && <GoalsArtifactEditor element={selectedElement} artifactOptions={artifactOptions} supportingSourceOptions={supportingSourceOptions} selectedReferences={selectedArtifactReferences} supportingArtifactType={supportingArtifactType} sourceSearch={supportingSourceSearch} customLabel={customArtifactLabel} customKind={customArtifactKind} customFormat={customArtifactFormat} customLocator={customArtifactLocator} selectClass={ARTIFACT_SELECT_CLASS} tasks={tasks} onUpdateReferences={references => { void updateArtifactReferences(references); }} onArtifactTypeChange={value => { setSupportingArtifactType(value); setSupportingSourceSearch(''); }} onSourceSearchChange={setSupportingSourceSearch} onSourceSelect={addSupportingSourceReference} onCustomLabelChange={setCustomArtifactLabel} onCustomKindChange={setCustomArtifactKind} onCustomFormatChange={setCustomArtifactFormat} onCustomLocatorChange={setCustomArtifactLocator} onAddCustomReference={addCustomArtifactReference} />}
         {selectedElement.type !== 'connector' && <GoalsConnectionsSection element={selectedElement} connections={selectedConnections} elements={activeGoal?.elements ?? []} onDeleteConnection={deleteConnection} />}
-        <GoalsRuntimeStatus element={selectedElement} connected={isGoalElementConnected(activeGoal?.elements ?? [], selectedElement.id)} />
+        <GoalsRuntimeStatus element={selectedElement} connected={isGoalElementConnected(activeGoal?.elements ?? [], selectedElement.id)} runtimeProjection={runtimeProjection} />
         <GoalsConnectorInspector element={selectedElement} elements={activeGoal?.elements ?? []} onRewire={element => { setConnectorMode(true); setRewireConnectorId(element.id); setConnectorSourceId(element.sourceId ?? null); setConnectorSourceSide(element.sourceSide ?? 'right'); setConnectorSourceBranch(element.conditionBranch); }} />
       </GoalsInspector>
     )}

@@ -502,7 +502,7 @@ test('goals.lifecycle exposes governed revision-checked and idempotent commands'
     command: 'acknowledge',
     expectedRevision: 1,
     commandId: 'ack-1',
-    payload: { contractRevision: 1 },
+    payload: { contractRevision: 0 },
   });
   assert.equal(acknowledged.structuredContent.execution.state, 'ready');
   assert.equal(acknowledged.structuredContent.execution.acknowledged, true);

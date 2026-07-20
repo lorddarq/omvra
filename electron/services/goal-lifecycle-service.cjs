@@ -393,13 +393,38 @@ function createGoalLifecycleService({
           createdAt: now(),
         };
 
+    const currentGoalRevision = goal.revision ?? goal.__mcpRevision ?? 0;
+    const refreshedContractPacket = buildContractPacket(store, goal, effectivePolicy, execution.attempt, now, { skillsRoot, userDataPath, ...payload });
+    const contractPacket = command === 'dispatch'
+      && execution.contractPacket
+      && execution.goalRevision === currentGoalRevision
+      && execution.contractPacket.contractHash === refreshedContractPacket.contractHash
+      ? execution.contractPacket
+      : refreshedContractPacket;
     const policyPayload = {
       ...payload,
       effectivePolicy,
       policyRevision: effectivePolicy.sourceRevision,
       executionAttemptId: execution.id,
-      contractPacket: buildContractPacket(store, goal, effectivePolicy, execution.attempt, now, { skillsRoot, userDataPath, ...payload }),
+      contractPacket,
     };
+    if (command === 'acknowledge') {
+      const acknowledgedRevision = normalizeRevision(policyPayload.contractRevision);
+      const acknowledgedHash = typeof policyPayload.contractHash === 'string' ? policyPayload.contractHash : '';
+      if (acknowledgedRevision === null && !acknowledgedHash) {
+        return failure('CONTRACT_REQUIRED', 'Acknowledgement requires the current contractRevision or contractHash.', {
+          contractRevision: policyPayload.contractPacket?.contractRevision,
+          contractHash: policyPayload.contractPacket?.contractHash,
+        });
+      }
+      if ((acknowledgedRevision !== null && acknowledgedRevision !== policyPayload.contractPacket?.contractRevision)
+        || (acknowledgedHash && acknowledgedHash !== policyPayload.contractPacket?.contractHash)) {
+        return failure('CONTRACT_STALE', 'The supplied contract no longer matches the current Goal contract packet.', {
+          contractRevision: policyPayload.contractPacket?.contractRevision,
+          contractHash: policyPayload.contractPacket?.contractHash,
+        });
+      }
+    }
     const controlValidation = validateControlInputs({ store, goal, execution, command, payload: policyPayload });
     if (!controlValidation.ok) return controlValidation;
     const transition = transitionExecution(execution, command, policyPayload);
@@ -409,7 +434,7 @@ function createGoalLifecycleService({
       ...execution,
       ...transition.patch,
       previousState: execution.state,
-      goalRevision: goal.revision ?? goal.__mcpRevision ?? 0,
+      goalRevision: currentGoalRevision,
       effectivePolicy,
       policyRevision: effectivePolicy.sourceRevision,
       executionAttemptId: execution.id,
@@ -687,7 +712,6 @@ function transitionExecution(execution, command, payload) {
       return { ok: true, patch: { state: 'working' }, eventPayload: {} };
     case 'acknowledge':
       if (!['ready', 'working', 'paused'].includes(state)) return failure('INVALID_TRANSITION', `Cannot acknowledge an execution in state "${state}".`);
-      if (payload.contractRevision === undefined && payload.contractRevision === null && !payload.contractHash) return failure('CONTRACT_REQUIRED', 'contractRevision or contractHash is required for acknowledgement.');
       return {
         ok: true,
         patch: {

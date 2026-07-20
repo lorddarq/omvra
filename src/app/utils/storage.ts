@@ -89,8 +89,8 @@ export async function deleteStoredValue(key: string): Promise<void> {
  * In Electron, the canonical data source is electron-store; localStorage remains
  * a portability/fallback layer for web-style and backup flows.
  */
-export function persistJSONWithElectronMirror<T = any>(key: string, value: T): void {
-  if (typeof window === 'undefined') return;
+export function persistJSONWithElectronMirror<T = any>(key: string, value: T): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve();
 
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
@@ -101,13 +101,15 @@ export function persistJSONWithElectronMirror<T = any>(key: string, value: T): v
   try {
     const storeSet = window.electron?.storeSet;
     if (typeof storeSet === 'function') {
-      void storeSet(key, value).catch(() => {
+      return storeSet(key, value).catch(() => {
         // Ignore mirror failures to keep renderer persistence non-breaking.
       });
     }
   } catch (err) {
     // ignore
   }
+
+  return Promise.resolve();
 }
 
 export function persistRawWithElectronMirror(key: string, value: string): void {

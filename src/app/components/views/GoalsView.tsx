@@ -324,6 +324,7 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
   const draggingRef = useRef(false);
   const localMutationRef = useRef(false);
   const rendererWritesPendingRef = useRef(0);
+  const scheduleWritesPendingRef = useRef(0);
   const [editNotice, setEditNotice] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const activeGoal = goals.find(goal => goal.id === selectedGoalId) ?? goals[0];
@@ -451,60 +452,87 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
     void refreshSchedules().then(() => {
       if (!cancelled) setSchedulesHydrated(true);
     });
-    const unsubscribe = window.electron?.onStoreChanged?.(() => { if (!draggingRef.current && rendererWritesPendingRef.current === 0) void refreshSchedules(); });
+    const unsubscribe = window.electron?.onStoreChanged?.(() => { if (!draggingRef.current && scheduleWritesPendingRef.current === 0) void refreshSchedules(); });
     return () => { cancelled = true; unsubscribe?.(); };
   }, []);
   useEffect(() => {
     if (!schedulesHydrated) return;
-    void setCanonicalJSON(GOAL_SCHEDULES_STORAGE_KEY, schedules);
+    const writeTimer = window.setTimeout(() => {
+      scheduleWritesPendingRef.current += 1;
+      void setCanonicalJSON(GOAL_SCHEDULES_STORAGE_KEY, schedules).finally(() => {
+        scheduleWritesPendingRef.current = Math.max(0, scheduleWritesPendingRef.current - 1);
+      });
+    }, 120);
+    return () => window.clearTimeout(writeTimer);
   }, [schedulesHydrated, schedules]);
   useEffect(() => {
     if (!canonicalHydrated || draggingRef.current) return;
-    rendererWritesPendingRef.current += 1;
-    canonicalWrite.current = canonicalWrite.current.then(async () => {
-      const forceLocalWrite = localMutationRef.current;
-      try {
-        const canonical = await getCanonicalJSON<GoalRecord[] | null>(STORAGE_KEY, null);
-        if (Array.isArray(canonical)) canonicalGoalsRef.current = canonical.filter(goal => goal.id !== GOAL_ID);
-        const localRevision = Math.max(0, ...goals.map(goalRevision));
-        const canonicalRevision = Array.isArray(canonical) ? Math.max(0, ...canonical.map(goalRevision)) : 0;
-        if (!forceLocalWrite && !draggingRef.current && canonicalRevision > localRevision && Array.isArray(canonical)) {
-          setGoals(canonical);
-          return;
-        }
-        const previous = canonicalGoalsRef.current;
-        const changed = goals.filter(goal => {
-          const prior = previous.find(item => item.id === goal.id);
-          return prior && JSON.stringify(prior) !== JSON.stringify(goal);
-        });
-        if (changed.length === 1 && previous.some(goal => goal.id === changed[0].id) && typeof window.electron?.goals?.update === 'function') {
-          const goal = changed[0];
-          const prior = previous.find(item => item.id === goal.id)!;
-          const result = await window.electron.goals.update({ goalId: goal.id, title: goal.title, elements: goal.elements, overseerAgentId: goal.overseerAgentId, expectedRevision: goalRevision(prior) });
-          if (result.ok && result.goal) {
-            canonicalGoalsRef.current = previous.map(item => item.id === goal.id ? result.goal : item);
-            if (!draggingRef.current) setGoals(current => current.map(item => item.id === goal.id ? result.goal : item));
+    const writeTimer = window.setTimeout(() => {
+      rendererWritesPendingRef.current += 1;
+      canonicalWrite.current = canonicalWrite.current.then(async () => {
+        const forceLocalWrite = localMutationRef.current;
+        try {
+          const canonical = await getCanonicalJSON<GoalRecord[] | null>(STORAGE_KEY, null);
+          if (Array.isArray(canonical)) canonicalGoalsRef.current = canonical.filter(goal => goal.id !== GOAL_ID);
+          const localRevision = Math.max(0, ...goals.map(goalRevision));
+          const canonicalRevision = Array.isArray(canonical) ? Math.max(0, ...canonical.map(goalRevision)) : 0;
+          const localChangedSinceSubmission = goalsRef.current.some(current => {
+            const submitted = goals.find(goal => goal.id === current.id);
+            return submitted && goalRevision(current) > goalRevision(submitted);
+          });
+          if (!forceLocalWrite && !draggingRef.current && !localChangedSinceSubmission && canonicalRevision > localRevision && Array.isArray(canonical)) {
+            setGoals(canonical);
             return;
           }
-          if (!forceLocalWrite && result.error === 'REVISION_MISMATCH') {
-            const fallback = await getCanonicalJSON<GoalRecord[] | null>(STORAGE_KEY, null);
-            if (Array.isArray(fallback)) {
-              canonicalGoalsRef.current = fallback;
-              if (!draggingRef.current) setGoals(fallback.filter(item => item.id !== GOAL_ID));
+          const previous = canonicalGoalsRef.current;
+          const changed = goals.filter(goal => {
+            const prior = previous.find(item => item.id === goal.id);
+            return prior && JSON.stringify(prior) !== JSON.stringify(goal);
+          });
+          if (changed.length === 1 && previous.some(goal => goal.id === changed[0].id) && typeof window.electron?.goals?.update === 'function') {
+            const goal = changed[0];
+            const prior = previous.find(item => item.id === goal.id)!;
+            const result = await window.electron.goals.update({ goalId: goal.id, title: goal.title, elements: goal.elements, overseerAgentId: goal.overseerAgentId, expectedRevision: goalRevision(prior) });
+            if (result.ok && result.goal) {
+              canonicalGoalsRef.current = previous.map(item => item.id === goal.id ? result.goal : item);
+              if (!draggingRef.current) setGoals(current => {
+                const local = current.find(item => item.id === goal.id);
+                if (!local || goalRevision(local) > goalRevision(goal)) return current;
+                return current.map(item => item.id === goal.id ? result.goal : item);
+              });
+              return;
             }
-            return;
+            if (!forceLocalWrite && result.error === 'REVISION_MISMATCH') {
+              const fallback = await getCanonicalJSON<GoalRecord[] | null>(STORAGE_KEY, null);
+              if (Array.isArray(fallback)) {
+                canonicalGoalsRef.current = fallback;
+                if (!draggingRef.current) setGoals(current => {
+                  const local = current.find(item => item.id === goal.id);
+                  if (local && goalRevision(local) > goalRevision(goal)) return current;
+                  return fallback.filter(item => item.id !== GOAL_ID);
+                });
+              }
+              return;
+            }
           }
+          const stored = await setCanonicalJSON(STORAGE_KEY, goals);
+          if (!stored) {
+            const fallback = await getCanonicalJSON<GoalRecord[] | null>(STORAGE_KEY, null);
+            if (Array.isArray(fallback) && !forceLocalWrite && !draggingRef.current) setGoals(current => {
+              if (current.some(item => {
+                const submitted = goals.find(goal => goal.id === item.id);
+                return submitted && goalRevision(item) > goalRevision(submitted);
+              })) return current;
+              return fallback;
+            });
+          }
+        } finally {
+          rendererWritesPendingRef.current = Math.max(0, rendererWritesPendingRef.current - 1);
+          if (forceLocalWrite) localMutationRef.current = false;
         }
-        const stored = await setCanonicalJSON(STORAGE_KEY, goals);
-        if (!stored) {
-          const fallback = await getCanonicalJSON<GoalRecord[] | null>(STORAGE_KEY, null);
-          if (Array.isArray(fallback) && !forceLocalWrite && !draggingRef.current) setGoals(fallback);
-        }
-      } finally {
-        rendererWritesPendingRef.current = Math.max(0, rendererWritesPendingRef.current - 1);
-        if (forceLocalWrite) localMutationRef.current = false;
-      }
-    });
+      });
+    }, 120);
+    return () => window.clearTimeout(writeTimer);
   }, [canonicalHydrated, goals]);
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
@@ -603,13 +631,18 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
   };
   const updateArtifactReferences = async (nextReferences: GoalArtifactReference[]) => {
     if (!activeGoal || !selectedElement || (selectedElement.type !== 'goal' && selectedElement.type !== 'subgoal' && selectedElement.type !== 'artifact')) return;
-    const result = await window.electron?.goals?.updateArtifacts?.({ goalId: activeGoal.id, elementId: selectedElement.id, artifactReferences: nextReferences, expectedRevision: goalRevision(activeGoal), idempotencyKey: createStableId('artifact-mutation') });
+    const submittedRevision = goalRevision(activeGoal);
+    const result = await window.electron?.goals?.updateArtifacts?.({ goalId: activeGoal.id, elementId: selectedElement.id, artifactReferences: nextReferences, expectedRevision: submittedRevision, idempotencyKey: createStableId('artifact-mutation') });
     if (!result?.ok || !result.goal) {
       setEditNotice(result?.message ?? 'Artifact links could not be updated. Refresh the Goal and try again.');
       return;
     }
     canonicalGoalsRef.current = canonicalGoalsRef.current.map(goal => goal.id === result.goal.id ? result.goal : goal);
-    setGoals(current => current.map(goal => goal.id === result.goal.id ? result.goal : goal));
+    setGoals(current => {
+      const local = current.find(goal => goal.id === result.goal.id);
+      if (!local || goalRevision(local) > submittedRevision) return current;
+      return current.map(goal => goal.id === result.goal.id ? result.goal : goal);
+    });
   };
   const addCustomArtifactReference = () => {
     if (!selectedElement || selectedElement.type !== 'artifact' || !customArtifactLabel.trim()) return;

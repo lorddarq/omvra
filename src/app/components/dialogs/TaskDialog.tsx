@@ -227,7 +227,7 @@ export function TaskDialog({
         setEndDate(todayISO);
       }
     }
-  }, [task, defaultStatus, defaultDate, defaultEndDate, defaultSwimlaneId, defaultAssigneeId, isOpen, milestones, readModel, todayISO]);
+  }, [isOpen, task?.id]);
 
   useEffect(() => {
     let isMounted = true;

@@ -74,7 +74,7 @@ export function ColumnDialog({
       setAiWatchEnabled(defaults.aiWatchEnabled);
       setAiAction(defaults.aiAction);
     }
-  }, [column, isOpen]);
+  }, [column?.id, isOpen]);
 
   const normalizedColor = normalizeHexColor(color) ?? FALLBACK_COLUMN_COLOR;
 

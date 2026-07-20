@@ -307,6 +307,14 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
   const previousGoalPolicyForImpactRef = useRef(goalPolicy);
   const goalPolicyImpactInitializedRef = useRef(false);
   const agentWatchConfigsRef = useRef(agentWatchConfigs);
+  const pendingCanonicalWritesRef = useRef<Record<string, number>>({});
+
+  const persistWorkspaceJSON = useCallback((key: string, value: unknown) => {
+    pendingCanonicalWritesRef.current[key] = (pendingCanonicalWritesRef.current[key] ?? 0) + 1;
+    void persistJSONWithElectronMirror(key, value).finally(() => {
+      pendingCanonicalWritesRef.current[key] = Math.max(0, (pendingCanonicalWritesRef.current[key] ?? 1) - 1);
+    });
+  }, []);
 
   useEffect(() => { tasksRef.current = tasks; }, [tasks]);
   useEffect(() => { timelineSwimlanesRef.current = timelineSwimlanes; }, [timelineSwimlanes]);
@@ -318,32 +326,32 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     if (!hasHydratedCanonicalWorkspace) return;
-    persistJSONWithElectronMirror(TASKS_KEY, tasks);
-  }, [hasHydratedCanonicalWorkspace, tasks]);
+    persistWorkspaceJSON(TASKS_KEY, tasks);
+  }, [hasHydratedCanonicalWorkspace, persistWorkspaceJSON, tasks]);
   useEffect(() => {
     if (!hasHydratedCanonicalWorkspace) return;
-    persistJSONWithElectronMirror(SWIMLANES_KEY, timelineSwimlanes);
-  }, [hasHydratedCanonicalWorkspace, timelineSwimlanes]);
+    persistWorkspaceJSON(SWIMLANES_KEY, timelineSwimlanes);
+  }, [hasHydratedCanonicalWorkspace, persistWorkspaceJSON, timelineSwimlanes]);
   useEffect(() => {
     if (!hasHydratedCanonicalWorkspace) return;
-    persistJSONWithElectronMirror(PEOPLE_KEY, people);
-  }, [hasHydratedCanonicalWorkspace, people]);
+    persistWorkspaceJSON(PEOPLE_KEY, people);
+  }, [hasHydratedCanonicalWorkspace, people, persistWorkspaceJSON]);
   useEffect(() => {
     if (!hasHydratedCanonicalWorkspace) return;
-    persistJSONWithElectronMirror(MILESTONES_KEY, milestones);
-  }, [hasHydratedCanonicalWorkspace, milestones]);
+    persistWorkspaceJSON(MILESTONES_KEY, milestones);
+  }, [hasHydratedCanonicalWorkspace, milestones, persistWorkspaceJSON]);
   useEffect(() => {
     if (!hasHydratedCanonicalWorkspace) return;
-    persistJSONWithElectronMirror(STATUS_COLUMNS_KEY, statusColumns);
-  }, [hasHydratedCanonicalWorkspace, statusColumns]);
+    persistWorkspaceJSON(STATUS_COLUMNS_KEY, statusColumns);
+  }, [hasHydratedCanonicalWorkspace, persistWorkspaceJSON, statusColumns]);
   useEffect(() => {
     if (!hasHydratedCanonicalWorkspace) return;
-    persistJSONWithElectronMirror(PREFERENCES_KEY, preferences);
-  }, [hasHydratedCanonicalWorkspace, preferences]);
+    persistWorkspaceJSON(PREFERENCES_KEY, preferences);
+  }, [hasHydratedCanonicalWorkspace, persistWorkspaceJSON, preferences]);
   useEffect(() => {
     if (!hasHydratedCanonicalWorkspace) return;
-    persistJSONWithElectronMirror(GOAL_POLICY_KEY, goalPolicy);
-  }, [goalPolicy, hasHydratedCanonicalWorkspace]);
+    persistWorkspaceJSON(GOAL_POLICY_KEY, goalPolicy);
+  }, [goalPolicy, hasHydratedCanonicalWorkspace, persistWorkspaceJSON]);
   useEffect(() => {
     if (!hasHydratedCanonicalWorkspace) return;
     if (!goalPolicyImpactInitializedRef.current) {
@@ -362,8 +370,8 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
   }, [goalPolicy, hasHydratedCanonicalWorkspace]);
   useEffect(() => {
     if (!hasHydratedCanonicalWorkspace) return;
-    persistJSONWithElectronMirror(MCP_AGENT_WATCH_CONFIGS_KEY, agentWatchConfigs);
-  }, [agentWatchConfigs, hasHydratedCanonicalWorkspace]);
+    persistWorkspaceJSON(MCP_AGENT_WATCH_CONFIGS_KEY, agentWatchConfigs);
+  }, [agentWatchConfigs, hasHydratedCanonicalWorkspace, persistWorkspaceJSON]);
 
   const syncCanonicalWorkspaceFromExport = useCallback((exported: Record<string, unknown>) => {
     const exportedTasks = getPortableStoreValue<Task[]>(exported, TASKS_KEY);
@@ -378,25 +386,25 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     let nextProjects = timelineSwimlanesRef.current;
     let nextStatusColumns = statusColumnsRef.current;
 
-    if (exportedProjects !== undefined) {
+    if (exportedProjects !== undefined && !pendingCanonicalWritesRef.current[SWIMLANES_KEY]) {
       nextProjects = sanitizeTimelineSwimlanes(exportedProjects, DEFAULT_SWIMLANES_SEED);
       mirrorCanonicalJsonToLocalStorage(SWIMLANES_KEY, nextProjects);
       setTimelineSwimlanes(previous => areSerializedValuesEqual(previous, nextProjects) ? previous : nextProjects);
     }
 
-    if (exportedPeople !== undefined) {
+    if (exportedPeople !== undefined && !pendingCanonicalWritesRef.current[PEOPLE_KEY]) {
       const nextPeople = sanitizePeople(exportedPeople, DEFAULT_PEOPLE_SEED);
       mirrorCanonicalJsonToLocalStorage(PEOPLE_KEY, nextPeople);
       setPeople(previous => areSerializedValuesEqual(previous, nextPeople) ? previous : nextPeople);
     }
 
-    if (exportedMilestones !== undefined) {
+    if (exportedMilestones !== undefined && !pendingCanonicalWritesRef.current[MILESTONES_KEY]) {
       const nextMilestones = sanitizeMilestones(exportedMilestones, nextProjects, DEFAULT_MILESTONES_SEED);
       mirrorCanonicalJsonToLocalStorage(MILESTONES_KEY, nextMilestones);
       setMilestones(previous => areSerializedValuesEqual(previous, nextMilestones) ? previous : nextMilestones);
     }
 
-    if (exportedStatusColumns !== undefined) {
+    if (exportedStatusColumns !== undefined && !pendingCanonicalWritesRef.current[STATUS_COLUMNS_KEY]) {
       nextStatusColumns = sanitizeStatusColumns(exportedStatusColumns, defaultSwimlanes, {
         executionLoadStatusIds: exportedPreferences?.executionLoadStatusIds,
         pipelineLoadStatusIds: exportedPreferences?.pipelineLoadStatusIds,
@@ -406,19 +414,19 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
       setStatusColumns(previous => areSerializedValuesEqual(previous, nextStatusColumns) ? previous : nextStatusColumns);
     }
 
-    if (exportedPreferences !== undefined) {
+    if (exportedPreferences !== undefined && !pendingCanonicalWritesRef.current[PREFERENCES_KEY]) {
       const nextPreferences = sanitizePreferences(exportedPreferences, nextStatusColumns, preferencesRef.current);
       mirrorCanonicalJsonToLocalStorage(PREFERENCES_KEY, nextPreferences);
       setPreferences(previous => areSerializedValuesEqual(previous, nextPreferences) ? previous : nextPreferences);
     }
 
-    if (exportedGoalPolicy !== undefined) {
+    if (exportedGoalPolicy !== undefined && !pendingCanonicalWritesRef.current[GOAL_POLICY_KEY]) {
       const repairedGoalPolicy = sanitizeGoalPolicy(exportedGoalPolicy, goalPolicyRef.current).policy;
       mirrorCanonicalJsonToLocalStorage(GOAL_POLICY_KEY, repairedGoalPolicy);
       setGoalPolicy(previous => areSerializedValuesEqual(previous, repairedGoalPolicy) ? previous : repairedGoalPolicy);
     }
 
-    if (exportedAgentWatchConfigs !== undefined) {
+    if (exportedAgentWatchConfigs !== undefined && !pendingCanonicalWritesRef.current[MCP_AGENT_WATCH_CONFIGS_KEY]) {
       const nextAgentWatchConfigs = sanitizeAgentWatchConfigs(exportedAgentWatchConfigs, []);
       mirrorCanonicalJsonToLocalStorage(MCP_AGENT_WATCH_CONFIGS_KEY, nextAgentWatchConfigs);
       setAgentWatchConfigs(previous => (
@@ -426,7 +434,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
       ));
     }
 
-    if (exportedTasks !== undefined) {
+    if (exportedTasks !== undefined && !pendingCanonicalWritesRef.current[TASKS_KEY]) {
       const nextTasks = sanitizeTasks(exportedTasks, nextProjects, DEFAULT_TASKS_SEED);
       mirrorCanonicalJsonToLocalStorage(TASKS_KEY, nextTasks);
       setTasks(previous => areSerializedValuesEqual(previous, nextTasks) ? previous : nextTasks);

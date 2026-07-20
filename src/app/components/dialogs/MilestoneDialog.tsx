@@ -82,7 +82,7 @@ export function MilestoneDialog({
     );
     setTaskSearchQuery('');
     setProjectSearchQuery('');
-  }, [defaultProjectId, milestone, projects, tasks]);
+  }, [isOpen, milestone?.id]);
 
   const projectTasks = useMemo(() => {
     if (readModel) {

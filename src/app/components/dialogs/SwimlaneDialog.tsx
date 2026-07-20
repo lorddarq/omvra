@@ -58,7 +58,7 @@ export function SwimlaneDialog({
       setColor(FALLBACK_SWIMLANE_COLOR);
       setDescription('');
     }
-  }, [swimlane, isOpen]);
+  }, [isOpen, swimlane?.id]);
 
   const normalizedColor = normalizeHexColor(color) ?? FALLBACK_SWIMLANE_COLOR;
 

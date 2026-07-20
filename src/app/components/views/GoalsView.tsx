@@ -1,155 +1,37 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
-import { CircleDot, LoaderCircle, MessageSquareText, Plus, RotateCcw, Sparkles, Target, Trash2 } from 'lucide-react';
-import type { GoalAcceptanceActor, GoalAgentConfiguration, GoalAgentMode, GoalArtifactReference, GoalBudgetMode, GoalConditionBranch, GoalConnectorSide, GoalElement, GoalElementType, GoalPolicy, GoalPolicyDimension, GoalPolicyDimensionOverride, GoalRecord, GoalRetryExhaustionPolicy, GoalSchedule, Person, ProjectMilestone, Task } from '../../types.ts';
+import type { GoalAgentConfiguration, GoalArtifactReference, GoalConditionBranch, GoalConnectorSide, GoalElement, GoalElementType, GoalPolicy, GoalPolicyDimension, GoalPolicyDimensionOverride, GoalRecord, GoalRuntimeProjection, GoalSchedule, Person, ProjectMilestone, SupportingArtifactType, Task } from '../../types.ts';
 import type { GoalPolicyV1 } from '../../utils/goalPolicy.ts';
 import { GOAL_TEMPLATES, instantiateGoalTemplate, type GoalTemplate } from '../../data/goalTemplates.ts';
 import { getCanonicalJSON, safeReadJSON, setCanonicalJSON } from '../../utils/storage.ts';
-import { isGoalElementConnected, isValidRetryTarget, wouldCreateGoalCycle } from '../../utils/goalCanvas.ts';
-import { AgentIcon as Bot } from '../icons/AgentIcon';
-import { LinkIcon as Link2 } from '../icons/LinkIcon';
-import { PuzzlePieceIcon } from '../icons/PuzzlePieceIcon';
-import { AttachmentIcon } from '../icons/AttachmentIcon';
+import { goalRevision, readGoals } from '../../utils/goalPersistence.ts';
+import { goalCanvasElementHeight, goalConnectorPath, isGoalElementConnected, isValidRetryTarget, wouldCreateGoalCycle } from '../../utils/goalCanvas.ts';
+import { createAgentElement, createGoalElement, createStableId } from '../../utils/goalElements.ts';
+import { createCustomArtifactReference, createSupportingSourceReference } from '../../utils/goalArtifacts.ts';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { GoalsCanvasControls } from '../goals/GoalsCanvasControls';
+import { GoalsCanvasEmptyState } from '../goals/GoalsCanvasEmptyState';
+import { GoalsCanvasSurface } from '../goals/GoalsCanvasSurface';
 import { GoalsCanvasNodes } from '../goals/GoalsCanvasNodes';
 import { GoalsConnectorLayer } from '../goals/GoalsConnectorLayer';
 import { DeleteGoalDialog, NewGoalDialog } from '../goals/GoalsDialogs';
 import { GoalsInspector } from '../goals/GoalsInspector';
-import { GoalsAgentSection, GoalsArtifactSection, GoalsConditionSection, GoalsConnectionsSection, GoalsControlFlowSection, GoalsDeliverableSection, GoalsRuntimeStatusSection, GoalsScheduleSection } from '../goals/GoalsInspectorSections';
-import { GoalsPolicySection } from '../goals/GoalsPolicySection';
+import { GoalsInspectorIdentity } from '../goals/GoalsInspectorIdentity';
+import { GoalsArtifactEditor } from '../goals/GoalsArtifactEditor';
+import { GoalsConnectorInspector } from '../goals/GoalsConnectorInspector';
+import { GoalsPolicyEditor } from '../goals/GoalsPolicyEditor';
+import { GoalsRuntimeStatus } from '../goals/GoalsRuntimeStatus';
+import { GoalsAgentSection, GoalsConditionSection, GoalsConnectionsSection, GoalsControlFlowSection, GoalsDeliverableSection, GoalsScheduleSection } from '../goals/GoalsInspectorSections';
 import { GoalsSidebar } from '../goals/GoalsSidebar';
 import { GoalsToolbar } from '../goals/GoalsToolbar';
 import { ARTIFACT_ITEMS, CONTROL_FLOW_ITEMS, TOOL_ITEMS } from '../goals/GoalsMetadata';
-import { ReadyIcon, StatusIcon, compactChipClass, conditionNegativeLabel, conditionPositiveLabel, isCompletionElement, readinessChipClass, readinessDescription, readinessForElement, readinessLabel, statusChipClass, statusDescription, statusLabel, statusNextStep } from '../goals/GoalsPresentation';
-import { GOAL_SCHEDULES_STORAGE_KEY, normalizeGoalSchedules, scheduleStatus } from '../../utils/goalSchedules.ts';
+import { ReadyIcon, StatusIcon, compactChipClass, conditionNegativeLabel, conditionPositiveLabel, elementIcon, getElementBody, getElementTitle, isCompletionElement, isExecutionLocked, nodeClass, readinessChipClass, readinessDescription, readinessForElement, readinessLabel, statusChipClass, statusDescription, statusLabel, statusNextStep } from '../goals/GoalsPresentation';
+import { GOAL_SCHEDULES_STORAGE_KEY, normalizeGoalSchedules } from '../../utils/goalSchedules.ts';
+import { useGoalsInspectorSelection } from '../../hooks/useGoalsInspectorSelection';
 
 const STORAGE_KEY = 'omvra.goals.v1';
 const GOAL_ID = 'goal-lights-off-factory';
-const GOAL_POLICY_DIMENSIONS: Array<{ key: GoalPolicyDimension; label: string; unit: GoalPolicyDimensionOverride['unit']; legacyMode: keyof GoalPolicy; legacyValue: keyof GoalPolicy }> = [
-  { key: 'financial', label: 'Financial cost', unit: 'USD', legacyMode: 'financialBudgetMode', legacyValue: 'maxFinancialCost' },
-  { key: 'tokens', label: 'Tokens', unit: 'tokens', legacyMode: 'tokenBudgetMode', legacyValue: 'maxTokens' },
-  { key: 'concurrency', label: 'Concurrent loops', unit: 'loops', legacyMode: 'concurrencyBudgetMode', legacyValue: 'maxConcurrentLoops' },
-  { key: 'attempts', label: 'Total loop attempts', unit: 'attempts', legacyMode: 'loopAttemptsBudgetMode', legacyValue: 'maxLoopAttempts' },
-  { key: 'retries', label: 'Retries / rework', unit: 'retries', legacyMode: 'retryBudgetMode', legacyValue: 'maxRetries' },
-];
-const GOAL_POLICY_SAFE_VALUES: Record<GoalPolicyDimension, number> = { financial: 10, tokens: 100000, concurrency: 1, attempts: 10, retries: 2 };
-const EXECUTION_LOCKED_STATUSES = new Set(['working', 'blocked', 'evidence-required', 'approval-required', 'complete', 'permission-denied']);
 const ARTIFACT_SELECT_CLASS = 'h-9 rounded-xl border-[#e5e7eb] bg-white px-3 text-sm font-medium text-[#71717a] shadow-[0_1px_2px_rgba(0,0,0,0.04)] focus-visible:ring-gray-200';
-type GoalRuntimeProjection = { execution?: { state?: string; revision?: number; attempt?: number; policyRevision?: number; executionAttemptId?: string; reconciliationRequired?: boolean } | null; handoffs?: Array<{ id: string; deliverableId?: string; producedArtifactReferences?: Array<{ label?: string; locator?: string; format?: string }>; deliveryFacts?: Record<string, unknown>; deliveredAt?: string }>; effectivePolicy?: GoalPolicyV1 | null; policyRevision?: number; executionAttempt?: number | null; executionAttemptId?: string | null; agentAvailability?: Array<{ elementId: string; available: boolean; errorCode?: string | null }>; policyImpacts?: Array<{ goalId?: string; status?: string; requiresUserConfirmation?: boolean }>; lastChange?: { scope?: string; errorCode?: string; changeType?: string } | null };
-type SupportingArtifactType = 'document' | 'file' | 'url' | 'user-defined';
-
-function isExecutionLocked(element: GoalElement | undefined): boolean {
-  return Boolean(element?.status && EXECUTION_LOCKED_STATUSES.has(element.status));
-}
-
-function goalRevision(goal: GoalRecord): number {
-  const revision = Number((goal as GoalRecord & { revision?: number; __mcpRevision?: number }).revision ?? (goal as GoalRecord & { __mcpRevision?: number }).__mcpRevision ?? 0);
-  return Number.isFinite(revision) ? Math.max(0, Math.floor(revision)) : 0;
-}
-
-function inspectorDefaultDimension(dimension: GoalPolicyDimension): { constrained: true; mode: Exclude<GoalBudgetMode, 'unbounded'>; value: number; unit: GoalPolicyDimensionOverride['unit'] } {
-  const metadata = GOAL_POLICY_DIMENSIONS.find(item => item.key === dimension)!;
-  return { constrained: true, mode: 'hard-cap', value: GOAL_POLICY_SAFE_VALUES[dimension], unit: metadata.unit };
-}
-
-function legacyDimensionOverride(policy: GoalPolicy | undefined, dimension: GoalPolicyDimension): GoalPolicyDimensionOverride | undefined {
-  if (!policy) return undefined;
-  const metadata = GOAL_POLICY_DIMENSIONS.find(item => item.key === dimension)!;
-  const mode = policy[metadata.legacyMode];
-  const value = policy[metadata.legacyValue];
-  if (mode === 'unbounded') return { constrained: false };
-  if (typeof mode === 'string' && typeof value === 'number' && value > 0) {
-    return { constrained: true, mode: mode as Exclude<GoalBudgetMode, 'unbounded'>, value, unit: metadata.unit };
-  }
-  return undefined;
-}
-
-function resolveInspectorPolicy(workspacePolicy: GoalPolicyV1 | undefined, goal: GoalRecord, target: GoalElement) {
-  const dimensions = { ...(workspacePolicy?.dimensions ?? {}) } as GoalPolicyV1['dimensions'];
-  const effective = {
-    dimensions: GOAL_POLICY_DIMENSIONS.reduce((result, dimension) => {
-      result[dimension.key] = dimensions[dimension.key] ?? inspectorDefaultDimension(dimension.key);
-      return result;
-    }, {} as GoalPolicyV1['dimensions']),
-    acceptance: workspacePolicy?.acceptance ?? { actor: 'human' as const },
-  };
-  const applyScope = (policy: GoalPolicy | undefined) => {
-    for (const dimension of GOAL_POLICY_DIMENSIONS) {
-      const override = policy?.dimensions?.[dimension.key] ?? legacyDimensionOverride(policy, dimension.key);
-      const current = effective.dimensions[dimension.key];
-      if (!override || override.constrained === false) continue;
-      if (!current.constrained || (override.value !== undefined && override.value <= current.value && override.unit === current.unit)) {
-        effective.dimensions[dimension.key] = { ...current, ...override, constrained: true, unit: dimension.unit } as typeof current;
-      }
-    }
-    const actor = policy?.acceptanceActor;
-    const rank = { agentic: 1, human: 2, both: 3 } as const;
-    if (actor && rank[actor] > rank[effective.acceptance.actor]) effective.acceptance = { actor };
-  };
-  applyScope(goal.policy);
-  const incoming = new Map<string, string[]>();
-  goal.elements.filter(element => element.type === 'connector' && element.sourceId && element.targetId).forEach(connection => {
-    const parents = incoming.get(connection.targetId!) ?? [];
-    parents.push(connection.sourceId!);
-    incoming.set(connection.targetId!, parents);
-  });
-  const visited = new Set<string>([target.id]);
-  const pending = [...(incoming.get(target.id) ?? [])];
-  const ancestors: GoalElement[] = [];
-  while (pending.length) {
-    const id = pending.shift()!;
-    if (visited.has(id)) continue;
-    visited.add(id);
-    const ancestor = goal.elements.find(element => element.id === id);
-    if (ancestor) {
-      if (ancestor.type === 'subgoal') ancestors.unshift(ancestor);
-      pending.push(...(incoming.get(id) ?? []));
-    }
-  }
-  ancestors.forEach(ancestor => applyScope(ancestor.policy));
-  applyScope(target.policy);
-  return effective;
-}
-
-function createStableId(prefix: string): string {
-  const uuid = typeof globalThis.crypto?.randomUUID === 'function'
-    ? globalThis.crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  return `${prefix}_${uuid}`;
-}
-
-
-function readGoals(): GoalRecord[] {
-  const stored = safeReadJSON<GoalRecord[]>(STORAGE_KEY, []);
-  if (!Array.isArray(stored)) return [];
-  return stored.filter(goal => goal.id !== GOAL_ID);
-}
-
-function nodeClass(type: GoalElementType, connected = true): string {
-  if (!connected && type === 'instructions') return 'border-slate-200 bg-slate-100 text-slate-500';
-  if (type === 'goal') return 'border-slate-900 bg-slate-900 text-white';
-  if (type === 'subgoal') return 'border-blue-200 bg-white text-slate-900';
-  if (type === 'agent') return 'border-amber-200 bg-amber-50 text-slate-900';
-  if (type === 'condition') return 'border-violet-200 bg-violet-50 text-slate-900';
-  if (type === 'approval-gate') return 'border-orange-200 bg-orange-50 text-slate-900';
-  if (type === 'human-input') return 'border-sky-200 bg-sky-50 text-slate-900';
-  if (type === 'retry') return 'border-cyan-200 bg-cyan-50 text-slate-900';
-  if (type === 'deliverable') return 'border-emerald-200 bg-emerald-50 text-slate-900';
-  if (type === 'artifact') return 'border-sky-200 bg-sky-50 text-slate-900';
-  return 'border-slate-200 bg-white text-slate-700';
-}
-
-
-function elementIcon(type: GoalElementType) {
-  if (type === 'agent') return <Bot className="size-3.5" />;
-  if (type === 'goal') return <Sparkles className="size-3.5" />;
-  if (type === 'human-input') return <MessageSquareText className="size-3.5" />;
-  if (type === 'retry') return <RotateCcw className="size-3.5" />;
-  if (type === 'deliverable') return <PuzzlePieceIcon className="size-3.5" />;
-  if (type === 'artifact') return <AttachmentIcon className="size-3.5" />;
-  return <Target className="size-3.5" />;
-}
 
 export function GoalsView({ people = [], tasks = [], milestones = [], workspacePolicy, goalAuditArchiveDirectory = '', onGoalAuditArchiveDirectoryChange }: { people?: Person[]; tasks?: Task[]; milestones?: ProjectMilestone[]; workspacePolicy?: GoalPolicyV1; goalAuditArchiveDirectory?: string; onGoalAuditArchiveDirectoryChange?: (directory: string) => void }) {
   const [goals, setGoals] = useState<GoalRecord[]>(readGoals);
@@ -201,36 +83,12 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
   const scheduleWritesPendingRef = useRef(0);
   const [editNotice, setEditNotice] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
-  const activeGoal = goals.find(goal => goal.id === selectedGoalId) ?? goals[0];
-  const activeSchedule = activeGoal ? schedules.find(schedule => schedule.goalId === activeGoal.id) : undefined;
-  const selectedElement = activeGoal?.elements.find(element => element.id === selectedElementId) ?? activeGoal?.elements[0];
-  const selectedAgent = selectedElement?.type === 'agent' ? people.find(person => person.id === selectedElement.assigneeId) : undefined;
-  const selectedAgentMissing = selectedElement?.type === 'agent' && selectedElement.agentConfiguration?.mode === 'existing' && (!selectedElement.agentConfiguration.assigneeId || !selectedAgent);
-  const selectedAgentConfiguration = selectedElement?.type === 'agent' ? selectedElement.agentConfiguration : undefined;
-  const selectedAgentMode: GoalAgentMode | undefined = selectedElement?.type === 'agent'
-    ? selectedAgentConfiguration?.mode ?? (selectedElement.assigneeId ? 'existing' : 'ephemeral')
-    : undefined;
-  const selectedRetryTarget = selectedElement?.type === 'retry'
-    ? activeGoal?.elements.find(element => element.type === 'connector' && element.sourceId === selectedElement.id)?.targetId
-    : undefined;
-  const selectedPolicyElement = selectedElement?.type === 'goal' || selectedElement?.type === 'subgoal' || selectedElement?.type === 'approval-gate' ? selectedElement : undefined;
+  const {
+    activeGoal, activeSchedule, selectedElement, selectedAgent, selectedAgentMissing, selectedAgentConfiguration, selectedAgentMode,
+    selectedRetryTarget, selectedPolicyElement, selectedEffectivePolicy, selectedPolicyImpact, selectedArtifactReferences,
+    artifactOptions, supportingSourceOptions, connections, selectedConnections,
+  } = useGoalsInspectorSelection({ goals, selectedGoalId, selectedElementId, schedules, people, tasks, milestones, workspacePolicy, runtimeProjection, policyImpacts, supportingArtifactType, supportingSourceSearch });
   const selectedElementLocked = isExecutionLocked(selectedElement);
-  const selectedEffectivePolicy = activeGoal && selectedPolicyElement
-    ? (runtimeProjection?.effectivePolicy ?? resolveInspectorPolicy(workspacePolicy, activeGoal, selectedPolicyElement))
-    : undefined;
-  const selectedPolicyImpact = (runtimeProjection?.policyImpacts ?? policyImpacts).find(impact => impact.goalId === activeGoal?.id && impact.status === 'pending');
-  const selectedArtifactReferences = selectedElement?.type === 'goal' || selectedElement?.type === 'subgoal' || selectedElement?.type === 'artifact' ? (selectedElement.artifactReferences ?? []) : [];
-  const artifactOptions = [
-    ...tasks.map(task => ({ value: `task:${task.id}`, label: `Task · ${task.title}`, searchText: task.title, artifactType: 'task' as const, artifactId: task.id })),
-    ...milestones.map(milestone => ({ value: `milestone:${milestone.id}`, label: `Milestone · ${milestone.title}`, searchText: milestone.title, artifactType: 'milestone' as const, artifactId: milestone.id })),
-    ...goals.filter(goal => goal.id !== activeGoal?.id).map(goal => ({ value: `goal:${goal.id}`, label: `Goal · ${goal.title}`, searchText: goal.title, artifactType: 'goal' as const, artifactId: goal.id })),
-  ];
-  const supportingSourceOptions = tasks.flatMap(task => (task.attachments ?? []).map(attachment => {
-    const extension = attachment.name.split('.').pop()?.toLowerCase() ?? '';
-    const documentExtensions = new Set(['md', 'markdown', 'txt', 'pdf', 'doc', 'docx', 'rtf', 'odt']);
-    const artifactType: SupportingArtifactType = documentExtensions.has(extension) ? 'document' : 'file';
-    return { value: `attachment:${task.id}:${attachment.id}`, label: `${artifactType === 'document' ? 'Document' : 'File'} · ${attachment.name}`, searchText: `${attachment.name} ${task.title}`, artifactType, artifactId: attachment.id, taskId: task.id, attachment };
-  })).filter(option => option.artifactType === supportingArtifactType && option.searchText.toLocaleLowerCase().includes(supportingSourceSearch.trim().toLocaleLowerCase()));
 
   useEffect(() => {
     if (goals.length === 0) {
@@ -283,13 +141,6 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
     });
     return () => { cancelled = true; };
   }, [activeGoal?.id]);
-
-  const getAgentForElement = (element: GoalElement) => element.type === 'agent'
-    ? people.find(person => person.id === element.assigneeId)
-    : undefined;
-
-  const getElementTitle = (element: GoalElement) => getAgentForElement(element)?.name ?? element.title;
-  const getElementBody = (element: GoalElement) => getAgentForElement(element)?.role ?? element.body;
 
   useEffect(() => {
     let cancelled = false;
@@ -426,10 +277,11 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
         return;
       }
       if (event.code !== 'Space') return;
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      if (target?.closest('input, textarea, select, button, [role="button"], [contenteditable="true"]')) return;
       spaceHeldRef.current = true;
       setSpacePressed(true);
-      const target = event.target instanceof HTMLElement ? event.target : null;
-      if (!target?.closest('input, textarea, select, [contenteditable="true"]')) event.preventDefault();
+      event.preventDefault();
     };
     const up = (event: KeyboardEvent) => {
       if (event.code !== 'Space') return;
@@ -443,9 +295,17 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
     };
     const visibility = () => { if (document.hidden) resetSpace(); };
     const closeMenus = (event: PointerEvent) => {
-      if (!agentMenuRef.current?.contains(event.target as Node)) setAgentMenuOpen(false);
-      if (!controlFlowMenuRef.current?.contains(event.target as Node)) setControlFlowMenuOpen(false);
-      if (!artifactMenuRef.current?.contains(event.target as Node)) setArtifactMenuOpen(false);
+      const target = event.target;
+      const nodeTarget = target && typeof target === 'object' && 'nodeType' in target ? target as Node : null;
+      if (!nodeTarget) {
+        setAgentMenuOpen(false);
+        setControlFlowMenuOpen(false);
+        setArtifactMenuOpen(false);
+        return;
+      }
+      if (!agentMenuRef.current?.contains(nodeTarget)) setAgentMenuOpen(false);
+      if (!controlFlowMenuRef.current?.contains(nodeTarget)) setControlFlowMenuOpen(false);
+      if (!artifactMenuRef.current?.contains(nodeTarget)) setArtifactMenuOpen(false);
     };
     window.addEventListener('keydown', down, true);
     window.addEventListener('keyup', up, true);
@@ -520,18 +380,7 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
   };
   const addCustomArtifactReference = () => {
     if (!selectedElement || selectedElement.type !== 'artifact' || !customArtifactLabel.trim()) return;
-    void updateArtifactReferences([...selectedArtifactReferences, {
-      id: createStableId('artifact-link'),
-      artifactType: customArtifactKind === 'url' ? 'url' : customArtifactKind === 'file' ? 'file' : customArtifactKind === 'document' ? 'document' : 'user-defined',
-      artifactId: createStableId('artifact'),
-      contribution: 'supporting',
-      label: customArtifactLabel.trim(),
-      kind: customArtifactKind,
-      format: customArtifactFormat.trim() || undefined,
-      locator: customArtifactLocator.trim() || undefined,
-      linkedBy: 'renderer',
-      linkedAt: new Date().toISOString(),
-    }]);
+    void updateArtifactReferences([...selectedArtifactReferences, createCustomArtifactReference(customArtifactLabel, customArtifactKind, customArtifactFormat, customArtifactLocator)]);
     setCustomArtifactLabel('');
     setCustomArtifactFormat('');
     setCustomArtifactLocator('');
@@ -540,12 +389,7 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
     if (!selectedElement || selectedElement.type !== 'artifact') return;
     const option = supportingSourceOptions.find(item => item.value === value);
     if (!option || selectedArtifactReferences.some(reference => reference.sourceAttachmentId === option.attachment.id && reference.sourceTaskId === option.taskId)) return;
-    void updateArtifactReferences([...selectedArtifactReferences, {
-      id: createStableId('artifact-link'), artifactType: option.artifactType, artifactId: option.attachment.id,
-      contribution: 'supporting', label: option.attachment.name, kind: option.artifactType,
-      format: option.attachment.name.split('.').pop()?.toUpperCase() || undefined, locator: option.attachment.uri || option.attachment.path,
-      sourceTaskId: option.taskId, sourceAttachmentId: option.attachment.id, linkedBy: 'renderer', linkedAt: new Date().toISOString(),
-    }]);
+    void updateArtifactReferences([...selectedArtifactReferences, createSupportingSourceReference(option)]);
   };
   const updateAgentConfiguration = (updates: Partial<GoalAgentConfiguration>) => {
     if (selectedElement?.type !== 'agent') return;
@@ -603,17 +447,7 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
   };
   const addElement = (type: GoalElementType) => {
     if (!activeGoal) return;
-    const id = createStableId(type === 'connector' ? 'connector' : 'element');
-    const title = type === 'subgoal' ? 'New subgoal' : type === 'condition' ? 'New condition' : type === 'approval-gate' ? 'Approval gate' : type === 'human-input' ? 'Ask the user' : type === 'retry' ? 'Retry an earlier step' : type === 'deliverable' ? 'New deliverable' : type === 'artifact' ? 'Supporting artifact' : `New ${type}`;
-    const body = type === 'condition' ? 'Define the condition to evaluate' : type === 'approval-gate' ? 'Define who must approve and what evidence is required' : type === 'human-input' ? 'Pause for overseer-mediated user input' : type === 'retry' ? 'Return to an earlier completed workflow step' : type === 'deliverable' ? 'Define the expected outcome and delivery handoff' : type === 'artifact' ? 'Declare an execution input or supporting file' : 'Describe the outcome and handoff';
-    const element: GoalElement = {
-      id, type, title, body, x: 260 + (activeGoal.elements.length % 3) * 260, y: 560,
-      width: 220, height: type === 'human-input' ? 120 : 90, status: 'draft',
-      ...(type === 'human-input' ? { humanInputPrompt: 'What input is needed to continue?' } : {}),
-      ...(type === 'retry' ? { retryMaxAttempts: 3, retryExhaustionPolicy: 'human-review' } : {}),
-      ...(type === 'deliverable' ? { deliverableStatus: 'planned', deliverySpec: { outcomeKind: 'other' as const, instructions: '', acceptanceCriteria: [] } } : {}),
-      ...(type === 'artifact' ? { artifactRole: 'supporting' as const, artifactReferences: [] } : {}),
-    };
+    const element = createGoalElement(type, activeGoal.elements.length);
     setGoals(current => current.map(goal => goal.id === selectedGoalId ? { ...goal, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString(), elements: [...goal.elements, element] } : goal));
     setSelectedElementId(id);
   };
@@ -671,14 +505,6 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
     setSelectedElementId(goal.elements.find(element => element.type === 'goal')?.id ?? goal.elements[0]?.id ?? '');
   };
 
-  const connections = activeGoal?.elements.filter(element => element.type === 'connector') ?? [];
-  const selectedConnections = selectedElement?.type !== 'connector'
-    ? connections.filter(connection => connection.sourceId === selectedElement?.id || connection.targetId === selectedElement?.id)
-    : [];
-
-  const canvasElementHeight = (element: GoalElement) => canvasElementHeights[element.id]
-    ?? (element.type === 'condition' ? Math.max(element.height ?? 90, 150) : element.type === 'human-input' ? Math.max(element.height ?? 90, 120) : element.height ?? 90);
-
   const moveCanvasSelection = (elementId: string, forward: boolean) => {
     const items = activeGoal?.elements ?? [];
     const index = items.findIndex(element => element.id === elementId);
@@ -692,8 +518,7 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
 
   const addAgent = (person: Person) => {
     if (!activeGoal) return;
-    const id = createStableId('element');
-    const element: GoalElement = { id, type: 'agent', title: person.name, body: person.role, assigneeId: person.id, agentConfiguration: { version: 1, mode: 'existing', assigneeId: person.id, instructions: '' }, x: 260 + (activeGoal.elements.length % 3) * 260, y: 560, width: 220, height: 90, status: 'draft' };
+    const element = createAgentElement(person, activeGoal.elements.length);
     setGoals(current => current.map(goal => goal.id === selectedGoalId ? { ...goal, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString(), elements: [...goal.elements, element] } : goal));
     setSelectedElementId(id);
     setAgentMenuOpen(false);
@@ -751,37 +576,6 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
     setConnectorSourceBranch(undefined);
     setRewireConnectorId(null);
     setConnectorError(null);
-  };
-
-  const nodePoint = (element: GoalElement, side: GoalConnectorSide, branch?: GoalConditionBranch) => {
-    const width = element.width ?? 220;
-    const height = canvasElementHeight(element);
-    if (side === 'top') return { x: element.x + width / 2, y: element.y };
-    if (side === 'bottom') return { x: element.x + width / 2, y: element.y + height };
-    if (side === 'left') return { x: element.x, y: element.y + height / 2 };
-    if (element.type === 'condition' && branch) return { x: element.x + width, y: element.y + height * (branch === 'positive' ? 0.32 : 0.68) };
-    return { x: element.x + width, y: element.y + height / 2 };
-  };
-
-  const controlPoint = (point: { x: number; y: number }, side: GoalConnectorSide, distance: number) => {
-    if (side === 'top') return { x: point.x, y: point.y - distance };
-    if (side === 'bottom') return { x: point.x, y: point.y + distance };
-    if (side === 'left') return { x: point.x - distance, y: point.y };
-    return { x: point.x + distance, y: point.y };
-  };
-
-  const connectorPath = (connection: GoalElement) => {
-    const source = activeGoal?.elements.find(element => element.id === connection.sourceId);
-    const target = activeGoal?.elements.find(element => element.id === connection.targetId);
-    if (!source || !target) return null;
-    const sourceSide = connection.sourceSide ?? 'right';
-    const targetSide = connection.targetSide ?? 'left';
-    const start = nodePoint(source, sourceSide, connection.conditionBranch);
-    const end = nodePoint(target, targetSide);
-    const bend = Math.max(48, Math.max(Math.abs(end.x - start.x), Math.abs(end.y - start.y)) * 0.35);
-    const first = controlPoint(start, sourceSide, bend);
-    const second = controlPoint(end, targetSide, bend);
-    return `M ${start.x} ${start.y} C ${first.x} ${first.y}, ${second.x} ${second.y}, ${end.x} ${end.y}`;
   };
 
   const beginConnection = (elementId: string, side: GoalConnectorSide, branch?: GoalConditionBranch) => {
@@ -865,64 +659,16 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
       onToggleArtifactMenu={() => setArtifactMenuOpen(value => !value)}
       onStartConnector={() => { setConnectorMode(true); setConnectorSourceId(null); setConnectorSourceBranch(undefined); }}
     />
-    <div ref={canvasRef} tabIndex={0} role="application" aria-label="Goal canvas. Hold space and drag to pan." className={`h-full w-full outline-none ${spacePressed || panMode ? 'cursor-grab' : 'cursor-default'}`} onPointerDown={beginCanvasPan} onPointerMove={moveCanvasPan} onPointerUp={endCanvasPan} onPointerCancel={endCanvasPan} onLostPointerCapture={event => { if (panSessionRef.current?.pointerId === event.pointerId) panSessionRef.current = null; }}>
-      <div className="goals-canvas-grid absolute inset-0" aria-hidden="true" />
-      {!activeGoal && <div className="absolute inset-0 flex items-center justify-center p-6" role="status" aria-live="polite"><div className="max-w-sm rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm"><div className="mx-auto flex size-10 items-center justify-center rounded-full bg-blue-50 text-blue-600"><Sparkles className="size-5" /></div><h2 className="mt-3 text-sm font-semibold text-slate-900">Start with a Goal</h2><p className="mt-1 text-xs leading-5 text-slate-500">Create a Goal to shape its subgoals, agents, instructions, and approval gates on the canvas.</p><button type="button" onClick={openNewGoalDialog} className="mt-4 inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700"><Plus className="size-3.5" /> New goal</button></div></div>}
-      <div className="absolute left-1/2 top-1/2" style={{ transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px)) scale(${zoom})`, transformOrigin: 'center' }}>
-        <GoalsConnectorLayer connections={connections} elements={activeGoal?.elements ?? []} selectedElementId={selectedElement?.id} connectorPath={connectorPath} onSelectConnector={connectionId => { setSelectedElementId(connectionId); setConnectorMode(false); setConnectorSourceId(null); setConnectorSourceBranch(undefined); }} onMoveSelection={moveCanvasSelection} />
+    <GoalsCanvasSurface canvasRef={canvasRef} spacePressed={spacePressed} panMode={panMode} pan={pan} zoom={zoom} emptyState={!activeGoal ? <GoalsCanvasEmptyState onNewGoal={openNewGoalDialog} /> : undefined} onPointerDown={beginCanvasPan} onPointerMove={moveCanvasPan} onPointerUp={endCanvasPan} onPointerCancel={endCanvasPan} onLostPointerCapture={event => { if (panSessionRef.current?.pointerId === event.pointerId) panSessionRef.current = null; }}>
+        <GoalsConnectorLayer connections={connections} elements={activeGoal?.elements ?? []} selectedElementId={selectedElement?.id} connectorPath={connection => goalConnectorPath(activeGoal?.elements ?? [], connection, canvasElementHeights)} onSelectConnector={connectionId => { setSelectedElementId(connectionId); setConnectorMode(false); setConnectorSourceId(null); setConnectorSourceBranch(undefined); }} onMoveSelection={moveCanvasSelection} />
         {connectorError && <div role="alert" className="absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 shadow-sm">{connectorError}</div>}
-        <GoalsCanvasNodes elements={activeGoal?.elements ?? []} selectedElementId={selectedElement?.id} connectorMode={connectorMode} connectorSourceId={connectorSourceId} connectorSourceSide={connectorSourceSide} connectorSourceBranch={connectorSourceBranch} panMode={panMode} spaceHeld={spaceHeldRef.current} canvasElementHeight={canvasElementHeight} getElementTitle={getElementTitle} getElementBody={getElementBody} isConnected={elementId => isGoalElementConnected(activeGoal?.elements ?? [], elementId)} isExecutionLocked={isExecutionLocked} nodeClass={nodeClass} elementIcon={elementIcon} conditionPositiveLabel={conditionPositiveLabel} conditionNegativeLabel={conditionNegativeLabel} readinessForElement={readinessForElement} readinessLabel={readinessLabel} readinessChipClass={readinessChipClass} isCompletionElement={isCompletionElement} compactChipClass={compactChipClass} statusChipClass={statusChipClass} statusLabel={statusLabel} StatusIcon={StatusIcon} onSelectElement={setSelectedElementId} onNodeClick={element => { if (connectorMode) { if (connectorSourceId) connectNodes(element.id); else beginConnection(element.id, 'right'); } else setSelectedElementId(element.id); }} onMoveSelection={moveCanvasSelection} onStartDrag={(element, event) => { if (spaceHeldRef.current || panMode || connectorMode || isExecutionLocked(element)) return; setSelectedElementId(element.id); setDrag({ id: element.id, startX: event.clientX, startY: event.clientY, originX: element.x, originY: element.y }); }} onConnectNode={connectNodes} onBeginConnection={beginConnection} />
-      </div>
-    </div>
+        <GoalsCanvasNodes elements={activeGoal?.elements ?? []} selectedElementId={selectedElement?.id} connectorMode={connectorMode} connectorSourceId={connectorSourceId} connectorSourceSide={connectorSourceSide} connectorSourceBranch={connectorSourceBranch} panMode={panMode} spaceHeld={spaceHeldRef.current} canvasElementHeight={element => goalCanvasElementHeight(element, canvasElementHeights)} getElementTitle={element => getElementTitle(element, people)} getElementBody={element => getElementBody(element, people)} isConnected={elementId => isGoalElementConnected(activeGoal?.elements ?? [], elementId)} isExecutionLocked={isExecutionLocked} nodeClass={nodeClass} elementIcon={elementIcon} conditionPositiveLabel={conditionPositiveLabel} conditionNegativeLabel={conditionNegativeLabel} readinessForElement={readinessForElement} readinessLabel={readinessLabel} readinessChipClass={readinessChipClass} isCompletionElement={isCompletionElement} compactChipClass={compactChipClass} statusChipClass={statusChipClass} statusLabel={statusLabel} StatusIcon={StatusIcon} onSelectElement={setSelectedElementId} onNodeClick={element => { if (connectorMode) { if (connectorSourceId) connectNodes(element.id); else beginConnection(element.id, 'right'); } else setSelectedElementId(element.id); }} onMoveSelection={moveCanvasSelection} onStartDrag={(element, event) => { if (spaceHeldRef.current || panMode || connectorMode || isExecutionLocked(element)) return; setSelectedElementId(element.id); setDrag({ id: element.id, startX: event.clientX, startY: event.clientY, originX: element.x, originY: element.y }); }} onConnectNode={connectNodes} onBeginConnection={beginConnection} />
+    </GoalsCanvasSurface>
     {editNotice && <div role="status" className="absolute bottom-16 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 shadow-sm"><LockKeyhole className="size-3.5 shrink-0" />{editNotice}<button type="button" className="ml-1 font-semibold text-amber-900" onClick={() => setEditNotice(null)}>Dismiss</button></div>}
 
     {selectedElement && (
       <GoalsInspector selectedElement={selectedElement} selectedElementLocked={selectedElementLocked} onDelete={deleteElement}>
-        <label className="mt-5 block text-xs font-medium text-slate-600">
-          {selectedElement.type === 'agent' ? 'Name' : 'Title'}
-          <Input
-            value={selectedElement.type === 'agent' ? selectedAgent?.name ?? (selectedAgentConfiguration?.autoGenerateName ? '' : selectedAgentConfiguration?.requestedName ?? selectedElement.title) : selectedElement.title}
-            placeholder={selectedElement.type === 'agent' && selectedAgentConfiguration?.autoGenerateName ? 'Generated at spawn' : undefined}
-            readOnly={selectedElement.type === 'agent' && (selectedAgentMode === 'existing' || selectedAgentConfiguration?.autoGenerateName === true)}
-            onChange={selectedElement.type === 'agent' ? event => updateAgentName(event.target.value) : event => updateElement({ title: event.target.value })}
-            className="mt-1"
-          />
-          {selectedElement.type === 'agent' && selectedAgentMode === 'ephemeral' && <span className="mt-1 block text-[11px] font-normal text-slate-400">{selectedAgentConfiguration?.autoGenerateName ? 'The overseer will generate a name when this agent is spawned.' : 'Required task-focused name.'}</span>}
-          {selectedAgentMissing && <span role="alert" className="mt-2 flex items-start gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] font-normal text-amber-800"><AlertTriangle className="mt-0.5 size-3.5 shrink-0" />Assign a canonical agent before this node can be started or dispatched.</span>}
-        </label>
-        {selectedElement.type === 'goal' && (
-          <>
-            <label className="mt-4 block text-xs font-medium text-slate-600">
-              Color
-              <input
-                type="color"
-                value={activeGoal?.color ?? '#2563eb'}
-                onChange={event => updateGoal({ color: event.target.value })}
-                aria-label="Goal color"
-                className="mt-1 h-9 w-full cursor-pointer rounded-md border border-slate-200 bg-white p-1"
-              />
-            </label>
-            <label className="mt-4 block text-xs font-medium text-slate-600">
-              Overseer agent
-              <Select value={activeGoal?.overseerAgentId ?? '__none__'} onValueChange={value => updateGoal({ overseerAgentId: value === '__none__' ? undefined : value })}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select an agent" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Select an agent</SelectItem>
-                  {people.filter(person => person.kind === 'agentic').map(person => (
-                    <SelectItem key={person.id} value={person.id}>{person.name} · {person.role}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span className="mt-1 block text-[11px] font-normal text-slate-400">This agent derives subgoal status toward the goal.</span>
-            </label>
-          </>
-        )}
-        {selectedElement.type !== 'agent' && <label className="mt-4 flex flex-wrap items-center gap-x-1 gap-y-1 text-xs font-medium text-slate-600">
-          Notes
-          <textarea value={selectedElement.body ?? ''} onChange={event => updateElement({ body: event.target.value })} rows={4} className="mt-1 w-full resize-none rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
-        </label>}
+        <GoalsInspectorIdentity element={selectedElement} activeGoal={activeGoal} people={people} selectedAgent={selectedAgent} selectedAgentMissing={Boolean(selectedAgentMissing)} selectedAgentConfiguration={selectedAgentConfiguration} selectedAgentMode={selectedAgentMode} onUpdateElement={updateElement} onUpdateGoal={updateGoal} onUpdateAgentName={updateAgentName} />
         <GoalsAgentSection element={selectedElement} people={people} selectedAgent={selectedAgent} selectedAgentMissing={Boolean(selectedAgentMissing)} selectedAgentConfiguration={selectedAgentConfiguration} selectedAgentMode={selectedAgentMode} onUpdateConfiguration={updateAgentConfiguration} />
         <GoalsControlFlowSection element={selectedElement} retryTargetTitle={selectedRetryTarget ? activeGoal?.elements.find(element => element.id === selectedRetryTarget)?.title ?? 'Missing node' : undefined} onUpdateElement={updateElement} />
         {selectedElement.type === 'deliverable' && (
@@ -967,194 +713,11 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
           </section>
         )}
         {selectedElement.type === 'goal' && <GoalsScheduleSection schedule={activeSchedule} onCreate={createSchedule} onUpdate={updateSchedule} onDelete={deleteSchedule} />}
-        {selectedPolicyElement && (
-          <GoalsPolicySection>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Policy</p>
-            <p className="mt-1 text-[11px] text-slate-400">Typed controls become part of the execution contract.</p>
-            {runtimeProjection?.execution && <p className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-600">Runtime: <span className="font-medium text-slate-800">{runtimeProjection.execution.state ?? 'unknown'}</span> · execution revision {runtimeProjection.execution.revision ?? 0} · policy revision {runtimeProjection.policyRevision ?? 0}</p>}
-            {runtimeProjection?.lastChange?.errorCode && <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-2.5 py-2 text-[11px] text-red-800">Conflict: <span className="font-semibold">{runtimeProjection.lastChange.errorCode}</span>. The rejected change remains inspectable and canonical state was preserved.</p>}
-            {runtimeProjection?.execution?.reconciliationRequired && <p className="mt-2 rounded-md border border-orange-200 bg-orange-50 px-2.5 py-2 text-[11px] text-orange-800">Reconciliation required before execution can continue.</p>}
-            {runtimeProjection?.execution?.state === 'approval-required' && <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800">Approval required before this execution can proceed.</p>}
-            {runtimeProjection?.execution?.state === 'blocked' && <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800">Execution is blocked. Review the runtime policy, dependencies, and agent availability.</p>}
-            {runtimeProjection?.agentAvailability?.some(item => !item.available) && <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-2.5 py-2 text-[11px] text-red-800">Agent unavailable: dispatch remains blocked until the configured capability is available or an approved fallback is selected.</p>}
-            {workspacePolicy && <p className="mt-2 rounded-md border border-blue-100 bg-blue-50/60 px-2.5 py-2 text-[11px] text-blue-800">Workspace policy revision {workspacePolicy.policyRevision} is the inherited baseline. Goal and gate values can only narrow it.</p>}
-            {selectedPolicyImpact && <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800">Active execution has a pending policy impact. {selectedPolicyImpact.requiresUserConfirmation ? 'Confirmation is required before the widened policy can apply.' : 'Pause and review the affected execution before continuing.'}</p>}
-            {selectedEffectivePolicy && <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/70 p-2.5">
-              <p className="text-[11px] font-medium text-slate-600">Effective policy</p>
-              <div className="mt-2 space-y-1.5">
-                {GOAL_POLICY_DIMENSIONS.map(dimension => {
-                  const explicit = selectedPolicyElement.policy?.dimensions?.[dimension.key] ?? legacyDimensionOverride(selectedPolicyElement.policy, dimension.key);
-                  const effective = selectedEffectivePolicy.dimensions[dimension.key];
-                  const value = effective.constrained ? `${effective.mode} · ${effective.value} ${dimension.unit}` : 'Unbounded';
-                  return <div key={dimension.key} className="flex items-center justify-between gap-2 text-[11px]"><span className="text-slate-500">{dimension.label}</span><span className="text-right text-slate-700"><span>{value}</span><span className="ml-1 text-slate-400">· {explicit ? 'Explicit override' : 'Inherited'}</span></span></div>;
-                })}
-              </div>
-              <p className="mt-2 text-[11px] text-slate-500">Acceptance: <span className="font-medium text-slate-700">{selectedEffectivePolicy.acceptance.actor}</span><span className="ml-1 text-slate-400">· {selectedPolicyElement.policy?.acceptanceActor ? 'Explicit override' : 'Inherited'}</span></p>
-            </div>}
-            {selectedPolicyElement.type === 'goal' && <div className="mt-3 space-y-3">
-              <p className="text-[11px] font-medium text-slate-500">Goal budget overrides</p>
-              {GOAL_POLICY_DIMENSIONS.map(dimension => {
-                const explicit = selectedPolicyElement.policy?.dimensions?.[dimension.key];
-                const mode = explicit?.constrained === false ? 'unbounded' : explicit?.mode ?? '__default__';
-                const value = explicit?.constrained === true ? explicit.value : '';
-                return <div key={dimension.key} className="rounded-lg border border-slate-200 p-2.5">
-                  <label className="block text-xs font-medium text-slate-600">{dimension.label}
-                    <Select value={mode} onValueChange={nextMode => {
-                      if (nextMode === '__default__') updatePolicyDimension(dimension.key, undefined);
-                      else if (nextMode === 'unbounded') updatePolicyDimension(dimension.key, { constrained: false });
-                      else updatePolicyDimension(dimension.key, { constrained: true, mode: nextMode as Exclude<GoalBudgetMode, 'unbounded'>, value: explicit?.constrained === true ? explicit.value : GOAL_POLICY_SAFE_VALUES[dimension.key], unit: dimension.unit });
-                    }}>
-                      <SelectTrigger className="mt-1"><SelectValue placeholder="Use workspace default" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__default__">Use workspace default</SelectItem>
-                        <SelectItem value="hard-cap">Hard cap</SelectItem>
-                        <SelectItem value="goal-pool">Goal pool</SelectItem>
-                        <SelectItem value="approval-required">Approval required</SelectItem>
-                        <SelectItem value="unbounded">Unbounded</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </label>
-                  {explicit?.constrained === true && <div className="mt-2 flex items-center gap-2">
-                    <Input type="number" min="0.01" step={dimension.key === 'financial' ? '0.01' : '1'} value={value} onChange={event => { const next = Number(event.target.value); if (Number.isFinite(next) && next > 0 && (dimension.key === 'financial' || Number.isInteger(next))) updatePolicyDimension(dimension.key, { ...explicit, value: next, unit: dimension.unit }); }} aria-label={`${dimension.label} override value`} />
-                    <span className="text-[11px] text-slate-400">{dimension.unit}</span>
-                  </div>}
-                  <span className="mt-1 block text-[11px] text-slate-400">Missing or cleared values inherit the workspace policy.</span>
-                </div>;
-              })}
-            </div>}
-            <label className="mt-3 block text-xs font-medium text-slate-600">
-              {selectedElement.type === 'approval-gate' ? 'Required approver' : 'Acceptance actor'}
-              <Select value={selectedPolicyElement.policy?.acceptanceActor ?? '__default__'} onValueChange={value => updatePolicy({ acceptanceActor: value === '__default__' ? undefined : value as GoalAcceptanceActor })}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Use goal default" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__default__">Use goal default</SelectItem>
-                  <SelectItem value="human">Human</SelectItem>
-                  <SelectItem value="agentic">Agentic</SelectItem>
-                  <SelectItem value="both">Both</SelectItem>
-                </SelectContent>
-              </Select>
-            </label>
-            {selectedElement.type === 'approval-gate' && <label className="mt-3 flex items-center gap-2 text-xs font-medium text-slate-600"><input type="checkbox" checked={selectedElement.approvalEvidenceRequired !== false} onChange={event => updateElement({ approvalEvidenceRequired: event.target.checked })} /> Require evidence before approval</label>}
-            <label className="mt-3 block text-xs font-medium text-slate-600">
-              Retry budget
-              <Select value={selectedPolicyElement.policy?.retryBudgetMode ?? '__default__'} onValueChange={value => updatePolicy({ retryBudgetMode: value === '__default__' ? undefined : value as GoalBudgetMode })}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Use goal default" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__default__">Use goal default</SelectItem>
-                  <SelectItem value="hard-cap">Hard cap</SelectItem>
-                  <SelectItem value="goal-pool">Goal pool</SelectItem>
-                  <SelectItem value="approval-required">Approval required</SelectItem>
-                  <SelectItem value="unbounded">Unbounded</SelectItem>
-                </SelectContent>
-              </Select>
-            </label>
-            {selectedPolicyElement.policy?.retryBudgetMode !== 'unbounded' && <label className="mt-3 block text-xs font-medium text-slate-600">
-              Max retries
-              <Input
-                type="number"
-                min={1}
-                step={1}
-                value={selectedPolicyElement.policy?.maxRetries ?? ''}
-                onChange={event => updatePolicy({ maxRetries: event.target.value === '' ? undefined : Math.max(1, Math.floor(Number(event.target.value))) })}
-                className="mt-1"
-                aria-describedby="max-retries-help"
-              />
-              <span id="max-retries-help" className="mt-1 block text-[11px] font-normal text-slate-400">Use a positive whole number. Leave unbounded selected to remove this limit.</span>
-            </label>}
-          </GoalsPolicySection>
-        )}
-        {(selectedElement.type === 'goal' || selectedElement.type === 'subgoal' || selectedElement.type === 'artifact') && <GoalsArtifactSection>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{selectedElement.type === 'artifact' ? 'Supporting artifacts' : 'Execution artifacts'}</p>
-          <p className="mt-1 text-[11px] text-slate-400">{selectedElement.type === 'artifact' ? 'These files and references support execution; they never satisfy delivery acceptance.' : 'Links stay attached to this node; task and milestone records remain canonical.'}</p>
-          {selectedElement.type !== 'artifact' && <Select onValueChange={value => {
-            const option = artifactOptions.find(item => item.value === value);
-            if (!option || selectedArtifactReferences.some(reference => reference.artifactType === option.artifactType && reference.artifactId === option.artifactId)) return;
-            void updateArtifactReferences([...selectedArtifactReferences, { id: createStableId('artifact-link'), artifactType: option.artifactType, artifactId: option.artifactId, linkedBy: 'renderer', linkedAt: new Date().toISOString() }]);
-          }}>
-            <SelectTrigger className="mt-2"><SelectValue placeholder="Link a task or milestone" /></SelectTrigger>
-            <SelectContent>
-              {artifactOptions.filter(option => !selectedArtifactReferences.some(reference => reference.artifactType === option.artifactType && reference.artifactId === option.artifactId)).map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
-              {artifactOptions.length === 0 && <SelectItem value="__none__" disabled>No tasks or milestones available</SelectItem>}
-            </SelectContent>
-          </Select>}
-          {selectedElement.type === 'artifact' && <div className="mt-3 rounded-md border border-sky-100 bg-sky-50/40 p-2.5">
-            <p className="text-[11px] font-semibold text-sky-800">Select a workspace source</p>
-            <p className="mt-1 text-[11px] text-sky-700/70">Links the existing attachment without copying its contents into the Goal.</p>
-            <label className="mt-3 block text-[11px] font-medium text-slate-600">Artifact type
-              <Select value={supportingArtifactType} onValueChange={value => { setSupportingArtifactType(value as SupportingArtifactType); setSupportingSourceSearch(''); }}>
-                <SelectTrigger className={`mt-1 ${ARTIFACT_SELECT_CLASS}`}><SelectValue /></SelectTrigger>
-                <SelectContent className="rounded-xl"><SelectItem value="document">Document</SelectItem><SelectItem value="file">File</SelectItem><SelectItem value="url">URL</SelectItem><SelectItem value="user-defined">User-defined</SelectItem></SelectContent>
-              </Select>
-            </label>
-            {(supportingArtifactType === 'document' || supportingArtifactType === 'file') && <>
-              <label className="mt-3 block text-[11px] font-medium text-slate-600">Search workspace sources
-                <Input value={supportingSourceSearch} onChange={event => setSupportingSourceSearch(event.target.value)} placeholder="Search by attachment or task name" className="mt-1 rounded-xl bg-white" />
-              </label>
-              <label className="mt-3 block text-[11px] font-medium text-slate-600">Workspace source
-                <Select onValueChange={addSupportingSourceReference}>
-                  <SelectTrigger className={`mt-1 ${ARTIFACT_SELECT_CLASS}`}><SelectValue placeholder={supportingSourceOptions.length ? 'Choose an existing source' : 'No matching sources'} /></SelectTrigger>
-                  <SelectContent className="rounded-xl">{supportingSourceOptions.map(option => <SelectItem key={option.value} value={option.value}>{option.label}<span className="ml-1 text-[10px] text-slate-400">· {option.searchText.replace(option.attachment.name, '').trim()}</span></SelectItem>)}{supportingSourceOptions.length === 0 && <SelectItem value="__none__" disabled>No matching workspace attachments</SelectItem>}</SelectContent>
-                </Select>
-              </label>
-            </>}
-            <p className="mt-3 text-[11px] font-semibold text-sky-800">Or declare an external/user-defined source</p>
-            <Input value={customArtifactLabel} onChange={event => setCustomArtifactLabel(event.target.value)} placeholder="Artifact label" className="mt-2 bg-white" />
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <Select value={customArtifactKind} onValueChange={setCustomArtifactKind}><SelectTrigger className={ARTIFACT_SELECT_CLASS}><SelectValue /></SelectTrigger><SelectContent className="rounded-xl"><SelectItem value="document">Document</SelectItem><SelectItem value="file">File</SelectItem><SelectItem value="url">URL</SelectItem><SelectItem value="user-defined">User-defined</SelectItem></SelectContent></Select>
-              <Input value={customArtifactFormat} onChange={event => setCustomArtifactFormat(event.target.value)} placeholder="Format (optional)" className="bg-white" />
-            </div>
-            <Input value={customArtifactLocator} onChange={event => setCustomArtifactLocator(event.target.value)} placeholder="Locator or URL (optional)" className="mt-2 bg-white" />
-            <button type="button" onClick={addCustomArtifactReference} disabled={!customArtifactLabel.trim()} className="mt-2 rounded-md border border-sky-200 bg-white px-2.5 py-1.5 text-xs font-medium text-sky-700 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50">Add supporting artifact</button>
-          </div>}
-          {selectedArtifactReferences.length > 0 ? <div className="mt-2 space-y-2">{selectedArtifactReferences.map(reference => {
-            const projection = reference.projection;
-            const sourceTask = reference.sourceTaskId ? tasks.find(task => task.id === reference.sourceTaskId) : undefined;
-            const sourceAvailable = reference.sourceAttachmentId ? Boolean(sourceTask?.attachments?.some(attachment => attachment.id === reference.sourceAttachmentId)) : undefined;
-            const missing = projection?.exists === false || sourceAvailable === false;
-            const blocked = projection?.status === 'blocked';
-            const approvalRequired = projection?.status === 'approval-required' || selectedElement.status === 'approval-required';
-            const status = missing ? 'Stale reference' : blocked ? 'Blocked' : approvalRequired ? 'Approval required' : projection?.status ?? 'Linked';
-            const statusClass = missing || blocked ? 'border-rose-200 bg-rose-50 text-rose-700' : approvalRequired ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-slate-200 bg-slate-50 text-slate-600';
-            return <div key={reference.id} className="rounded-md border border-slate-200 px-2.5 py-2"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate text-xs font-medium text-slate-700">{projection?.title ?? reference.label ?? `${reference.artifactType} · ${reference.artifactId}`}</p><p className={`mt-1 inline-flex rounded-full border px-1.5 py-0.5 text-[10px] font-semibold capitalize ${statusClass}`}>{status.replaceAll('-', ' ')}</p></div><button type="button" onClick={() => void updateArtifactReferences(selectedArtifactReferences.filter(item => item.id !== reference.id))} className="shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label="Unlink execution artifact">×</button></div>{projection?.exists && <p className="mt-1 text-[10px] text-slate-400">{projection.assigneeId ? `Assignee ${projection.assigneeId}` : 'Unassigned'}{projection.dependencyIds?.length ? ` · ${projection.dependencyIds.length} dependencies` : ''}{projection.evidence?.length ? ` · ${projection.evidence.length} evidence refs` : ''}</p>}{missing && <p className="mt-1 text-[10px] text-rose-600">The source artifact no longer exists and must be relinked.</p>}</div>;
-          })}</div> : <p className="mt-2 text-[11px] text-slate-400">No execution artifacts linked yet.</p>}
-        </GoalsArtifactSection>}
+        {selectedPolicyElement && <GoalsPolicyEditor element={selectedElement} policyElement={selectedPolicyElement} effectivePolicy={selectedEffectivePolicy} runtimeProjection={runtimeProjection} workspacePolicy={workspacePolicy} policyImpact={selectedPolicyImpact} onUpdateElement={updateElement} onUpdatePolicy={updatePolicy} onUpdatePolicyDimension={updatePolicyDimension} />}
+        {(selectedElement.type === 'goal' || selectedElement.type === 'subgoal' || selectedElement.type === 'artifact') && <GoalsArtifactEditor element={selectedElement} artifactOptions={artifactOptions} supportingSourceOptions={supportingSourceOptions} selectedReferences={selectedArtifactReferences} supportingArtifactType={supportingArtifactType} sourceSearch={supportingSourceSearch} customLabel={customArtifactLabel} customKind={customArtifactKind} customFormat={customArtifactFormat} customLocator={customArtifactLocator} selectClass={ARTIFACT_SELECT_CLASS} tasks={tasks} onUpdateReferences={references => { void updateArtifactReferences(references); }} onArtifactTypeChange={value => { setSupportingArtifactType(value); setSupportingSourceSearch(''); }} onSourceSearchChange={setSupportingSourceSearch} onSourceSelect={addSupportingSourceReference} onCustomLabelChange={setCustomArtifactLabel} onCustomKindChange={setCustomArtifactKind} onCustomFormatChange={setCustomArtifactFormat} onCustomLocatorChange={setCustomArtifactLocator} onAddCustomReference={addCustomArtifactReference} />}
         {selectedElement.type !== 'connector' && <GoalsConnectionsSection element={selectedElement} connections={selectedConnections} elements={activeGoal?.elements ?? []} onDeleteConnection={deleteConnection} />}
-        <GoalsRuntimeStatusSection>
-          {isCompletionElement(selectedElement) ? <>
-            <div className="flex items-center gap-1">
-              <span>Completion</span>
-              <span className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-xs font-semibold capitalize ${compactChipClass(statusChipClass(selectedElement.status))}`}>
-                <StatusIcon status={selectedElement.status} className="mr-1 size-3.5" />{statusLabel(selectedElement.status)}
-              </span>
-            </div>
-            <span className="mt-1 block text-[11px] text-slate-400">{statusDescription(selectedElement.status)}</span>
-            {statusNextStep(selectedElement.status) && <span className="mt-2 block rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] font-normal text-slate-600"><span className="font-semibold text-slate-700">Next step: </span>{statusNextStep(selectedElement.status)}</span>}
-          </> : (() => { const readiness = readinessForElement(selectedElement, isGoalElementConnected(activeGoal?.elements ?? [], selectedElement.id)); return <>
-            <div className="flex items-center gap-1">
-              <span>Readiness</span>
-              {readiness === 'ready' ? <span className="inline-flex items-center" title="Ready for workflow use"><ReadyIcon /></span> : <span className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-xs font-semibold capitalize ${readinessChipClass(readiness)}`}><CircleDot className="mr-1 size-3.5" />{readinessLabel(readiness)}</span>}
-            </div>
-            <span className="mt-1 block text-[11px] text-slate-400">{readinessDescription(selectedElement, readiness)}</span>
-          </>; })()}
-        </GoalsRuntimeStatusSection>
-        {selectedElement.type === 'connector' && (
-          <section className="mt-5 border-t border-slate-100 pt-4">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Connection</p>
-            <dl className="mt-2 space-y-1 text-[11px] text-slate-500">
-              <div className="flex justify-between gap-3"><dt>From</dt><dd className="max-w-[150px] truncate font-medium text-slate-700">{activeGoal?.elements.find(element => element.id === selectedElement.sourceId)?.title ?? 'Missing node'}</dd></div>
-              <div className="flex justify-between gap-3"><dt>To</dt><dd className="max-w-[150px] truncate font-medium text-slate-700">{activeGoal?.elements.find(element => element.id === selectedElement.targetId)?.title ?? 'Missing node'}</dd></div>
-              <div className="flex justify-between gap-3"><dt>Ports</dt><dd className="font-medium capitalize text-slate-700">{selectedElement.sourceSide ?? 'right'} → {selectedElement.targetSide ?? 'left'}</dd></div>
-            </dl>
-            {selectedElement.conditionBranch && <div className="mt-2 text-[11px] font-medium capitalize text-slate-500">Branch: {selectedElement.conditionBranch}</div>}
-            <button disabled={selectedElement.status === 'permission-denied'} onClick={() => { setConnectorMode(true); setRewireConnectorId(selectedElement.id); setConnectorSourceId(selectedElement.sourceId ?? null); setConnectorSourceSide(selectedElement.sourceSide ?? 'right'); setConnectorSourceBranch(selectedElement.conditionBranch); }} className="mt-4 flex items-center gap-2 text-xs font-medium text-blue-600 hover:text-blue-700 disabled:cursor-not-allowed disabled:text-slate-400">
-              <Link2 className="size-3.5" /> {selectedElement.status === 'permission-denied' ? 'Rewiring unavailable' : 'Rewire connector'}
-            </button>
-          </section>
-        )}
+        <GoalsRuntimeStatus element={selectedElement} connected={isGoalElementConnected(activeGoal?.elements ?? [], selectedElement.id)} />
+        <GoalsConnectorInspector element={selectedElement} elements={activeGoal?.elements ?? []} onRewire={element => { setConnectorMode(true); setRewireConnectorId(element.id); setConnectorSourceId(element.sourceId ?? null); setConnectorSourceSide(element.sourceSide ?? 'right'); setConnectorSourceBranch(element.conditionBranch); }} />
       </GoalsInspector>
     )}
     <DeleteGoalDialog open={deleteDialogOpen} onCancel={() => setDeleteDialogOpen(false)} onConfirm={performDeleteElement} />

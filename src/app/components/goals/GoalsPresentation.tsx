@@ -1,8 +1,53 @@
-import { AlertTriangle, CheckCircle2, CircleDot, ClipboardCheck, LockKeyhole, ShieldCheck, UserRoundCheck } from 'lucide-react';
-import type { GoalElement, GoalElementReadiness } from '../../types.ts';
+import { AlertTriangle, CheckCircle2, CircleDot, ClipboardCheck, LockKeyhole, MessageSquareText, RotateCcw, ShieldCheck, Sparkles, Target, UserRoundCheck } from 'lucide-react';
+import type { GoalElement, GoalElementReadiness, GoalElementType, Person } from '../../types.ts';
+import { AgentIcon as Bot } from '../icons/AgentIcon';
+import { AttachmentIcon } from '../icons/AttachmentIcon';
+import { PuzzlePieceIcon } from '../icons/PuzzlePieceIcon';
+
+const EXECUTION_LOCKED_STATUSES = new Set(['working', 'blocked', 'evidence-required', 'approval-required', 'complete', 'permission-denied']);
 
 export function compactChipClass(colorClass: string): string {
   return `${colorClass} !gap-0.5 !rounded-full !border !px-1.5 !py-0 !text-[10px] [&>svg]:!mr-0 [&>svg]:!size-2.5`;
+}
+
+export function isExecutionLocked(element: GoalElement | undefined): boolean {
+  return Boolean(element?.status && EXECUTION_LOCKED_STATUSES.has(element.status));
+}
+
+export function nodeClass(type: GoalElementType, connected = true): string {
+  if (!connected && type === 'instructions') return 'border-slate-200 bg-slate-100 text-slate-500';
+  if (type === 'goal') return 'border-slate-900 bg-slate-900 text-white';
+  if (type === 'subgoal') return 'border-blue-200 bg-white text-slate-900';
+  if (type === 'agent') return 'border-amber-200 bg-amber-50 text-slate-900';
+  if (type === 'condition') return 'border-violet-200 bg-violet-50 text-slate-900';
+  if (type === 'approval-gate') return 'border-orange-200 bg-orange-50 text-slate-900';
+  if (type === 'human-input') return 'border-sky-200 bg-sky-50 text-slate-900';
+  if (type === 'retry') return 'border-cyan-200 bg-cyan-50 text-slate-900';
+  if (type === 'deliverable') return 'border-emerald-200 bg-emerald-50 text-slate-900';
+  if (type === 'artifact') return 'border-sky-200 bg-sky-50 text-slate-900';
+  return 'border-slate-200 bg-white text-slate-700';
+}
+
+export function elementIcon(type: GoalElementType) {
+  if (type === 'agent') return <Bot className="size-3.5" />;
+  if (type === 'goal') return <Sparkles className="size-3.5" />;
+  if (type === 'human-input') return <MessageSquareText className="size-3.5" />;
+  if (type === 'retry') return <RotateCcw className="size-3.5" />;
+  if (type === 'deliverable') return <PuzzlePieceIcon className="size-3.5" />;
+  if (type === 'artifact') return <AttachmentIcon className="size-3.5" />;
+  return <Target className="size-3.5" />;
+}
+
+export function getAgentForElement(element: GoalElement, people: Person[]): Person | undefined {
+  return element.type === 'agent' ? people.find(person => person.id === element.assigneeId) : undefined;
+}
+
+export function getElementTitle(element: GoalElement, people: Person[]): string {
+  return getAgentForElement(element, people)?.name ?? element.title;
+}
+
+export function getElementBody(element: GoalElement, people: Person[]): string | undefined {
+  return getAgentForElement(element, people)?.role ?? element.body;
 }
 
 export function statusChipClass(status: GoalElement['status']): string {

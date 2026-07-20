@@ -108,6 +108,19 @@ export type GoalPolicyUnit = 'USD' | 'tokens' | 'loops' | 'attempts' | 'retries'
 export type GoalArtifactType = 'task' | 'milestone' | 'goal' | 'document' | 'file' | 'url' | 'user-defined';
 export type GoalArtifactRole = 'supporting' | 'deliverable';
 export type GoalDeliverableStatus = 'planned' | 'in-progress' | 'ready-for-review' | 'accepted' | 'rejected';
+export type SupportingArtifactType = 'document' | 'file' | 'url' | 'user-defined';
+
+export interface GoalRuntimeProjection {
+  execution?: { state?: string; revision?: number; attempt?: number; policyRevision?: number; executionAttemptId?: string; reconciliationRequired?: boolean } | null;
+  handoffs?: Array<{ id: string; deliverableId?: string; producedArtifactReferences?: Array<{ label?: string; locator?: string; format?: string }>; deliveryFacts?: Record<string, unknown>; deliveredAt?: string }>;
+  effectivePolicy?: import('./utils/goalPolicy.ts').GoalPolicyV1 | null;
+  policyRevision?: number;
+  executionAttempt?: number | null;
+  executionAttemptId?: string | null;
+  agentAvailability?: Array<{ elementId: string; available: boolean; errorCode?: string | null }>;
+  policyImpacts?: Array<{ goalId?: string; status?: string; requiresUserConfirmation?: boolean }>;
+  lastChange?: { scope?: string; errorCode?: string; changeType?: string } | null;
+}
 
 export interface GoalDeliverySpec {
   outcomeKind: 'file' | 'summary' | 'conclusion' | 'resolution' | 'other';

@@ -200,12 +200,15 @@ function buildContractPacket(store, goal, effectivePolicy, executionAttempt, now
   const skillResolution = resolveRequiredSkills(skillRequirements, {
     skillsRoot: options.skillsRoot || preferences.skillsRoot,
     skillRoots: options.skillRoots || preferences.skillRoots,
+    userDataPath: options.userDataPath || preferences.userDataPath,
+    agentSkills: options.agentSkills || preferences.agentSkills,
+    availableSkills: options.availableSkills || preferences.availableSkills,
   });
   return {
     ...packet,
     skillRequirements,
     skillReferences: skillResolution.skills,
-    skillResolution: { ok: skillResolution.ok, blockingResults: skillResolution.blockingResults },
+    skillResolution: { ok: skillResolution.ok, blockingResults: skillResolution.blockingResults, diagnostics: skillResolution.diagnostics },
     agentDelegations,
     recruitmentRequests: agentDelegations.filter(item => item.status === 'recruitment-requested' || item.recruitmentFallback).map(item => ({
       elementId: item.elementId,
@@ -300,6 +303,8 @@ function createGoalLifecycleService({
   cleanup = cleanupGoalArtifacts,
   now = () => new Date().toISOString(),
   onRuntimeChange,
+  skillsRoot,
+  userDataPath,
 } = {}) {
   if (!store || typeof store.get !== 'function' || typeof store.set !== 'function') {
     throw new TypeError('A synchronous store with get/set methods is required.');
@@ -384,7 +389,7 @@ function createGoalLifecycleService({
           effectivePolicy,
           policyRevision: effectivePolicy.sourceRevision,
           executionAttemptId: executionId,
-          contractPacket: buildContractPacket(store, goal, effectivePolicy, 1, now, payload),
+          contractPacket: buildContractPacket(store, goal, effectivePolicy, 1, now, { skillsRoot, userDataPath, ...payload }),
           createdAt: now(),
         };
 
@@ -393,7 +398,7 @@ function createGoalLifecycleService({
       effectivePolicy,
       policyRevision: effectivePolicy.sourceRevision,
       executionAttemptId: execution.id,
-      contractPacket: buildContractPacket(store, goal, effectivePolicy, execution.attempt, now, payload),
+      contractPacket: buildContractPacket(store, goal, effectivePolicy, execution.attempt, now, { skillsRoot, userDataPath, ...payload }),
     };
     const controlValidation = validateControlInputs({ store, goal, execution, command, payload: policyPayload });
     if (!controlValidation.ok) return controlValidation;

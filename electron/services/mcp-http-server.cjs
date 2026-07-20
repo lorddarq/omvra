@@ -1530,7 +1530,7 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
     case 'goals.lifecycle': {
       const goalId = parseGoalId(args);
       if (!goalId) return { error: invalidParams('Invalid params: "goalId" (or "id") is required.') };
-      const lifecycle = createGoalLifecycleService({ store, onRuntimeChange: emitRuntimeChange });
+      const lifecycle = createGoalLifecycleService({ store, onRuntimeChange: emitRuntimeChange, skillsRoot, userDataPath: userSkillsRoot });
       const result = lifecycle.execute({
         goalId,
         command: args.command,

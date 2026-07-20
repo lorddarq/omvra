@@ -181,6 +181,8 @@ Skill resolution should follow this contract:
 
 1. If one or more valid settings-designated roots are enabled, resolve the requested `skillId` from those roots in the user's configured order. A valid, trusted configured skill may intentionally override a bundled or fallback skill when the version/source constraint permits it.
 2. If the settings-designated root list is empty, use the fallback chain: Omvra-bundled skills → skills made available by the assigned agent/runtime → codebase/workspace-local skills.
+
+A failure to read the bundled catalog is diagnostic, not an automatic Goal blocker. If a required skill resolves from a valid configured root, assigned agent/runtime capability, or workspace-local source, setup proceeds and records the bundled-source issue for inspection. A Goal blocks only when the required skill itself cannot be resolved, is incompatible, fails integrity/trust checks, or otherwise violates its contract.
 3. If configured roots exist but do not contain the requested skill, apply the declared fallback policy and record that fallback; do not silently substitute a different skill or prose.
 
 The resolved source, root identifier, version, integrity hash, and fallback reason must be visible before dispatch and durable in execution history. External sources must not be downloaded, installed, or executed implicitly during goal setup. A required skill that is unavailable, ambiguous, invalid, or incompatible pauses setup with a typed missing-skill result.

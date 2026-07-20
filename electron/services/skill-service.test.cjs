@@ -53,7 +53,8 @@ test('required skill failures are typed and block setup without installation', (
   fs.writeFileSync(path.join(root, 'manifest.json'), '{"schemaVersion": 9}');
   const invalid = resolveRequiredSkills([{ skillId: 'missing-skill' }], { skillsRoot, skillRoots: [{ root }] });
   assert.equal(invalid.ok, false);
-  assert.equal(invalid.blockingResults[0].code, 'INVALID_MANIFEST');
+  assert.equal(invalid.blockingResults[0].code, 'MISSING_SKILL');
+  assert.equal(invalid.diagnostics.some(item => item.code === 'INVALID_MANIFEST'), true);
 
   fs.writeFileSync(path.join(root, 'manifest.json'), JSON.stringify({ schemaVersion: 1, skills: [{
     skillId: 'untrusted', version: '1.0.0', entrypoint: 'untrusted.md', trustStatus: 'untrusted',
@@ -71,6 +72,40 @@ test('malformed bundled manifests produce a typed resolver result', () => {
   fs.writeFileSync(path.join(root, 'manifest.json'), '{"schemaVersion": 9}');
   const result = resolveRequiredSkills([{ skillId: 'process-modeler' }], { skillsRoot: root });
   assert.equal(result.ok, false);
-  assert.equal(result.blockingResults[0].code, 'INVALID_MANIFEST');
+  assert.equal(result.blockingResults[0].code, 'MISSING_SKILL');
+  assert.equal(result.diagnostics[0].code, 'INVALID_MANIFEST');
   fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('configured skills remain usable when the bundled catalog is unavailable', () => {
+  const bundledRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omvra-bundled-skills-'));
+  const configuredRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omvra-configured-skills-'));
+  fs.writeFileSync(path.join(configuredRoot, 'local.md'), '# Local skill\n');
+  fs.writeFileSync(path.join(configuredRoot, 'manifest.json'), JSON.stringify({ schemaVersion: 1, skills: [{
+    skillId: 'local-skill', version: '1.0.0', entrypoint: 'local.md', supportedStages: ['implementation'], supportedPersonas: ['backend-engineer'], trustStatus: 'trusted',
+  }] }));
+  fs.writeFileSync(path.join(bundledRoot, 'manifest.json'), '{"schemaVersion": 9}');
+
+  const result = resolveRequiredSkills([{ skillId: 'local-skill', stage: 'implementation', persona: 'backend-engineer' }], {
+    skillsRoot: bundledRoot,
+    skillRoots: [{ root: configuredRoot }],
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.skills[0].source, 'omvra-configured');
+  assert.equal(result.diagnostics.some(item => item.code === 'INVALID_MANIFEST'), true);
+
+  fs.rmSync(bundledRoot, { recursive: true, force: true });
+  fs.rmSync(configuredRoot, { recursive: true, force: true });
+});
+
+test('agent-provided skills remain usable when bundled resolution is unavailable', () => {
+  const bundledRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omvra-bundled-skills-'));
+  const result = resolveRequiredSkills([{ skillId: 'agent-skill', version: '^2.0.0' }], {
+    skillsRoot: bundledRoot,
+    agentSkills: [{ skillId: 'agent-skill', version: '2.1.0' }],
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.skills[0].source, 'agent-runtime');
+  assert.equal(result.skills[0].trustStatus, 'trusted');
+  fs.rmSync(bundledRoot, { recursive: true, force: true });
 });

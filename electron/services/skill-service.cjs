@@ -112,7 +112,11 @@ function listAvailableSkills(options = {}) {
     const resolved = listRootSkills(root);
     for (const skill of resolved.skills) available.set(skill.skillId, skill);
   }
-  for (const skill of listBundledSkills(options)) if (!available.has(skill.skillId)) available.set(skill.skillId, skill);
+  try {
+    for (const skill of listBundledSkills(options)) if (!available.has(skill.skillId)) available.set(skill.skillId, skill);
+  } catch {
+    // A missing bundled catalog must not hide configured or agent-provided skills.
+  }
   for (const skill of discoverUserSkills(options)) if (!available.has(skill.skillId)) available.set(skill.skillId, skill);
   return [...available.values()];
 }
@@ -137,23 +141,41 @@ function versionCompatible(required, actual) {
   return required.startsWith('^') && major(required.slice(1)) === major(actual);
 }
 
+function normalizeRuntimeSkills(skills = []) {
+  return (Array.isArray(skills) ? skills : []).map(skill => {
+    const value = typeof skill === 'string' ? { skillId: skill } : skill;
+    if (!value || typeof value !== 'object') return null;
+    const normalizedId = normalizeSkillId(value.skillId || value.id || value.name);
+    if (!normalizedId) return null;
+    return normalizeSkill({ ...value, skillId: normalizedId, trustStatus: 'trusted' }, {
+      root: typeof value.root === 'string' ? path.resolve(value.root) : '',
+      source: 'agent-runtime',
+    });
+  }).filter(Boolean);
+}
+
 function resolveRequiredSkills(requirements = [], options = {}) {
   const requested = Array.isArray(requirements) ? requirements : [];
   let bundled = [];
-  const blockingResults = [];
+  const diagnostics = [];
   try {
     bundled = listBundledSkills(options);
   } catch (error) {
-    blockingResults.push({ code: 'INVALID_MANIFEST', message: error.message, blocking: true, source: 'omvra-bundled' });
+    diagnostics.push({ code: 'INVALID_MANIFEST', message: error.message, blocking: false, source: 'omvra-bundled' });
   }
   const configured = configuredSkillRoots(options).map(root => ({ root, ...listRootSkills(root) }));
-  blockingResults.push(...configured.flatMap(entry => entry.error ? [{ ...entry.error, code: 'INVALID_MANIFEST', blocking: true }] : []));
+  diagnostics.push(...configured.flatMap(entry => entry.error ? [{ ...entry.error, code: 'INVALID_MANIFEST', blocking: false }] : []));
+  const runtime = normalizeRuntimeSkills(options.agentSkills || options.availableSkills);
+  const user = discoverUserSkills(options);
+  const blockingResults = [];
   const skills = [];
   for (const requirement of requested) {
     const skillId = normalizeSkillId(requirement?.skillId);
     const candidates = [
       ...configured.flatMap(entry => entry.skills.filter(skill => skill.skillId === skillId)),
       ...bundled.filter(skill => skill.skillId === skillId),
+      ...runtime.filter(skill => skill.skillId === skillId),
+      ...user.filter(skill => skill.skillId === skillId),
     ];
     const skill = candidates.find(candidate => versionCompatible(requirement?.version, candidate.version)
       && (!requirement?.stage || candidate.supportedStages.includes(requirement.stage))
@@ -164,13 +186,15 @@ function resolveRequiredSkills(requirements = [], options = {}) {
       continue;
     }
     let actualHash;
-    try {
-      actualHash = hashFile(path.resolve(skill.root, skill.entrypoint));
-    } catch (error) {
-      blockingResults.push({ code: 'INVALID_MANIFEST', skillId, message: error.message, blocking: true });
-      continue;
+    if (skill.entrypoint) {
+      try {
+        actualHash = hashFile(path.resolve(skill.root, skill.entrypoint));
+      } catch (error) {
+        blockingResults.push({ code: 'INVALID_MANIFEST', skillId, message: error.message, blocking: true });
+        continue;
+      }
     }
-    if (skill.integrityHash && skill.integrityHash !== actualHash) {
+    if (actualHash && skill.integrityHash && skill.integrityHash !== actualHash) {
       blockingResults.push({ code: 'INTEGRITY_FAILURE', skillId, expected: skill.integrityHash, actual: actualHash, blocking: true });
       continue;
     }
@@ -178,9 +202,9 @@ function resolveRequiredSkills(requirements = [], options = {}) {
       blockingResults.push({ code: 'UNTRUSTED_SKILL', skillId, trustStatus: skill.trustStatus, blocking: true });
       continue;
     }
-    skills.push({ skillId, version: skill.version, source: skill.source, root: skill.root, entrypoint: skill.entrypoint, integrityHash: actualHash, trustStatus: skill.trustStatus, fallback: skill.source === 'omvra-bundled' && configured.length > 0 ? 'configured-root-miss' : undefined });
+    skills.push({ skillId, version: skill.version, source: skill.source, root: skill.root, entrypoint: skill.entrypoint, integrityHash: actualHash || skill.integrityHash || null, trustStatus: skill.trustStatus, fallback: skill.source === 'omvra-bundled' && configured.length > 0 ? 'configured-root-miss' : undefined });
   }
-  return { ok: blockingResults.length === 0, skills, blockingResults };
+  return { ok: blockingResults.length === 0, skills, blockingResults, diagnostics };
 }
 
 function collectSkillRequirements(goal) {

@@ -1,5 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 
 const { createRequestDispatcher } = require('./mcp-http-server.cjs');
 const {
@@ -541,6 +544,32 @@ test('goals.lifecycle exposes governed revision-checked and idempotent commands'
     'start', 'dispatch', 'acknowledge', 'submit-evidence', 'request-handoff',
     'accept', 'pause', 'resume', 'retry', 'delegate', 'wake', 'escalate', 'approve', 'reconcile', 'fail', 'complete', 'retry-cleanup',
   ]);
+});
+
+test('goals.lifecycle uses the configured skill root when the bundled root is unavailable', () => {
+  const bundledRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omvra-bundled-skills-'));
+  const configuredRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omvra-configured-skills-'));
+  fs.writeFileSync(path.join(bundledRoot, 'manifest.json'), '{"schemaVersion": 9}');
+  fs.writeFileSync(path.join(configuredRoot, 'local.md'), '# Local skill\n');
+  fs.writeFileSync(path.join(configuredRoot, 'manifest.json'), JSON.stringify({ schemaVersion: 1, skills: [{
+    skillId: 'local-skill', version: '1.0.0', entrypoint: 'local.md', supportedStages: ['implementation'], supportedPersonas: ['backend-engineer'], trustStatus: 'trusted',
+  }] }));
+  const store = makeStoreFromFixture('workspace-basic', {
+    [PREFERENCES_KEY]: { mcpAgentAccessEnabled: true, mcpCapabilityProfile: 'task_write', skillRoots: [{ root: configuredRoot }] },
+    [GOALS_KEY]: [{ id: 'goal-skill-root', title: 'Use configured skill', requiredSkills: [{ skillId: 'local-skill', stage: 'implementation', persona: 'backend-engineer' }] }],
+  });
+  const dispatch = createRequestDispatcher(store, { skillsRoot: bundledRoot });
+  const response = dispatch({
+    jsonrpc: '2.0',
+    id: 'goals-lifecycle-skill-root',
+    method: 'tools/call',
+    params: { name: 'goals.lifecycle', arguments: { goalId: 'goal-skill-root', command: 'start', expectedRevision: 0, commandId: 'start-skill-root' } },
+  }, makeReq()).result;
+
+  assert.equal(response.structuredContent.execution.contractPacket.skillResolution.ok, true);
+  assert.equal(response.structuredContent.execution.contractPacket.skillReferences[0].source, 'omvra-configured');
+  fs.rmSync(bundledRoot, { recursive: true, force: true });
+  fs.rmSync(configuredRoot, { recursive: true, force: true });
 });
 
 test('MCP Goal writes round-trip versioned agent configuration and dispatch metadata', () => {

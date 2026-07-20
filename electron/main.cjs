@@ -112,7 +112,15 @@ function restartMcpServer() {
 
 function startGoalScheduleRuntime() {
   if (goalScheduleTimer) clearInterval(goalScheduleTimer);
-  const lifecycle = createGoalLifecycleService({ store });
+  const lifecycle = createGoalLifecycleService({
+    store,
+    skillsRoot: getBundledSkillsRoot({
+      isPackaged: app.isPackaged,
+      appPath: app.getAppPath(),
+      resourcesPath: process.resourcesPath,
+    }),
+    userDataPath: app.getPath('userData'),
+  });
   const tick = () => {
     try {
       const result = runDueSchedules({ store, lifecycle });

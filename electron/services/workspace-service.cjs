@@ -963,6 +963,11 @@ function withGoalExecutionReadModel(store, goal) {
       id: execution.id,
       state: execution.state,
       revision: execution.revision,
+      attempt: execution.attempt,
+      executionAttemptId: execution.executionAttemptId || execution.id,
+      policyRevision: execution.policyRevision || execution.effectivePolicy?.sourceRevision || execution.contractPacket?.policyRevision || 0,
+      effectivePolicy: execution.effectivePolicy || null,
+      contractPacket: execution.contractPacket || null,
       cleanupStatus: execution.cleanupStatus || 'not-requested',
       cleanupPending: execution.cleanupPending === true,
       updatedAt: execution.updatedAt,
@@ -977,7 +982,7 @@ function getGoalById(store, goalId) {
   return listGoals(store).find(goal => goal && goal.id === normalizedId) || null;
 }
 
-function updateGoal(store, { goalId, title, elements, overseerAgentId, expectedRevision, actor = 'agent', humanConfirmed = false } = {}) {
+function updateGoal(store, { goalId, title, elements, overseerAgentId, expectedRevision, actor = 'agent', humanConfirmed = false, emitRuntimeChange } = {}) {
   const normalizedGoalId = normalizeString(goalId).trim();
   if (!normalizedGoalId) return { ok: false, error: 'GOAL_ID_REQUIRED', message: 'goalId is required.' };
   const goals = readArray(store, GOALS_KEY);
@@ -1017,6 +1022,7 @@ function updateGoal(store, { goalId, title, elements, overseerAgentId, expectedR
   });
   goals[goalIndex] = nextGoal;
   store.set(GOALS_KEY, goals);
+  if (typeof emitRuntimeChange === 'function') emitRuntimeChange({ scope: 'graph', goalId: normalizedGoalId, revision: nextGoal[MCP_TASK_REV_FIELD], actor, changeType: 'graph.updated' });
   return { ok: true, changed: true, goal: nextGoal, revision: nextGoal[MCP_TASK_REV_FIELD] };
 }
 
@@ -1029,6 +1035,7 @@ function updateGoalElement(store, {
   idempotencyKey,
   connectorOnly = false,
   humanConfirmed = false,
+  emitRuntimeChange,
 } = {}) {
   const normalizedGoalId = normalizeString(goalId).trim();
   const normalizedElementId = normalizeString(elementId).trim();
@@ -1093,6 +1100,7 @@ function updateGoalElement(store, {
   });
   goals[goalIndex] = nextGoal;
   store.set(GOALS_KEY, goals);
+  if (typeof emitRuntimeChange === 'function') emitRuntimeChange({ scope: 'graph', goalId: normalizedGoalId, revision: nextGoal[MCP_TASK_REV_FIELD], actor, changeType: connectorOnly ? 'connector.updated' : 'element.updated' });
   const result = { ok: true, changed: true, goal: nextGoal, revision: nextGoal[MCP_TASK_REV_FIELD] };
   store.set(GOAL_MUTATION_COMMANDS_KEY, commands.concat({
     idempotencyKey: normalizedKey,

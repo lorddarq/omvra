@@ -19,29 +19,47 @@ export function parseUpdateReleaseNotes(
   }
 
   const maxItems = Number.isFinite(options.maxItems) ? Math.max(1, Number(options.maxItems)) : 3;
-  const rawLines = releaseNotes
+  const sourceLines = releaseNotes
     .replace(/<p\b[^>]*>([\s\S]*?)<\/p>/gi, '$1')
     .replace(/<[^>]*>/g, '')
     .split('\n')
-    .map(normalizeReleaseNoteLine)
-    .filter(Boolean)
-    .filter(isUsefulReleaseNoteLine);
+    .map(line => ({
+      explicitListItem: isExplicitListItem(line),
+      value: normalizeReleaseNoteLine(line),
+    }))
+    .filter(({ value }) => value)
+    .filter(({ value }) => isUsefulReleaseNoteLine(value));
 
-  const uniqueLines = Array.from(new Set(rawLines));
-  const candidateItems = uniqueLines.filter(line => isUsefulReleaseNoteLine(line));
+  const uniqueLines = Array.from(new Map(sourceLines.map(item => [item.value, item])).values());
+  const hasExplicitList = uniqueLines.some(item => item.explicitListItem);
+  const candidateItems = hasExplicitList
+    ? uniqueLines.reduce<string[]>((items, item) => {
+      if (item.explicitListItem || items.length === 0) {
+        items.push(item.value);
+      } else {
+        items[items.length - 1] = `${items[items.length - 1]} ${item.value}`;
+      }
+      return items;
+    }, [])
+    : [uniqueLines.map(item => item.value).join(' ')].filter(Boolean);
   const items = candidateItems.slice(0, maxItems);
-  const summary = uniqueLines.find(line => !looksLikeListItem(line)) || items[0] || null;
+  const summary = uniqueLines.find(line => !looksLikeListItem(line.value))?.value || items[0] || null;
 
   return {
     items,
     hasMore: candidateItems.length > items.length,
     summary,
-    rawLines: uniqueLines,
+    rawLines: uniqueLines.map(item => item.value),
   };
+}
+
+function isExplicitListItem(line: string) {
+  return /^\s*(?:[-*•]\s+|\d+\.\s+)/.test(line);
 }
 
 function normalizeReleaseNoteLine(line: string) {
   return line
+    .trim()
     .replace(/^#{1,6}\s*/, '')
     .replace(/^[-*•]\s*/, '')
     .replace(/^\d+\.\s*/, '')

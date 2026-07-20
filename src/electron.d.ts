@@ -203,6 +203,11 @@ declare global {
       storeDelete: (key: string) => Promise<void>;
       storeExport: () => Promise<Record<string, any>>;
       recordGoalPolicyImpact: (payload: { previousPolicy: any; nextPolicy: any; actor?: string }) => Promise<{ ok: boolean; changed?: boolean; impacts?: any[] }>;
+      goals: {
+        getRuntime: (goalId: string) => Promise<any>;
+        update: (payload: { goalId: string; title?: string; elements?: any[]; overseerAgentId?: string; expectedRevision: number }) => Promise<{ ok: boolean; goal?: any; revision?: number; error?: string; currentRevision?: number; message?: string }>;
+        onRuntimeChanged: (listener: (payload: { eventId: string; scope: 'graph' | 'execution' | 'policy' | 'conflict' | 'reconciliation'; goalId: string; revision: number; actor: string; changeType: string; occurredAt: string; errorCode?: string; details?: Record<string, unknown> }) => void) => () => void;
+      };
       onStoreChanged: (listener: (payload: { updatedAt: string }) => void) => () => void;
       app: {
         getRuntimeInfo: () => Promise<{

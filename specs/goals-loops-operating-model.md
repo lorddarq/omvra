@@ -636,6 +636,28 @@ Until the remaining implementation boundaries are available at runtime, the safe
 
 ## Implementation handoff
 
+## Goal runtime convergence contract
+
+The canonical Electron store remains the durable authority for Goal graph, execution, policy, and reconciliation records. A committed write may emit one scoped runtime envelope through `goals.onRuntimeChanged` and persist it under `omvra.goalRuntimeEvents.v1`:
+
+```ts
+interface GoalRuntimeChange {
+  eventId: string;
+  scope: 'graph' | 'execution' | 'policy' | 'conflict' | 'reconciliation';
+  goalId: string;
+  revision: number;
+  actor: string;
+  changeType: string;
+  occurredAt: string;
+  errorCode?: string;
+  details?: Record<string, unknown>;
+}
+```
+
+Graph revisions protect editable `omvra.goals.v1` state. Execution revisions protect `omvra.goalExecutions.v1`; policy revisions remain attached to the resolved effective policy and contract packet. `goals.getRuntime` joins those records with policy impacts, reconciliation records, and agent availability without allowing graph edits to overwrite overseer-owned execution state. Renderer hydration ignores stale graph revisions and preserves active drag or pending writes; focus refresh is recovery only.
+
+Rejected MCP/lifecycle writes retain their stable typed error and audit record and may emit a `conflict` or `reconciliation` envelope. They must not mutate graph, execution, policy, or event state as part of rejection.
+
 The next deliverable is the implementation of the lifecycle boundary described above, covering:
 
 - the minimum goal/subgoal/contract/acknowledgement schema;

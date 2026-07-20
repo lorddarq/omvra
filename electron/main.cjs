@@ -22,10 +22,12 @@ const { registerUpdateIpcHandlers } = require('./services/update-ipc.cjs');
 const {
   isMcpAgentAccessEnabled,
   buildMcpListenerStatus,
+  updateGoal,
 } = require('./services/workspace-service.cjs');
 const { recordGoalPolicyChangeImpact } = require('./services/goal-policy.cjs');
 const { createGoalLifecycleService } = require('./services/goal-lifecycle-service.cjs');
 const { runDueSchedules } = require('./services/goal-schedule-service.cjs');
+const { createGoalRuntimeService } = require('./services/goal-runtime-service.cjs');
 const { getBundledSkillsRoot } = require('./services/skill-service.cjs');
 
 const APP_NAME = 'Omvra';
@@ -43,7 +45,9 @@ app.setPath('userData', userDataPath);
 const store = new Store({ name: storeName });
 const STORE_DID_CHANGE_CHANNEL = 'store/did-change';
 const UPDATE_STATE_CHANNEL = 'updates/state-changed';
+const GOAL_RUNTIME_CHANGED_CHANNEL = 'goals/runtime-changed';
 const PREFERENCES_KEY = 'omvra.preferences.v1';
+const goalRuntime = createGoalRuntimeService({ store });
 let mcpHttpServer = null;
 let updateController = null;
 let goalScheduleTimer = null;
@@ -101,6 +105,7 @@ function restartMcpServer() {
       resourcesPath: process.resourcesPath,
     }),
     userSkillsRoot: app.getPath('userData'),
+    emitRuntimeChange: goalRuntime.emit,
   });
 }
 
@@ -130,6 +135,12 @@ function broadcastStoreDidChange() {
     }
   }
 }
+
+goalRuntime.onChanged((event) => {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.webContents.send(GOAL_RUNTIME_CHANGED_CHANNEL, event);
+  }
+});
 
 function broadcastUpdateState(updateState) {
   for (const window of BrowserWindow.getAllWindows()) {
@@ -480,7 +491,23 @@ ipcMain.handle('store/get', (_, key) => store.get(key));
 ipcMain.handle('store/set', (_, key, value) => store.set(key, value));
 ipcMain.handle('store/delete', (_, key) => store.delete(key));
 ipcMain.handle('store/export', () => store.store);
-ipcMain.handle('goal-policy/record-impact', (_, payload) => recordGoalPolicyChangeImpact(store, payload));
+ipcMain.handle('goal-policy/record-impact', (_, payload) => {
+  const result = recordGoalPolicyChangeImpact(store, payload);
+  if (result.ok && result.changed) {
+    for (const impact of result.impacts || []) goalRuntime.emit({ scope: 'policy', goalId: impact.goalId, revision: impact.effectivePolicyRevision, actor: payload?.actor || 'workspace-settings', changeType: 'policy.impact-recorded' });
+  }
+  return result;
+});
+ipcMain.handle('goals/get-runtime', (_, goalId) => goalRuntime.get(goalId));
+ipcMain.handle('goals/update', (_, payload = {}) => updateGoal(store, {
+  goalId: payload.goalId,
+  title: payload.title,
+  elements: payload.elements,
+  overseerAgentId: payload.overseerAgentId,
+  expectedRevision: payload.expectedRevision,
+  actor: 'renderer',
+  emitRuntimeChange: goalRuntime.emit,
+}));
 ipcMain.handle('app/get-runtime-info', () => ({
   name: app.getName(),
   version: app.getVersion(),

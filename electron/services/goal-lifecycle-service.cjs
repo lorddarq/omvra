@@ -259,9 +259,14 @@ function createGoalLifecycleService({
   store,
   cleanup = cleanupGoalArtifacts,
   now = () => new Date().toISOString(),
+  onRuntimeChange,
 } = {}) {
   if (!store || typeof store.get !== 'function' || typeof store.set !== 'function') {
     throw new TypeError('A synchronous store with get/set methods is required.');
+  }
+
+  function notifyRuntime(change) {
+    if (typeof onRuntimeChange === 'function') onRuntimeChange(change);
   }
 
   function getExecution(goalId) {
@@ -322,10 +327,11 @@ function createGoalLifecycleService({
       return failure('INTERDICTED', `Lifecycle command "${command}" is interdicted by policy.`);
     }
 
+    const executionId = existing?.id || `execution_${randomUUID()}`;
     const execution = existing
       ? { ...existing }
       : {
-          id: `execution_${randomUUID()}`,
+          id: executionId,
           goalId,
           attempt: 1,
           revision: 0,
@@ -336,6 +342,8 @@ function createGoalLifecycleService({
           cleanupPending: false,
           commandResults: {},
           effectivePolicy,
+          policyRevision: effectivePolicy.sourceRevision,
+          executionAttemptId: executionId,
           contractPacket: buildContractPacket(store, goal, effectivePolicy, 1, now),
           createdAt: now(),
         };
@@ -343,6 +351,8 @@ function createGoalLifecycleService({
     const policyPayload = {
       ...payload,
       effectivePolicy,
+      policyRevision: effectivePolicy.sourceRevision,
+      executionAttemptId: execution.id,
       contractPacket: buildContractPacket(store, goal, effectivePolicy, execution.attempt, now),
     };
     const controlValidation = validateControlInputs({ store, goal, execution, command, payload: policyPayload });
@@ -356,6 +366,8 @@ function createGoalLifecycleService({
       previousState: execution.state,
       goalRevision: goal.revision ?? goal.__mcpRevision ?? 0,
       effectivePolicy,
+      policyRevision: effectivePolicy.sourceRevision,
+      executionAttemptId: execution.id,
       contractPacket: policyPayload.contractPacket,
       revision: execution.revision + 1,
       updatedAt: now(),
@@ -412,6 +424,14 @@ function createGoalLifecycleService({
       : executions.concat(nextExecution);
     writeExecutionState(store, nextExecutions, events.concat(event));
 
+    notifyRuntime({
+      scope: command === 'reconcile' ? 'reconciliation' : 'execution',
+      goalId,
+      revision: nextExecution.revision,
+      actor,
+      changeType: `lifecycle.${command}`,
+    });
+
     if (pendingImpact && command === 'pause') resolveGoalPolicyImpact(store, goalId, 'paused', now);
     if (pendingImpact && command === 'resume' && impactDecision === 'confirmed') resolveGoalPolicyImpact(store, goalId, 'confirmed', now);
 
@@ -430,6 +450,7 @@ function createGoalLifecycleService({
     const executions = readArray(store, EXECUTIONS_KEY);
     const next = { ...execution, pendingCommand: { command, commandId, payload, actor, recordedAt: now() }, updatedAt: now() };
     store.set(EXECUTIONS_KEY, executions.map(item => item?.goalId === goalId ? next : item));
+    notifyRuntime({ scope: 'execution', goalId, revision: execution.revision, actor, changeType: 'execution.command-pending' });
     return { ok: true, execution: next };
   }
 
@@ -471,6 +492,9 @@ function createGoalLifecycleService({
     }
     writeExecutionState(store, nextExecutions, nextEvents);
     store.set(RECONCILIATIONS_KEY, nextReconciliations);
+    for (const execution of nextExecutions.filter(item => item?.reconciliationRequired)) {
+      notifyRuntime({ scope: 'reconciliation', goalId: execution.goalId, revision: execution.revision, actor: 'lifecycle-service', changeType: 'reconciliation.required' });
+    }
     return { ok: true, executions: nextExecutions, events: nextEvents, reconciliations: nextReconciliations };
   }
 
@@ -549,6 +573,7 @@ function createGoalLifecycleService({
     }
     writeExecutionState(store, executions.map(item => item && item.goalId === updated.goalId ? updated : item), events.concat(cleanupAttemptEvent, cleanupEvent));
     store.set(RECONCILIATIONS_KEY, nextReconciliations);
+    notifyRuntime({ scope: 'reconciliation', goalId: updated.goalId, revision: updated.revision, actor: 'lifecycle-service', changeType: 'reconciliation.cleanup' });
     return commandResult(updated, event, { cleanup: cleanupResult, cleanupEvent });
   }
 
@@ -581,6 +606,7 @@ function createGoalLifecycleService({
     updated.commandResults = { ...execution.commandResults, [commandId]: { revision: updated.revision, eventId: nextEvent.id } };
     writeExecutionState(store, executions.map(item => item?.goalId === goalId ? updated : item), events.concat(cleanupAttemptEvent, nextEvent, cleanupEvent));
     store.set(RECONCILIATIONS_KEY, nextReconciliations);
+    notifyRuntime({ scope: 'reconciliation', goalId, revision: updated.revision, actor, changeType: 'reconciliation.cleanup-retry' });
     return commandResult(updated, nextEvent, { cleanup: cleanupResult, cleanupEvent, auditArchive });
   }
 

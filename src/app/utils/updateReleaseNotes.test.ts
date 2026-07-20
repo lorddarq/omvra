@@ -27,7 +27,7 @@ Changes:
 1. Auto-update capabilities
 1. Auto-update capabilities
 Version 0.3.33
-Improved user interface
+    - Improved user interface
 `);
 
   assert.deepEqual(parsed.items, [
@@ -40,11 +40,20 @@ Improved user interface
 });
 
 test('parseUpdateReleaseNotes keeps prose summary when no bullets exist', () => {
-  const parsed = parseUpdateReleaseNotes('This release improves update reliability across packaged Omvra builds.');
+  const parsed = parseUpdateReleaseNotes('This release improves update reliability\nacross packaged Omvra builds.');
 
   assert.deepEqual(parsed.items, ['This release improves update reliability across packaged Omvra builds.']);
   assert.equal(parsed.summary, 'This release improves update reliability across packaged Omvra builds.');
   assert.equal(parsed.hasMore, false);
+});
+
+test('parseUpdateReleaseNotes joins wrapped continuation lines into the preceding bullet', () => {
+  const parsed = parseUpdateReleaseNotes('- Fixed update dialog\nvisibility.\n- Added release note parsing.');
+
+  assert.deepEqual(parsed.items, [
+    'Fixed update dialog visibility.',
+    'Added release note parsing.',
+  ]);
 });
 
 test('parseUpdateReleaseNotes strips HTML without splitting one note across items', () => {

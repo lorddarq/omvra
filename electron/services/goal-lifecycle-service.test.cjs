@@ -300,3 +300,21 @@ test('pending commands reconcile after restart without inferring completion from
   assert.equal(result.reconciliations.at(-1).markdownCompletionIgnored, true);
   assert.ok(store.get('omvra.goalExecutionEvents.v1').some(event => event.type === 'goal.reconciled'));
 });
+
+test('lifecycle persists policy and attempt metadata and emits scoped runtime changes', () => {
+  const store = makeStore();
+  store.set('omvra.goalPolicy.v1', { policyRevision: 9, acceptance: { actor: 'human' } });
+  const changes = [];
+  const lifecycle = createGoalLifecycleService({ store, now: makeClock(), onRuntimeChange: change => changes.push(change) });
+  const started = lifecycle.execute({ goalId: 'goal-1', command: 'start', expectedRevision: 0, commandId: 'runtime-start' });
+  assert.equal(started.execution.policyRevision, 9);
+  assert.equal(started.execution.executionAttemptId, started.execution.id);
+  assert.equal(started.execution.contractPacket.executionAttempt, 1);
+  assert.deepEqual(changes[0], {
+    scope: 'execution',
+    goalId: 'goal-1',
+    revision: 1,
+    actor: 'overseer',
+    changeType: 'lifecycle.start',
+  });
+});

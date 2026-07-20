@@ -1392,7 +1392,7 @@ function recordToolAttempt(store, req, details) {
   return appendNormalizedMcpAudit(store, req, details);
 }
 
-function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot } = {}) {
+function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRuntimeChange } = {}) {
   const payload = getToolCallPayload(params);
   if (payload.error) {
     return { error: payload.error };
@@ -1512,7 +1512,7 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot } = {})
     case 'goals.lifecycle': {
       const goalId = parseGoalId(args);
       if (!goalId) return { error: invalidParams('Invalid params: "goalId" (or "id") is required.') };
-      const lifecycle = createGoalLifecycleService({ store });
+      const lifecycle = createGoalLifecycleService({ store, onRuntimeChange: emitRuntimeChange });
       const result = lifecycle.execute({
         goalId,
         command: args.command,
@@ -1522,6 +1522,7 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot } = {})
         payload: args.payload,
       });
       if (!result.ok) {
+        if (typeof emitRuntimeChange === 'function') emitRuntimeChange({ scope: result.error === 'RECONCILIATION_REQUIRED' ? 'reconciliation' : 'conflict', goalId, revision: result.currentRevision || result.currentRevision === 0 ? result.currentRevision : 0, actor: args.actor || 'mcp-agent', changeType: 'lifecycle.rejected', errorCode: result.error, details: { command: args.command } });
         recordWriteAttempt(store, req, {
           outcome: 'denied',
           reason: result.error,
@@ -1574,8 +1575,10 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot } = {})
         expectedRevision: args.expectedRevision,
         actor: 'mcp-agent',
         humanConfirmed: args.humanConfirmed === true,
+        emitRuntimeChange,
       });
       if (!result.ok) {
+        if (typeof emitRuntimeChange === 'function') emitRuntimeChange({ scope: 'conflict', goalId, revision: result.currentRevision || 0, actor: 'mcp-agent', changeType: 'graph.rejected', errorCode: result.error, details: { fields: Object.keys(args).filter(key => key !== 'expectedRevision') } });
         recordWriteAttempt(store, req, {
           outcome: 'denied',
           reason: result.error,
@@ -1616,8 +1619,10 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot } = {})
         connectorOnly: name === 'goals.update_connector',
         actor: 'mcp-agent',
         humanConfirmed: args.humanConfirmed === true,
+        emitRuntimeChange,
       });
       if (!result.ok) {
+        if (typeof emitRuntimeChange === 'function') emitRuntimeChange({ scope: 'conflict', goalId, revision: result.currentRevision || 0, actor: 'mcp-agent', changeType: 'element.rejected', errorCode: result.error, details: { elementId } });
         recordWriteAttempt(store, req, {
           outcome: 'denied',
           reason: result.error,
@@ -2501,7 +2506,7 @@ function createAccessDisabledError(serverConfig, req) {
   );
 }
 
-function createRequestDispatcher(store, { skillsRoot, userSkillsRoot } = {}) {
+function createRequestDispatcher(store, { skillsRoot, userSkillsRoot, emitRuntimeChange } = {}) {
   const clientProvenanceBySession = new Map();
 
   function getSessionKey(req) {
@@ -2711,7 +2716,7 @@ function createRequestDispatcher(store, { skillsRoot, userSkillsRoot } = {}) {
     if (normalizedMethod === 'tools/call') {
       let toolResponse;
       try {
-        toolResponse = handleToolCall(store, req, params, { skillsRoot, userSkillsRoot });
+        toolResponse = handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRuntimeChange });
       } catch (error) {
         recordToolAttempt(store, req, {
           outcome: 'failure',
@@ -2809,8 +2814,8 @@ function applyCorsHeaders(req, res) {
   res.setHeader('Access-Control-Max-Age', '600');
 }
 
-function startMcpHttpServer(store, { logger = console, onStatusChange, skillsRoot, userSkillsRoot } = {}) {
-  const dispatch = createRequestDispatcher(store, { skillsRoot, userSkillsRoot });
+function startMcpHttpServer(store, { logger = console, onStatusChange, skillsRoot, userSkillsRoot, emitRuntimeChange } = {}) {
+  const dispatch = createRequestDispatcher(store, { skillsRoot, userSkillsRoot, emitRuntimeChange });
   const serverConfig = getMcpServerConfig(store);
   const emitStatus = (status) => {
     if (typeof onStatusChange !== 'function') return;

@@ -1,0 +1,17 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { createGoalRuntimeService, RUNTIME_EVENTS_KEY } = require('./goal-runtime-service.cjs');
+
+function store(seed = {}) { const data = new Map(Object.entries(seed)); return { get: key => data.get(key), set: (key, value) => data.set(key, value) }; }
+
+test('runtime changes are typed, durable, and scoped to a joined read model', () => {
+  const db = store({ 'omvra.goals.v1': [{ id: 'goal-1', revision: 4 }], 'omvra.goalExecutions.v1': [{ goalId: 'goal-1', revision: 2, effectivePolicy: { policyRevision: 7 } }] });
+  const runtime = createGoalRuntimeService({ store: db, now: () => '2026-07-20T00:00:00.000Z' });
+  let received;
+  runtime.onChanged(event => { received = event; });
+  const event = runtime.emit({ scope: 'graph', goalId: 'goal-1', revision: 5, actor: 'renderer', changeType: 'graph.updated' });
+  assert.equal(event.eventId, received.eventId);
+  assert.equal(event.occurredAt, '2026-07-20T00:00:00.000Z');
+  assert.equal(db.get(RUNTIME_EVENTS_KEY).length, 1);
+  assert.equal(runtime.get('goal-1').execution.effectivePolicy.policyRevision, 7);
+});

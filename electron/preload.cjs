@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 const STORE_DID_CHANGE_CHANNEL = 'store/did-change';
 const UPDATE_STATE_CHANNEL = 'updates/state-changed';
+const GOAL_RUNTIME_CHANGED_CHANNEL = 'goals/runtime-changed';
 
 contextBridge.exposeInMainWorld('electron', {
   // Store
@@ -9,6 +10,16 @@ contextBridge.exposeInMainWorld('electron', {
   storeDelete: (key) => ipcRenderer.invoke('store/delete', key),
   storeExport: () => ipcRenderer.invoke('store/export'),
   recordGoalPolicyImpact: (payload) => ipcRenderer.invoke('goal-policy/record-impact', payload),
+  goals: {
+    getRuntime: (goalId) => ipcRenderer.invoke('goals/get-runtime', goalId),
+    update: (payload) => ipcRenderer.invoke('goals/update', payload),
+    onRuntimeChanged: (listener) => {
+      if (typeof listener !== 'function') return () => {};
+      const wrappedListener = (_event, payload) => listener(payload);
+      ipcRenderer.on(GOAL_RUNTIME_CHANGED_CHANNEL, wrappedListener);
+      return () => ipcRenderer.removeListener(GOAL_RUNTIME_CHANGED_CHANNEL, wrappedListener);
+    },
+  },
   onStoreChanged: (listener) => {
     if (typeof listener !== 'function') {
       return () => {};

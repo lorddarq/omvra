@@ -26,6 +26,7 @@ const GOAL_POLICY_DIMENSIONS: Array<{ key: GoalPolicyDimension; label: string; u
 ];
 const GOAL_POLICY_SAFE_VALUES: Record<GoalPolicyDimension, number> = { financial: 10, tokens: 100000, concurrency: 1, attempts: 10, retries: 2 };
 const EXECUTION_LOCKED_STATUSES = new Set(['working', 'blocked', 'evidence-required', 'approval-required', 'complete', 'permission-denied']);
+type GoalRuntimeProjection = { execution?: { state?: string; revision?: number; attempt?: number; policyRevision?: number; executionAttemptId?: string; reconciliationRequired?: boolean } | null; effectivePolicy?: GoalPolicyV1 | null; policyRevision?: number; executionAttempt?: number | null; executionAttemptId?: string | null; agentAvailability?: Array<{ elementId: string; available: boolean; errorCode?: string | null }>; policyImpacts?: Array<{ goalId?: string; status?: string; requiresUserConfirmation?: boolean }>; lastChange?: { scope?: string; errorCode?: string; changeType?: string } | null };
 
 function isExecutionLocked(element: GoalElement | undefined): boolean {
   return Boolean(element?.status && EXECUTION_LOCKED_STATUSES.has(element.status));
@@ -261,6 +262,9 @@ function elementIcon(type: GoalElementType) {
 
 export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirectory = '', onGoalAuditArchiveDirectoryChange }: { people?: Person[]; workspacePolicy?: GoalPolicyV1; goalAuditArchiveDirectory?: string; onGoalAuditArchiveDirectoryChange?: (directory: string) => void }) {
   const [goals, setGoals] = useState<GoalRecord[]>(readGoals);
+  const goalsRef = useRef<GoalRecord[]>([]);
+  goalsRef.current = goals;
+  const canonicalGoalsRef = useRef<GoalRecord[]>([]);
   const [schedules, setSchedules] = useState<GoalSchedule[]>(() => normalizeGoalSchedules(safeReadJSON<unknown>(GOAL_SCHEDULES_STORAGE_KEY, [])));
   const [schedulesHydrated, setSchedulesHydrated] = useState(false);
   const [canonicalHydrated, setCanonicalHydrated] = useState(false);
@@ -275,6 +279,7 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
   const [agentMenuOpen, setAgentMenuOpen] = useState(false);
   const [controlFlowMenuOpen, setControlFlowMenuOpen] = useState(false);
   const [policyImpacts, setPolicyImpacts] = useState<Array<{ goalId?: string; status?: string; requiresUserConfirmation?: boolean }>>([]);
+  const [runtimeProjection, setRuntimeProjection] = useState<GoalRuntimeProjection | null>(null);
   const agentMenuRef = useRef<HTMLDivElement | null>(null);
   const controlFlowMenuRef = useRef<HTMLDivElement | null>(null);
   const [connectorMode, setConnectorMode] = useState(false);
@@ -309,9 +314,9 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
   const selectedPolicyElement = selectedElement?.type === 'goal' || selectedElement?.type === 'subgoal' || selectedElement?.type === 'approval-gate' ? selectedElement : undefined;
   const selectedElementLocked = isExecutionLocked(selectedElement);
   const selectedEffectivePolicy = activeGoal && selectedPolicyElement
-    ? resolveInspectorPolicy(workspacePolicy, activeGoal, selectedPolicyElement)
+    ? (runtimeProjection?.effectivePolicy ?? resolveInspectorPolicy(workspacePolicy, activeGoal, selectedPolicyElement))
     : undefined;
-  const selectedPolicyImpact = policyImpacts.find(impact => impact.goalId === activeGoal?.id && impact.status === 'pending');
+  const selectedPolicyImpact = (runtimeProjection?.policyImpacts ?? policyImpacts).find(impact => impact.goalId === activeGoal?.id && impact.status === 'pending');
 
   useEffect(() => {
     if (goals.length === 0) {
@@ -356,6 +361,14 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
     });
     return () => { cancelled = true; };
   }, [workspacePolicy?.policyRevision]);
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeGoal) { setRuntimeProjection(null); return () => { cancelled = true; }; }
+    void window.electron?.goals?.getRuntime?.(activeGoal.id).then(value => {
+      if (!cancelled && value && typeof value === 'object') setRuntimeProjection(value as GoalRuntimeProjection);
+    });
+    return () => { cancelled = true; };
+  }, [activeGoal?.id]);
 
   const getAgentForElement = (element: GoalElement) => element.type === 'agent'
     ? people.find(person => person.id === element.assigneeId)
@@ -368,14 +381,28 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
     let cancelled = false;
     const refreshCanonicalGoals = () => getCanonicalJSON<GoalRecord[] | null>(STORAGE_KEY, null).then(stored => {
       if (cancelled || localMutationRef.current) return;
-      if (Array.isArray(stored)) setGoals(stored.filter(goal => goal.id !== GOAL_ID));
+      if (Array.isArray(stored)) {
+        const filtered = stored.filter(goal => goal.id !== GOAL_ID);
+        canonicalGoalsRef.current = filtered;
+        setGoals(filtered);
+      }
     });
     void refreshCanonicalGoals().then(() => {
       setCanonicalHydrated(true);
     });
     window.addEventListener('focus', refreshCanonicalGoals);
     const unsubscribe = window.electron?.onStoreChanged?.(() => { if (!draggingRef.current && rendererWritesPendingRef.current === 0) void refreshCanonicalGoals(); });
-    return () => { cancelled = true; window.removeEventListener('focus', refreshCanonicalGoals); unsubscribe?.(); };
+    const unsubscribeRuntime = window.electron?.goals?.onRuntimeChanged?.((event) => {
+      if (cancelled) return;
+      if (event.goalId === activeGoal?.id) {
+        void window.electron?.goals?.getRuntime?.(event.goalId).then(value => { if (!cancelled && value && typeof value === 'object') setRuntimeProjection(value as GoalRuntimeProjection); });
+      }
+      if (event.scope !== 'graph' || draggingRef.current || rendererWritesPendingRef.current > 0) return;
+      const local = goalsRef.current.find(goal => goal.id === event.goalId);
+      if (local && goalRevision(local) >= event.revision) return;
+      void refreshCanonicalGoals();
+    });
+    return () => { cancelled = true; window.removeEventListener('focus', refreshCanonicalGoals); unsubscribe?.(); unsubscribeRuntime?.(); };
   }, []);
   useEffect(() => {
     let cancelled = false;
@@ -399,11 +426,32 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
       const forceLocalWrite = localMutationRef.current;
       try {
         const canonical = await getCanonicalJSON<GoalRecord[] | null>(STORAGE_KEY, null);
+        if (Array.isArray(canonical)) canonicalGoalsRef.current = canonical.filter(goal => goal.id !== GOAL_ID);
         const localRevision = Math.max(0, ...goals.map(goalRevision));
         const canonicalRevision = Array.isArray(canonical) ? Math.max(0, ...canonical.map(goalRevision)) : 0;
         if (!forceLocalWrite && canonicalRevision > localRevision && Array.isArray(canonical)) {
           setGoals(canonical);
           return;
+        }
+        const previous = canonicalGoalsRef.current;
+        const changed = goals.filter(goal => {
+          const prior = previous.find(item => item.id === goal.id);
+          return prior && JSON.stringify(prior) !== JSON.stringify(goal);
+        });
+        if (changed.length === 1 && previous.some(goal => goal.id === changed[0].id) && typeof window.electron?.goals?.update === 'function') {
+          const goal = changed[0];
+          const prior = previous.find(item => item.id === goal.id)!;
+          const result = await window.electron.goals.update({ goalId: goal.id, title: goal.title, elements: goal.elements, overseerAgentId: goal.overseerAgentId, expectedRevision: goalRevision(prior) });
+          if (result.ok && result.goal) {
+            canonicalGoalsRef.current = previous.map(item => item.id === goal.id ? result.goal : item);
+            setGoals(current => current.map(item => item.id === goal.id ? result.goal : item));
+            return;
+          }
+          if (!forceLocalWrite && result.error === 'REVISION_MISMATCH') {
+            const fallback = await getCanonicalJSON<GoalRecord[] | null>(STORAGE_KEY, null);
+            if (Array.isArray(fallback)) { canonicalGoalsRef.current = fallback; setGoals(fallback.filter(item => item.id !== GOAL_ID)); }
+            return;
+          }
         }
         const stored = await setCanonicalJSON(STORAGE_KEY, goals);
         if (!stored) {
@@ -961,6 +1009,12 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
           <section className="mt-5 border-t border-slate-100 pt-4">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Policy</p>
             <p className="mt-1 text-[11px] text-slate-400">Typed controls become part of the execution contract.</p>
+            {runtimeProjection?.execution && <p className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-600">Runtime: <span className="font-medium text-slate-800">{runtimeProjection.execution.state ?? 'unknown'}</span> · execution revision {runtimeProjection.execution.revision ?? 0} · policy revision {runtimeProjection.policyRevision ?? 0}</p>}
+            {runtimeProjection?.lastChange?.errorCode && <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-2.5 py-2 text-[11px] text-red-800">Conflict: <span className="font-semibold">{runtimeProjection.lastChange.errorCode}</span>. The rejected change remains inspectable and canonical state was preserved.</p>}
+            {runtimeProjection?.execution?.reconciliationRequired && <p className="mt-2 rounded-md border border-orange-200 bg-orange-50 px-2.5 py-2 text-[11px] text-orange-800">Reconciliation required before execution can continue.</p>}
+            {runtimeProjection?.execution?.state === 'approval-required' && <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800">Approval required before this execution can proceed.</p>}
+            {runtimeProjection?.execution?.state === 'blocked' && <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800">Execution is blocked. Review the runtime policy, dependencies, and agent availability.</p>}
+            {runtimeProjection?.agentAvailability?.some(item => !item.available) && <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-2.5 py-2 text-[11px] text-red-800">Agent unavailable: dispatch remains blocked until the configured capability is available or an approved fallback is selected.</p>}
             {workspacePolicy && <p className="mt-2 rounded-md border border-blue-100 bg-blue-50/60 px-2.5 py-2 text-[11px] text-blue-800">Workspace policy revision {workspacePolicy.policyRevision} is the inherited baseline. Goal and gate values can only narrow it.</p>}
             {selectedPolicyImpact && <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800">Active execution has a pending policy impact. {selectedPolicyImpact.requiresUserConfirmation ? 'Confirmation is required before the widened policy can apply.' : 'Pause and review the affected execution before continuing.'}</p>}
             {selectedEffectivePolicy && <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/70 p-2.5">

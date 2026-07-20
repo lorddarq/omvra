@@ -623,12 +623,38 @@ interface GoalProjectBinding {
 
 interface GoalArtifactReference {
   goalId: string;
-  projectId: string; // Required because tasks and milestones are project-owned.
-  artifactType: 'task' | 'milestone';
+  projectId?: string; // Required for project-owned task/milestone artifacts; omitted for projectless Goals.
+  artifactType: 'task' | 'milestone' | 'goal';
   artifactId: string;
   contribution?: 'deliverable' | 'dependency' | 'evidence';
 }
 ```
+
+### Resolved Goal–artifact contract
+
+The Goal–artifact relation is a separate durable relation. It is many-to-many
+between Goals/Subgoals and artifacts: links are additive, unlink is explicit,
+and a replace operation is scoped to one Goal/Subgoal node rather than
+rewriting other relations. Task and milestone records remain authoritative for
+their mutable state; Goal state stores references and projection metadata, not
+copies of mutable artifact contents.
+
+A Goal may itself be referenced as an artifact by another Goal, including when
+the referenced Goal is projectless. Live relations remain editable for future
+Goal revisions. Agents may propose links, but assign, start, move, complete,
+and delete actions require human confirmation by default; narrower exceptions
+must be explicitly authorized by policy.
+
+Evidence is represented by immutable references with metadata and an optional
+content hash. Mutable source contents are never copied into Goal state. When a
+task, milestone, or Goal revision changes, projections expose stale references
+and the affected contract is re-evaluated rather than silently treating the
+old source as current.
+
+Once execution begins, the resolved Goal contract/revision snapshot and its
+artifact references are immutable for that execution. Future edits create or
+target a later revision and cannot rewrite the historical decision basis used
+for downstream evaluation.
 
 A projectless Goal must still be executable when its inputs, capabilities, acceptance policy, and evidence requirements are defined. A recurring multi-source briefing may reference sources or MCP capabilities directly without creating project bindings or project-owned artifact references.
 

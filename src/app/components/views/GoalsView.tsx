@@ -1,21 +1,19 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, CircleDot, ClipboardCheck, LoaderCircle, LockKeyhole, MessageSquareText, Minus, Plus, RotateCcw, ShieldCheck, Sparkles, Target, Trash2, UserRoundCheck, ZoomIn } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CircleDot, ClipboardCheck, LoaderCircle, LockKeyhole, MessageSquareText, Plus, RotateCcw, ShieldCheck, Sparkles, Target, Trash2, UserRoundCheck } from 'lucide-react';
 import type { GoalAcceptanceActor, GoalAgentConfiguration, GoalAgentMode, GoalArtifactReference, GoalBudgetMode, GoalConditionBranch, GoalConnectorSide, GoalElement, GoalElementReadiness, GoalElementType, GoalPolicy, GoalPolicyDimension, GoalPolicyDimensionOverride, GoalRecord, GoalRetryExhaustionPolicy, GoalSchedule, Person, ProjectMilestone, Task } from '../../types.ts';
 import type { GoalPolicyV1 } from '../../utils/goalPolicy.ts';
 import { GOAL_TEMPLATES, instantiateGoalTemplate, type GoalTemplate } from '../../data/goalTemplates.ts';
 import { getCanonicalJSON, safeReadJSON, setCanonicalJSON } from '../../utils/storage.ts';
 import { isGoalElementConnected, isValidRetryTarget, wouldCreateGoalCycle } from '../../utils/goalCanvas.ts';
 import { AgentIcon as Bot } from '../icons/AgentIcon';
-import { DropdownChevron } from '../icons/DropdownChevron';
-import { WorkflowsIcon } from '../icons/WorkflowsIcon';
 import { LinkIcon as Link2 } from '../icons/LinkIcon';
 import { PuzzlePieceIcon } from '../icons/PuzzlePieceIcon';
 import { AttachmentIcon } from '../icons/AttachmentIcon';
-import { AwardCertificateIcon } from '../icons/AwardCertificateIcon';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
-import { GoalTemplatesPopover } from '../GoalTemplatesPopover';
+import { GoalsCanvasControls } from '../goals/GoalsCanvasControls';
+import { GoalsSidebar } from '../goals/GoalsSidebar';
+import { GoalsToolbar } from '../goals/GoalsToolbar';
 import { GOAL_SCHEDULES_STORAGE_KEY, normalizeGoalSchedules, scheduleStatus } from '../../utils/goalSchedules.ts';
 
 const STORAGE_KEY = 'omvra.goals.v1';
@@ -969,77 +967,42 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
 
   return (
   <section className="goals-view relative h-full min-h-0 overflow-hidden bg-slate-50 text-slate-700">
-    <aside className={`absolute left-4 top-4 bottom-4 z-20 flex flex-col rounded-xl border border-slate-200 bg-white shadow-sm transition-[width] duration-200 ${leftPanelCollapsed ? 'w-12' : 'w-64'}`}>
-      <div className={`flex items-center border-b px-3 py-3 ${leftPanelCollapsed ? 'justify-center' : 'justify-between'}`}><div className={leftPanelCollapsed ? 'hidden' : ''}><h1 className="text-sm font-semibold text-slate-900">Goals</h1><p className="mt-0.5 text-xs text-slate-500">Shape work as a loop</p></div><button onClick={() => setLeftPanelCollapsed(value => !value)} className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label={leftPanelCollapsed ? 'Expand goals panel' : 'Collapse goals panel'}>{leftPanelCollapsed ? <ChevronRight className="size-4" /> : <ChevronLeft className="size-4" />}</button></div>
-      <div className={`flex-1 space-y-1 overflow-auto p-2 ${leftPanelCollapsed ? 'hidden' : ''}`}>{goals.map(goal => { const goalStatus = goal.elements.find(element => element.type === 'goal')?.status ?? 'draft'; return <button key={goal.id} onClick={() => { setSelectedGoalId(goal.id); setSelectedElementId(goal.elements[0]?.id ?? ''); }} className={`w-full rounded-lg px-3 py-2 text-left text-sm ${goal.id === selectedGoalId ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-600 hover:bg-slate-50'}`}><span className="block truncate">{goal.title}</span><span className="mt-1 flex items-center justify-between gap-2 text-[11px] text-slate-400"><span>{goal.elements.filter(element => element.type === 'subgoal').length} subgoals · {goal.elements.length} nodes</span><span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 font-medium ${compactChipClass(statusChipClass(goalStatus))}`}><StatusIcon status={goalStatus} className="size-3" />{statusLabel(goalStatus)}</span></span></button>; })}</div>
-      <div className={`flex-1 flex-col items-center gap-2 overflow-auto p-2 ${leftPanelCollapsed ? 'flex' : 'hidden'}`}>{goals.map(goal => <button key={goal.id} onClick={() => { setSelectedGoalId(goal.id); setSelectedElementId(goal.elements[0]?.id ?? ''); }} className={`rounded-lg p-2 ${goal.id === selectedGoalId ? 'bg-slate-100' : 'hover:bg-slate-50'}`} aria-label={goal.title} title={goal.title}><Sparkles className="size-4" style={{ color: goal.color ?? '#2563eb' }} /></button>)}</div>
-      <div className={`border-t p-3 ${leftPanelCollapsed ? 'hidden' : ''}`}><button onClick={openNewGoalDialog} className="flex w-full items-center justify-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700"><Plus className="size-3.5" /> New goal</button></div>
-    </aside>
-
-    <div className="absolute left-1/2 top-4 z-20 flex w-fit h-fit shrink -translate-x-1/2 items-center justify-center gap-1 rounded-full border border-slate-200 bg-white p-1 shadow-sm">
-    <GoalTemplatesPopover templates={GOAL_TEMPLATES} onSelect={addTemplate} />
-    <div ref={controlFlowMenuRef} className="relative w-fit h-fit shrink-0">
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button disabled={!activeGoal} onClick={() => setControlFlowMenuOpen(value => !value)} className="relative flex w-fit h-8 shrink-0 items-center justify-center gap-1 rounded-full px-2 text-xs text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Add control flow" aria-haspopup="menu" aria-expanded={controlFlowMenuOpen}>
-            <span className="flex items-center justify-center"><WorkflowsIcon className="size-3.5 text-[#71717a]" /></span>
-            <DropdownChevron />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" sideOffset={4}>Add control flow</TooltipContent>
-      </Tooltip>
-      {controlFlowMenuOpen && activeGoal && <div role="menu" aria-label="Add control flow" className="absolute left-0 top-full mt-1 w-48 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
-        {CONTROL_FLOW_ITEMS.map(item => <button key={item.type} role="menuitem" onClick={() => { addElement(item.type); setControlFlowMenuOpen(false); }} className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs hover:bg-slate-100">
-          <span className="text-slate-600">{item.icon}</span><span><span className="block font-medium text-slate-800">{item.label}</span><span className="block text-[11px] text-slate-400">{item.type === 'human-input' ? 'Pause for user input' : 'Return to an earlier step'}</span></span>
-        </button>)}
-      </div>}
-    </div>
-    <div ref={artifactMenuRef} className="relative w-fit h-fit shrink-0">
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button type="button" disabled={!activeGoal} onClick={() => setArtifactMenuOpen(value => !value)} className="relative flex w-fit h-8 shrink-0 items-center justify-center gap-1 rounded-full px-2 text-xs text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Add artifact">
-            <span className="flex items-center justify-center"><AwardCertificateIcon className="size-3.5 text-[#71717a]" /></span>
-            <DropdownChevron />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" sideOffset={4}>Add artifact</TooltipContent>
-      </Tooltip>
-      {artifactMenuOpen && activeGoal && <div role="menu" aria-label="Add artifact" className="absolute left-0 top-full mt-1 w-56 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
-        {ARTIFACT_ITEMS.map(item => <button key={item.type} role="menuitem" onClick={() => { addElement(item.type); setArtifactMenuOpen(false); }} className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs hover:bg-slate-100">
-          <span className="text-slate-600">{item.icon}</span><span><span className="block font-medium text-slate-800">{item.label}</span><span className="block text-[11px] text-slate-400">{item.description}</span></span>
-        </button>)}
-      </div>}
-    </div>
-    {TOOL_ITEMS.map(tool => tool.type === 'agent' ?
-      <div key={tool.type} ref={agentMenuRef} className="relative w-fit h-fit shrink-0">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button disabled={!activeGoal} onClick={() => setAgentMenuOpen(value => !value)} className="relative flex w-fit h-8 shrink-0 items-center justify-center gap-1 rounded-full px-2 text-xs text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Add agent" aria-haspopup="menu" aria-expanded={agentMenuOpen}>
-              <span className="flex items-center justify-center">{tool.icon}</span>
-              <DropdownChevron />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" sideOffset={4}>Add {tool.label}</TooltipContent>
-          </Tooltip>
-            {agentMenuOpen && activeGoal &&
-            <div role="menu" aria-label="Add agent" className="absolute left-0 top-full mt-1 w-56 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
-              {people.filter(person => person.kind === 'agentic').map(person =>
-                <button key={person.id} role="menuitem" onClick={() => addAgent(person)} className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs hover:bg-slate-100">
-                  <Bot className="size-3.5 text-amber-500" />
-                  <span>
-                    <span className="block font-medium text-slate-800">{person.name}</span>
-                    <span className="block text-[11px] text-slate-400">{person.role}</span>
-                  </span>
-                </button>)}
-                  {people.filter(person => person.kind === 'agentic').length === 0 &&
-                  <p className="px-2.5 py-2 text-xs text-slate-400">No agents configured</p>}
-                  </div>}
-                  </div> : <Tooltip key={tool.type}>
-                    <TooltipTrigger asChild>
-                      <button disabled={!activeGoal} onClick={() => tool.type === 'connector' ? (setConnectorMode(true), setConnectorSourceId(null), setConnectorSourceBranch(undefined)) : addElement(tool.type)} className={`flex size-8 shrink-0 items-center justify-center rounded-full p-0 text-xs disabled:cursor-not-allowed disabled:opacity-40 ${tool.type === 'connector' && connectorMode ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`} aria-label={`Add ${tool.label}`}>{tool.icon}</button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" sideOffset={4}>{tool.type === 'connector' && connectorMode ? 'Choose source' : `Add ${tool.label}`}</TooltipContent></Tooltip>)}</div>
-
+    <GoalsSidebar
+      goals={goals}
+      selectedGoalId={selectedGoalId}
+      collapsed={leftPanelCollapsed}
+      onSelectGoal={goal => { setSelectedGoalId(goal.id); setSelectedElementId(goal.elements[0]?.id ?? ''); }}
+      onToggleCollapsed={() => setLeftPanelCollapsed(value => !value)}
+      onNewGoal={openNewGoalDialog}
+      statusChipClass={statusChipClass}
+      compactChipClass={compactChipClass}
+      statusLabel={statusLabel}
+      StatusIcon={StatusIcon}
+    />
+    <GoalsToolbar
+      activeGoal={activeGoal}
+      people={people}
+      connectorMode={connectorMode}
+      agentMenuOpen={agentMenuOpen}
+      controlFlowMenuOpen={controlFlowMenuOpen}
+      artifactMenuOpen={artifactMenuOpen}
+      agentMenuRef={agentMenuRef}
+      controlFlowMenuRef={controlFlowMenuRef}
+      artifactMenuRef={artifactMenuRef}
+      templates={GOAL_TEMPLATES}
+      toolItems={TOOL_ITEMS}
+      artifactItems={ARTIFACT_ITEMS}
+      controlFlowItems={CONTROL_FLOW_ITEMS}
+      onSelectTemplate={addTemplate}
+      onAddElement={addElement}
+      onAddControlFlow={type => { addElement(type); setControlFlowMenuOpen(false); }}
+      onAddArtifact={type => { addElement(type); setArtifactMenuOpen(false); }}
+      onAddAgent={addAgent}
+      onToggleAgentMenu={() => setAgentMenuOpen(value => !value)}
+      onToggleControlFlowMenu={() => setControlFlowMenuOpen(value => !value)}
+      onToggleArtifactMenu={() => setArtifactMenuOpen(value => !value)}
+      onStartConnector={() => { setConnectorMode(true); setConnectorSourceId(null); setConnectorSourceBranch(undefined); }}
+    />
     <div ref={canvasRef} tabIndex={0} role="application" aria-label="Goal canvas. Hold space and drag to pan." className={`h-full w-full outline-none ${spacePressed || panMode ? 'cursor-grab' : 'cursor-default'}`} onPointerDown={beginCanvasPan} onPointerMove={moveCanvasPan} onPointerUp={endCanvasPan} onPointerCancel={endCanvasPan} onLostPointerCapture={event => { if (panSessionRef.current?.pointerId === event.pointerId) panSessionRef.current = null; }}>
       <div className="goals-canvas-grid absolute inset-0" aria-hidden="true" />
       {!activeGoal && <div className="absolute inset-0 flex items-center justify-center p-6" role="status" aria-live="polite"><div className="max-w-sm rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm"><div className="mx-auto flex size-10 items-center justify-center rounded-full bg-blue-50 text-blue-600"><Sparkles className="size-5" /></div><h2 className="mt-3 text-sm font-semibold text-slate-900">Start with a Goal</h2><p className="mt-1 text-xs leading-5 text-slate-500">Create a Goal to shape its subgoals, agents, instructions, and approval gates on the canvas.</p><button type="button" onClick={openNewGoalDialog} className="mt-4 inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700"><Plus className="size-3.5" /> New goal</button></div></div>}
@@ -1484,28 +1447,14 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
         <div className="mt-6 flex justify-end gap-2"><button type="button" onClick={() => setNewGoalDialogOpen(false)} className="min-h-10 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button><button type="submit" className="min-h-10 rounded-md bg-slate-900 px-3 text-sm font-medium text-white hover:bg-slate-700">Create Goal</button></div>
       </form>
     </div>}
-    <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-2">
-      {(spacePressed || panMode) && (
-        <div className="pointer-events-none rounded bg-slate-900/80 px-2 py-1 text-xs text-white shadow-sm">
-          {spacePressed ? 'Release space to edit' : 'Pan mode · drag to move'}
-        </div>
-      )}
-      <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white p-2 text-xs text-slate-500 shadow-sm">
-        <button
-          onClick={() => setPanMode(value => !value)}
-          className={`size-8 rounded-full p-2 text-xs ${panMode ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'}`}
-          aria-pressed={panMode}
-          aria-label="Pan canvas"
-        >
-          Pan
-        </button>
-        <div className="flex h-8 items-center gap-1 rounded-full border border-slate-200 bg-white p-1">
-          <button className="rounded-full p-1 hover:bg-slate-100" onClick={() => setZoom(value => Math.max(.6, value - .1))} aria-label="Zoom out"><Minus className="size-3" /></button>
-          <span className="min-w-9 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
-          <button className="rounded-full p-1 hover:bg-slate-100" onClick={() => setZoom(value => Math.min(1.4, value + .1))} aria-label="Zoom in"><ZoomIn className="size-3" /></button>
-        </div>
-      </div>
-    </div>
+    <GoalsCanvasControls
+      spacePressed={spacePressed}
+      panMode={panMode}
+      zoom={zoom}
+      onTogglePanMode={() => setPanMode(value => !value)}
+      onZoomOut={() => setZoom(value => Math.max(.6, value - .1))}
+      onZoomIn={() => setZoom(value => Math.min(1.4, value + .1))}
+    />
   </section>
   );
 }

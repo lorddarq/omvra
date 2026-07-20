@@ -367,7 +367,7 @@ export function PeopleManagementSections({
             ? pendingDeleteImpact?.loading
               ? 'Checking assigned work and Goal workflows…'
               : `This removes the agent and unassigns ${pendingDeleteImpact?.taskCount ?? getTaskCountForPerson(pendingDeletePerson.id)} task${(pendingDeleteImpact?.taskCount ?? 0) === 1 ? '' : 's'}. ${pendingDeleteImpact?.goalNodeCount ? `${pendingDeleteImpact.goalNodeCount} Goal node${pendingDeleteImpact.goalNodeCount === 1 ? '' : 's'} across ${pendingDeleteImpact.goalCount} workflow${pendingDeleteImpact.goalCount === 1 ? '' : 's'} will remain as missing-agent references${pendingDeleteImpact.goalTitles.length ? ` (${pendingDeleteImpact.goalTitles.join(', ')}${pendingDeleteImpact.goalCount > pendingDeleteImpact.goalTitles.length ? ', …' : ''})` : ''}.` : 'Existing Goal workflow references will be preserved as missing-agent references.'}`
-            : `This removes the person and unassigns ${pendingDeleteImpact?.taskCount ?? getTaskCountForPerson(pendingDeletePerson.id)} task${(pendingDeleteImpact?.taskCount ?? 0) === 1 ? '' : 's'}.`
+            : `This removes the person and unassigns ${pendingDeleteImpact?.taskCount ?? (pendingDeletePerson ? getTaskCountForPerson(pendingDeletePerson.id) : 0)} task${(pendingDeleteImpact?.taskCount ?? 0) === 1 ? '' : 's'}.`
         }
         confirmLabel={pendingDeletePerson?.kind === 'agentic' ? 'Delete agent' : 'Delete person'}
         onOpenChange={(open) => {

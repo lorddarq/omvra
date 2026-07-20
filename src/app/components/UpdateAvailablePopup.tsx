@@ -55,10 +55,10 @@ export function UpdateAvailablePopup({
       <DialogContent
         showClose={false}
         aria-describedby={undefined}
-        overlayClassName="bg-transparent"
+        overlayClassName="z-[90] bg-transparent"
         onEscapeKeyDown={(event) => event.preventDefault()}
         onInteractOutside={(event) => event.preventDefault()}
-        className="top-auto left-auto right-6 bottom-[44px] z-[70] w-[288px] max-w-[calc(100vw-2rem)] translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-[24px] border-0 bg-white p-0 shadow-[0px_2px_8px_rgba(0,0,0,0.1),0px_2px_4px_rgba(0,0,0,0.04),0px_1px_2px_rgba(0,0,0,0.06),0px_0px_41px_rgba(0,0,0,0.2)] sm:max-w-none"
+        className="top-auto left-auto right-6 bottom-[44px] z-[100] w-[288px] max-w-[calc(100vw-2rem)] translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-[24px] border-0 bg-white p-0 shadow-[0px_2px_8px_rgba(0,0,0,0.1),0px_2px_4px_rgba(0,0,0,0.04),0px_1px_2px_rgba(0,0,0,0.06),0px_0px_41px_rgba(0,0,0,0.2)] sm:max-w-none"
       >
         <section className="relative overflow-hidden rounded-[24px] bg-white">
           <DialogTitle className="sr-only">{title}</DialogTitle>

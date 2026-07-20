@@ -37,6 +37,17 @@ npm install
 npm run dev
 ```
 
+To exercise the auto-update surfaces while running an unpackaged development build, use the debug fixtures:
+
+```bash
+npm run dev:update               # Available update dialog
+npm run dev:update:downloading   # Download-progress state
+npm run dev:update:downloaded    # Restart-to-install state
+npm run dev:update:backup        # Backup-required update flow
+```
+
+These commands use the existing in-memory updater fixture and do not contact a release server or install anything.
+
 `npm run dev` starts:
 
 1. Vite renderer dev server on `http://localhost:5173`

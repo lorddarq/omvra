@@ -23,7 +23,7 @@ export function OverflowActionMenu({
   menuLabel,
   items,
   buttonClassName = 'h-8 w-9 rounded-xl border-black/10 bg-white text-[#71717a] shadow-none hover:bg-[#71717a]/5',
-  menuClassName = 'absolute right-0 top-[34px] z-50 w-[168px] overflow-hidden rounded-xl border border-black/10 bg-white p-1 text-sm shadow-[0_8px_24px_rgba(15,23,42,0.12),0_1px_2px_rgba(0,0,0,0.06)]',
+  menuClassName = 'absolute right-0 top-[34px] z-[100] w-[168px] overflow-hidden rounded-xl border border-black/10 bg-white p-1 text-sm shadow-[0_8px_24px_rgba(15,23,42,0.12),0_1px_2px_rgba(0,0,0,0.06)]',
   onOpenChange,
 }: OverflowActionMenuProps) {
   const [isOpen, setIsOpen] = useState(false);

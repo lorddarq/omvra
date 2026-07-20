@@ -20,6 +20,7 @@ interface ColumnDialogProps {
 }
 
 const FALLBACK_COLUMN_COLOR = '#9CA3AF';
+const columnSelectClassName = 'h-9 w-full rounded-xl border-[#e5e7eb] bg-white px-3 text-sm font-medium text-[#71717a] shadow-[0_1px_2px_rgba(0,0,0,0.04)] focus-visible:ring-gray-200';
 
 function normalizeHexColor(value: string): string | null {
   const trimmed = value.trim();
@@ -171,14 +172,14 @@ export function ColumnDialog({
               <div className="space-y-2">
                 <Label htmlFor="column-load">Workload classification</Label>
                 <Select value={loadClassification} onValueChange={value => setLoadClassification(value as LoadClassification)}>
-                  <SelectTrigger id="column-load"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="column-load" className={columnSelectClassName}><SelectValue /></SelectTrigger>
                   <SelectContent>{LOAD_CLASSIFICATIONS.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="column-roadmap">Roadmap stage</Label>
                 <Select value={roadmapStage} onValueChange={value => setRoadmapStage(value as RoadmapStage)}>
-                  <SelectTrigger id="column-roadmap"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="column-roadmap" className={columnSelectClassName}><SelectValue /></SelectTrigger>
                   <SelectContent>{ROADMAP_STAGES.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
@@ -197,7 +198,7 @@ export function ColumnDialog({
               <div className="space-y-2">
                 <Label htmlFor="column-ai-action">Agent action</Label>
                 <Select value={aiAction} onValueChange={value => setAiAction(value as AgentWatchAction)}>
-                  <SelectTrigger id="column-ai-action"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="column-ai-action" className={columnSelectClassName}><SelectValue /></SelectTrigger>
                   <SelectContent>{AI_ACTIONS.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>

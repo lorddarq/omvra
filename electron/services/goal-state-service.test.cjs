@@ -49,6 +49,51 @@ test('control-flow nodes normalize as supported Goal elements and preserve their
   assert.equal(goal.elements[1].retryExhaustionPolicy, 'human-review');
 });
 
+test('deliverable nodes keep the delivery contract separate from migrated supporting artifacts', () => {
+  const goal = normalizeGoal({
+    id: 'goal-deliverable',
+    title: 'Deliverable goal',
+    elements: [{
+      id: 'deliverable-1',
+      type: 'deliverable',
+      title: 'Final report',
+      deliverySpec: {
+        outcomeKind: 'file',
+        instructions: 'Deliver the report to the research folder.',
+        format: 'PDF',
+        acceptanceCriteria: ['Contains findings'],
+        expectedArtifactCount: 1.8,
+      },
+      deliverableStatus: 'ready-for-review',
+      artifactReferences: [
+        { id: 'artifact-1', artifactType: 'user-defined', artifactId: 'report-1', contribution: 'deliverable', label: 'Report', kind: 'document', format: 'PDF', locator: 'file:///tmp/report.pdf' },
+        { id: 'artifact-duplicate', artifactType: 'user-defined', artifactId: 'report-1', label: 'Ignored duplicate' },
+      ],
+      x: 0,
+      y: 0,
+    }],
+  });
+
+  const deliverable = goal.elements.find(element => element.type === 'deliverable');
+  assert.equal(deliverable.type, 'deliverable');
+  assert.equal(deliverable.deliverableStatus, 'ready-for-review');
+  assert.equal(deliverable.deliverySpec.expectedArtifactCount, 1);
+  assert.equal(deliverable.artifactReferences, undefined);
+  const supporting = goal.elements.find(element => element.type === 'artifact');
+  assert.equal(supporting.artifactRole, 'supporting');
+  assert.equal(supporting.artifactReferences[0].contribution, 'supporting');
+  assert.equal(supporting.artifactReferences[0].locator, 'file:///tmp/report.pdf');
+});
+
+test('supporting artifact nodes normalize their role and references', () => {
+  const goal = normalizeGoal({ id: 'goal-supporting', title: 'Inputs', elements: [{ id: 'artifact-1', type: 'artifact', title: 'Research notes', artifactReferences: [{ artifactType: 'document', artifactId: 'doc-1', sourceTaskId: 'task-1', sourceAttachmentId: 'attachment-1', copiedContents: 'must-not-persist' }] }] });
+  assert.equal(goal.elements[0].artifactRole, 'supporting');
+  assert.equal(goal.elements[0].artifactReferences[0].contribution, undefined);
+  assert.equal(goal.elements[0].artifactReferences[0].sourceTaskId, 'task-1');
+  assert.equal(goal.elements[0].artifactReferences[0].sourceAttachmentId, 'attachment-1');
+  assert.equal(goal.elements[0].artifactReferences[0].copiedContents, undefined);
+});
+
 test('agent configuration migrates legacy assignees and rejects incomplete ephemeral nodes', () => {
   const goal = normalizeGoal({
     id: 'goal-agent-contract',

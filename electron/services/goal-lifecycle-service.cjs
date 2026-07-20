@@ -14,6 +14,7 @@ const { GOAL_POLICY_KEY, buildGoalContractPacket, getPendingGoalPolicyImpact, re
 const { collectSkillRequirements, resolveRequiredSkills } = require('./skill-service.cjs');
 
 const RECONCILIATIONS_KEY = 'omvra.goalReconciliations.v1';
+const HANDOFFS_KEY = 'omvra.goalHandoffs.v1';
 const PREFERENCES_KEY = 'omvra.preferences.v1';
 
 const STATES = [
@@ -63,6 +64,23 @@ function writeExecutionState(store, executions, events) {
 
 function writeEvidence(store, evidence) {
   store.set(EVIDENCE_KEY, evidence);
+}
+
+function createHandoffRecord({ goalId, execution, payload, now }) {
+  const produced = Array.isArray(payload?.producedArtifactReferences) ? payload.producedArtifactReferences : [];
+  return {
+    id: `handoff_${randomUUID()}`,
+    goalId,
+    executionId: execution.id,
+    executionRevision: execution.revision,
+    goalRevision: execution.goalRevision ?? null,
+    ...(typeof payload?.deliverableId === 'string' && payload.deliverableId.trim() ? { deliverableId: payload.deliverableId.trim() } : {}),
+    producedArtifactReferences: produced.filter(item => item && typeof item === 'object' && !Array.isArray(item)).map(item => ({ ...item, immutable: true })),
+    deliveryFacts: payload?.deliveryFacts && typeof payload.deliveryFacts === 'object' && !Array.isArray(payload.deliveryFacts) ? { ...payload.deliveryFacts } : {},
+    deliveredAt: typeof payload?.deliveredAt === 'string' ? payload.deliveredAt : now(),
+    immutable: true,
+    createdAt: now(),
+  };
 }
 
 function normalizeRevision(value) {
@@ -394,6 +412,11 @@ function createGoalLifecycleService({
       revision: execution.revision + 1,
       updatedAt: now(),
     };
+    if (command === 'request-handoff' || command === 'complete') {
+      const handoff = createHandoffRecord({ goalId, execution: nextExecution, payload, now });
+      store.set(HANDOFFS_KEY, readArray(store, HANDOFFS_KEY).concat(handoff));
+      transition.eventPayload = { ...transition.eventPayload, handoffRecord: handoff };
+    }
     const event = {
       ...eventFor(nextExecution, command, actor, {
         ...transition.eventPayload,
@@ -756,6 +779,7 @@ module.exports = {
   EXECUTIONS_KEY,
   GOALS_KEY,
   RECONCILIATIONS_KEY,
+  HANDOFFS_KEY,
   STATES,
   createGoalLifecycleService,
 };

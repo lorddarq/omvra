@@ -286,3 +286,25 @@ test('workspace backup preserves Goal graphs and rejects duplicate Goal or eleme
   assert.equal(invalid.ok, false);
   assert.match(invalid.error || '', /duplicate Goal id/);
 });
+
+test('workspace backup preserves deliverable contracts and separate supporting artifact nodes', () => {
+  const goal = {
+    id: 'goal-deliverable-backup',
+    title: 'Preserve deliverable',
+    elements: [{
+      id: 'deliverable-1',
+      type: 'deliverable',
+      title: 'Report',
+      deliverySpec: { outcomeKind: 'file', instructions: 'Deliver PDF', format: 'PDF', expectedArtifactCount: 1 },
+    }, {
+      id: 'artifact-1',
+      type: 'artifact',
+      artifactRole: 'supporting',
+      title: 'Research source',
+      artifactReferences: [{ id: 'artifact-ref-1', artifactType: 'document', artifactId: 'source', contribution: 'supporting', label: 'Source', locator: 'file:///tmp/source.pdf' }],
+    }],
+  };
+  const repaired = repairWorkspaceBackupPayload({ version: 2, projects: [], people: [], tasks: [], milestones: [], statusColumns: fallbackStatusColumns, preferences: {}, electronStore: { 'omvra.goals.v1': [goal] } }, { fallbackStatusColumns, fallbackPreferences: createDefaultWorkspacePreferences(fallbackStatusColumns) });
+  assert.equal(repaired.ok, true);
+  assert.deepEqual(repaired.electronStoreSnapshot['omvra.goals.v1'], [goal]);
+});

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { createGoalLifecycleService, EVENTS_KEY, EXECUTIONS_KEY, EVIDENCE_KEY } = require('./goal-lifecycle-service.cjs');
+const { createGoalLifecycleService, EVENTS_KEY, EXECUTIONS_KEY, EVIDENCE_KEY, HANDOFFS_KEY } = require('./goal-lifecycle-service.cjs');
 
 function makeStore() {
   const values = new Map([
@@ -43,6 +43,7 @@ test('lifecycle transitions require evidence, acceptance, and revisions', () => 
 
   const handoff = lifecycle.execute({ goalId: 'goal-1', command: 'request-handoff', expectedRevision: 4, commandId: 'handoff-2' });
   assert.equal(handoff.execution.state, 'handoff-pending');
+  assert.equal(store.get(HANDOFFS_KEY).length, 1);
 
   const accepted = lifecycle.execute({ goalId: 'goal-1', command: 'accept', expectedRevision: 5, commandId: 'accept-1', payload: { finalEvidenceVerified: true, acceptedBy: 'human-1' } });
   assert.equal(accepted.execution.state, 'handoff-pending');
@@ -55,6 +56,22 @@ test('lifecycle transitions require evidence, acceptance, and revisions', () => 
   assert.equal(completed.execution.state, 'complete');
   assert.equal(completed.cleanup.status, 'skipped');
   assert.equal(store.get(EXECUTIONS_KEY)[0].state, 'complete');
+});
+
+test('terminal handoff records produced outputs as immutable runtime evidence', () => {
+  const store = makeStore();
+  const lifecycle = createGoalLifecycleService({ store, now: makeClock(), cleanup: () => ({ status: 'skipped', ok: true }) });
+  lifecycle.execute({ goalId: 'goal-1', command: 'start', expectedRevision: 0, commandId: 'start-handoff' });
+  lifecycle.execute({ goalId: 'goal-1', command: 'acknowledge', expectedRevision: 1, commandId: 'ack-handoff', payload: { contractRevision: 0 } });
+  lifecycle.execute({ goalId: 'goal-1', command: 'dispatch', expectedRevision: 2, commandId: 'dispatch-handoff' });
+  lifecycle.execute({ goalId: 'goal-1', command: 'submit-evidence', expectedRevision: 3, commandId: 'evidence-handoff', payload: { evidenceRefs: ['supporting-input'] } });
+  const result = lifecycle.execute({ goalId: 'goal-1', command: 'request-handoff', expectedRevision: 4, commandId: 'request-handoff', payload: { deliverableId: 'deliverable-1', producedArtifactReferences: [{ label: 'Final report', locator: 'file:///tmp/report.pdf' }], deliveryFacts: { recipient: 'user' } } });
+  assert.equal(result.event.payload.handoffRecord.immutable, true);
+  assert.equal(store.get(HANDOFFS_KEY)[0].producedArtifactReferences[0].label, 'Final report');
+  assert.equal(store.get(HANDOFFS_KEY)[0].deliveryFacts.recipient, 'user');
+  const duplicate = lifecycle.execute({ goalId: 'goal-1', command: 'request-handoff', expectedRevision: 5, commandId: 'request-handoff', payload: { producedArtifactReferences: [{ label: 'Duplicate' }] } });
+  assert.equal(duplicate.idempotent, true);
+  assert.equal(store.get(HANDOFFS_KEY).length, 1);
 });
 
 test('acceptance also requires verified final evidence', () => {
@@ -73,6 +90,18 @@ test('acceptance also requires verified final evidence', () => {
   assert.equal(accepted.execution.state, 'handoff-pending');
   const completed = lifecycle.execute({ goalId: 'goal-1', command: 'complete', expectedRevision: 6, commandId: 'complete', payload: { finalEvidenceVerified: true } });
   assert.equal(completed.execution.state, 'complete');
+});
+
+test('deliverable contract changes invalidate the acknowledged execution contract', () => {
+  const store = makeStore();
+  store.set('omvra.goals.v1', [{ id: 'goal-1', title: 'Ship it', elements: [{ id: 'deliverable-1', type: 'deliverable', title: 'Report', deliverySpec: { outcomeKind: 'file', instructions: 'Deliver PDF' } }] }]);
+  const lifecycle = createGoalLifecycleService({ store, now: makeClock(), cleanup: () => ({ status: 'skipped', ok: true }) });
+  const started = lifecycle.execute({ goalId: 'goal-1', command: 'start', expectedRevision: 0, commandId: 'start-deliverable' });
+  const packet = started.execution.contractPacket;
+  lifecycle.execute({ goalId: 'goal-1', command: 'acknowledge', expectedRevision: 1, commandId: 'ack-deliverable', payload: { contractRevision: packet.contractRevision, contractHash: packet.contractHash } });
+  store.set('omvra.goals.v1', [{ id: 'goal-1', title: 'Ship it', elements: [{ id: 'deliverable-1', type: 'deliverable', title: 'Report', deliverySpec: { outcomeKind: 'summary', instructions: 'Deliver a summary' } }] }]);
+  const stale = lifecycle.execute({ goalId: 'goal-1', command: 'dispatch', expectedRevision: 2, commandId: 'dispatch-deliverable' });
+  assert.equal(stale.error, 'CONTRACT_STALE');
 });
 
 test('acknowledgement records receipt without completing or changing execution state', () => {

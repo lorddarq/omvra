@@ -624,9 +624,14 @@ interface GoalProjectBinding {
 interface GoalArtifactReference {
   goalId: string;
   projectId?: string; // Required for project-owned task/milestone artifacts; omitted for projectless Goals.
-  artifactType: 'task' | 'milestone' | 'goal';
+  artifactType: 'task' | 'milestone' | 'goal' | 'document' | 'file' | 'url' | 'user-defined';
   artifactId: string;
   contribution?: 'deliverable' | 'dependency' | 'evidence';
+  label?: string;
+  kind?: string;
+  format?: string;
+  locator?: string;
+  contentHash?: string;
 }
 ```
 
@@ -657,6 +662,69 @@ target a later revision and cannot rewrite the historical decision basis used
 for downstream evaluation.
 
 A projectless Goal must still be executable when its inputs, capabilities, acceptance policy, and evidence requirements are defined. A recurring multi-source briefing may reference sources or MCP capabilities directly without creating project bindings or project-owned artifact references.
+
+### Artifact node roles
+
+Supporting artifacts and deliverables belong to one Artifact node family, but
+they have different meanings and lifecycle rules. Sharing a topic or reference
+shape does not make them interchangeable.
+
+- A `supporting` artifact node represents execution input or context, such as a
+  file, document, URL, or user-defined reference. It is available to the
+  execution context and never counts toward delivery acceptance.
+- A `deliverable` artifact node represents the expected output contract. It may
+  connect directly to a Goal, Subgoal, or Agent; a Subgoal is not required. It
+  owns delivery requirements and acceptance, never supporting inputs.
+- A terminal handoff is not an Artifact node. It is an immutable runtime record
+  containing the produced artifact references, actual delivery facts, hashes,
+  timestamps, and acceptance evidence. It may be projected in a deliverable's
+  delivery history, but it is not an editable canvas node.
+
+Supporting artifact nodes and deliverable artifact nodes may share reference
+metadata, but a supporting reference must not be rendered as a required
+deliverable. The UI should expose supporting artifacts in execution context and
+show deliverable requirements and produced handoff outputs in delivery context.
+
+Supporting artifact selection has two paths:
+
+- Existing workspace attachments and documents are selectable through a typed
+  source picker. The picker differentiates document/file/URL sources and
+  supports search by exact or partial human-facing name before linking.
+- External or user-defined references remain available through a manual
+  declaration fallback with label, kind, format, locator, and optional content
+  hash.
+
+Both paths persist only an immutable reference and projection metadata in the
+Goal revision; they do not copy mutable document contents into Goal state.
+Unavailable or deleted sources remain visible as stale references and require
+an explicit relink. A supporting source can never satisfy a deliverable's
+acceptance criteria.
+
+### Deliverable node contract
+
+A deliverable is a dedicated typed Artifact node in the Goal graph. The graph
+connection expresses workflow ordering and ownership, while the deliverable
+node owns the delivery contract only. Supporting inputs are modeled by separate
+supporting artifact nodes rather than by links on the deliverable.
+
+The authoritative delivery contract includes an expected outcome kind,
+delivery instructions, optional format, destination, recipient, acceptance
+criteria, and optional expected artifact count. Freeform notes are contextual
+only and cannot override the delivery contract. The terminal handoff records
+runtime facts such as produced references, actual location, content hashes,
+delivery time, and acceptance evidence; it cannot redefine the requirement.
+
+Deliverables have an independent acceptance state (`planned`, `in-progress`,
+`ready-for-review`, `accepted`, or `rejected`). Task and milestone status is
+projection-only, and accepting a deliverable never completes or moves its
+source artifact automatically.
+
+Artifact references may target Omvra-native records or flexible external and
+user-defined artifacts. Labels are human-facing; optional kind and format
+metadata make expectations machine-checkable without requiring a visual
+artifact builder. A supporting artifact can be linked to execution context,
+while produced output references are recorded by terminal handoff. Changes to
+the delivery contract require a new Goal revision.
 
 Until the remaining implementation boundaries are available at runtime, the safe default is to pause at ambiguity, approval, stale-contract, missing-evidence, and failed-gate states; preserve evidence; and request a human decision.
 

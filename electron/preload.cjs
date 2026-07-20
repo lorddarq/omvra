@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('electron', {
   goals: {
     getRuntime: (goalId) => ipcRenderer.invoke('goals/get-runtime', goalId),
     update: (payload) => ipcRenderer.invoke('goals/update', payload),
+    updateArtifacts: (payload) => ipcRenderer.invoke('goals/update-artifacts', payload),
     onRuntimeChanged: (listener) => {
       if (typeof listener !== 'function') return () => {};
       const wrappedListener = (_event, payload) => listener(payload);

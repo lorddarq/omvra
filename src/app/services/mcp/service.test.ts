@@ -27,26 +27,31 @@ function setWindowMock() {
   };
 }
 
-function jsonRpcResponse(result: unknown) {
+function jsonRpcResponse(result: unknown, headers: Record<string, string> = {}) {
   return new Response(JSON.stringify({ jsonrpc: '2.0', id: 'test', result }), {
     status: 200,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
   });
 }
 
 test('validateHealth treats underscore MCP tool aliases as canonical tools', async () => {
   const restoreWindow = setWindowMock();
   const previousFetch = globalThis.fetch;
+  let sessionHeader: string | null = null;
   globalThis.fetch = async (_url, init) => {
     const body = JSON.parse(String(init?.body || '{}'));
+    const headers = init?.headers as Record<string, string> | undefined;
 
     if (body.method === 'initialize') {
-      return jsonRpcResponse({
+      const response = jsonRpcResponse({
         protocolVersion: '2024-11-05',
         serverInfo: { name: 'Omvra', version: '0.0.1' },
         capabilities: {},
-      });
+      }, { 'Mcp-Session-Id': 'session-1' });
+      return response;
     }
+
+    if (body.method !== 'notifications/initialized') sessionHeader = headers?.['Mcp-Session-Id'] ?? null;
 
     if (body.method === 'tools/list') {
       return jsonRpcResponse({
@@ -92,6 +97,7 @@ test('validateHealth treats underscore MCP tool aliases as canonical tools', asy
       'cards_kanban_list',
       'cards_timeline_list',
     ]);
+    assert.equal(sessionHeader, 'session-1');
   } finally {
     globalThis.fetch = previousFetch;
     restoreWindow();

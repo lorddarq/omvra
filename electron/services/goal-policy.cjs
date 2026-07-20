@@ -120,11 +120,20 @@ function resolveGoalPolicy({ workspacePolicy, goal, targetElementId } = {}) {
 
 function buildGoalContractPacket({ goal, effectivePolicy, executionAttempt = 1, now = () => new Date().toISOString() } = {}) {
   const elements = Array.isArray(goal?.elements) ? goal.elements : [];
+  const deliverables = elements
+    .filter(item => item?.type === 'deliverable')
+    .map(item => ({
+      id: item.id,
+      title: item.title,
+      body: item.body,
+      deliverySpec: item.deliverySpec,
+      deliverableStatus: item.deliverableStatus,
+    }));
   const references = {
     objective: goal?.title,
     scope: goal?.scope ?? goal?.scopedInstructions ?? goal?.description,
     instructions: goal?.instructions ?? elements.filter(item => item?.type === 'instructions').map(item => item.instructions || item.content || item.title).filter(Boolean),
-    outputs: goal?.outputs ?? goal?.expectedOutputs,
+    outputs: goal?.outputs ?? goal?.expectedOutputs ?? deliverables,
     constraints: goal?.constraints,
     permissions: effectivePolicy?.permissions ?? goal?.permissions,
     acceptance: goal?.acceptance ?? effectivePolicy?.acceptance,

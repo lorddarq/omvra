@@ -94,7 +94,7 @@ export interface ProjectMilestone {
   linkedTaskIds?: string[];
 }
 
-export type GoalElementType = 'goal' | 'subgoal' | 'agent' | 'connector' | 'instructions' | 'condition' | 'approval-gate' | 'human-input' | 'retry';
+export type GoalElementType = 'goal' | 'subgoal' | 'agent' | 'connector' | 'instructions' | 'condition' | 'approval-gate' | 'human-input' | 'retry' | 'artifact' | 'deliverable';
 export type GoalConnectorSide = 'top' | 'right' | 'bottom' | 'left';
 export type GoalConditionBranch = 'positive' | 'negative';
 export type GoalRetryExhaustionPolicy = 'human-review' | 'fail-goal';
@@ -104,6 +104,51 @@ export type GoalAcceptanceActor = 'human' | 'agentic' | 'both';
 export type GoalBudgetMode = 'hard-cap' | 'goal-pool' | 'approval-required' | 'unbounded';
 export type GoalPolicyDimension = 'financial' | 'tokens' | 'concurrency' | 'attempts' | 'retries';
 export type GoalPolicyUnit = 'USD' | 'tokens' | 'loops' | 'attempts' | 'retries';
+
+export type GoalArtifactType = 'task' | 'milestone' | 'goal' | 'document' | 'file' | 'url' | 'user-defined';
+export type GoalArtifactRole = 'supporting' | 'deliverable';
+export type GoalDeliverableStatus = 'planned' | 'in-progress' | 'ready-for-review' | 'accepted' | 'rejected';
+
+export interface GoalDeliverySpec {
+  outcomeKind: 'file' | 'summary' | 'conclusion' | 'resolution' | 'other';
+  instructions: string;
+  format?: string;
+  destination?: string;
+  recipient?: string;
+  acceptanceCriteria?: string[];
+  expectedArtifactCount?: number;
+}
+
+export interface GoalArtifactReference {
+  id: string;
+  artifactType: GoalArtifactType;
+  artifactId: string;
+  role?: string;
+  linkedAt?: string;
+  linkedBy?: string;
+  sourceRevision?: number;
+  contribution?: 'supporting' | 'deliverable';
+  label?: string;
+  kind?: string;
+  format?: string;
+  locator?: string;
+  contentHash?: string;
+  sourceTaskId?: string;
+  sourceAttachmentId?: string;
+  projection?: {
+    exists?: boolean;
+    state?: string;
+    title?: string;
+    status?: string;
+    assigneeId?: string;
+    dependencyIds?: string[];
+    startDate?: string;
+    endDate?: string;
+    milestoneId?: string;
+    evidence?: unknown[];
+    sourceRevision?: number;
+  };
+}
 
 export interface GoalPolicyDimensionOverride {
   constrained?: boolean;
@@ -171,8 +216,12 @@ export interface GoalElement {
   retryExhaustionPolicy?: GoalRetryExhaustionPolicy;
   handoffRequired?: boolean;
   handoffNotes?: string;
+  artifactRole?: 'supporting';
   approvalEvidenceRequired?: boolean;
   policy?: GoalPolicy;
+  artifactReferences?: GoalArtifactReference[];
+  deliverySpec?: GoalDeliverySpec;
+  deliverableStatus?: GoalDeliverableStatus;
 }
 
 export interface GoalRecord {

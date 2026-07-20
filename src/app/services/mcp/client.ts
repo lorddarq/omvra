@@ -40,6 +40,7 @@ export class McpClientDisabledError extends Error {
 export class McpClient {
   private readonly config: McpClientConfig;
   private initializePromise: Promise<McpInitializeResult> | null = null;
+  private mcpSessionId: string | null = null;
 
   constructor(config: McpClientConfig) {
     this.config = {
@@ -145,6 +146,7 @@ export class McpClient {
           'Content-Type': 'application/json',
           Accept: 'application/json',
           ...this.config.headers,
+          ...(this.mcpSessionId ? { 'Mcp-Session-Id': this.mcpSessionId } : {}),
         },
         body: JSON.stringify({
           jsonrpc: '2.0',
@@ -154,6 +156,9 @@ export class McpClient {
         }),
         signal: controller.signal,
       });
+
+      const sessionId = response.headers.get('Mcp-Session-Id');
+      if (sessionId) this.mcpSessionId = sessionId;
 
       let payload: JsonRpcResponse<T> | null = null;
       try {

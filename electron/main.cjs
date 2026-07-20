@@ -23,6 +23,7 @@ const {
   isMcpAgentAccessEnabled,
   buildMcpListenerStatus,
   updateGoal,
+  updateGoalArtifactReferences,
 } = require('./services/workspace-service.cjs');
 const { recordGoalPolicyChangeImpact } = require('./services/goal-policy.cjs');
 const { createGoalLifecycleService } = require('./services/goal-lifecycle-service.cjs');
@@ -504,6 +505,15 @@ ipcMain.handle('goals/update', (_, payload = {}) => updateGoal(store, {
   title: payload.title,
   elements: payload.elements,
   overseerAgentId: payload.overseerAgentId,
+  expectedRevision: payload.expectedRevision,
+  idempotencyKey: payload.idempotencyKey,
+  actor: 'renderer',
+  emitRuntimeChange: goalRuntime.emit,
+}));
+ipcMain.handle('goals/update-artifacts', (_, payload = {}) => updateGoalArtifactReferences(store, {
+  goalId: payload.goalId,
+  elementId: payload.elementId,
+  artifactReferences: payload.artifactReferences,
   expectedRevision: payload.expectedRevision,
   actor: 'renderer',
   emitRuntimeChange: goalRuntime.emit,

@@ -24,6 +24,7 @@ const DEFAULT_MCP_CAPABILITY_PROFILE = 'read_only';
 const MCP_CAPABILITY_PROFILES = ['read_only', 'task_write', 'admin'];
 const MCP_AUDIT_LOG_KEY = 'omvra.mcp.audit.v1';
 const GOAL_MUTATION_COMMANDS_KEY = 'omvra.goalMutationCommands.v1';
+const GOAL_ARTIFACT_AUDIT_KEY = 'omvra.goalArtifactAudit.v1';
 const MCP_AUDIT_LOG_MAX_ENTRIES = 200;
 const MCP_TASK_REV_FIELD = '__mcpRevision';
 const TASK_ACTIVITY_LOG_MAX_ENTRIES = 50;
@@ -894,6 +895,53 @@ function normalizeGoalForMcp(goal) {
   };
 }
 
+function projectGoalArtifactReference(store, reference) {
+  const artifactType = normalizeString(reference?.artifactType).trim();
+  const artifactId = normalizeString(reference?.artifactId).trim();
+  const goalArtifact = artifactType === 'goal'
+    ? readArray(store, GOALS_KEY).find(candidate => candidate?.id === artifactId)
+    : null;
+  const artifact = artifactType === 'task'
+    ? getTaskById(store, artifactId)
+    : artifactType === 'milestone'
+      ? getMilestoneById(store, artifactId)
+      : artifactType === 'goal'
+        ? normalizeGoalForMcp(goalArtifact)
+        : null;
+  const externalArtifact = !artifact && ['document', 'file', 'url', 'user-defined'].includes(artifactType)
+    ? { title: reference.label || reference.artifactId, status: reference.locator ? 'linked' : 'planned', [MCP_TASK_REV_FIELD]: reference.sourceRevision || 0 }
+    : null;
+  const projectedArtifact = artifact || externalArtifact;
+  return {
+    ...reference,
+    projection: projectedArtifact ? {
+      exists: true,
+      title: projectedArtifact.title,
+      status: projectedArtifact.status ?? (projectedArtifact.linkedTaskIds ? 'roadmap' : undefined),
+      assigneeId: projectedArtifact.assigneeId,
+      dependencyIds: projectedArtifact.dependencyIds,
+      startDate: projectedArtifact.startDate,
+      endDate: projectedArtifact.endDate,
+      milestoneId: projectedArtifact.milestoneId,
+      evidence: projectedArtifact.attachments,
+      sourceRevision: projectedArtifact[MCP_TASK_REV_FIELD] ?? projectedArtifact.revision ?? 0,
+    } : { exists: false, state: 'stale-reference' },
+  };
+}
+
+function withGoalArtifactProjections(store, goal) {
+  return {
+    ...goal,
+    elements: goal.elements.map(element => {
+      if (element.type !== 'goal' && element.type !== 'subgoal' && element.type !== 'artifact') return element;
+      const artifactReferences = Array.isArray(element.artifactReferences)
+        ? element.artifactReferences.map(reference => projectGoalArtifactReference(store, reference))
+        : [];
+      return artifactReferences.length ? { ...element, artifactReferences } : element;
+    }),
+  };
+}
+
 function resolveGoalAgentDispatch(store, element) {
   if (!element || element.type !== 'agent') return undefined;
   const configuration = normalizeAgentConfiguration(element.agentConfiguration, element.assigneeId);
@@ -939,7 +987,7 @@ function listGoals(store) {
     const elements = normalized.elements.map(element => element.type === 'agent'
       ? { ...element, agentDispatch: resolveGoalAgentDispatch(store, element) }
       : element);
-    return withGoalExecutionReadModel(store, { ...normalized, elements, agents: elements.filter(element => element.type === 'agent') });
+    return withGoalExecutionReadModel(store, withGoalArtifactProjections(store, { ...normalized, elements, agents: elements.filter(element => element.type === 'agent') }));
   });
 }
 
@@ -1109,6 +1157,71 @@ function updateGoalElement(store, {
     connectorOnly,
     result,
   }).slice(-MCP_AUDIT_LOG_MAX_ENTRIES));
+  return result;
+}
+
+function updateGoalArtifactReferences(store, {
+  goalId,
+  elementId,
+  artifactReferences,
+  expectedRevision,
+  actor = 'agent',
+  idempotencyKey,
+  humanConfirmed = false,
+  emitRuntimeChange,
+} = {}) {
+  const normalizedGoalId = normalizeString(goalId).trim();
+  const normalizedElementId = normalizeString(elementId).trim();
+  const normalizedKey = normalizeString(idempotencyKey).trim() || `artifact-links-${randomUUID()}`;
+  if (!normalizedGoalId) return { ok: false, error: 'GOAL_ID_REQUIRED', message: 'goalId is required.' };
+  if (!normalizedElementId) return { ok: false, error: 'ELEMENT_ID_REQUIRED', message: 'elementId is required.' };
+  if (!Array.isArray(artifactReferences)) return { ok: false, error: 'INVALID_ARTIFACT_REFERENCES', message: 'artifactReferences must be an array.' };
+  const commands = readArray(store, GOAL_MUTATION_COMMANDS_KEY);
+  const prior = commands.find(command => command && command.idempotencyKey === normalizedKey);
+  if (prior) {
+    if (prior.goalId !== normalizedGoalId || prior.elementId !== normalizedElementId || prior.artifactOnly !== true) return { ok: false, error: 'IDEMPOTENCY_KEY_CONFLICT', message: 'idempotencyKey is already associated with another Goal mutation.' };
+    return { ...prior.result, idempotent: true };
+  }
+  if (actor === 'mcp-agent') {
+    const confirmation = isAgentMutationAllowed(store, humanConfirmed);
+    if (!confirmation.allowed) return confirmation;
+  }
+  const goals = readArray(store, GOALS_KEY);
+  const goalIndex = goals.findIndex(goal => goal && goal.id === normalizedGoalId);
+  if (goalIndex < 0) return { ok: false, error: 'GOAL_NOT_FOUND', message: `Goal "${normalizedGoalId}" not found.` };
+  const currentGoal = normalizeGoalForMcp(goals[goalIndex]);
+  const currentRevision = currentGoal[MCP_TASK_REV_FIELD];
+  if (!Number.isFinite(Number(expectedRevision))) return { ok: false, error: 'EXPECTED_REVISION_REQUIRED', message: 'expectedRevision is required and must be a finite number.', currentRevision };
+  const expected = Math.max(0, Math.floor(Number(expectedRevision)));
+  if (expected !== currentRevision) return { ok: false, error: 'REVISION_MISMATCH', message: 'Goal revision mismatch.', currentRevision, expectedRevision: expected };
+  const element = currentGoal.elements.find(candidate => candidate?.id === normalizedElementId);
+  if (!element) return { ok: false, error: 'ELEMENT_NOT_FOUND', message: `Element "${normalizedElementId}" not found.` };
+  if (element.type !== 'goal' && element.type !== 'subgoal' && element.type !== 'artifact') return { ok: false, error: 'ARTIFACT_LINKS_UNSUPPORTED', message: 'Only Goal, Subgoal, and Supporting Artifact nodes can link execution artifacts.' };
+
+  const references = artifactReferences.map(reference => ({ ...reference, contribution: element.type === 'artifact' ? 'supporting' : reference.contribution, linkedBy: reference.linkedBy || actor, linkedAt: reference.linkedAt || new Date().toISOString() }));
+  const nextGoal = normalizeGoalForMcp({
+    ...currentGoal,
+    elements: currentGoal.elements.map(candidate => candidate.id === normalizedElementId ? { ...candidate, artifactReferences: references } : candidate),
+    [MCP_TASK_REV_FIELD]: currentRevision + 1,
+    mcpUpdatedAt: new Date().toISOString(),
+    mcpLastActor: actor,
+  });
+  goals[goalIndex] = nextGoal;
+  store.set(GOALS_KEY, goals);
+  const audit = readArray(store, GOAL_ARTIFACT_AUDIT_KEY).concat({
+    id: `goal-artifact-audit-${randomUUID()}`,
+    goalId: normalizedGoalId,
+    elementId: normalizedElementId,
+    actor,
+    action: 'replace',
+    referenceIds: references.map(reference => reference.id),
+    revision: nextGoal[MCP_TASK_REV_FIELD],
+    createdAt: new Date().toISOString(),
+  }).slice(-MCP_AUDIT_LOG_MAX_ENTRIES);
+  store.set(GOAL_ARTIFACT_AUDIT_KEY, audit);
+  const result = { ok: true, changed: true, goal: nextGoal, revision: nextGoal[MCP_TASK_REV_FIELD], audit: audit.at(-1) };
+  store.set(GOAL_MUTATION_COMMANDS_KEY, commands.concat({ idempotencyKey: normalizedKey, goalId: normalizedGoalId, elementId: normalizedElementId, artifactOnly: true, result }).slice(-MCP_AUDIT_LOG_MAX_ENTRIES));
+  if (typeof emitRuntimeChange === 'function') emitRuntimeChange({ scope: 'graph', goalId: normalizedGoalId, revision: nextGoal[MCP_TASK_REV_FIELD], actor, changeType: 'artifact-links.updated' });
   return result;
 }
 
@@ -3645,6 +3758,7 @@ module.exports = {
   MCP_CAPABILITY_PROFILES,
   MCP_AUDIT_LOG_KEY,
   GOAL_MUTATION_COMMANDS_KEY,
+  GOAL_ARTIFACT_AUDIT_KEY,
   MCP_BOARD_WATCHERS_KEY,
   isMcpAgentAccessEnabled,
   getMcpServerConfig,
@@ -3664,6 +3778,7 @@ module.exports = {
   getGoalById,
   updateGoal,
   updateGoalElement,
+  updateGoalArtifactReferences,
   listMilestones,
   getMilestoneById,
   listTasks,

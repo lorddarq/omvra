@@ -13,6 +13,7 @@ const {
   getGoalById,
   updateGoal,
   updateGoalElement,
+  updateGoalArtifactReferences,
   listMilestones,
   getMilestoneById,
   buildMcpAgentGuide,
@@ -275,6 +276,23 @@ const WRITE_TOOL_DEFINITIONS = [
         humanConfirmed: { type: 'boolean' },
       },
       required: ['goalId', 'elementId', 'updates', 'expectedRevision', 'idempotencyKey'],
+    },
+  },
+  {
+    name: 'goals.update_artifacts',
+    description: 'Replaces the additive execution-artifact links for one Goal, Subgoal, or Deliverable node with optimistic Goal revision protection. Task and milestone records remain canonical and are projected read-only.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        goalId: { type: 'string' },
+        elementId: { type: 'string' },
+        artifactReferences: { type: 'array', items: { type: 'object' } },
+        expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+        idempotencyKey: { type: 'string' },
+        humanConfirmed: { type: 'boolean' },
+      },
+      required: ['goalId', 'elementId', 'artifactReferences', 'expectedRevision', 'idempotencyKey'],
     },
   },
   {
@@ -1220,7 +1238,7 @@ function isKnownWriteToolName(name) {
   if (WRITE_TOOL_DEFINITIONS.some(tool => tool.name === name)) {
     return true;
   }
-  return /^(goals\.(update|update_element|update_connector|lifecycle)|tasks\.(create|update|delete|write|set|transition|complete|log_time)|milestones\.(create|update|delete))/.test(name);
+  return /^(goals\.(update|update_element|update_connector|update_artifacts|lifecycle)|tasks\.(create|update|delete|write|set|transition|complete|log_time)|milestones\.(create|update|delete))/.test(name);
 }
 
 function getResourceForUri(store, uri, requestParams) {
@@ -1517,6 +1535,7 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
         goalId,
         command: args.command,
         expectedRevision: args.expectedRevision,
+        idempotencyKey: args.idempotencyKey,
         commandId: args.commandId,
         actor: args.actor || 'mcp-agent',
         payload: args.payload,
@@ -1645,6 +1664,52 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
           changed: result.changed,
           idempotent: result.idempotent === true,
           auditId: audit?.auditId,
+          goal: result.goal,
+          revision: result.revision,
+        }),
+      };
+    }
+
+    case 'goals.update_artifacts': {
+      const goalId = parseGoalId(args);
+      if (!goalId) return { error: invalidParams('Invalid params: "goalId" (or "id") is required.') };
+      const result = updateGoalArtifactReferences(store, {
+        goalId,
+        elementId: args.elementId,
+        artifactReferences: args.artifactReferences,
+        expectedRevision: args.expectedRevision,
+        idempotencyKey: args.idempotencyKey,
+        actor: 'mcp-agent',
+        humanConfirmed: args.humanConfirmed === true,
+        emitRuntimeChange,
+      });
+      if (!result.ok) {
+        recordWriteAttempt(store, req, { outcome: 'denied', reason: result.error, toolName: name, entityId: goalId });
+        return { error: invalidParams(result.message, result) };
+      }
+      if (result.idempotent) {
+        return {
+          result: makeWriteToolResult(name, {
+            changed: false,
+            idempotent: true,
+            artifactAuditId: result.audit?.id,
+            goal: result.goal,
+            revision: result.revision,
+          }),
+        };
+      }
+      const audit = recordWriteAttempt(store, req, {
+        outcome: 'allowed',
+        toolName: name,
+        entityId: goalId,
+        fields: ['artifactReferences'],
+        nextRevision: result.revision,
+      });
+      return {
+        result: makeWriteToolResult(name, {
+          changed: true,
+          auditId: audit?.auditId,
+          artifactAuditId: result.audit?.id,
           goal: result.goal,
           revision: result.revision,
         }),

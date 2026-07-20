@@ -62,3 +62,54 @@ test('renderer/MCP/lifecycle writes converge and rejected writes do not partiall
   assert.equal(projection.execution.executionAttemptId, projection.execution.id);
   assert.equal(store.get('omvra.goalRuntimeEvents.v1').some(event => event.changeType === 'lifecycle.start'), true);
 });
+
+test('runtime projection exposes terminal handoffs without adding canvas nodes', () => {
+  const store = makeStoreFromFixture('workspace-basic', {
+    [GOALS_KEY]: [{ id: 'goal-handoff-projection', title: 'Delivery', revision: 0, elements: [{ id: 'deliverable-1', type: 'deliverable', title: 'Report', x: 0, y: 0 }] }],
+    'omvra.goalHandoffs.v1': [{ id: 'handoff-1', goalId: 'goal-handoff-projection', deliverableId: 'deliverable-1', immutable: true, producedArtifactReferences: [{ label: 'Report.pdf' }] }],
+  });
+  const runtime = createGoalRuntimeService({ store });
+  const projection = runtime.get('goal-handoff-projection');
+  assert.equal(projection.handoffs[0].immutable, true);
+  assert.equal(projection.handoffs[0].deliverableId, 'deliverable-1');
+  assert.equal(projection.goal.elements.some(element => element.type === 'handoff'), false);
+});
+
+test('Goal artifact links project canonical task and milestone state without mutating source records', () => {
+  const store = makeStoreFromFixture('workspace-basic', {
+    [GOALS_KEY]: [
+      { id: 'goal-artifacts', title: 'Artifact goal', revision: 0, elements: [{ id: 'subgoal-1', type: 'subgoal', title: 'Ship', x: 0, y: 0 }] },
+      { id: 'goal-source', title: 'Source goal', revision: 3, elements: [] },
+    ],
+    'omvra.tasks.v1': [{ id: 'task-1', title: 'Build', status: 'in-progress', assigneeId: 'agent-1', dependencyIds: ['task-0'], __mcpRevision: 4 }],
+    'omvra.milestones.v1': [{ id: 'milestone-1', title: 'Release', endDate: '2026-08-01', linkedTaskIds: ['task-1'], __mcpRevision: 2 }],
+  });
+  store.set('omvra.preferences.v1', { mcpAgentAccessEnabled: true, mcpCapabilityProfile: 'task_write', agentMutationConfirmation: 'allowed' });
+  const dispatch = createGoalRuntimeService ? createRequestDispatcher(store) : null;
+  const linked = dispatch(request('goals.update_artifacts', {
+    goalId: 'goal-artifacts', elementId: 'subgoal-1', expectedRevision: 0, idempotencyKey: 'artifact-link-1', humanConfirmed: true,
+    artifactReferences: [{ id: 'link-task', artifactType: 'task', artifactId: 'task-1' }, { id: 'link-milestone', artifactType: 'milestone', artifactId: 'milestone-1' }, { id: 'link-goal', artifactType: 'goal', artifactId: 'goal-source' }],
+  }), req());
+  assert.equal(linked.result.structuredContent.revision, 1);
+  const projected = dispatch(request('goals.get', { goalId: 'goal-artifacts' }), req()).result.structuredContent;
+  const links = projected.elements.find(element => element.id === 'subgoal-1').artifactReferences;
+  assert.equal(links[0].projection.title, 'Build');
+  assert.deepEqual(links[0].projection.dependencyIds, ['task-0']);
+  assert.equal(links[1].projection.title, 'Release');
+  assert.equal(links[2].projection.title, 'Source goal');
+  assert.equal(store.get('omvra.tasks.v1')[0].__mcpRevision, 4);
+  assert.equal(store.get('omvra.milestones.v1')[0].__mcpRevision, 2);
+
+  const duplicate = dispatch(request('goals.update_artifacts', {
+    goalId: 'goal-artifacts', elementId: 'subgoal-1', expectedRevision: 0, idempotencyKey: 'artifact-link-1', humanConfirmed: true,
+    artifactReferences: [],
+  }), req());
+  assert.equal(duplicate.result.structuredContent.idempotent, true);
+  assert.equal(store.get('omvra.goalArtifactAudit.v1').length, 1);
+
+  const stale = dispatch(request('goals.update_artifacts', {
+    goalId: 'goal-artifacts', elementId: 'subgoal-1', expectedRevision: 0, idempotencyKey: 'artifact-link-stale', artifactReferences: [], humanConfirmed: true,
+  }), req());
+  assert.equal(stale.error.data.error, 'REVISION_MISMATCH');
+  assert.equal(store.get('omvra.goalArtifactAudit.v1').length, 1);
+});

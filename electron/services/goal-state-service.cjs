@@ -6,10 +6,12 @@ const EXECUTIONS_KEY = 'omvra.goalExecutions.v1';
 const EVENTS_KEY = 'omvra.goalExecutionEvents.v1';
 const EVIDENCE_KEY = 'omvra.goalEvidence.v1';
 
-const GOAL_ELEMENT_TYPES = new Set(['goal', 'subgoal', 'agent', 'connector', 'instructions', 'condition', 'approval-gate', 'human-input', 'retry']);
+const GOAL_ELEMENT_TYPES = new Set(['goal', 'subgoal', 'agent', 'connector', 'instructions', 'condition', 'approval-gate', 'human-input', 'retry', 'artifact', 'deliverable']);
 const GOAL_STATUSES = new Set(['draft', 'working', 'blocked', 'complete']);
 const CONNECTOR_SIDES = new Set(['top', 'right', 'bottom', 'left']);
 const GOAL_AGENT_MODES = new Set(['existing', 'ephemeral']);
+const GOAL_ARTIFACT_TYPES = new Set(['task', 'milestone', 'goal', 'document', 'file', 'url', 'user-defined']);
+const GOAL_DELIVERABLE_STATUSES = new Set(['planned', 'in-progress', 'ready-for-review', 'accepted', 'rejected']);
 
 function prefixedId(prefix) {
   return `${prefix}_${randomUUID()}`;
@@ -64,6 +66,44 @@ function normalizeAgentConfiguration(configuration, legacyAssigneeId) {
   return normalized;
 }
 
+function normalizeArtifactReferences(references) {
+  if (!Array.isArray(references)) return [];
+  const seen = new Set();
+  return references.map(reference => {
+    if (!reference || typeof reference !== 'object' || Array.isArray(reference)) return null;
+    const artifactType = GOAL_ARTIFACT_TYPES.has(reference.artifactType) ? reference.artifactType : null;
+    const artifactId = normalizeString(reference.artifactId);
+    if (!artifactType || !artifactId) return null;
+    const key = `${artifactType}:${artifactId}`;
+    if (seen.has(key)) return null;
+    seen.add(key);
+    const normalized = {
+      ...reference,
+      id: normalizeString(reference.id) || prefixedId('artifact-link'),
+      artifactType,
+      artifactId,
+    };
+    delete normalized.content;
+    delete normalized.contents;
+    delete normalized.copiedContents;
+    if (reference.contribution === 'supporting' || reference.contribution === 'deliverable') normalized.contribution = reference.contribution;
+    for (const field of ['label', 'kind', 'format', 'locator', 'contentHash', 'sourceTaskId', 'sourceAttachmentId']) {
+      const value = normalizeString(reference[field]);
+      if (value) normalized[field] = value;
+      else delete normalized[field];
+    }
+    for (const field of ['role', 'linkedAt', 'linkedBy']) {
+      const value = normalizeString(reference[field]);
+      if (value) normalized[field] = value;
+      else delete normalized[field];
+    }
+    const sourceRevision = Number(reference.sourceRevision);
+    if (Number.isFinite(sourceRevision) && sourceRevision >= 0) normalized.sourceRevision = Math.floor(sourceRevision);
+    else delete normalized.sourceRevision;
+    return normalized;
+  }).filter(Boolean);
+}
+
 function normalizeElement(element) {
   if (!element || typeof element !== 'object' || Array.isArray(element)) return null;
   const type = GOAL_ELEMENT_TYPES.has(element.type) ? element.type : 'subgoal';
@@ -90,12 +130,39 @@ function normalizeElement(element) {
     if (['human-review', 'fail-goal'].includes(element.retryExhaustionPolicy)) normalized.retryExhaustionPolicy = element.retryExhaustionPolicy;
     else delete normalized.retryExhaustionPolicy;
   }
+  if (element.type === 'deliverable') {
+    const deliverySpec = element.deliverySpec && typeof element.deliverySpec === 'object' && !Array.isArray(element.deliverySpec) ? element.deliverySpec : {};
+    const outcomeKind = ['file', 'summary', 'conclusion', 'resolution', 'other'].includes(deliverySpec.outcomeKind) ? deliverySpec.outcomeKind : 'other';
+    const instructions = normalizeString(deliverySpec.instructions);
+    normalized.deliverySpec = {
+      outcomeKind,
+      instructions,
+      format: normalizeString(deliverySpec.format) || undefined,
+      destination: normalizeString(deliverySpec.destination) || undefined,
+      recipient: normalizeString(deliverySpec.recipient) || undefined,
+      acceptanceCriteria: Array.isArray(deliverySpec.acceptanceCriteria) ? deliverySpec.acceptanceCriteria.map(normalizeString).filter(Boolean) : [],
+    };
+    const expectedArtifactCount = Number(deliverySpec.expectedArtifactCount);
+    if (Number.isFinite(expectedArtifactCount) && expectedArtifactCount >= 0) normalized.deliverySpec.expectedArtifactCount = Math.floor(expectedArtifactCount);
+    normalized.deliverableStatus = GOAL_DELIVERABLE_STATUSES.has(element.deliverableStatus) ? element.deliverableStatus : 'planned';
+  }
+  if (element.type === 'artifact') {
+    normalized.artifactRole = 'supporting';
+  } else {
+    delete normalized.artifactRole;
+  }
   if (element.type === 'agent') {
     const agentConfiguration = normalizeAgentConfiguration(element.agentConfiguration, element.assigneeId);
     if (agentConfiguration) normalized.agentConfiguration = agentConfiguration;
     else delete normalized.agentConfiguration;
     if (agentConfiguration?.mode === 'existing') normalized.assigneeId = agentConfiguration.assigneeId;
     else delete normalized.assigneeId;
+  }
+  if (element.type === 'goal' || element.type === 'subgoal' || element.type === 'artifact') {
+    normalized.artifactReferences = normalizeArtifactReferences(element.artifactReferences);
+    if (normalized.artifactReferences.length === 0) delete normalized.artifactReferences;
+  } else {
+    delete normalized.artifactReferences;
   }
   const policy = normalizePolicy(element.policy);
   if (policy) normalized.policy = policy;
@@ -105,6 +172,28 @@ function normalizeElement(element) {
 
 function normalizeGoal(goal) {
   if (!goal || typeof goal !== 'object' || Array.isArray(goal)) return null;
+  const rawElements = Array.isArray(goal.elements) ? goal.elements : [];
+  const normalizedElements = rawElements.map(normalizeElement).filter(Boolean);
+  const migratedIds = new Set(normalizedElements.map(element => element.id));
+  for (const rawElement of rawElements) {
+    if (rawElement?.type !== 'deliverable' || !Array.isArray(rawElement.artifactReferences)) continue;
+    const references = normalizeArtifactReferences(rawElement.artifactReferences).map(reference => ({ ...reference, contribution: 'supporting' }));
+    references.forEach((reference, index) => {
+      const migratedId = `artifact_migrated_${rawElement.id}_${reference.id}`;
+      if (migratedIds.has(migratedId)) return;
+      migratedIds.add(migratedId);
+      normalizedElements.push({
+        id: migratedId,
+        type: 'artifact',
+        artifactRole: 'supporting',
+        title: reference.label || 'Supporting artifact',
+        body: 'Migrated from a deliverable artifact link.',
+        x: Number(rawElement.x || 0) + 40 + (index * 24),
+        y: Number(rawElement.y || 0) + 180,
+        artifactReferences: [reference],
+      });
+    });
+  }
   const normalized = {
     ...goal,
     schemaVersion: Number.isFinite(Number(goal.schemaVersion)) ? Number(goal.schemaVersion) : GOAL_SCHEMA_VERSION,
@@ -112,7 +201,7 @@ function normalizeGoal(goal) {
     title: normalizeString(goal.title) || 'Untitled goal',
     updatedAt: normalizeString(goal.updatedAt) || new Date().toISOString(),
     revision: normalizeRevision(goal.revision ?? goal.__mcpRevision),
-    elements: Array.isArray(goal.elements) ? goal.elements.map(normalizeElement).filter(Boolean) : [],
+    elements: normalizedElements,
   };
   const policy = normalizePolicy(goal.policy);
   if (policy) normalized.policy = policy;

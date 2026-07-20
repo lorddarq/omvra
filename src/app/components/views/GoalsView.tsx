@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, CircleDot, ClipboardCheck, FileText, LoaderCircle, LockKeyhole, MessageSquareText, Minus, Plus, RotateCcw, ShieldCheck, Sparkles, Target, Trash2, UserRoundCheck, ZoomIn } from 'lucide-react';
-import type { GoalAcceptanceActor, GoalAgentConfiguration, GoalAgentMode, GoalBudgetMode, GoalConditionBranch, GoalConnectorSide, GoalElement, GoalElementReadiness, GoalElementType, GoalPolicy, GoalPolicyDimension, GoalPolicyDimensionOverride, GoalRecord, GoalRetryExhaustionPolicy, GoalSchedule, Person } from '../../types.ts';
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, CircleDot, ClipboardCheck, LoaderCircle, LockKeyhole, MessageSquareText, Minus, Plus, RotateCcw, ShieldCheck, Sparkles, Target, Trash2, UserRoundCheck, ZoomIn } from 'lucide-react';
+import type { GoalAcceptanceActor, GoalAgentConfiguration, GoalAgentMode, GoalArtifactReference, GoalBudgetMode, GoalConditionBranch, GoalConnectorSide, GoalElement, GoalElementReadiness, GoalElementType, GoalPolicy, GoalPolicyDimension, GoalPolicyDimensionOverride, GoalRecord, GoalRetryExhaustionPolicy, GoalSchedule, Person, ProjectMilestone, Task } from '../../types.ts';
 import type { GoalPolicyV1 } from '../../utils/goalPolicy.ts';
 import { GOAL_TEMPLATES, instantiateGoalTemplate, type GoalTemplate } from '../../data/goalTemplates.ts';
 import { getCanonicalJSON, safeReadJSON, setCanonicalJSON } from '../../utils/storage.ts';
@@ -9,6 +9,9 @@ import { AgentIcon as Bot } from '../icons/AgentIcon';
 import { DropdownChevron } from '../icons/DropdownChevron';
 import { WorkflowsIcon } from '../icons/WorkflowsIcon';
 import { LinkIcon as Link2 } from '../icons/LinkIcon';
+import { PuzzlePieceIcon } from '../icons/PuzzlePieceIcon';
+import { AttachmentIcon } from '../icons/AttachmentIcon';
+import { AwardCertificateIcon } from '../icons/AwardCertificateIcon';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
@@ -26,7 +29,9 @@ const GOAL_POLICY_DIMENSIONS: Array<{ key: GoalPolicyDimension; label: string; u
 ];
 const GOAL_POLICY_SAFE_VALUES: Record<GoalPolicyDimension, number> = { financial: 10, tokens: 100000, concurrency: 1, attempts: 10, retries: 2 };
 const EXECUTION_LOCKED_STATUSES = new Set(['working', 'blocked', 'evidence-required', 'approval-required', 'complete', 'permission-denied']);
-type GoalRuntimeProjection = { execution?: { state?: string; revision?: number; attempt?: number; policyRevision?: number; executionAttemptId?: string; reconciliationRequired?: boolean } | null; effectivePolicy?: GoalPolicyV1 | null; policyRevision?: number; executionAttempt?: number | null; executionAttemptId?: string | null; agentAvailability?: Array<{ elementId: string; available: boolean; errorCode?: string | null }>; policyImpacts?: Array<{ goalId?: string; status?: string; requiresUserConfirmation?: boolean }>; lastChange?: { scope?: string; errorCode?: string; changeType?: string } | null };
+const ARTIFACT_SELECT_CLASS = 'h-9 rounded-xl border-[#e5e7eb] bg-white px-3 text-sm font-medium text-[#71717a] shadow-[0_1px_2px_rgba(0,0,0,0.04)] focus-visible:ring-gray-200';
+type GoalRuntimeProjection = { execution?: { state?: string; revision?: number; attempt?: number; policyRevision?: number; executionAttemptId?: string; reconciliationRequired?: boolean } | null; handoffs?: Array<{ id: string; deliverableId?: string; producedArtifactReferences?: Array<{ label?: string; locator?: string; format?: string }>; deliveryFacts?: Record<string, unknown>; deliveredAt?: string }>; effectivePolicy?: GoalPolicyV1 | null; policyRevision?: number; executionAttempt?: number | null; executionAttemptId?: string | null; agentAvailability?: Array<{ elementId: string; available: boolean; errorCode?: string | null }>; policyImpacts?: Array<{ goalId?: string; status?: string; requiresUserConfirmation?: boolean }>; lastChange?: { scope?: string; errorCode?: string; changeType?: string } | null };
+type SupportingArtifactType = 'document' | 'file' | 'url' | 'user-defined';
 
 function isExecutionLocked(element: GoalElement | undefined): boolean {
   return Boolean(element?.status && EXECUTION_LOCKED_STATUSES.has(element.status));
@@ -117,6 +122,10 @@ const TOOL_ITEMS: Array<{ type: GoalElementType; label: string; icon: ReactNode 
   { type: 'approval-gate', label: 'Approval gate', icon: <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><title>thumbs-up</title><g fill="currentColor"><path d="M5.25 7.494C5.25 7.014 5.423 6.55 5.736 6.187L10 1.25C10.854 1.677 11.25 2.678 10.92 3.574L9.75 6.75H14.152C15.465 6.75 16.421 7.993 16.085 9.262L14.894 13.762C14.662 14.639 13.868 15.25 12.961 15.25H7.25C6.145 15.25 5.25 14.355 5.25 13.25" fill="currentColor" fillOpacity="0.3" data-stroke="none" stroke="none" /><path d="M5.25 7.494C5.25 7.014 5.423 6.55 5.736 6.187L10 1.25C10.854 1.677 11.25 2.678 10.92 3.574L9.75 6.75H14.152C15.465 6.75 16.421 7.993 16.085 9.262L14.894 13.762C14.662 14.639 13.868 15.25 12.961 15.25H7.25C6.145 15.25 5.25 14.355 5.25 13.25" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" /><path d="M4.25 6.75H2.75C2.19772 6.75 1.75 7.19772 1.75 7.75V14.25C1.75 14.8023 2.19772 15.25 2.75 15.25H4.25C4.80228 15.25 5.25 14.8023 5.25 14.25V7.75C5.25 7.19772 4.80228 6.75 4.25 6.75Z" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" /></g></svg> },
   { type: 'goal', label: 'Goal', icon: <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><title>flag-7</title><g fill="currentColor"><path d="M3.75 3.25H11.25C11.802 3.25 12.25 3.698 12.25 4.25V9.25H3.75" fill="currentColor" fillOpacity="0.3" data-stroke="none" stroke="none" /><path d="M3.75 3.25H11.25C11.802 3.25 12.25 3.698 12.25 4.25V9.25H3.75" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" /><path d="M12.25 5.75H14.25C14.802 5.75 15.25 6.198 15.25 6.75V10.75C15.25 11.302 14.802 11.75 14.25 11.75H10.75C10.198 11.75 9.75 11.302 9.75 10.75V9.25" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" /><path d="M10.043 11.457L12.25 9.25" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" /><path d="M3.75 1.75V16.25" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" /></g></svg> },
 ];
+const ARTIFACT_ITEMS: Array<{ type: Extract<GoalElementType, 'artifact' | 'deliverable'>; label: string; description: string; icon: ReactNode }> = [
+  { type: 'artifact', label: 'Supporting artifact', description: 'Add execution input or context', icon: <AttachmentIcon className="size-3.5" /> },
+  { type: 'deliverable', label: 'Deliverable', description: 'Define an expected output', icon: <PuzzlePieceIcon className="size-3.5" /> },
+];
 const CONTROL_FLOW_ITEMS: Array<{ type: Extract<GoalElementType, 'human-input' | 'retry'>; label: string; icon: ReactNode }> = [
   { type: 'human-input', label: 'Human input', icon: <MessageSquareText className="size-3.5" /> },
   { type: 'retry', label: 'Retry', icon: <RotateCcw className="size-3.5" /> },
@@ -137,6 +146,8 @@ function nodeClass(type: GoalElementType, connected = true): string {
   if (type === 'approval-gate') return 'border-orange-200 bg-orange-50 text-slate-900';
   if (type === 'human-input') return 'border-sky-200 bg-sky-50 text-slate-900';
   if (type === 'retry') return 'border-cyan-200 bg-cyan-50 text-slate-900';
+  if (type === 'deliverable') return 'border-emerald-200 bg-emerald-50 text-slate-900';
+  if (type === 'artifact') return 'border-sky-200 bg-sky-50 text-slate-900';
   return 'border-slate-200 bg-white text-slate-700';
 }
 
@@ -192,6 +203,8 @@ function readinessForElement(element: GoalElement, connected: boolean): GoalElem
   if (element.type === 'instructions') return connected ? 'ready' : 'not-ready';
   if (element.type === 'human-input') return element.humanInputPrompt?.trim() && connected ? 'ready' : 'needs-review';
   if (element.type === 'retry') return element.retryMaxAttempts && connected ? 'ready' : 'needs-review';
+  if (element.type === 'deliverable') return element.deliverySpec?.instructions.trim() && connected ? 'ready' : 'needs-review';
+  if (element.type === 'artifact') return (element.artifactReferences?.length ?? 0) > 0 && connected ? 'ready' : 'needs-review';
   if (element.type === 'condition') return element.conditionPositiveOutcome && element.conditionNegativeOutcome ? 'ready' : 'needs-review';
   if (element.type === 'approval-gate') return element.policy?.acceptanceActor ? 'ready' : 'needs-review';
   return 'ready';
@@ -226,6 +239,8 @@ function readinessDescription(element: GoalElement, readiness: GoalElementReadin
   if (element.type === 'instructions') return 'Connect this node to a workflow step before it can be used.';
   if (element.type === 'human-input') return 'Define the prompt and connect this node before it can pause the workflow.';
   if (element.type === 'retry') return 'Set a retry limit and connect this node to an earlier workflow step.';
+  if (element.type === 'deliverable') return 'Define delivery instructions and connect this node to the Goal, Subgoal, or Agent that produces it.';
+  if (element.type === 'artifact') return 'Declare a supporting file, document, URL, or user-defined input and connect it to the workflow.';
   if (element.type === 'condition') return 'Define both branch outcomes before this condition can be evaluated.';
   if (element.type === 'approval-gate') return 'Configure the approval actor before this gate can be used.';
   return 'This node is not ready for use in the workflow.';
@@ -257,10 +272,12 @@ function elementIcon(type: GoalElementType) {
   if (type === 'goal') return <Sparkles className="size-3.5" />;
   if (type === 'human-input') return <MessageSquareText className="size-3.5" />;
   if (type === 'retry') return <RotateCcw className="size-3.5" />;
+  if (type === 'deliverable') return <PuzzlePieceIcon className="size-3.5" />;
+  if (type === 'artifact') return <AttachmentIcon className="size-3.5" />;
   return <Target className="size-3.5" />;
 }
 
-export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirectory = '', onGoalAuditArchiveDirectoryChange }: { people?: Person[]; workspacePolicy?: GoalPolicyV1; goalAuditArchiveDirectory?: string; onGoalAuditArchiveDirectoryChange?: (directory: string) => void }) {
+export function GoalsView({ people = [], tasks = [], milestones = [], workspacePolicy, goalAuditArchiveDirectory = '', onGoalAuditArchiveDirectoryChange }: { people?: Person[]; tasks?: Task[]; milestones?: ProjectMilestone[]; workspacePolicy?: GoalPolicyV1; goalAuditArchiveDirectory?: string; onGoalAuditArchiveDirectoryChange?: (directory: string) => void }) {
   const [goals, setGoals] = useState<GoalRecord[]>(readGoals);
   const goalsRef = useRef<GoalRecord[]>([]);
   goalsRef.current = goals;
@@ -274,14 +291,18 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [spacePressed, setSpacePressed] = useState(false);
+  const spaceHeldRef = useRef(false);
+  const panSessionRef = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [panMode, setPanMode] = useState(false);
   const [agentMenuOpen, setAgentMenuOpen] = useState(false);
   const [controlFlowMenuOpen, setControlFlowMenuOpen] = useState(false);
+  const [artifactMenuOpen, setArtifactMenuOpen] = useState(false);
   const [policyImpacts, setPolicyImpacts] = useState<Array<{ goalId?: string; status?: string; requiresUserConfirmation?: boolean }>>([]);
   const [runtimeProjection, setRuntimeProjection] = useState<GoalRuntimeProjection | null>(null);
   const agentMenuRef = useRef<HTMLDivElement | null>(null);
   const controlFlowMenuRef = useRef<HTMLDivElement | null>(null);
+  const artifactMenuRef = useRef<HTMLDivElement | null>(null);
   const [connectorMode, setConnectorMode] = useState(false);
   const [connectorSourceId, setConnectorSourceId] = useState<string | null>(null);
   const [connectorSourceSide, setConnectorSourceSide] = useState<GoalConnectorSide>('right');
@@ -292,6 +313,12 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
   const [newGoalDialogOpen, setNewGoalDialogOpen] = useState(false);
   const [newGoalTitle, setNewGoalTitle] = useState('');
   const [newGoalBody, setNewGoalBody] = useState('');
+  const [customArtifactLabel, setCustomArtifactLabel] = useState('');
+  const [customArtifactKind, setCustomArtifactKind] = useState('document');
+  const [customArtifactFormat, setCustomArtifactFormat] = useState('');
+  const [customArtifactLocator, setCustomArtifactLocator] = useState('');
+  const [supportingArtifactType, setSupportingArtifactType] = useState<SupportingArtifactType>('document');
+  const [supportingSourceSearch, setSupportingSourceSearch] = useState('');
   const [canvasElementHeights, setCanvasElementHeights] = useState<Record<string, number>>({});
   const [drag, setDrag] = useState<{ id: string; startX: number; startY: number; originX: number; originY: number } | null>(null);
   const draggingRef = useRef(false);
@@ -317,6 +344,18 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
     ? (runtimeProjection?.effectivePolicy ?? resolveInspectorPolicy(workspacePolicy, activeGoal, selectedPolicyElement))
     : undefined;
   const selectedPolicyImpact = (runtimeProjection?.policyImpacts ?? policyImpacts).find(impact => impact.goalId === activeGoal?.id && impact.status === 'pending');
+  const selectedArtifactReferences = selectedElement?.type === 'goal' || selectedElement?.type === 'subgoal' || selectedElement?.type === 'artifact' ? (selectedElement.artifactReferences ?? []) : [];
+  const artifactOptions = [
+    ...tasks.map(task => ({ value: `task:${task.id}`, label: `Task · ${task.title}`, searchText: task.title, artifactType: 'task' as const, artifactId: task.id })),
+    ...milestones.map(milestone => ({ value: `milestone:${milestone.id}`, label: `Milestone · ${milestone.title}`, searchText: milestone.title, artifactType: 'milestone' as const, artifactId: milestone.id })),
+    ...goals.filter(goal => goal.id !== activeGoal?.id).map(goal => ({ value: `goal:${goal.id}`, label: `Goal · ${goal.title}`, searchText: goal.title, artifactType: 'goal' as const, artifactId: goal.id })),
+  ];
+  const supportingSourceOptions = tasks.flatMap(task => (task.attachments ?? []).map(attachment => {
+    const extension = attachment.name.split('.').pop()?.toLowerCase() ?? '';
+    const documentExtensions = new Set(['md', 'markdown', 'txt', 'pdf', 'doc', 'docx', 'rtf', 'odt']);
+    const artifactType: SupportingArtifactType = documentExtensions.has(extension) ? 'document' : 'file';
+    return { value: `attachment:${task.id}:${attachment.id}`, label: `${artifactType === 'document' ? 'Document' : 'File'} · ${attachment.name}`, searchText: `${attachment.name} ${task.title}`, artifactType, artifactId: attachment.id, taskId: task.id, attachment };
+  })).filter(option => option.artifactType === supportingArtifactType && option.searchText.toLocaleLowerCase().includes(supportingSourceSearch.trim().toLocaleLowerCase()));
 
   useEffect(() => {
     if (goals.length === 0) {
@@ -420,7 +459,7 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
     void setCanonicalJSON(GOAL_SCHEDULES_STORAGE_KEY, schedules);
   }, [schedulesHydrated, schedules]);
   useEffect(() => {
-    if (!canonicalHydrated) return;
+    if (!canonicalHydrated || draggingRef.current) return;
     rendererWritesPendingRef.current += 1;
     canonicalWrite.current = canonicalWrite.current.then(async () => {
       const forceLocalWrite = localMutationRef.current;
@@ -429,7 +468,7 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
         if (Array.isArray(canonical)) canonicalGoalsRef.current = canonical.filter(goal => goal.id !== GOAL_ID);
         const localRevision = Math.max(0, ...goals.map(goalRevision));
         const canonicalRevision = Array.isArray(canonical) ? Math.max(0, ...canonical.map(goalRevision)) : 0;
-        if (!forceLocalWrite && canonicalRevision > localRevision && Array.isArray(canonical)) {
+        if (!forceLocalWrite && !draggingRef.current && canonicalRevision > localRevision && Array.isArray(canonical)) {
           setGoals(canonical);
           return;
         }
@@ -444,19 +483,22 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
           const result = await window.electron.goals.update({ goalId: goal.id, title: goal.title, elements: goal.elements, overseerAgentId: goal.overseerAgentId, expectedRevision: goalRevision(prior) });
           if (result.ok && result.goal) {
             canonicalGoalsRef.current = previous.map(item => item.id === goal.id ? result.goal : item);
-            setGoals(current => current.map(item => item.id === goal.id ? result.goal : item));
+            if (!draggingRef.current) setGoals(current => current.map(item => item.id === goal.id ? result.goal : item));
             return;
           }
           if (!forceLocalWrite && result.error === 'REVISION_MISMATCH') {
             const fallback = await getCanonicalJSON<GoalRecord[] | null>(STORAGE_KEY, null);
-            if (Array.isArray(fallback)) { canonicalGoalsRef.current = fallback; setGoals(fallback.filter(item => item.id !== GOAL_ID)); }
+            if (Array.isArray(fallback)) {
+              canonicalGoalsRef.current = fallback;
+              if (!draggingRef.current) setGoals(fallback.filter(item => item.id !== GOAL_ID));
+            }
             return;
           }
         }
         const stored = await setCanonicalJSON(STORAGE_KEY, goals);
         if (!stored) {
           const fallback = await getCanonicalJSON<GoalRecord[] | null>(STORAGE_KEY, null);
-          if (Array.isArray(fallback) && !forceLocalWrite) setGoals(fallback);
+          if (Array.isArray(fallback) && !forceLocalWrite && !draggingRef.current) setGoals(fallback);
         }
       } finally {
         rendererWritesPendingRef.current = Math.max(0, rendererWritesPendingRef.current - 1);
@@ -467,42 +509,136 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
       if (event.code === 'Escape') {
+        spaceHeldRef.current = false;
+        setSpacePressed(false);
+        panSessionRef.current = null;
         setPanMode(false);
         setConnectorMode(false);
-      setConnectorSourceId(null);
-      setConnectorSourceBranch(undefined);
+        setConnectorSourceId(null);
+        setConnectorSourceBranch(undefined);
         setRewireConnectorId(null);
         setAgentMenuOpen(false);
         setControlFlowMenuOpen(false);
+        setArtifactMenuOpen(false);
         setNewGoalDialogOpen(false);
         return;
       }
-      if (event.code === 'Space' && (event.target === document.body || event.target === canvasRef.current)) { event.preventDefault(); setSpacePressed(true); }
+      if (event.code !== 'Space') return;
+      spaceHeldRef.current = true;
+      setSpacePressed(true);
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      if (!target?.closest('input, textarea, select, [contenteditable="true"]')) event.preventDefault();
     };
-    const up = (event: KeyboardEvent) => { if (event.code === 'Space') setSpacePressed(false); };
+    const up = (event: KeyboardEvent) => {
+      if (event.code !== 'Space') return;
+      spaceHeldRef.current = false;
+      setSpacePressed(false);
+    };
+    const resetSpace = () => {
+      spaceHeldRef.current = false;
+      setSpacePressed(false);
+      panSessionRef.current = null;
+    };
+    const visibility = () => { if (document.hidden) resetSpace(); };
     const closeMenus = (event: PointerEvent) => {
       if (!agentMenuRef.current?.contains(event.target as Node)) setAgentMenuOpen(false);
       if (!controlFlowMenuRef.current?.contains(event.target as Node)) setControlFlowMenuOpen(false);
+      if (!artifactMenuRef.current?.contains(event.target as Node)) setArtifactMenuOpen(false);
     };
-    window.addEventListener('keydown', down); window.addEventListener('keyup', up); window.addEventListener('pointerdown', closeMenus);
-    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); window.removeEventListener('pointerdown', closeMenus); };
+    window.addEventListener('keydown', down, true);
+    window.addEventListener('keyup', up, true);
+    window.addEventListener('blur', resetSpace);
+    window.addEventListener('pointerdown', closeMenus);
+    document.addEventListener('visibilitychange', visibility);
+    return () => {
+      window.removeEventListener('keydown', down, true);
+      window.removeEventListener('keyup', up, true);
+      window.removeEventListener('blur', resetSpace);
+      window.removeEventListener('pointerdown', closeMenus);
+      document.removeEventListener('visibilitychange', visibility);
+    };
   }, []);
   useEffect(() => {
     if (!drag) return;
     draggingRef.current = true;
-    const move = (event: PointerEvent) => setGoals(current => current.map(goal => goal.id !== selectedGoalId ? goal : ({ ...goal, elements: goal.elements.map(element => element.id !== drag.id ? element : { ...element, x: drag.originX + (event.clientX - drag.startX) / zoom, y: drag.originY + (event.clientY - drag.startY) / zoom }) })));
-    const up = () => {
+    let frame = 0;
+    let latestX = drag.startX;
+    let latestY = drag.startY;
+    const updatePosition = (clientX: number, clientY: number, finalize = false) => setGoals(current => current.map(goal => goal.id !== selectedGoalId ? goal : ({
+      ...goal,
+      ...(finalize ? { revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString() } : {}),
+      elements: goal.elements.map(element => element.id !== drag.id ? element : { ...element, x: drag.originX + (clientX - drag.startX) / zoom, y: drag.originY + (clientY - drag.startY) / zoom }),
+    })));
+    const move = (event: PointerEvent) => {
+      latestX = event.clientX;
+      latestY = event.clientY;
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        updatePosition(latestX, latestY);
+      });
+    };
+    const up = (event: PointerEvent) => {
+      if (frame) cancelAnimationFrame(frame);
+      frame = 0;
       draggingRef.current = false;
-      setGoals(current => current.map(goal => goal.id !== selectedGoalId ? goal : ({ ...goal, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString() })));
+      updatePosition(event.clientX, event.clientY, true);
       setDrag(null);
     };
-    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
-    return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      draggingRef.current = false;
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+    };
   }, [drag, selectedGoalId, zoom]);
 
   const updateElement = (updates: Partial<GoalElement>) => {
     if (selectedElementLocked) { setEditNotice('This node is locked while execution is active or committed. Pause, cancel, or amend the lifecycle before editing it.'); return; }
     setGoals(current => current.map(goal => goal.id !== selectedGoalId ? goal : ({ ...goal, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString(), elements: goal.elements.map(element => element.id === selectedElement?.id ? { ...element, ...updates } : element) })));
+  };
+  const updateArtifactReferences = async (nextReferences: GoalArtifactReference[]) => {
+    if (!activeGoal || !selectedElement || (selectedElement.type !== 'goal' && selectedElement.type !== 'subgoal' && selectedElement.type !== 'artifact')) return;
+    const result = await window.electron?.goals?.updateArtifacts?.({ goalId: activeGoal.id, elementId: selectedElement.id, artifactReferences: nextReferences, expectedRevision: goalRevision(activeGoal), idempotencyKey: createStableId('artifact-mutation') });
+    if (!result?.ok || !result.goal) {
+      setEditNotice(result?.message ?? 'Artifact links could not be updated. Refresh the Goal and try again.');
+      return;
+    }
+    canonicalGoalsRef.current = canonicalGoalsRef.current.map(goal => goal.id === result.goal.id ? result.goal : goal);
+    setGoals(current => current.map(goal => goal.id === result.goal.id ? result.goal : goal));
+  };
+  const addCustomArtifactReference = () => {
+    if (!selectedElement || selectedElement.type !== 'artifact' || !customArtifactLabel.trim()) return;
+    void updateArtifactReferences([...selectedArtifactReferences, {
+      id: createStableId('artifact-link'),
+      artifactType: customArtifactKind === 'url' ? 'url' : customArtifactKind === 'file' ? 'file' : customArtifactKind === 'document' ? 'document' : 'user-defined',
+      artifactId: createStableId('artifact'),
+      contribution: 'supporting',
+      label: customArtifactLabel.trim(),
+      kind: customArtifactKind,
+      format: customArtifactFormat.trim() || undefined,
+      locator: customArtifactLocator.trim() || undefined,
+      linkedBy: 'renderer',
+      linkedAt: new Date().toISOString(),
+    }]);
+    setCustomArtifactLabel('');
+    setCustomArtifactFormat('');
+    setCustomArtifactLocator('');
+  };
+  const addSupportingSourceReference = (value: string) => {
+    if (!selectedElement || selectedElement.type !== 'artifact') return;
+    const option = supportingSourceOptions.find(item => item.value === value);
+    if (!option || selectedArtifactReferences.some(reference => reference.sourceAttachmentId === option.attachment.id && reference.sourceTaskId === option.taskId)) return;
+    void updateArtifactReferences([...selectedArtifactReferences, {
+      id: createStableId('artifact-link'), artifactType: option.artifactType, artifactId: option.attachment.id,
+      contribution: 'supporting', label: option.attachment.name, kind: option.artifactType,
+      format: option.attachment.name.split('.').pop()?.toUpperCase() || undefined, locator: option.attachment.uri || option.attachment.path,
+      sourceTaskId: option.taskId, sourceAttachmentId: option.attachment.id, linkedBy: 'renderer', linkedAt: new Date().toISOString(),
+    }]);
   };
   const updateAgentConfiguration = (updates: Partial<GoalAgentConfiguration>) => {
     if (selectedElement?.type !== 'agent') return;
@@ -561,13 +697,15 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
   const addElement = (type: GoalElementType) => {
     if (!activeGoal) return;
     const id = createStableId(type === 'connector' ? 'connector' : 'element');
-    const title = type === 'subgoal' ? 'New subgoal' : type === 'condition' ? 'New condition' : type === 'approval-gate' ? 'Approval gate' : type === 'human-input' ? 'Ask the user' : type === 'retry' ? 'Retry an earlier step' : `New ${type}`;
-    const body = type === 'condition' ? 'Define the condition to evaluate' : type === 'approval-gate' ? 'Define who must approve and what evidence is required' : type === 'human-input' ? 'Pause for overseer-mediated user input' : type === 'retry' ? 'Return to an earlier completed workflow step' : 'Describe the outcome and handoff';
+    const title = type === 'subgoal' ? 'New subgoal' : type === 'condition' ? 'New condition' : type === 'approval-gate' ? 'Approval gate' : type === 'human-input' ? 'Ask the user' : type === 'retry' ? 'Retry an earlier step' : type === 'deliverable' ? 'New deliverable' : type === 'artifact' ? 'Supporting artifact' : `New ${type}`;
+    const body = type === 'condition' ? 'Define the condition to evaluate' : type === 'approval-gate' ? 'Define who must approve and what evidence is required' : type === 'human-input' ? 'Pause for overseer-mediated user input' : type === 'retry' ? 'Return to an earlier completed workflow step' : type === 'deliverable' ? 'Define the expected outcome and delivery handoff' : type === 'artifact' ? 'Declare an execution input or supporting file' : 'Describe the outcome and handoff';
     const element: GoalElement = {
       id, type, title, body, x: 260 + (activeGoal.elements.length % 3) * 260, y: 560,
       width: 220, height: type === 'human-input' ? 120 : 90, status: 'draft',
       ...(type === 'human-input' ? { humanInputPrompt: 'What input is needed to continue?' } : {}),
       ...(type === 'retry' ? { retryMaxAttempts: 3, retryExhaustionPolicy: 'human-review' } : {}),
+      ...(type === 'deliverable' ? { deliverableStatus: 'planned', deliverySpec: { outcomeKind: 'other' as const, instructions: '', acceptanceCriteria: [] } } : {}),
+      ...(type === 'artifact' ? { artifactRole: 'supporting' as const, artifactReferences: [] } : {}),
     };
     setGoals(current => current.map(goal => goal.id === selectedGoalId ? { ...goal, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString(), elements: [...goal.elements, element] } : goal));
     setSelectedElementId(id);
@@ -652,6 +790,7 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
     setGoals(current => current.map(goal => goal.id === selectedGoalId ? { ...goal, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString(), elements: [...goal.elements, element] } : goal));
     setSelectedElementId(id);
     setAgentMenuOpen(false);
+    setArtifactMenuOpen(false);
   };
 
   const deleteConnection = (connectionId: string) => {
@@ -757,11 +896,42 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
     return { left: '-0.5rem', top: '50%', transform: 'translateY(-50%)' };
   };
 
+  const beginCanvasPan = (event: ReactPointerEvent<HTMLDivElement>) => {
+    setAgentMenuOpen(false);
+    setArtifactMenuOpen(false);
+    if ((!spaceHeldRef.current && !panMode) || event.button !== 0) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    panSessionRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: pan.x,
+      originY: pan.y,
+    };
+  };
+
+  const moveCanvasPan = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const session = panSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    setPan({
+      x: session.originX + event.clientX - session.startX,
+      y: session.originY + event.clientY - session.startY,
+    });
+  };
+
+  const endCanvasPan = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const session = panSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    panSessionRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
   const renderPorts = (element: GoalElement) => {
     const sides = (['top', 'right', 'bottom', 'left'] as GoalConnectorSide[]).filter(side => element.type !== 'condition' || side !== 'right');
     return <>{sides.map(side => (
-      <button key={side} type="button" style={portStyle(side)} className={`absolute size-4 rounded-full border-2 border-white shadow-sm ${connectorMode && connectorSourceId === element.id && connectorSourceSide === side ? 'bg-amber-400' : 'bg-blue-400'}`} onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); if (connectorMode && connectorSourceId) connectNodes(element.id, side); else beginConnection(element.id, side); }} aria-label={`${connectorMode && connectorSourceId ? 'Connect to' : 'Connect from'} ${element.title} via ${side} handle`} />
-    ))}{element.type === 'condition' && <><button type="button" style={{ right: '-0.5rem', top: '32%', transform: 'translateY(-50%)' }} className={`absolute size-4 rounded-full border-2 border-white bg-emerald-400 shadow-sm ${connectorMode && connectorSourceId === element.id && connectorSourceBranch === 'positive' ? 'ring-2 ring-amber-400' : ''}`} onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); if (connectorMode && connectorSourceId) connectNodes(element.id, 'right'); else beginConnection(element.id, 'right', 'positive'); }} aria-label={`${connectorMode && connectorSourceId ? 'Connect to' : 'Connect from'} ${conditionPositiveLabel(element)} branch`} /><button type="button" style={{ right: '-0.5rem', top: '68%', transform: 'translateY(-50%)' }} className={`absolute size-4 rounded-full border-2 border-white bg-rose-400 shadow-sm ${connectorMode && connectorSourceId === element.id && connectorSourceBranch === 'negative' ? 'ring-2 ring-amber-400' : ''}`} onPointerDown={event => event.stopPropagation()} onClick={event => { event.stopPropagation(); if (connectorMode && connectorSourceId) connectNodes(element.id, 'right'); else beginConnection(element.id, 'right', 'negative'); }} aria-label={`${connectorMode && connectorSourceId ? 'Connect to' : 'Connect from'} ${conditionNegativeLabel(element)} branch`} /></>}</>;
+      <button key={side} type="button" style={portStyle(side)} className={`absolute size-4 rounded-full border-2 border-white shadow-sm ${connectorMode && connectorSourceId === element.id && connectorSourceSide === side ? 'bg-amber-400' : 'bg-blue-400'}`} onPointerDown={event => { if (!spaceHeldRef.current && !panMode) event.stopPropagation(); }} onClick={event => { event.stopPropagation(); if (connectorMode && connectorSourceId) connectNodes(element.id, side); else beginConnection(element.id, side); }} aria-label={`${connectorMode && connectorSourceId ? 'Connect to' : 'Connect from'} ${element.title} via ${side} handle`} />
+    ))}{element.type === 'condition' && <><button type="button" style={{ right: '-0.5rem', top: '32%', transform: 'translateY(-50%)' }} className={`absolute size-4 rounded-full border-2 border-white bg-emerald-400 shadow-sm ${connectorMode && connectorSourceId === element.id && connectorSourceBranch === 'positive' ? 'ring-2 ring-amber-400' : ''}`} onPointerDown={event => { if (!spaceHeldRef.current && !panMode) event.stopPropagation(); }} onClick={event => { event.stopPropagation(); if (connectorMode && connectorSourceId) connectNodes(element.id, 'right'); else beginConnection(element.id, 'right', 'positive'); }} aria-label={`${connectorMode && connectorSourceId ? 'Connect to' : 'Connect from'} ${conditionPositiveLabel(element)} branch`} /><button type="button" style={{ right: '-0.5rem', top: '68%', transform: 'translateY(-50%)' }} className={`absolute size-4 rounded-full border-2 border-white bg-rose-400 shadow-sm ${connectorMode && connectorSourceId === element.id && connectorSourceBranch === 'negative' ? 'ring-2 ring-amber-400' : ''}`} onPointerDown={event => { if (!spaceHeldRef.current && !panMode) event.stopPropagation(); }} onClick={event => { event.stopPropagation(); if (connectorMode && connectorSourceId) connectNodes(element.id, 'right'); else beginConnection(element.id, 'right', 'negative'); }} aria-label={`${connectorMode && connectorSourceId ? 'Connect to' : 'Connect from'} ${conditionNegativeLabel(element)} branch`} /></>}</>;
   };
 
   return (
@@ -788,6 +958,22 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
       {controlFlowMenuOpen && activeGoal && <div role="menu" aria-label="Add control flow" className="absolute left-0 top-full mt-1 w-48 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
         {CONTROL_FLOW_ITEMS.map(item => <button key={item.type} role="menuitem" onClick={() => { addElement(item.type); setControlFlowMenuOpen(false); }} className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs hover:bg-slate-100">
           <span className="text-slate-600">{item.icon}</span><span><span className="block font-medium text-slate-800">{item.label}</span><span className="block text-[11px] text-slate-400">{item.type === 'human-input' ? 'Pause for user input' : 'Return to an earlier step'}</span></span>
+        </button>)}
+      </div>}
+    </div>
+    <div ref={artifactMenuRef} className="relative w-fit h-fit shrink-0">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button type="button" disabled={!activeGoal} onClick={() => setArtifactMenuOpen(value => !value)} className="relative flex w-fit h-8 shrink-0 items-center justify-center gap-1 rounded-full px-2 text-xs text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40" aria-label="Add artifact">
+            <span className="flex items-center justify-center"><AwardCertificateIcon className="size-3.5 text-[#71717a]" /></span>
+            <DropdownChevron />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={4}>Add artifact</TooltipContent>
+      </Tooltip>
+      {artifactMenuOpen && activeGoal && <div role="menu" aria-label="Add artifact" className="absolute left-0 top-full mt-1 w-56 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+        {ARTIFACT_ITEMS.map(item => <button key={item.type} role="menuitem" onClick={() => { addElement(item.type); setArtifactMenuOpen(false); }} className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs hover:bg-slate-100">
+          <span className="text-slate-600">{item.icon}</span><span><span className="block font-medium text-slate-800">{item.label}</span><span className="block text-[11px] text-slate-400">{item.description}</span></span>
         </button>)}
       </div>}
     </div>
@@ -821,13 +1007,13 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
                       </TooltipTrigger>
                       <TooltipContent side="bottom" sideOffset={4}>{tool.type === 'connector' && connectorMode ? 'Choose source' : `Add ${tool.label}`}</TooltipContent></Tooltip>)}</div>
 
-    <div ref={canvasRef} tabIndex={0} role="application" aria-label="Goal canvas. Hold space and drag to pan." className={`h-full w-full outline-none ${spacePressed || panMode ? 'cursor-grab' : 'cursor-default'}`} onPointerDown={event => { setAgentMenuOpen(false); if (spacePressed || panMode) { const start = { x: event.clientX, y: event.clientY }; const origin = { ...pan }; const move = (next: PointerEvent) => setPan({ x: origin.x + next.clientX - start.x, y: origin.y + next.clientY - start.y }); const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); }; window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); } }}>
+    <div ref={canvasRef} tabIndex={0} role="application" aria-label="Goal canvas. Hold space and drag to pan." className={`h-full w-full outline-none ${spacePressed || panMode ? 'cursor-grab' : 'cursor-default'}`} onPointerDown={beginCanvasPan} onPointerMove={moveCanvasPan} onPointerUp={endCanvasPan} onPointerCancel={endCanvasPan} onLostPointerCapture={event => { if (panSessionRef.current?.pointerId === event.pointerId) panSessionRef.current = null; }}>
       <div className="goals-canvas-grid absolute inset-0" aria-hidden="true" />
       {!activeGoal && <div className="absolute inset-0 flex items-center justify-center p-6" role="status" aria-live="polite"><div className="max-w-sm rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm"><div className="mx-auto flex size-10 items-center justify-center rounded-full bg-blue-50 text-blue-600"><Sparkles className="size-5" /></div><h2 className="mt-3 text-sm font-semibold text-slate-900">Start with a Goal</h2><p className="mt-1 text-xs leading-5 text-slate-500">Create a Goal to shape its subgoals, agents, instructions, and approval gates on the canvas.</p><button type="button" onClick={openNewGoalDialog} className="mt-4 inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700"><Plus className="size-3.5" /> New goal</button></div></div>}
       <div className="absolute left-1/2 top-1/2" style={{ transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px)) scale(${zoom})`, transformOrigin: 'center' }}>
         <svg className="pointer-events-auto absolute left-0 top-0 h-[1200px] w-[2000px] overflow-visible"><defs>{connections.map(connection => <linearGradient key={connection.id} id={`connector-gradient-${connection.id}`} x1="0%" x2="100%" y1="0%" y2="0%"><stop offset="0%" stopColor={connection.conditionBranch === 'positive' ? '#34d399' : '#fb7185'} /><stop offset="100%" stopColor="#60a5fa" /></linearGradient>)}</defs>{connections.map(connection => { const path = connectorPath(connection); const branchLabel = connection.conditionBranch ? ` via ${connection.conditionBranch} branch` : ''; const source = activeGoal?.elements.find(element => element.id === connection.sourceId); const isRetryReturn = source?.type === 'retry'; return path ? <path key={connection.id} id={`goal-canvas-item-${connection.id}`} d={path} fill="none" stroke={connection.conditionBranch ? `url(#connector-gradient-${connection.id})` : isRetryReturn ? '#0891b2' : selectedElement?.id === connection.id ? '#2563eb' : '#94a3b8'} strokeWidth={selectedElement?.id === connection.id ? '3' : '2'} strokeDasharray={isRetryReturn ? '7 5' : undefined} strokeLinecap="round" className="cursor-pointer outline-none focus-visible:stroke-blue-600" onClick={event => { event.stopPropagation(); setSelectedElementId(connection.id); setConnectorMode(false); setConnectorSourceId(null); setConnectorSourceBranch(undefined); }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedElementId(connection.id); } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'ArrowRight' || event.key === 'ArrowDown') { event.preventDefault(); moveCanvasSelection(connection.id, event.key === 'ArrowRight' || event.key === 'ArrowDown'); } }} role="button" tabIndex={selectedElement?.id === connection.id ? 0 : -1} aria-label={`${isRetryReturn ? 'Retry return' : 'Connector'} from ${connection.sourceId} to ${connection.targetId}${branchLabel}`} /> : null; })}</svg>
         {connectorError && <div role="alert" className="absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 shadow-sm">{connectorError}</div>}
-        {activeGoal?.elements.filter(element => element.type !== 'connector').map(element => { const connected = isGoalElementConnected(activeGoal.elements, element.id); const locked = isExecutionLocked(element); const readiness = readinessForElement(element, connected); const readinessDisplay = readiness === 'ready' ? <span className="mt-3 inline-flex items-center" title="Ready for workflow use"><ReadyIcon /></span> : <span className={`mt-3 inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${readinessChipClass(readiness)}`}><CircleDot className="size-3" />{readinessLabel(readiness)}</span>; return <div key={element.id} id={`goal-canvas-item-${element.id}`} role="group" aria-label={`${element.type}: ${getElementTitle(element)}`} tabIndex={selectedElement?.id === element.id ? 0 : -1} onClick={() => { if (connectorMode) { if (connectorSourceId) connectNodes(element.id); else beginConnection(element.id, 'right'); } else setSelectedElementId(element.id); }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedElementId(element.id); } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'ArrowRight' || event.key === 'ArrowDown') { event.preventDefault(); moveCanvasSelection(element.id, event.key === 'ArrowRight' || event.key === 'ArrowDown'); } }} onPointerDown={event => { if (spacePressed || panMode || connectorMode || locked) return; setSelectedElementId(element.id); setDrag({ id: element.id, startX: event.clientX, startY: event.clientY, originX: element.x, originY: element.y }); }} className={`absolute flex flex-col rounded-lg border p-3 text-left shadow-sm transition-shadow hover:shadow-md ${nodeClass(element.type, connected)} ${locked ? 'cursor-not-allowed' : ''} ${selectedElement?.id === element.id ? 'ring-2 ring-blue-500 ring-offset-2' : ''}`} style={{ left: element.x, top: element.y, width: element.width ?? 220, height: canvasElementHeight(element) }}><span className="flex min-w-0 items-center gap-2 text-xs font-semibold"><span className="rounded bg-black/5 p-1">{elementIcon(element.type)}</span><span className="truncate">{getElementTitle(element)}</span></span>{getElementBody(element) && <span className={`mt-2 line-clamp-2 text-[11px] ${element.type === 'goal' ? 'text-slate-300' : 'text-slate-500'}`}>{getElementBody(element)}</span>}{element.type === 'condition' && <div className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold"><span className="rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-emerald-700">{conditionPositiveLabel(element)}</span><span className="rounded-full border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-rose-700">{conditionNegativeLabel(element)}</span></div>}{element.type === 'retry' && <span className="mt-2 inline-flex w-fit items-center gap-1 text-[10px] font-semibold text-cyan-700"><RotateCcw className="size-3" />Max {element.retryMaxAttempts ?? '—'} attempts</span>}{isCompletionElement(element) ? <span className={`mt-3 inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${compactChipClass(statusChipClass(element.status))}`}><StatusIcon status={element.status} />{statusLabel(element.status)}</span> : readinessDisplay}{locked && <span className="pointer-events-none absolute right-2 top-2 inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/95 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600 shadow-sm" title={element.status === 'working' ? 'In progress — editing locked' : 'Editing locked'}>{element.status === 'working' ? <LoaderCircle aria-hidden="true" className="size-3 animate-spin" /> : <LockKeyhole aria-hidden="true" className="size-3" />}</span>}{renderPorts(element)}</div>; })}
+        {activeGoal?.elements.filter(element => element.type !== 'connector').map(element => { const connected = isGoalElementConnected(activeGoal.elements, element.id); const locked = isExecutionLocked(element); const readiness = readinessForElement(element, connected); const readinessDisplay = readiness === 'ready' ? <span className="mt-3 inline-flex items-center" title="Ready for workflow use"><ReadyIcon /></span> : <span className={`mt-3 inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${readinessChipClass(readiness)}`}><CircleDot className="size-3" />{readinessLabel(readiness)}</span>; return <div key={element.id} id={`goal-canvas-item-${element.id}`} role="group" aria-label={`${element.type}: ${getElementTitle(element)}`} tabIndex={selectedElement?.id === element.id ? 0 : -1} onClick={() => { if (connectorMode) { if (connectorSourceId) connectNodes(element.id); else beginConnection(element.id, 'right'); } else setSelectedElementId(element.id); }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedElementId(element.id); } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'ArrowRight' || event.key === 'ArrowDown') { event.preventDefault(); moveCanvasSelection(element.id, event.key === 'ArrowRight' || event.key === 'ArrowDown'); } }} onPointerDown={event => { if (spaceHeldRef.current || panMode || connectorMode || locked) return; setSelectedElementId(element.id); setDrag({ id: element.id, startX: event.clientX, startY: event.clientY, originX: element.x, originY: element.y }); }} className={`absolute flex flex-col rounded-lg border p-3 text-left shadow-sm transition-shadow hover:shadow-md ${nodeClass(element.type, connected)} ${locked ? 'cursor-not-allowed' : ''} ${selectedElement?.id === element.id ? 'ring-2 ring-blue-500 ring-offset-2' : ''}`} style={{ left: element.x, top: element.y, width: element.width ?? 220, height: canvasElementHeight(element) }}><span className="flex min-w-0 items-center gap-2 text-xs font-semibold"><span className="rounded bg-black/5 p-1">{elementIcon(element.type)}</span><span className="truncate">{getElementTitle(element)}</span></span>{getElementBody(element) && <span className={`mt-2 line-clamp-2 text-[11px] ${element.type === 'goal' ? 'text-slate-300' : 'text-slate-500'}`}>{getElementBody(element)}</span>}{element.type === 'condition' && <div className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold"><span className="rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-emerald-700">{conditionPositiveLabel(element)}</span><span className="rounded-full border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-rose-700">{conditionNegativeLabel(element)}</span></div>}{element.type === 'retry' && <span className="mt-2 inline-flex w-fit items-center gap-1 text-[10px] font-semibold text-cyan-700"><RotateCcw className="size-3" />Max {element.retryMaxAttempts ?? '—'} attempts</span>}{isCompletionElement(element) ? <span className={`mt-3 inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${compactChipClass(statusChipClass(element.status))}`}><StatusIcon status={element.status} />{statusLabel(element.status)}</span> : readinessDisplay}{locked && <span className="pointer-events-none absolute right-2 top-2 inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/95 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600 shadow-sm" title={element.status === 'working' ? 'In progress — editing locked' : 'Editing locked'}>{element.status === 'working' ? <LoaderCircle aria-hidden="true" className="size-3 animate-spin" /> : <LockKeyhole aria-hidden="true" className="size-3" />}</span>}{renderPorts(element)}</div>; })}
       </div>
     </div>
     {editNotice && <div role="status" className="absolute bottom-16 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 shadow-sm"><LockKeyhole className="size-3.5 shrink-0" />{editNotice}<button type="button" className="ml-1 font-semibold text-amber-900" onClick={() => setEditNotice(null)}>Dismiss</button></div>}
@@ -940,6 +1126,39 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
               </Select>
             </label>
             <div className="mt-3 rounded-md border border-cyan-100 bg-cyan-50/60 px-2.5 py-2 text-[11px] text-cyan-800"><span className="font-semibold">Retry target:</span> {selectedRetryTarget ? activeGoal?.elements.find(element => element.id === selectedRetryTarget)?.title ?? 'Missing node' : 'Connect this node to an earlier step.'}</div>
+          </section>
+        )}
+        {selectedElement.type === 'deliverable' && (
+          <section className="mt-5 border-t border-slate-100 pt-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Delivery contract</p>
+            <p className="mt-1 text-[11px] text-slate-400">These instructions are authoritative for this Goal revision. Notes provide context only.</p>
+            <label className="mt-3 block text-xs font-medium text-slate-600">Outcome kind
+              <Select value={selectedElement.deliverySpec?.outcomeKind ?? 'other'} onValueChange={value => updateElement({ deliverySpec: { ...(selectedElement.deliverySpec ?? { instructions: '' }), outcomeKind: value as NonNullable<GoalElement['deliverySpec']>['outcomeKind'] } })}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="file">File</SelectItem><SelectItem value="summary">Summary</SelectItem><SelectItem value="conclusion">Conclusion</SelectItem><SelectItem value="resolution">Resolution</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent>
+              </Select>
+            </label>
+            <label className="mt-3 block text-xs font-medium text-slate-600">Delivery instructions<textarea value={selectedElement.deliverySpec?.instructions ?? ''} onChange={event => updateElement({ deliverySpec: { ...(selectedElement.deliverySpec ?? { outcomeKind: 'other' }), instructions: event.target.value } })} rows={5} placeholder="Describe how this outcome should be delivered, where, and in what form." className="mt-1 w-full resize-y rounded-md border border-emerald-200 bg-emerald-50/30 px-2.5 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" /></label>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <label className="block text-xs font-medium text-slate-600">Format<Input value={selectedElement.deliverySpec?.format ?? ''} onChange={event => updateElement({ deliverySpec: { ...(selectedElement.deliverySpec ?? { outcomeKind: 'other', instructions: '' }), format: event.target.value || undefined } })} placeholder="e.g. PDF" className="mt-1" /></label>
+              <label className="block text-xs font-medium text-slate-600">Recipient<Input value={selectedElement.deliverySpec?.recipient ?? ''} onChange={event => updateElement({ deliverySpec: { ...(selectedElement.deliverySpec ?? { outcomeKind: 'other', instructions: '' }), recipient: event.target.value || undefined } })} placeholder="Person or team" className="mt-1" /></label>
+            </div>
+            <label className="mt-3 block text-xs font-medium text-slate-600">Destination<Input value={selectedElement.deliverySpec?.destination ?? ''} onChange={event => updateElement({ deliverySpec: { ...(selectedElement.deliverySpec ?? { outcomeKind: 'other', instructions: '' }), destination: event.target.value || undefined } })} placeholder="Workspace, folder, URL, or channel" className="mt-1" /></label>
+            <label className="mt-3 block text-xs font-medium text-slate-600">Acceptance criteria<textarea value={(selectedElement.deliverySpec?.acceptanceCriteria ?? []).join('\n')} onChange={event => updateElement({ deliverySpec: { ...(selectedElement.deliverySpec ?? { outcomeKind: 'other', instructions: '' }), acceptanceCriteria: event.target.value.split(/\r?\n/).map(value => value.trim()).filter(Boolean) } })} rows={4} placeholder="One criterion per line" className="mt-1 w-full resize-y rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" /></label>
+            <label className="mt-3 block text-xs font-medium text-slate-600">Expected artifact count <span className="font-normal text-slate-400">(optional)</span><Input type="number" min={0} step={1} value={selectedElement.deliverySpec?.expectedArtifactCount ?? ''} onChange={event => updateElement({ deliverySpec: { ...(selectedElement.deliverySpec ?? { outcomeKind: 'other', instructions: '' }), expectedArtifactCount: event.target.value === '' ? undefined : Math.max(0, Math.floor(Number(event.target.value))) } })} className="mt-1" /></label>
+            <label className="mt-3 block text-xs font-medium text-slate-600">Acceptance state
+              <Select value={selectedElement.deliverableStatus ?? 'planned'} onValueChange={value => updateElement({ deliverableStatus: value as GoalElement['deliverableStatus'] })}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="planned">Planned</SelectItem><SelectItem value="in-progress">In progress</SelectItem><SelectItem value="ready-for-review">Ready for review</SelectItem><SelectItem value="accepted">Accepted</SelectItem><SelectItem value="rejected">Rejected</SelectItem></SelectContent>
+              </Select>
+            </label>
+            <div className="mt-4 rounded-md border border-emerald-100 bg-emerald-50/40 p-2.5">
+              <p className="text-[11px] font-semibold text-emerald-800">Delivered outputs</p>
+              <p className="mt-1 text-[11px] text-emerald-700/70">Runtime handoff records appear here after execution. Supporting artifacts are kept on separate nodes.</p>
+              {(runtimeProjection?.handoffs ?? []).filter(handoff => !handoff.deliverableId || handoff.deliverableId === selectedElement.id).length === 0
+                ? <p className="mt-2 text-[11px] text-slate-400">No terminal handoff recorded yet.</p>
+                : <div className="mt-2 space-y-2">{(runtimeProjection?.handoffs ?? []).filter(handoff => !handoff.deliverableId || handoff.deliverableId === selectedElement.id).map(handoff => <div key={handoff.id} className="rounded-md border border-emerald-100 bg-white px-2.5 py-2"><p className="text-[10px] text-slate-400">{handoff.deliveredAt ? new Date(handoff.deliveredAt).toLocaleString() : 'Recorded handoff'}</p>{(handoff.producedArtifactReferences ?? []).map((reference, index) => <p key={`${handoff.id}-${index}`} className="mt-1 truncate text-xs font-medium text-slate-700">{reference.label ?? reference.locator ?? 'Produced output'}{reference.format ? ` · ${reference.format}` : ''}</p>)}</div>)}</div>}
+            </div>
           </section>
         )}
         {selectedElement.type === 'condition' && (
@@ -1105,6 +1324,61 @@ export function GoalsView({ people = [], workspacePolicy, goalAuditArchiveDirect
             </label>}
           </section>
         )}
+        {(selectedElement.type === 'goal' || selectedElement.type === 'subgoal' || selectedElement.type === 'artifact') && <section className="mt-5 border-t border-slate-100 pt-4">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{selectedElement.type === 'artifact' ? 'Supporting artifacts' : 'Execution artifacts'}</p>
+          <p className="mt-1 text-[11px] text-slate-400">{selectedElement.type === 'artifact' ? 'These files and references support execution; they never satisfy delivery acceptance.' : 'Links stay attached to this node; task and milestone records remain canonical.'}</p>
+          {selectedElement.type !== 'artifact' && <Select onValueChange={value => {
+            const option = artifactOptions.find(item => item.value === value);
+            if (!option || selectedArtifactReferences.some(reference => reference.artifactType === option.artifactType && reference.artifactId === option.artifactId)) return;
+            void updateArtifactReferences([...selectedArtifactReferences, { id: createStableId('artifact-link'), artifactType: option.artifactType, artifactId: option.artifactId, linkedBy: 'renderer', linkedAt: new Date().toISOString() }]);
+          }}>
+            <SelectTrigger className="mt-2"><SelectValue placeholder="Link a task or milestone" /></SelectTrigger>
+            <SelectContent>
+              {artifactOptions.filter(option => !selectedArtifactReferences.some(reference => reference.artifactType === option.artifactType && reference.artifactId === option.artifactId)).map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+              {artifactOptions.length === 0 && <SelectItem value="__none__" disabled>No tasks or milestones available</SelectItem>}
+            </SelectContent>
+          </Select>}
+          {selectedElement.type === 'artifact' && <div className="mt-3 rounded-md border border-sky-100 bg-sky-50/40 p-2.5">
+            <p className="text-[11px] font-semibold text-sky-800">Select a workspace source</p>
+            <p className="mt-1 text-[11px] text-sky-700/70">Links the existing attachment without copying its contents into the Goal.</p>
+            <label className="mt-3 block text-[11px] font-medium text-slate-600">Artifact type
+              <Select value={supportingArtifactType} onValueChange={value => { setSupportingArtifactType(value as SupportingArtifactType); setSupportingSourceSearch(''); }}>
+                <SelectTrigger className={`mt-1 ${ARTIFACT_SELECT_CLASS}`}><SelectValue /></SelectTrigger>
+                <SelectContent className="rounded-xl"><SelectItem value="document">Document</SelectItem><SelectItem value="file">File</SelectItem><SelectItem value="url">URL</SelectItem><SelectItem value="user-defined">User-defined</SelectItem></SelectContent>
+              </Select>
+            </label>
+            {(supportingArtifactType === 'document' || supportingArtifactType === 'file') && <>
+              <label className="mt-3 block text-[11px] font-medium text-slate-600">Search workspace sources
+                <Input value={supportingSourceSearch} onChange={event => setSupportingSourceSearch(event.target.value)} placeholder="Search by attachment or task name" className="mt-1 rounded-xl bg-white" />
+              </label>
+              <label className="mt-3 block text-[11px] font-medium text-slate-600">Workspace source
+                <Select onValueChange={addSupportingSourceReference}>
+                  <SelectTrigger className={`mt-1 ${ARTIFACT_SELECT_CLASS}`}><SelectValue placeholder={supportingSourceOptions.length ? 'Choose an existing source' : 'No matching sources'} /></SelectTrigger>
+                  <SelectContent className="rounded-xl">{supportingSourceOptions.map(option => <SelectItem key={option.value} value={option.value}>{option.label}<span className="ml-1 text-[10px] text-slate-400">· {option.searchText.replace(option.attachment.name, '').trim()}</span></SelectItem>)}{supportingSourceOptions.length === 0 && <SelectItem value="__none__" disabled>No matching workspace attachments</SelectItem>}</SelectContent>
+                </Select>
+              </label>
+            </>}
+            <p className="mt-3 text-[11px] font-semibold text-sky-800">Or declare an external/user-defined source</p>
+            <Input value={customArtifactLabel} onChange={event => setCustomArtifactLabel(event.target.value)} placeholder="Artifact label" className="mt-2 bg-white" />
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <Select value={customArtifactKind} onValueChange={setCustomArtifactKind}><SelectTrigger className={ARTIFACT_SELECT_CLASS}><SelectValue /></SelectTrigger><SelectContent className="rounded-xl"><SelectItem value="document">Document</SelectItem><SelectItem value="file">File</SelectItem><SelectItem value="url">URL</SelectItem><SelectItem value="user-defined">User-defined</SelectItem></SelectContent></Select>
+              <Input value={customArtifactFormat} onChange={event => setCustomArtifactFormat(event.target.value)} placeholder="Format (optional)" className="bg-white" />
+            </div>
+            <Input value={customArtifactLocator} onChange={event => setCustomArtifactLocator(event.target.value)} placeholder="Locator or URL (optional)" className="mt-2 bg-white" />
+            <button type="button" onClick={addCustomArtifactReference} disabled={!customArtifactLabel.trim()} className="mt-2 rounded-md border border-sky-200 bg-white px-2.5 py-1.5 text-xs font-medium text-sky-700 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50">Add supporting artifact</button>
+          </div>}
+          {selectedArtifactReferences.length > 0 ? <div className="mt-2 space-y-2">{selectedArtifactReferences.map(reference => {
+            const projection = reference.projection;
+            const sourceTask = reference.sourceTaskId ? tasks.find(task => task.id === reference.sourceTaskId) : undefined;
+            const sourceAvailable = reference.sourceAttachmentId ? Boolean(sourceTask?.attachments?.some(attachment => attachment.id === reference.sourceAttachmentId)) : undefined;
+            const missing = projection?.exists === false || sourceAvailable === false;
+            const blocked = projection?.status === 'blocked';
+            const approvalRequired = projection?.status === 'approval-required' || selectedElement.status === 'approval-required';
+            const status = missing ? 'Stale reference' : blocked ? 'Blocked' : approvalRequired ? 'Approval required' : projection?.status ?? 'Linked';
+            const statusClass = missing || blocked ? 'border-rose-200 bg-rose-50 text-rose-700' : approvalRequired ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-slate-200 bg-slate-50 text-slate-600';
+            return <div key={reference.id} className="rounded-md border border-slate-200 px-2.5 py-2"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate text-xs font-medium text-slate-700">{projection?.title ?? reference.label ?? `${reference.artifactType} · ${reference.artifactId}`}</p><p className={`mt-1 inline-flex rounded-full border px-1.5 py-0.5 text-[10px] font-semibold capitalize ${statusClass}`}>{status.replaceAll('-', ' ')}</p></div><button type="button" onClick={() => void updateArtifactReferences(selectedArtifactReferences.filter(item => item.id !== reference.id))} className="shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label="Unlink execution artifact">×</button></div>{projection?.exists && <p className="mt-1 text-[10px] text-slate-400">{projection.assigneeId ? `Assignee ${projection.assigneeId}` : 'Unassigned'}{projection.dependencyIds?.length ? ` · ${projection.dependencyIds.length} dependencies` : ''}{projection.evidence?.length ? ` · ${projection.evidence.length} evidence refs` : ''}</p>}{missing && <p className="mt-1 text-[10px] text-rose-600">The source artifact no longer exists and must be relinked.</p>}</div>;
+          })}</div> : <p className="mt-2 text-[11px] text-slate-400">No execution artifacts linked yet.</p>}
+        </section>}
         {selectedElement.type !== 'connector' && <section className="mt-5 border-t border-slate-100 pt-4">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Connections</p>
           {selectedConnections.length === 0 ? <p className="mt-2 text-[11px] text-slate-400">No connected nodes yet.</p> : <div className="mt-2 space-y-2">{selectedConnections.map(connection => {

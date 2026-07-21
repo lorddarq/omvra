@@ -23,6 +23,7 @@ export function GoalsAgentSection({ element, people, selectedAgent, selectedAgen
       <textarea value={selectedAgentConfiguration?.instructions ?? ''} onChange={event => onUpdateConfiguration({ instructions: event.target.value })} rows={8} autoFocus={false} placeholder="Describe the concrete work, scope, and expected result for this agent node." className="mt-1 w-full resize-y rounded-md border border-blue-200 bg-blue-50/30 px-3 py-2.5 text-sm leading-5 text-slate-700 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
     </label>
     <p className="mt-2 text-[11px] text-slate-400">These instructions are sent with the delegation contract. They are separate from the node label and canonical agent profile.</p>
+    <label className="mt-3 flex items-start gap-2 text-xs font-medium text-slate-600"><input type="checkbox" checked={selectedAgentConfiguration?.workAsSubagent === true} onChange={event => onUpdateConfiguration({ workAsSubagent: event.target.checked })} className="mt-0.5" /> <span>Instruct the working agent to run this as a subagent<span className="mt-1 block text-[11px] font-normal text-slate-400">Omvra does not spawn it. The working agent must create and manage the subagent through its own runtime.</span></span></label>
     <div className="mt-5 border-t border-slate-100 pt-4">
       <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Agent setup</p>
       <label className="mt-3 block text-xs font-medium text-slate-600">Agent mode

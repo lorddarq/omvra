@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const { spawnSync } = require('child_process');
+const { randomUUID } = require('crypto');
 const path = require('path');
 const fs = require('fs');
 const Store = require('electron-store');
@@ -24,12 +25,14 @@ const {
   buildMcpListenerStatus,
   updateGoal,
   updateGoalArtifactReferences,
+  archiveMcpAuditEntries,
 } = require('./services/workspace-service.cjs');
 const { recordGoalPolicyChangeImpact } = require('./services/goal-policy.cjs');
 const { createGoalLifecycleService } = require('./services/goal-lifecycle-service.cjs');
 const { runDueSchedules } = require('./services/goal-schedule-service.cjs');
 const { createGoalRuntimeService } = require('./services/goal-runtime-service.cjs');
 const { getBundledSkillsRoot } = require('./services/skill-service.cjs');
+const { resolveWorkspaceUserDataPath } = require('./services/workspace-paths.cjs');
 
 const APP_NAME = 'Omvra';
 // Consider the app to be in dev mode when it's not packaged. This avoids trying to load a dev server in packaged builds.
@@ -37,10 +40,7 @@ const isDev = !app.isPackaged;
 const storeName = isDev ? 'omvra-store-dev' : 'omvra-store';
 // Keep existing development workspaces on their original path after the package rename.
 const appDataPath = app.getPath('appData');
-const legacyDevUserDataPath = path.join(appDataPath, '@figma', 'my-make-file');
-const userDataPath = isDev && fs.existsSync(legacyDevUserDataPath)
-  ? legacyDevUserDataPath
-  : (isDev ? path.join(appDataPath, APP_NAME) : app.getPath('userData'));
+const userDataPath = resolveWorkspaceUserDataPath({ appDataPath, appName: APP_NAME, isDev }) || app.getPath('userData');
 app.setName(APP_NAME);
 app.setPath('userData', userDataPath);
 const store = new Store({ name: storeName });
@@ -497,7 +497,18 @@ app.on('before-quit', () => {
 // IPC: Store
 // =====================
 ipcMain.handle('store/get', (_, key) => store.get(key));
-ipcMain.handle('store/set', (_, key, value) => store.set(key, value));
+ipcMain.handle('store/set', (_, key, value) => {
+  const result = store.set(key, value);
+  if (key === PREFERENCES_KEY && value?.goalAuditArchiveDirectory) {
+    archiveMcpAuditEntries(store, store.get('omvra.mcp.audit.v1'));
+    createGoalLifecycleService({
+      store,
+      skillsRoot: getBundledSkillsRoot({ isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath }),
+      userDataPath: app.getPath('userData'),
+    });
+  }
+  return result;
+});
 ipcMain.handle('store/delete', (_, key) => store.delete(key));
 ipcMain.handle('store/export', () => store.store);
 ipcMain.handle('goal-policy/record-impact', (_, payload) => {
@@ -508,6 +519,29 @@ ipcMain.handle('goal-policy/record-impact', (_, payload) => {
   return result;
 });
 ipcMain.handle('goals/get-runtime', (_, goalId) => goalRuntime.get(goalId));
+ipcMain.handle('goals/reset-execution', (_, payload = {}) => {
+  const goalId = typeof payload.goalId === 'string' ? payload.goalId.trim() : '';
+  if (!goalId) return { ok: false, error: 'GOAL_ID_REQUIRED', message: 'goalId is required.' };
+
+  const lifecycle = createGoalLifecycleService({
+    store,
+    skillsRoot: getBundledSkillsRoot({ isPackaged: app.isPackaged, appPath: app.getAppPath(), resourcesPath: process.resourcesPath }),
+    userDataPath: app.getPath('userData'),
+    onRuntimeChange: goalRuntime.emit,
+  });
+  const current = lifecycle.getExecution(goalId);
+  if (!current) return { ok: true, reset: true, alreadyReset: true, execution: null };
+  const resetResult = lifecycle.execute({
+    command: 'reset',
+    goalId,
+    expectedRevision: current.revision,
+    commandId: `renderer-reset-${randomUUID()}`,
+    actor: 'human',
+    payload: { humanConfirmed: true, reason: 'user-requested-reset' },
+  });
+  if (!resetResult.ok) return resetResult;
+  return { ...resetResult, reset: true };
+});
 ipcMain.handle('goals/update', (_, payload = {}) => updateGoal(store, {
   goalId: payload.goalId,
   title: payload.title,

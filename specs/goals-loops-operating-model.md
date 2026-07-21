@@ -27,9 +27,9 @@ Execution state is overseer-managed and separate from editable Goal graph defini
 
 The first slice preserves missing dependency and persona references. A missing agent remains traceable as a degraded reference rather than being silently reassigned or deleted from workflow data. Available agent UI metadata may provide role context, but missing skills and instructions are shown explicitly and are not implied. Deleting an available agent requires confirmation that explains which workflows reference the agent and what degraded behavior will result.
 
-Agent nodes are executable delegation points. They carry task-specific instructions independently from the selected agent's persona and operational profile. The agent-node inspector exposes an `existing` or `ephemeral` mode, canonical agent selection for existing agents, requested capability/name/type for ephemeral recruitment, task-specific instructions, and an explicit `spawnIfUnavailable` fallback.
+Agent nodes are executable delegation points. They carry task-specific instructions independently from the selected agent's persona and operational profile. The agent-node inspector exposes an `existing` or `ephemeral` mode, canonical agent selection for existing agents, requested capability/name/type for ephemeral recruitment, task-specific instructions, an explicit `workAsSubagent` toggle, and an explicit `spawnIfUnavailable` fallback. The toggle is the only signal that turns an agent node into a worker-owned subagent request.
 
-When configured for an existing agent, the overseer resolves the canonical person and combines that person's behavior/persona guidance and operational instructions with the node's task-specific instructions. When configured for an ephemeral agent, the overseer must not attach a persona profile or invent behavior/operational instructions; it passes the requested capability and node instructions to temporary-agent recruitment. If a requested existing agent cannot be resolved and fallback is enabled, the overseer receives a typed unavailable-agent result and may spawn a temporary agent rather than silently assigning a different canonical person.
+When configured for an existing agent, the overseer resolves the canonical person and combines that person's behavior/persona guidance and operational instructions with the node's task-specific instructions. When configured for an ephemeral agent, the overseer must not attach a persona profile or invent behavior/operational instructions; it passes the requested capability and node instructions to the working agent. If `workAsSubagent` is enabled, the working agent owns subagent creation and management through its available runtime and must report a typed blocked result if that runtime cannot create a requested subagent. Omvra does not spawn subagents. If a requested existing agent cannot be resolved and fallback is enabled, the working agent may create a temporary subagent rather than silently assigning a different canonical person.
 
 Templates must not use agent-node bodies as a substitute for dispatch instructions or hard-code canonical assignee IDs that may not exist in another workspace. `instructions` nodes remain separate shared/scoped guidance and do not replace the agent node's delegation contract.
 
@@ -434,7 +434,8 @@ type GoalExecutionStatus =
   | 'complete'
   | 'blocked'
   | 'approval-required'
-  | 'failed';
+  | 'failed'
+  | 'abandoned';
 
 interface GoalExecutionRecord {
   goalId: string;
@@ -469,8 +470,11 @@ Every command includes `commandId`, `goalId`, `expectedGoalRevision`, `execution
 | `blocked` / `approval-required` | `resume` | Blocking reason resolved, revision revalidated, contract still current | `ready` or prior active state |
 | `working` / `evidence-required` / `handoff-pending` | `fail` | Failure reason and preserved evidence recorded | `failed` |
 | `working` / `evidence-required` / `handoff-pending` / `failed` | `retry` | Retry budget and policy permit another attempt | `ready` |
+| `ready` / `working` / `evidence-required` / `handoff-pending` / `paused` / `blocked` / `approval-required` / `interrupted` | `abandon` | Explicit human confirmation or confirmed stale-execution GC | `abandoned` |
 
-`complete` is terminal for an execution attempt, not for the Goal definition. Every Goal is re-runnable: starting a Goal whose latest execution is terminal creates a new execution record with a new `executionAttemptId`, preserves the prior execution and evidence as immutable history, and never reopens the completed attempt in place. A changed objective, acceptance boundary, or semantic contract additionally creates a new Goal revision and contract snapshot for that attempt. Only one execution may be active for a Goal by default. A newly discovered cleanup failure does not downgrade completion. It updates the cleanup outcome and emits an operational event for retry or inspection.
+`complete`, `failed`, and `abandoned` are terminal for an execution attempt, not for the Goal definition. Every Goal is re-runnable: starting a Goal whose latest execution is terminal creates a new execution record with a new `executionAttemptId`, preserves the prior execution and evidence as immutable history, and never reopens the completed attempt in place. A changed objective, acceptance boundary, or semantic contract additionally creates a new Goal revision and contract snapshot for that attempt. Only one execution may be active for a Goal by default. Abandonment is an explicit, auditable terminal decision; stale-execution garbage collection may discover candidates and may mark them abandoned only with explicit human confirmation. It never deletes the Goal graph, evidence, or execution history. A newly discovered cleanup failure does not downgrade completion. It updates the cleanup outcome and emits an operational event for retry or inspection.
+
+The Goals inspector provides **Reset execution** as a single governed recovery action. Reset never deletes or reopens the current attempt: it records a human-confirmed reset, marks an active attempt abandoned when necessary, and clears the current runtime projection back to the Goal's initial not-started state. The prior execution, contract snapshot, evidence, handoffs, and audit events remain available for inspection. The next explicit `start` creates a new attempt and remains subject to all setup and contract gates.
 
 ### Completion transaction
 
@@ -485,7 +489,7 @@ If step 2 fails, no cleanup is attempted. If the process exits between steps 2 a
 
 ### Commands and durable events
 
-The minimum command surface is `start`, `dispatch`, `acknowledge`, `submit-evidence`, `request-handoff`, `accept`, `pause`, `resume`, `retry`, `fail`, and `complete`. `acknowledge` is receipt-only; `accept` records acceptance; `complete` performs the terminal transition. Each accepted command appends an event containing `eventId`, `eventType`, `goalId`, `goalRevision`, `executionAttemptId`, `actorId`, `occurredAt`, `previousStatus`, `nextStatus`, `commandId`, and typed reason/evidence fields. Replaying a command with the same idempotency key returns the original result without appending a second transition. Stale acknowledgements are rejected and recorded.
+The minimum command surface is `start`, `dispatch`, `acknowledge`, `report-recruitment`, `submit-evidence`, `request-handoff`, `accept`, `pause`, `resume`, `retry`, `fail`, `complete`, `abandon`, and `reset`. `acknowledge` is receipt-only; `report-recruitment` records the working agent's subagent identities and outcome without Omvra spawning them; `accept` records acceptance; `complete` and `abandon` perform terminal transitions; `reset` preserves the current attempt as history and clears the current runtime projection without deleting it. `goals.gc` provides a dry-run stale-execution candidate scan and a confirmation-gated application path. Each accepted command appends an event containing `eventId`, `eventType`, `goalId`, `goalRevision`, `executionAttemptId`, `actorId`, `occurredAt`, `previousStatus`, `nextStatus`, `commandId`, and typed reason/evidence fields. Replaying a command with the same idempotency key returns the original result without appending a second transition. Stale acknowledgements are rejected and recorded.
 
 The `GoalLifecycleService` is the sole validator and durable lifecycle committer. An `OverseerAdapter` performs delegation, wake, retry, escalation, and configured approval handling; it returns typed outcomes or intents to the lifecycle service, which validates budget and policy boundaries before reflecting them in durable execution state. It cannot mutate lifecycle state directly.
 
@@ -508,7 +512,7 @@ Both paths use the aggregate Goal revision, preserve unknown fields, and require
 
 Agent-originated Goal graph mutation is controlled by a user-configurable preference. The default requires human confirmation; users may explicitly relax that policy for their workspace. The preference itself is versioned policy and is included in the effective Goal contract.
 
-MCP audit history keeps a bounded in-app fallback of the most recent 200 metadata-only records. Users may configure a separate local archive directory for longer-term MCP history and analysis. Archive records use an append-oriented format such as JSONL, exclude credentials and raw sensitive payloads, and do not replace the canonical audit state.
+MCP audit history keeps a bounded in-app fallback of the most recent 200 metadata-only records. Users may configure a separate local archive directory for longer-term MCP history and analysis. Archive records use an append-oriented format such as JSONL, exclude credentials and raw sensitive payloads, and do not replace the canonical audit state. Lifecycle write records retain the command actor, goal/execution identity, execution state and revision, expected/current revision, attempt, and contract revision/hash so rejected retries, orphan recovery, and dispatch transitions can be reconstructed without copying the contract packet itself.
 
 ## Backup and restore compatibility
 
@@ -768,13 +772,13 @@ The next deliverable is the implementation of the lifecycle boundary described a
 
 ## Open tasks from the first live Goal test run
 
-The first live run of `goal_d45c31ef-7f4b-4a71-b3b9-f74b9cd0c950` exposed execution-contract gaps. The workflow graph contained an ephemeral researcher node with `recruitment-requested`, but no subagent was spawned, no step-by-step acknowledgement conversation was visible, and no execution record made the skipped stages or active stage explicit. The Goals UI also did not reflect the executing state through the MCP/IPC path.
+The first live run of `goal_d45c31ef-7f4b-4a71-b3b9-f74b9cd0c950` exposed execution-contract gaps. The workflow graph contained an ephemeral researcher node with `recruitment-requested`, but the working agent was not explicitly instructed to create the subagent through its own runtime, no step-by-step acknowledgement conversation was visible, and no execution record made the skipped stages or active stage explicit. The Goals UI also did not reflect the executing state through the MCP/IPC path.
 
 These are open Omvra tasks in project `omvra`:
 
 | Task | Scope | Priority |
 | --- | --- | --- |
-| `task-4c05fab3-9f23-454c-998c-6835f6898ee2` | Enforce subagent spawn and ordered workflow-step execution | Urgent |
+| `task-4c05fab3-9f23-454c-998c-6835f6898ee2` | Instruct the working agent to spawn requested subagents and execute ordered workflow steps | Urgent |
 | `task-078b0240-6892-437a-875d-973965d0576a` | Persist acknowledgement and explicit workflow stage events | Urgent |
 | `task-1c865bd1-182d-4a91-ae7e-e685308b4dba` | Bridge MCP execution progress into the Goals UI | Urgent |
 | `task-c00f270f-49e5-4810-8941-fe55ee3d457c` | Add terminal delivery-handoff contract and human preferences | High |
@@ -783,4 +787,4 @@ These are open Omvra tasks in project `omvra`:
 
 The run must make the operating agent's current stage explicit, for example `received → acknowledged → worker assessed → eligible → started → evidence submitted → overseer validated → handoff pending → delivered`. A stage is not complete merely because the agent produced a response; the stage transition and its evidence must be durable.
 
-Delivery handoff is intentionally tracked separately from ordinary connectors. It is a terminal delivery contract that controls recipient, artifact format, channel, attachment/download preference, acceptance, and stop condition. It may be rendered near the end of the workflow, but it is not a normal dependency node.
+Delivery handoff is intentionally tracked separately from ordinary connectors. It is a terminal delivery contract that controls recipient, artifact format, channel, attachment/download preference, acceptance, and stop condition. It may be rendered near the end of the workflow, but it is not a normal dependency node. When a produced output has a valid `file://`, `http://`, or `https://` locator, the MCP handoff response must also expose it as a downloadable resource link; durable metadata alone is not delivery.

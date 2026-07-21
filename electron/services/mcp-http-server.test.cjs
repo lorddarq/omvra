@@ -534,6 +534,37 @@ test('goals.lifecycle exposes governed revision-checked and idempotent commands'
   assert.equal(stale.error.code, -32602);
   assert.match(stale.error.message, /revision mismatch/i);
 
+  const lifecycleAudits = store.get('omvra.mcp.audit.v1').filter(entry => entry.toolName === 'goals.lifecycle');
+  assert.equal(lifecycleAudits[0].command, 'start');
+  assert.equal(lifecycleAudits[0].actor, 'mcp-agent');
+  assert.equal(lifecycleAudits[0].executionId, started.structuredContent.execution.id);
+  assert.equal(lifecycleAudits[0].executionState, 'ready');
+  assert.equal(lifecycleAudits[0].executionRevision, 1);
+  assert.equal(lifecycleAudits.at(-1).command, 'dispatch');
+  assert.equal(lifecycleAudits.at(-1).outcome, 'failure');
+  assert.equal(lifecycleAudits.at(-1).failureClass, 'conflict');
+  assert.equal(lifecycleAudits.at(-1).expectedRevision, 1);
+  assert.equal(lifecycleAudits.at(-1).currentRevision, 2);
+
+  const dispatched = call({ goalId: 'goal-lifecycle', command: 'dispatch', expectedRevision: 2, commandId: 'dispatch-1' });
+  assert.equal(dispatched.structuredContent.execution.state, 'working');
+  const evidence = call({ goalId: 'goal-lifecycle', command: 'submit-evidence', expectedRevision: 3, commandId: 'evidence-1', payload: { evidenceRefs: ['supporting-input'] } });
+  assert.equal(evidence.structuredContent.execution.state, 'evidence-required');
+  const handoff = call({
+    goalId: 'goal-lifecycle',
+    command: 'request-handoff',
+    expectedRevision: 4,
+    commandId: 'handoff-1',
+    payload: { producedArtifactReferences: [{ label: 'Final report', locator: 'file:///tmp/report.pdf', mimeType: 'application/pdf' }] },
+  });
+  assert.equal(handoff.structuredContent.execution.state, 'handoff-pending');
+  assert.deepEqual(handoff.content[1], {
+    type: 'resource_link',
+    uri: 'file:///tmp/report.pdf',
+    name: 'Final report',
+    mimeType: 'application/pdf',
+  });
+
   const lifecycleTool = dispatch({
     jsonrpc: '2.0',
     id: 'goals-lifecycle-schema',
@@ -541,8 +572,8 @@ test('goals.lifecycle exposes governed revision-checked and idempotent commands'
     params: {},
   }, makeReq()).result.tools.find(tool => tool.name === 'goals_lifecycle');
   assert.deepEqual(lifecycleTool.inputSchema.properties.command.enum, [
-    'start', 'dispatch', 'acknowledge', 'submit-evidence', 'request-handoff',
-    'accept', 'pause', 'resume', 'retry', 'delegate', 'wake', 'escalate', 'approve', 'reconcile', 'fail', 'complete', 'retry-cleanup',
+    'start', 'dispatch', 'acknowledge', 'report-recruitment', 'submit-evidence', 'request-handoff',
+    'accept', 'pause', 'resume', 'retry', 'delegate', 'wake', 'escalate', 'approve', 'reconcile', 'fail', 'complete', 'abandon', 'reset', 'retry-cleanup',
   ]);
 });
 
@@ -579,7 +610,7 @@ test('MCP Goal writes round-trip versioned agent configuration and dispatch meta
   const call = (name, argumentsValue) => dispatch({
     jsonrpc: '2.0', id: `agent-mcp-${name}`, method: 'tools/call', params: { name, arguments: argumentsValue },
   }, makeReq());
-  const configuration = { version: 1, mode: 'ephemeral', autoGenerateName: true, requestedType: 'researcher', instructions: 'Find evidence.' };
+  const configuration = { version: 1, mode: 'ephemeral', autoGenerateName: true, requestedType: 'researcher', instructions: 'Find evidence.', workAsSubagent: true };
   const updated = call('goals.update', {
     goalId: 'goal-agent-mcp', expectedRevision: 0,
     humanConfirmed: true,

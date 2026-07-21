@@ -15,7 +15,7 @@ const node = (id: string, type: GoalElementType, title: string, body: string, x:
 });
 
 const ephemeralAgent = (requestedType: string, instructions: string): Partial<GoalElement> => ({
-  agentConfiguration: { version: 1, mode: 'ephemeral', requestedName: requestedType.replace(/^\w/, character => character.toUpperCase()), requestedType, instructions },
+  agentConfiguration: { version: 1, mode: 'ephemeral', requestedName: requestedType.replace(/^\w/, character => character.toUpperCase()), requestedType, instructions, workAsSubagent: true },
 });
 
 const link = (id: string, title: string, sourceId: string, targetId: string, sourceSide: GoalElement['sourceSide'] = 'right', targetSide: GoalElement['targetSide'] = 'left', extra: Partial<GoalElement> = {}): GoalElement => ({

@@ -101,6 +101,39 @@ test('completed Goals can start a new immutable execution attempt', () => {
   assert.equal(store.get(EXECUTIONS_KEY)[1].id, rerun.execution.id);
 });
 
+test('reset preserves the attempt while returning the Goal to not-started runtime state', () => {
+  const store = makeStore();
+  const lifecycle = createGoalLifecycleService({ store, now: makeClock(), cleanup: () => ({ status: 'skipped', ok: true }) });
+  const started = lifecycle.execute({ goalId: 'goal-1', command: 'start', expectedRevision: 0, commandId: 'reset-start' });
+  const reset = lifecycle.execute({ goalId: 'goal-1', command: 'reset', expectedRevision: 1, commandId: 'reset-command', actor: 'human', payload: { humanConfirmed: true } });
+
+  assert.equal(reset.ok, true);
+  assert.equal(reset.execution.id, started.execution.id);
+  assert.equal(reset.execution.state, 'abandoned');
+  assert.equal(typeof reset.execution.resetAt, 'string');
+  assert.equal(store.get(EXECUTIONS_KEY).length, 1);
+  assert.equal(lifecycle.execute({ goalId: 'goal-1', command: 'start', expectedRevision: 0, commandId: 'reset-next-start' }).execution.attempt, 2);
+});
+
+test('stale execution GC reports candidates and abandons only with confirmation', () => {
+  const store = makeStore();
+  const lifecycle = createGoalLifecycleService({ store, now: () => '2026-07-21T00:00:00.000Z' });
+  const started = lifecycle.execute({ goalId: 'goal-1', command: 'start', expectedRevision: 0, commandId: 'stale-start' });
+  store.set(EXECUTIONS_KEY, [{ ...started.execution, updatedAt: '2026-06-01T00:00:00.000Z' }]);
+
+  const candidates = lifecycle.collectStaleExecutions({ maxAgeMs: 7 * 24 * 60 * 60 * 1000, at: '2026-07-21T00:00:00.000Z' });
+  assert.equal(candidates.applied, false);
+  assert.deepEqual(candidates.candidates.map(item => item.executionId), [started.execution.id]);
+
+  const denied = lifecycle.collectStaleExecutions({ maxAgeMs: 7 * 24 * 60 * 60 * 1000, apply: true, at: '2026-07-21T00:00:00.000Z' });
+  assert.equal(denied.error, 'HUMAN_CONFIRMATION_REQUIRED');
+
+  const collected = lifecycle.collectStaleExecutions({ maxAgeMs: 7 * 24 * 60 * 60 * 1000, apply: true, humanConfirmed: true, at: '2026-07-21T00:00:00.000Z' });
+  assert.equal(collected.applied, true);
+  assert.equal(collected.results[0].execution.state, 'abandoned');
+  assert.equal(lifecycle.execute({ goalId: 'goal-1', command: 'start', expectedRevision: 0, commandId: 'after-gc-start' }).execution.state, 'ready');
+});
+
 test('acknowledgement remains valid for the following dispatch', () => {
   const store = makeStore();
   const lifecycle = createGoalLifecycleService({ store, now: makeClock(), cleanup: () => ({ status: 'skipped', ok: true }) });
@@ -234,7 +267,7 @@ test('agent delegation contract packets resolve canonical profiles and keep ephe
   store.set('omvra.people.v1', [{ id: 'canonical-1', kind: 'agentic', agentInstructions: 'Persona', agentOperationalInstructions: 'Method' }]);
   store.set('omvra.goals.v1', [{ id: 'goal-1', title: 'Delegate', elements: [
     { id: 'existing', type: 'agent', title: 'Existing', agentConfiguration: { mode: 'existing', assigneeId: 'canonical-1', instructions: 'Node task' } },
-    { id: 'ephemeral', type: 'agent', title: 'Temporary', agentConfiguration: { mode: 'ephemeral', autoGenerateName: true, requestedType: 'researcher', instructions: 'Research task' } },
+    { id: 'ephemeral', type: 'agent', title: 'Temporary', agentConfiguration: { mode: 'ephemeral', autoGenerateName: true, requestedType: 'researcher', instructions: 'Research task', workAsSubagent: true } },
   ] }]);
   const lifecycle = createGoalLifecycleService({ store, now: makeClock(), cleanup: () => ({ status: 'skipped', ok: true }) });
 
@@ -248,6 +281,30 @@ test('agent delegation contract packets resolve canonical profiles and keep ephe
   assert.equal(delegations[1].profileSource, 'none');
   assert.equal('personaInstructions' in delegations[1], false);
   assert.equal(started.execution.contractPacket.recruitmentRequests[0].rationale.includes('explicitly requests'), true);
+  assert.equal(started.execution.contractPacket.workerDelegation.owner, 'working-agent');
+  assert.equal(started.execution.contractPacket.workerDelegation.omvraSpawnsAgents, false);
+  assert.equal(started.execution.contractPacket.workerDelegation.required, true);
+  assert.match(started.execution.contractPacket.workerDelegation.instructions, /your own available subagent runtime/i);
+});
+
+test('working execution exposes pending worker-owned recruitment until reported', () => {
+  const store = makeStore();
+  store.set('omvra.goals.v1', [{ id: 'goal-1', title: 'Delegate', elements: [
+    { id: 'ephemeral', type: 'agent', title: 'Temporary', agentConfiguration: { mode: 'ephemeral', autoGenerateName: true, requestedType: 'researcher', instructions: 'Research task', workAsSubagent: true } },
+  ] }]);
+  const lifecycle = createGoalLifecycleService({ store, now: makeClock(), cleanup: () => ({ status: 'skipped', ok: true }) });
+  lifecycle.execute({ goalId: 'goal-1', command: 'start', expectedRevision: 0, commandId: 'start-recruitment' });
+  lifecycle.execute({ goalId: 'goal-1', command: 'acknowledge', expectedRevision: 1, commandId: 'ack-recruitment', payload: { contractRevision: 0 } });
+  const dispatched = lifecycle.execute({ goalId: 'goal-1', command: 'dispatch', expectedRevision: 2, commandId: 'dispatch-recruitment' });
+  assert.equal(dispatched.execution.state, 'working');
+  assert.equal(dispatched.execution.workerDelegationStatus, 'required');
+  const reported = lifecycle.execute({
+    goalId: 'goal-1', command: 'report-recruitment', expectedRevision: 3, commandId: 'report-recruitment',
+    payload: { recruitmentResults: [{ elementId: 'ephemeral', status: 'active', agentId: 'subagent-1' }] },
+  });
+  assert.equal(reported.execution.state, 'working');
+  assert.equal(reported.execution.workerDelegationStatus, 'fulfilled');
+  assert.equal(reported.execution.workerDelegationResults[0].agentId, 'subagent-1');
 });
 
 test('dispatch rejects unavailable canonical agent references unless fallback is enabled', () => {
@@ -259,7 +316,7 @@ test('dispatch rejects unavailable canonical agent references unless fallback is
   const blocked = lifecycle.execute({ goalId: 'goal-1', command: 'dispatch', expectedRevision: 2, commandId: 'dispatch-unavailable', payload: { targetElementId: 'agent-node' } });
   assert.equal(blocked.error, 'AGENT_UNAVAILABLE');
 
-  store.set('omvra.goals.v1', [{ id: 'goal-1', title: 'Fallback', elements: [{ id: 'agent-node', type: 'agent', title: 'Missing', agentConfiguration: { mode: 'existing', assigneeId: 'gone', instructions: 'Recruit if needed', spawnIfUnavailable: true } }] }]);
+  store.set('omvra.goals.v1', [{ id: 'goal-1', title: 'Fallback', elements: [{ id: 'agent-node', type: 'agent', title: 'Missing', agentConfiguration: { mode: 'existing', assigneeId: 'gone', instructions: 'Recruit if needed', spawnIfUnavailable: true, workAsSubagent: true } }] }]);
   const allowed = lifecycle.execute({ goalId: 'goal-1', command: 'dispatch', expectedRevision: 2, commandId: 'dispatch-fallback', payload: { targetElementId: 'agent-node' } });
   assert.equal(allowed.ok, true);
   assert.equal(allowed.execution.contractPacket.recruitmentRequests[0].rationale.includes('unavailable'), true);

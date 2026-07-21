@@ -28,15 +28,17 @@ const STATES = [
   'interrupted',
   'failed',
   'complete',
+  'abandoned',
 ];
 
 const CLEANUP_PENDING_STATUSES = new Set(['blocked', 'invalid', 'partial-failure', 'failed']);
-const TERMINAL_EXECUTION_STATES = new Set(['complete', 'failed']);
+const TERMINAL_EXECUTION_STATES = new Set(['complete', 'failed', 'abandoned']);
 
 const COMMANDS = [
   'start',
   'dispatch',
   'acknowledge',
+  'report-recruitment',
   'submit-evidence',
   'request-handoff',
   'accept',
@@ -50,6 +52,8 @@ const COMMANDS = [
   'reconcile',
   'fail',
   'complete',
+  'abandon',
+  'reset',
   'retry-cleanup',
 ];
 
@@ -173,6 +177,7 @@ function archiveGoalEvents(store, events, payload = {}) {
     if (records.length) fs.appendFileSync(filePath, `${records.join('\n')}\n`, 'utf8');
     return { status: 'written', filePath, archived: records.length };
   } catch (error) {
+    console.warn('[audit] external Goal lifecycle archive failed:', error?.message || error);
     return { status: 'failed', filePath, archived: 0, error: error?.message || String(error) };
   }
 }
@@ -192,8 +197,9 @@ function buildAgentDelegations(store, goal) {
         requestedName: configuration.requestedName,
         requestedType: configuration.requestedType,
         autoGenerateName: configuration.autoGenerateName,
+        workAsSubagent: configuration.workAsSubagent === true,
         instructions: configuration.instructions,
-        recruitmentFallback: 'overseer-managed-temporary-agent',
+      recruitmentFallback: 'overseer-managed-temporary-agent',
       };
     }
     const person = people.find(candidate => candidate?.id === configuration.assigneeId && candidate.kind === 'agentic');
@@ -204,6 +210,7 @@ function buildAgentDelegations(store, goal) {
       mode: 'existing',
       assigneeId: configuration.assigneeId,
       profileSource: 'none',
+      workAsSubagent: configuration.workAsSubagent === true,
       instructions: configuration.instructions,
       recruitmentFallback: configuration.spawnIfUnavailable ? 'overseer-managed-temporary-agent' : undefined,
     };
@@ -216,6 +223,7 @@ function buildAgentDelegations(store, goal) {
       profileSource: 'canonical',
       personaInstructions: typeof person.agentInstructions === 'string' ? person.agentInstructions.trim() || undefined : undefined,
       operationalInstructions: typeof person.agentOperationalInstructions === 'string' ? person.agentOperationalInstructions.trim() || undefined : undefined,
+      workAsSubagent: configuration.workAsSubagent === true,
       instructions: configuration.instructions,
     };
   });
@@ -233,20 +241,30 @@ function buildContractPacket(store, goal, effectivePolicy, executionAttempt, now
     agentSkills: options.agentSkills || preferences.agentSkills,
     availableSkills: options.availableSkills || preferences.availableSkills,
   });
+  const recruitmentRequests = agentDelegations.filter(item => item.workAsSubagent === true && (item.status === 'recruitment-requested' || item.recruitmentFallback)).map(item => ({
+    elementId: item.elementId,
+    mode: item.mode,
+    requestedName: item.requestedName,
+    requestedType: item.requestedType,
+    autoGenerateName: item.autoGenerateName,
+    rationale: item.mode === 'ephemeral' ? 'The node explicitly requests temporary capability-scoped recruitment.' : 'The configured canonical agent is unavailable and fallback is enabled.',
+  }));
   return {
     ...packet,
     skillRequirements,
     skillReferences: skillResolution.skills,
     skillResolution: { ok: skillResolution.ok, blockingResults: skillResolution.blockingResults, diagnostics: skillResolution.diagnostics },
     agentDelegations,
-    recruitmentRequests: agentDelegations.filter(item => item.status === 'recruitment-requested' || item.recruitmentFallback).map(item => ({
-      elementId: item.elementId,
-      mode: item.mode,
-      requestedName: item.requestedName,
-      requestedType: item.requestedType,
-      autoGenerateName: item.autoGenerateName,
-      rationale: item.mode === 'ephemeral' ? 'The node explicitly requests temporary capability-scoped recruitment.' : 'The configured canonical agent is unavailable and fallback is enabled.',
-    })),
+    recruitmentRequests,
+    workerDelegation: {
+      owner: 'working-agent',
+      omvraSpawnsAgents: false,
+      required: recruitmentRequests.length > 0,
+      instructions: recruitmentRequests.length > 0
+        ? 'Create and manage the requested subagents using your own available subagent runtime before executing work that depends on them. Omvra records the delegation contract and lifecycle evidence; it does not spawn subagents for you. If your runtime cannot create a requested subagent, report the execution as blocked with the missing capability instead of silently doing that work yourself.'
+        : 'No subagent recruitment is requested by this Goal contract.',
+      requests: recruitmentRequests,
+    },
   };
 }
 
@@ -275,6 +293,7 @@ function appendCleanupAudit(store, record, payload = {}) {
     fs.appendFileSync(filePath, `${JSON.stringify(record)}\n`, 'utf8');
     return { status: 'written', filePath };
   } catch (error) {
+    console.warn('[audit] external Goal cleanup archive failed:', error?.message || error);
     return { status: 'failed', reason: error instanceof Error ? error.message : String(error) };
   }
 }
@@ -477,6 +496,15 @@ function createGoalLifecycleService({
       revision: execution.revision + 1,
       updatedAt: now(),
     };
+    if (command === 'start' && nextExecution.contractPacket?.workerDelegation) {
+      nextExecution.workerDelegationStatus = nextExecution.contractPacket.workerDelegation.required ? 'required' : 'not-required';
+      nextExecution.workerDelegationResults = [];
+    }
+    if (command === 'abandon') nextExecution.abandonedAt = payload.abandonedAt || now();
+    if (command === 'reset') {
+      nextExecution.resetAt = payload.resetAt || now();
+      nextExecution.resetReason = payload.reason || 'user-requested-reset';
+    }
     if (command === 'request-handoff' || command === 'complete') {
       const handoff = createHandoffRecord({ goalId, execution: nextExecution, payload, now });
       store.set(HANDOFFS_KEY, readArray(store, HANDOFFS_KEY).concat(handoff));
@@ -726,10 +754,39 @@ function createGoalLifecycleService({
     return commandResult(updated, nextEvent, { cleanup: cleanupResult, cleanupEvent, auditArchive });
   }
 
+  function collectStaleExecutions({ goalId: rawGoalId, maxAgeMs = 30 * 24 * 60 * 60 * 1000, apply = false, humanConfirmed = false, actor = 'goal-gc', at } = {}) {
+    const goalId = normalizeGoalId(rawGoalId);
+    const collectedAt = typeof at === 'string' && at.trim() ? at : now();
+    const collectedTime = Date.parse(collectedAt);
+    const age = Number(maxAgeMs);
+    if (!Number.isFinite(collectedTime) || !Number.isFinite(age) || age < 0) return failure('GC_INPUT_INVALID', 'GC requires a valid collection time and non-negative maxAgeMs.');
+    const cutoff = collectedTime - age;
+    const latestByGoal = new Map();
+    readArray(store, EXECUTIONS_KEY).forEach(execution => {
+      if (execution?.goalId) latestByGoal.set(execution.goalId, execution);
+    });
+    const candidates = [...latestByGoal.values()]
+      .filter(execution => (!goalId || execution.goalId === goalId) && !TERMINAL_EXECUTION_STATES.has(execution.state))
+      .map(execution => ({ executionId: execution.id, goalId: execution.goalId, state: execution.state, revision: execution.revision, updatedAt: execution.updatedAt || execution.createdAt || null }))
+      .filter(candidate => candidate.updatedAt && Date.parse(candidate.updatedAt) <= cutoff);
+    if (!apply) return { ok: true, applied: false, collectedAt, maxAgeMs: age, cutoff: new Date(cutoff).toISOString(), candidates };
+    if (humanConfirmed !== true) return failure('HUMAN_CONFIRMATION_REQUIRED', 'Applying Goal garbage collection requires explicit human confirmation.', { collectedAt, maxAgeMs: age, cutoff: new Date(cutoff).toISOString(), candidates });
+    const results = candidates.map(candidate => execute({
+      goalId: candidate.goalId,
+      command: 'abandon',
+      expectedRevision: candidate.revision,
+      commandId: `goal-gc:${candidate.executionId}:${candidate.revision}`,
+      actor,
+      payload: { humanConfirmed: true, reason: 'stale-execution-garbage-collection', abandonedAt: collectedAt },
+    }));
+    return { ok: true, applied: true, collectedAt, maxAgeMs: age, cutoff: new Date(cutoff).toISOString(), candidates, results };
+  }
+
   return {
     execute,
     markPendingCommand,
     reconcilePending,
+    collectStaleExecutions,
     getExecution,
     keys: { GOALS_KEY, EXECUTIONS_KEY, EVENTS_KEY, EVIDENCE_KEY, RECONCILIATIONS_KEY, PREFERENCES_KEY },
     states: [...STATES],
@@ -770,6 +827,32 @@ function transitionExecution(execution, command, payload) {
           skillReferences: payload.contractPacket?.skillReferences || [],
         },
       };
+    case 'report-recruitment': {
+      if (!['working', 'paused', 'blocked'].includes(state)) return failure('INVALID_TRANSITION', `Cannot report recruitment for an execution in state "${state}".`);
+      const requests = Array.isArray(execution.contractPacket?.recruitmentRequests) ? execution.contractPacket.recruitmentRequests : [];
+      if (requests.length === 0) return failure('RECRUITMENT_NOT_REQUIRED', 'This Goal execution has no requested subagents.');
+      const results = Array.isArray(payload.recruitmentResults) ? payload.recruitmentResults : [];
+      const byElementId = new Map(results.filter(item => item && typeof item === 'object').map(item => [item.elementId, item]));
+      const missing = requests.filter(request => !byElementId.has(request.elementId)).map(request => request.elementId);
+      if (missing.length) return failure('RECRUITMENT_RESULTS_REQUIRED', 'Report a result for every requested subagent.', { missingElementIds: missing });
+      const normalized = requests.map(request => {
+        const result = byElementId.get(request.elementId);
+        const status = typeof result.status === 'string' ? result.status.trim() : '';
+        if (!['active', 'completed', 'failed', 'unavailable'].includes(status)) return null;
+        const identity = typeof result.agentId === 'string' && result.agentId.trim()
+          ? result.agentId.trim()
+          : typeof result.agentName === 'string' && result.agentName.trim() ? result.agentName.trim() : '';
+        if (!identity) return null;
+        return { elementId: request.elementId, status, agentId: typeof result.agentId === 'string' ? result.agentId.trim() : undefined, agentName: typeof result.agentName === 'string' ? result.agentName.trim() : undefined };
+      });
+      if (normalized.some(item => !item)) return failure('RECRUITMENT_RESULT_INVALID', 'Each recruitment result requires a valid status and subagent identity.');
+      const failed = normalized.some(item => item.status === 'failed' || item.status === 'unavailable');
+      return {
+        ok: true,
+        patch: { state: failed ? 'blocked' : 'working', workerDelegationStatus: failed ? 'blocked' : 'fulfilled', workerDelegationResults: normalized },
+        eventPayload: { recruitmentResults: normalized, workerDelegationStatus: failed ? 'blocked' : 'fulfilled' },
+      };
+    }
     case 'submit-evidence': {
       if (!['working', 'evidence-required'].includes(state)) return failure('INVALID_TRANSITION', `Cannot submit evidence in state "${state}".`);
       const refs = Array.isArray(payload.evidenceRefs) ? payload.evidenceRefs.filter(Boolean) : [];
@@ -805,6 +888,19 @@ function transitionExecution(execution, command, payload) {
       if (acceptanceActor === 'human' && !humanAccepted && !payload.acceptanceSatisfied) return failure('ACCEPTANCE_REQUIRED', 'Human acceptance is required before completion.');
       if (acceptanceActor === 'agentic' && !agenticAccepted && !payload.acceptanceSatisfied) return failure('ACCEPTANCE_REQUIRED', 'Agentic acceptance is required before completion.');
       return { ok: true, patch: { state: 'complete', acceptanceSatisfied: true }, eventPayload: {} };
+    case 'abandon':
+      if (['complete', 'failed', 'abandoned'].includes(state)) return failure('INVALID_TRANSITION', `Cannot abandon an execution in state "${state}".`);
+      if (payload.humanConfirmed !== true) return failure('HUMAN_CONFIRMATION_REQUIRED', 'Abandoning an execution requires explicit human confirmation.');
+      return { ok: true, patch: { state: 'abandoned', abandonmentReason: payload.reason || 'user-abandoned' }, eventPayload: { reason: payload.reason || 'user-abandoned' } };
+    case 'reset':
+      if (payload.humanConfirmed !== true) return failure('HUMAN_CONFIRMATION_REQUIRED', 'Resetting an execution requires explicit human confirmation.');
+      return {
+        ok: true,
+        patch: state === 'complete' || state === 'failed' || state === 'abandoned'
+          ? {}
+          : { state: 'abandoned', abandonmentReason: 'user-requested-reset' },
+        eventPayload: { reason: payload.reason || 'user-requested-reset', reset: true },
+      };
     case 'pause':
       if (['complete', 'failed'].includes(state)) return failure('INVALID_TRANSITION', `Cannot pause an execution in state "${state}".`);
       return { ok: true, patch: { state: 'paused' }, eventPayload: {} };

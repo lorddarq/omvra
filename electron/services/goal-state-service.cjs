@@ -61,6 +61,7 @@ function normalizeAgentConfiguration(configuration, legacyAssigneeId) {
   }
   if (configuration.spawnIfUnavailable === true) normalized.spawnIfUnavailable = true;
   if (configuration.autoGenerateName === true) normalized.autoGenerateName = true;
+  if (configuration.workAsSubagent === true) normalized.workAsSubagent = true;
   if (mode === 'existing' && !normalized.assigneeId) return undefined;
   if (mode === 'ephemeral' && !normalized.requestedName && !normalized.autoGenerateName) return undefined;
   return normalized;

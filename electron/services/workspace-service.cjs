@@ -1,4 +1,6 @@
 const { randomUUID } = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const { migrateGoalRecords, normalizeAgentConfiguration } = require('./goal-state-service.cjs');
 const { isAgentMutationAllowed } = require('./goal-policy.cjs');
 
@@ -613,7 +615,39 @@ function appendMcpAuditLog(store, entry) {
   };
   const nextLog = existing.concat(nextEntry).slice(-MCP_AUDIT_LOG_MAX_ENTRIES);
   store.set(MCP_AUDIT_LOG_KEY, nextLog);
+  archiveMcpAuditEntries(store, nextLog);
   return nextEntry;
+}
+
+function archiveMcpAuditEntries(store, entries) {
+  const directory = typeof store.get(PREFERENCES_KEY)?.goalAuditArchiveDirectory === 'string'
+    ? store.get(PREFERENCES_KEY).goalAuditArchiveDirectory.trim()
+    : '';
+  if (!directory) return { status: 'unconfigured', archived: 0 };
+  const filePath = path.join(directory, 'mcp-audit.jsonl');
+  try {
+    fs.mkdirSync(directory, { recursive: true });
+    const existingAuditIds = new Set();
+    if (fs.existsSync(filePath)) {
+      for (const line of fs.readFileSync(filePath, 'utf8').split('\n')) {
+        if (!line.trim()) continue;
+        try {
+          const record = JSON.parse(line);
+          if (typeof record?.auditId === 'string') existingAuditIds.add(record.auditId);
+        } catch {
+          // Preserve malformed historical lines and continue exporting new records.
+        }
+      }
+    }
+    const records = (Array.isArray(entries) ? entries : [])
+      .filter(item => item && typeof item.auditId === 'string' && !existingAuditIds.has(item.auditId))
+      .map(item => JSON.stringify({ schemaVersion: 1, kind: 'mcp-audit-event', auditId: item.auditId, archivedAt: new Date().toISOString(), entry: item }));
+    if (records.length) fs.appendFileSync(filePath, `${records.join('\n')}\n`, 'utf8');
+    return { status: 'written', filePath, archived: records.length };
+  } catch (error) {
+    console.warn('[audit] external MCP archive failed:', error?.message || error);
+    return { status: 'failed', filePath, archived: 0, error: error?.message || String(error) };
+  }
 }
 
 function listMcpAuditLog(store, { limit } = {}) {
@@ -992,7 +1026,8 @@ function listGoals(store) {
 }
 
 function withGoalExecutionReadModel(store, goal) {
-  const execution = readArray(store, GOAL_EXECUTIONS_KEY).findLast(item => item?.goalId === goal?.id);
+  const latestExecution = readArray(store, GOAL_EXECUTIONS_KEY).findLast(item => item?.goalId === goal?.id);
+  const execution = latestExecution?.resetAt ? null : latestExecution;
   const reconciliations = readArray(store, GOAL_RECONCILIATIONS_KEY)
     .filter(item => item?.goalId === goal?.id)
     .map(item => ({
@@ -1016,6 +1051,9 @@ function withGoalExecutionReadModel(store, goal) {
       policyRevision: execution.policyRevision || execution.effectivePolicy?.sourceRevision || execution.contractPacket?.policyRevision || 0,
       effectivePolicy: execution.effectivePolicy || null,
       contractPacket: execution.contractPacket || null,
+      workerDelegation: execution.contractPacket?.workerDelegation || null,
+      workerDelegationStatus: execution.workerDelegationStatus || (execution.contractPacket?.workerDelegation?.required ? 'required' : 'not-required'),
+      workerDelegationResults: execution.workerDelegationResults || [],
       cleanupStatus: execution.cleanupStatus || 'not-requested',
       cleanupPending: execution.cleanupPending === true,
       updatedAt: execution.updatedAt,
@@ -3769,6 +3807,7 @@ module.exports = {
   buildMcpCapabilitySnapshot,
   buildMcpInitializeResult,
   appendMcpAuditLog,
+  archiveMcpAuditEntries,
   listMcpAuditLog,
   buildMcpAuditSummary,
   MCP_TASK_REV_FIELD,

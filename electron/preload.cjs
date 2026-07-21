@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('electron', {
   recordGoalPolicyImpact: (payload) => ipcRenderer.invoke('goal-policy/record-impact', payload),
   goals: {
     getRuntime: (goalId) => ipcRenderer.invoke('goals/get-runtime', goalId),
+    resetExecution: (payload) => ipcRenderer.invoke('goals/reset-execution', payload),
     update: (payload) => ipcRenderer.invoke('goals/update', payload),
     updateArtifacts: (payload) => ipcRenderer.invoke('goals/update-artifacts', payload),
     onRuntimeChanged: (listener) => {

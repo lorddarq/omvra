@@ -111,7 +111,7 @@ export type GoalDeliverableStatus = 'planned' | 'in-progress' | 'ready-for-revie
 export type SupportingArtifactType = 'document' | 'file' | 'url' | 'user-defined';
 
 export interface GoalRuntimeProjection {
-  execution?: { state?: string; revision?: number; attempt?: number; policyRevision?: number; executionAttemptId?: string; reconciliationRequired?: boolean } | null;
+  execution?: { state?: string; revision?: number; attempt?: number; policyRevision?: number; executionAttemptId?: string; reconciliationRequired?: boolean; workerDelegationStatus?: 'not-required' | 'required' | 'fulfilled' | 'blocked'; workerDelegationResults?: Array<{ elementId: string; status: string; agentId?: string; agentName?: string }> } | null;
   handoffs?: Array<{ id: string; deliverableId?: string; producedArtifactReferences?: Array<{ label?: string; locator?: string; format?: string }>; deliveryFacts?: Record<string, unknown>; deliveredAt?: string }>;
   effectivePolicy?: import('./utils/goalPolicy.ts').GoalPolicyV1 | null;
   policyRevision?: number;
@@ -195,6 +195,7 @@ export interface GoalAgentConfiguration {
   requestedType?: string;
   autoGenerateName?: boolean;
   instructions: string;
+  workAsSubagent?: boolean;
   spawnIfUnavailable?: boolean;
 }
 

@@ -35,7 +35,7 @@ const GOAL_ID = 'goal-lights-off-factory';
 const ARTIFACT_SELECT_CLASS = 'h-9 rounded-xl border-[#e5e7eb] bg-white px-3 text-sm font-medium text-[#71717a] shadow-[0_1px_2px_rgba(0,0,0,0.04)] focus-visible:ring-gray-200';
 
 export function GoalsView({ people = [], tasks = [], milestones = [], workspacePolicy, goalAuditArchiveDirectory = '', onGoalAuditArchiveDirectoryChange }: { people?: Person[]; tasks?: Task[]; milestones?: ProjectMilestone[]; workspacePolicy?: GoalPolicyV1; goalAuditArchiveDirectory?: string; onGoalAuditArchiveDirectoryChange?: (directory: string) => void }) {
-  const [goals, setGoals] = useState<GoalRecord[]>(readGoals);
+  const [goals, setGoals] = useState<GoalRecord[]>(() => readGoals(STORAGE_KEY));
   const goalsRef = useRef<GoalRecord[]>([]);
   goalsRef.current = goals;
   const canonicalGoalsRef = useRef<GoalRecord[]>([]);
@@ -94,7 +94,7 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
   activeGoalIdRef.current = activeGoal?.id ?? '';
   const isRuntimeExecutionLocked = (element: GoalElement | undefined) => {
     const executionState = runtimeProjection?.execution?.state;
-    const executionActive = Boolean(executionState && !['ready', 'paused', 'complete', 'failed'].includes(executionState));
+    const executionActive = Boolean(executionState && !['ready', 'paused', 'complete', 'failed', 'abandoned'].includes(executionState));
     return isExecutionLocked(element) || executionActive;
   };
   const selectedElementLocked = isRuntimeExecutionLocked(selectedElement);
@@ -199,7 +199,18 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
       setCanonicalHydrated(true);
     });
     window.addEventListener('focus', refreshCanonicalGoals);
-    const unsubscribe = window.electron?.onStoreChanged?.(() => { if (!draggingRef.current && rendererWritesPendingRef.current === 0) void refreshCanonicalGoals(); });
+    const refreshRuntimeProjection = () => {
+      const goalId = activeGoalIdRef.current;
+      if (!goalId) return;
+      void window.electron?.goals?.getRuntime?.(goalId).then(value => {
+        if (!cancelled && value && typeof value === 'object') setRuntimeProjection(value as GoalRuntimeProjection);
+      }).catch(() => {});
+    };
+    const runtimePoll = window.setInterval(refreshRuntimeProjection, 1000);
+    const unsubscribe = window.electron?.onStoreChanged?.(() => {
+      refreshRuntimeProjection();
+      if (!draggingRef.current && rendererWritesPendingRef.current === 0) void refreshCanonicalGoals();
+    });
     const unsubscribeRuntime = window.electron?.goals?.onRuntimeChanged?.((event) => {
       if (cancelled) return;
       if (event.goalId === activeGoalIdRef.current) {
@@ -210,7 +221,7 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
       if (local && goalRevision(local) >= event.revision) return;
       void refreshCanonicalGoals();
     });
-    return () => { cancelled = true; window.removeEventListener('focus', refreshCanonicalGoals); unsubscribe?.(); unsubscribeRuntime?.(); };
+    return () => { cancelled = true; window.clearInterval(runtimePoll); window.removeEventListener('focus', refreshCanonicalGoals); unsubscribe?.(); unsubscribeRuntime?.(); };
   }, []);
   useEffect(() => {
     let cancelled = false;
@@ -449,6 +460,17 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
   const updateGoal = (updates: Partial<GoalRecord>) => {
     if (selectedElementLocked) { setEditNotice('This Goal is locked while execution is active. Pause or reconcile the lifecycle before editing it.'); return; }
     setGoals(current => current.map(goal => goal.id === selectedGoalId ? { ...goal, ...updates, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString() } : goal));
+  };
+  const resetGoalExecution = async () => {
+    if (!activeGoal || !runtimeProjection?.execution) return;
+    if (typeof window !== 'undefined' && !window.confirm('Reset this Goal execution? The current attempt will be preserved in history and the Goal will return to its initial not-started state.')) return;
+    const result = await window.electron?.goals?.resetExecution?.({ goalId: activeGoal.id });
+    if (!result?.ok) {
+      setEditNotice(result?.message ?? 'The execution could not be reset. Refresh the Goal and try again.');
+      return;
+    }
+    const refreshed = await window.electron?.goals?.getRuntime?.(activeGoal.id);
+    if (refreshed && typeof refreshed === 'object') setRuntimeProjection(refreshed as GoalRuntimeProjection);
   };
   const createSchedule = () => {
     if (!activeGoal || activeSchedule) return;
@@ -703,7 +725,7 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
       onStartConnector={() => { setConnectorMode(true); setConnectorSourceId(null); setConnectorSourceBranch(undefined); }}
     />
     <GoalsCanvasSurface canvasRef={canvasRef} spacePressed={spacePressed} panMode={panMode} pan={pan} zoom={zoom} emptyState={!activeGoal ? <GoalsCanvasEmptyState onNewGoal={openNewGoalDialog} /> : undefined} onPointerDown={beginCanvasPan} onPointerMove={moveCanvasPan} onPointerUp={endCanvasPan} onPointerCancel={endCanvasPan} onLostPointerCapture={event => { if (panSessionRef.current?.pointerId === event.pointerId) panSessionRef.current = null; }}>
-        {runtimeProjection?.execution?.state && <div role="status" className="absolute left-4 top-4 z-10 rounded-md border border-blue-200 bg-white/95 px-3 py-2 text-xs text-slate-600 shadow-sm"><span className="font-semibold text-slate-800">Execution:</span> <span className="capitalize">{runtimeProjection.execution.state.replaceAll('-', ' ')}</span>{runtimeProjection.execution.state === 'working' && <span className="ml-1 text-blue-700">· Agent is working</span>}</div>}
+        {runtimeProjection?.execution?.state && <div role="status" className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-md border border-blue-200 bg-white/95 px-3 py-2 text-xs text-slate-600 shadow-sm"><span><span className="font-semibold text-slate-800">Execution:</span> <span className="capitalize">{runtimeProjection.execution.state.replaceAll('-', ' ')}</span>{runtimeProjection.execution.state === 'working' && <span className="ml-1 text-blue-700">· {runtimeProjection.execution.workerDelegationStatus === 'required' ? 'Subagent recruitment required' : 'Agent is working'}</span>}</span><button type="button" onClick={resetGoalExecution} className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 hover:border-slate-300 hover:bg-slate-50">Reset execution</button></div>}
         <GoalsConnectorLayer connections={connections} elements={activeGoal?.elements ?? []} selectedElementId={selectedElement?.id} connectorPath={connection => goalConnectorPath(activeGoal?.elements ?? [], connection, canvasElementHeights)} onSelectConnector={connectionId => { setSelectedElementId(connectionId); setConnectorMode(false); setConnectorSourceId(null); setConnectorSourceBranch(undefined); }} onMoveSelection={moveCanvasSelection} />
         {connectorError && <div role="alert" className="absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 shadow-sm">{connectorError}</div>}
         <GoalsCanvasNodes elements={activeGoal?.elements ?? []} selectedElementId={selectedElement?.id} connectorMode={connectorMode} connectorSourceId={connectorSourceId} connectorSourceSide={connectorSourceSide} connectorSourceBranch={connectorSourceBranch} panMode={panMode} spaceHeld={spaceHeldRef.current} canvasElementHeight={element => goalCanvasElementHeight(element, canvasElementHeights)} getElementTitle={element => getElementTitle(element, people)} getElementBody={element => getElementBody(element, people)} isConnected={elementId => isGoalElementConnected(activeGoal?.elements ?? [], elementId)} isExecutionLocked={isRuntimeExecutionLocked} nodeClass={nodeClass} elementIcon={elementIcon} conditionPositiveLabel={conditionPositiveLabel} conditionNegativeLabel={conditionNegativeLabel} readinessForElement={readinessForElement} readinessLabel={readinessLabel} readinessChipClass={readinessChipClass} isCompletionElement={isCompletionElement} compactChipClass={compactChipClass} statusChipClass={statusChipClass} statusLabel={statusLabel} StatusIcon={StatusIcon} runtimeStatusForElement={element => runtimeStatusForElement(element, runtimeProjection)} onSelectElement={setSelectedElementId} onNodeClick={element => { if (connectorMode) { if (connectorSourceId) connectNodes(element.id); else beginConnection(element.id, 'right'); } else setSelectedElementId(element.id); }} onMoveSelection={moveCanvasSelection} onStartDrag={(element, event) => { if (spaceHeldRef.current || panMode || connectorMode || isRuntimeExecutionLocked(element)) return; setSelectedElementId(element.id); setDrag({ id: element.id, startX: event.clientX, startY: event.clientY, originX: element.x, originY: element.y }); }} onConnectNode={connectNodes} onBeginConnection={beginConnection} />
@@ -760,7 +782,7 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
         {selectedPolicyElement && <GoalsPolicyEditor element={selectedElement} policyElement={selectedPolicyElement} effectivePolicy={selectedEffectivePolicy} runtimeProjection={runtimeProjection} workspacePolicy={workspacePolicy} policyImpact={selectedPolicyImpact} onUpdateElement={updateElement} onUpdatePolicy={updatePolicy} onUpdatePolicyDimension={updatePolicyDimension} />}
         {(selectedElement.type === 'goal' || selectedElement.type === 'subgoal' || selectedElement.type === 'artifact') && <GoalsArtifactEditor element={selectedElement} artifactOptions={artifactOptions} supportingSourceOptions={supportingSourceOptions} selectedReferences={selectedArtifactReferences} supportingArtifactType={supportingArtifactType} sourceSearch={supportingSourceSearch} customLabel={customArtifactLabel} customKind={customArtifactKind} customFormat={customArtifactFormat} customLocator={customArtifactLocator} selectClass={ARTIFACT_SELECT_CLASS} tasks={tasks} onUpdateReferences={references => { void updateArtifactReferences(references); }} onArtifactTypeChange={value => { setSupportingArtifactType(value); setSupportingSourceSearch(''); }} onSourceSearchChange={setSupportingSourceSearch} onSourceSelect={addSupportingSourceReference} onCustomLabelChange={setCustomArtifactLabel} onCustomKindChange={setCustomArtifactKind} onCustomFormatChange={setCustomArtifactFormat} onCustomLocatorChange={setCustomArtifactLocator} onAddCustomReference={addCustomArtifactReference} />}
         {selectedElement.type !== 'connector' && <GoalsConnectionsSection element={selectedElement} connections={selectedConnections} elements={activeGoal?.elements ?? []} onDeleteConnection={deleteConnection} />}
-        <GoalsRuntimeStatus element={selectedElement} connected={isGoalElementConnected(activeGoal?.elements ?? [], selectedElement.id)} runtimeProjection={runtimeProjection} />
+        <GoalsRuntimeStatus element={selectedElement} connected={isGoalElementConnected(activeGoal?.elements ?? [], selectedElement.id)} runtimeProjection={runtimeProjection} onResetExecution={resetGoalExecution} />
         <GoalsConnectorInspector element={selectedElement} elements={activeGoal?.elements ?? []} onRewire={element => { setConnectorMode(true); setRewireConnectorId(element.id); setConnectorSourceId(element.sourceId ?? null); setConnectorSourceSide(element.sourceSide ?? 'right'); setConnectorSourceBranch(element.conditionBranch); }} />
       </GoalsInspector>
     )}

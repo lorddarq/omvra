@@ -2,9 +2,12 @@
 
 const Store = require('electron-store');
 const { createRequestDispatcher } = require('../services/mcp-http-server.cjs');
+const { resolveWorkspaceUserDataPath } = require('../services/workspace-paths.cjs');
 
 const storeName = process.env.OMVRA_STORE_NAME || (process.env.NODE_ENV === 'development' ? 'omvra-store-dev' : 'omvra-store');
-const store = new Store({ name: storeName });
+const isDev = process.env.NODE_ENV === 'development';
+const userDataPath = resolveWorkspaceUserDataPath({ appDataPath: process.env.OMVRA_APP_DATA_PATH || process.env.APPDATA, appName: 'Omvra', isDev });
+const store = new Store({ name: storeName, ...(userDataPath ? { cwd: userDataPath } : {}) });
 const dispatch = createRequestDispatcher(store);
 
 let buffer = '';

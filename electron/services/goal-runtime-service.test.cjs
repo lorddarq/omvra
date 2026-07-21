@@ -15,3 +15,12 @@ test('runtime changes are typed, durable, and scoped to a joined read model', ()
   assert.equal(db.get(RUNTIME_EVENTS_KEY).length, 1);
   assert.equal(runtime.get('goal-1').execution.effectivePolicy.policyRevision, 7);
 });
+
+test('reset executions remain historical but disappear from the current runtime projection', () => {
+  const db = store({
+    'omvra.goals.v1': [{ id: 'goal-1', revision: 1 }],
+    'omvra.goalExecutions.v1': [{ id: 'execution-1', goalId: 'goal-1', state: 'abandoned', resetAt: '2026-07-20T00:00:00.000Z' }],
+  });
+  const runtime = createGoalRuntimeService({ store: db });
+  assert.equal(runtime.get('goal-1').execution, null);
+});

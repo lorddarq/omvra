@@ -1,5 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const { MILESTONES_KEY, STATUS_COLUMNS_KEY, TASKS_KEY, makeStoreFromFixture } = require('./test-fixtures.cjs');
 const { createRequestDispatcher } = require('./mcp-http-server.cjs');
 
@@ -163,6 +166,22 @@ test('audit log returns most recent entries first and respects limit', () => {
   assert.equal(recent[0].toolName, 'tasks.update_agent_summary');
   assert.equal(recent[1].toolName, 'tasks.move_to_status');
   assert.ok(recent.every(entry => typeof entry.auditId === 'string' && entry.auditId.startsWith('audit-')));
+});
+
+test('audit writes backfill and append to the configured external directory', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const archiveDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'omvra-mcp-audit-'));
+  store.set('omvra.preferences.v1', { goalAuditArchiveDirectory: archiveDirectory });
+  store.set('omvra.mcp.audit.v1', [{ auditId: 'audit-historical', type: 'mcp_tool_call', toolName: 'goals.list' }]);
+
+  appendMcpAuditLog(store, { type: 'mcp_write_attempt', toolName: 'goals.gc', outcome: 'allowed' });
+  const archivePath = path.join(archiveDirectory, 'mcp-audit.jsonl');
+  const readArchive = () => fs.readFileSync(archivePath, 'utf8').trim().split('\n').map(line => JSON.parse(line));
+  assert.deepEqual(readArchive().map(item => item.auditId), ['audit-historical', store.get('omvra.mcp.audit.v1')[1].auditId]);
+
+  appendMcpAuditLog(store, { type: 'mcp_write_attempt', toolName: 'goals.get', outcome: 'allowed' });
+  assert.equal(readArchive().length, 3);
+  fs.rmSync(archiveDirectory, { recursive: true, force: true });
 });
 
 test('audit summary normalizes legacy outcomes and groups bounded metadata', () => {

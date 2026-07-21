@@ -211,7 +211,7 @@ const READ_TOOL_DEFINITIONS = [
   },
   {
     name: 'goals.get',
-    description: 'Gets one complete goal graph by id, including all canvas and execution subinformation.',
+    description: 'Gets one complete goal graph by id, including current execution state and explicit worker-owned subagent delegation instructions.',
     inputSchema: {
       type: 'object',
       additionalProperties: true,
@@ -320,13 +320,28 @@ const WRITE_TOOL_DEFINITIONS = [
       additionalProperties: false,
       properties: {
         goalId: { type: 'string' },
-        command: { type: 'string', enum: ['start', 'dispatch', 'acknowledge', 'submit-evidence', 'request-handoff', 'accept', 'pause', 'resume', 'retry', 'delegate', 'wake', 'escalate', 'approve', 'reconcile', 'fail', 'complete', 'retry-cleanup'] },
+        command: { type: 'string', enum: ['start', 'dispatch', 'acknowledge', 'report-recruitment', 'submit-evidence', 'request-handoff', 'accept', 'pause', 'resume', 'retry', 'delegate', 'wake', 'escalate', 'approve', 'reconcile', 'fail', 'complete', 'abandon', 'reset', 'retry-cleanup'] },
         expectedRevision: { anyOf: [{ type: 'string' }, { type: 'number' }] },
         commandId: { type: 'string' },
         actor: { type: 'string' },
         payload: { type: 'object' },
       },
       required: ['goalId', 'command', 'expectedRevision', 'commandId'],
+    },
+  },
+  {
+    name: 'goals.gc',
+    description: 'Finds stale Goal executions and, only with explicit human confirmation, marks them abandoned so the Goal can be rerun without deleting its graph or history.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        goalId: { type: 'string' },
+        maxAgeMs: { type: 'number', minimum: 0 },
+        apply: { type: 'boolean' },
+        humanConfirmed: { type: 'boolean' },
+        actor: { type: 'string' },
+      },
     },
   },
   {
@@ -769,6 +784,7 @@ const TOOL_NAME_ALIASES = new Map([
   ['goals_update_element', 'goals.update_element'],
   ['goals_update_connector', 'goals.update_connector'],
   ['goals_lifecycle', 'goals.lifecycle'],
+  ['goals_gc', 'goals.gc'],
   ['tasks_list', 'tasks.list'],
   ['tasks_get', 'tasks.get'],
   ['agent_resolve_task_context', 'agent.resolve_task_context'],
@@ -926,7 +942,7 @@ function makeJsonRpcResponse(id, payload) {
   };
 }
 
-function makeToolResult(structuredContent, { isError = false } = {}) {
+function makeToolResult(structuredContent, { isError = false, content = [] } = {}) {
   return {
     structuredContent,
     content: [
@@ -934,9 +950,30 @@ function makeToolResult(structuredContent, { isError = false } = {}) {
         type: 'text',
         text: JSON.stringify(structuredContent),
       },
+      ...content,
     ],
     isError,
   };
+}
+
+function getArtifactResourceLinks(references = []) {
+  const seen = new Set();
+  return (Array.isArray(references) ? references : [])
+    .map(reference => {
+      const item = reference && typeof reference === 'object' ? reference : {};
+      const uri = typeof item.locator === 'string' ? item.locator.trim()
+        : typeof item.uri === 'string' ? item.uri.trim()
+          : typeof item.url === 'string' ? item.url.trim() : '';
+      if (!/^(file|https?):\/\//i.test(uri) || seen.has(uri)) return null;
+      seen.add(uri);
+      return {
+        type: 'resource_link',
+        uri,
+        name: typeof item.label === 'string' && item.label.trim() ? item.label.trim().slice(0, 160) : 'Delivered artifact',
+        ...(typeof item.mimeType === 'string' && item.mimeType.trim() ? { mimeType: item.mimeType.trim().slice(0, 120) } : {}),
+      };
+    })
+    .filter(Boolean);
 }
 
 function makeWriteToolResult(action, payload = {}) {
@@ -995,7 +1032,9 @@ function makeWriteToolResult(action, payload = {}) {
     structuredContent.deletedTaskId = payload.deletedTaskId;
   }
 
-  return makeToolResult(structuredContent);
+  return makeToolResult(structuredContent, {
+    content: getArtifactResourceLinks(payload.artifactReferences),
+  });
 }
 
 function normalizeObject(value) {
@@ -1030,6 +1069,8 @@ const AUDIT_DETAIL_KEYS = [
   'outcome',
   'reason',
   'toolName',
+  'command',
+  'actor',
   'taskId',
   'projectId',
   'entityId',
@@ -1040,6 +1081,17 @@ const AUDIT_DETAIL_KEYS = [
   'assigneeName',
   'capabilityProfile',
   'revision',
+  'expectedRevision',
+  'currentRevision',
+  'executionId',
+  'executionState',
+  'executionRevision',
+  'goalRevision',
+  'attempt',
+  'contractRevision',
+  'contractHash',
+  'idempotent',
+  'fields',
   'statusId',
   'statusTitle',
   'deletedTaskId',
@@ -1530,6 +1582,7 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
     case 'goals.lifecycle': {
       const goalId = parseGoalId(args);
       if (!goalId) return { error: invalidParams('Invalid params: "goalId" (or "id") is required.') };
+      const actor = args.actor || 'mcp-agent';
       const lifecycle = createGoalLifecycleService({ store, onRuntimeChange: emitRuntimeChange, skillsRoot, userDataPath: userSkillsRoot });
       const result = lifecycle.execute({
         goalId,
@@ -1537,17 +1590,25 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
         expectedRevision: args.expectedRevision,
         idempotencyKey: args.idempotencyKey,
         commandId: args.commandId,
-        actor: args.actor || 'mcp-agent',
+        actor,
         payload: args.payload,
       });
       if (!result.ok) {
-        if (typeof emitRuntimeChange === 'function') emitRuntimeChange({ scope: result.error === 'RECONCILIATION_REQUIRED' ? 'reconciliation' : 'conflict', goalId, revision: result.currentRevision || result.currentRevision === 0 ? result.currentRevision : 0, actor: args.actor || 'mcp-agent', changeType: 'lifecycle.rejected', errorCode: result.error, details: { command: args.command } });
+        if (typeof emitRuntimeChange === 'function') emitRuntimeChange({ scope: result.error === 'RECONCILIATION_REQUIRED' ? 'reconciliation' : 'conflict', goalId, revision: result.currentRevision || result.currentRevision === 0 ? result.currentRevision : 0, actor, changeType: 'lifecycle.rejected', errorCode: result.error, details: { command: args.command } });
         recordWriteAttempt(store, req, {
           outcome: 'denied',
           reason: result.error,
           toolName: name,
           entityId: goalId,
           command: args.command,
+          actor,
+          expectedRevision: args.expectedRevision,
+          currentRevision: result.currentRevision,
+          executionId: result.execution?.id,
+          executionState: result.execution?.state,
+          executionRevision: result.execution?.revision,
+          contractRevision: result.contractRevision,
+          contractHash: result.contractHash,
         });
         return { error: invalidParams(result.message, result) };
       }
@@ -1556,9 +1617,20 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
         toolName: name,
         entityId: goalId,
         command: args.command,
+        actor,
+        expectedRevision: args.expectedRevision,
         nextRevision: result.execution?.revision,
+        currentRevision: result.execution?.revision,
+        executionId: result.execution?.id,
+        executionState: result.execution?.state,
+        executionRevision: result.execution?.revision,
+        goalRevision: result.execution?.goalRevision,
+        attempt: result.execution?.attempt,
+        contractRevision: result.execution?.contractPacket?.contractRevision,
+        contractHash: result.execution?.contractPacket?.contractHash,
         idempotent: result.idempotent === true,
       });
+      const handoff = result.event?.payload?.handoffRecord;
       return {
         result: makeWriteToolResult(name, {
           changed: !result.idempotent,
@@ -1567,9 +1639,24 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
           execution: result.execution,
           event: result.event,
           cleanup: result.cleanup,
+          artifactReferences: handoff?.producedArtifactReferences,
           revision: result.execution?.revision,
         }),
       };
+    }
+
+    case 'goals.gc': {
+      const goalId = parseGoalId(args);
+      const lifecycle = createGoalLifecycleService({ store, onRuntimeChange: emitRuntimeChange, skillsRoot, userDataPath: userSkillsRoot });
+      const result = lifecycle.collectStaleExecutions({
+        goalId,
+        maxAgeMs: args.maxAgeMs,
+        apply: args.apply === true,
+        humanConfirmed: args.humanConfirmed === true,
+        actor: args.actor || 'mcp-agent',
+      });
+      if (!result.ok) return { error: invalidParams(result.message, result) };
+      return { result: makeToolResult(result) };
     }
 
     case 'skills.list':

@@ -745,6 +745,39 @@ test('underscore tool aliases dispatch to the canonical handlers', () => {
   assert.ok(response.result.structuredContent.some(task => task.id === 'task-1'));
 });
 
+test('underscore goals_update_artifacts alias dispatches to the canonical handler', () => {
+  const store = makeStoreFromFixture('workspace-basic', {
+    [GOALS_KEY]: [{
+      id: 'goal-artifact-alias',
+      title: 'Artifact alias goal',
+      revision: 0,
+      elements: [{ id: 'subgoal-1', type: 'subgoal', title: 'Prepare', x: 0, y: 0 }],
+    }],
+  });
+  store.set('omvra.preferences.v1', { mcpAgentAccessEnabled: true, mcpCapabilityProfile: 'task_write' });
+  const dispatch = createRequestDispatcher(store);
+  const response = dispatch({
+    jsonrpc: '2.0',
+    id: 'alias-artifacts-1',
+    method: 'tools/call',
+    params: {
+      name: 'goals_update_artifacts',
+      arguments: {
+        goalId: 'goal-artifact-alias',
+        elementId: 'subgoal-1',
+        artifactReferences: [{ id: 'artifact-1', artifactType: 'document', label: 'Brief' }],
+        expectedRevision: 0,
+        idempotencyKey: 'alias-artifacts-1',
+        humanConfirmed: true,
+      },
+    },
+  }, makeReq());
+
+  assert.equal(response.jsonrpc, '2.0');
+  assert.equal(response.result.structuredContent.revision, 1);
+  assert.equal(store.get('omvra.goals.v1')[0].elements[0].artifactReferences[0].id, 'artifact-1');
+});
+
 test('MCP persists dependency IDs and approximate time fields through task writes', () => {
   const store = makeStoreFromFixture('workspace-basic', {
     [MILESTONES_KEY]: [

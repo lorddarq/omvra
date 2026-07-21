@@ -280,7 +280,7 @@ const WRITE_TOOL_DEFINITIONS = [
   },
   {
     name: 'goals.update_artifacts',
-    description: 'Replaces the additive execution-artifact links for one Goal, Subgoal, or Deliverable node with optimistic Goal revision protection. Task and milestone records remain canonical and are projected read-only.',
+    description: 'Replaces the additive execution-artifact links for one Goal, Subgoal, or Supporting Artifact node with optimistic Goal revision protection. Deliverable nodes own output contracts and terminal handoffs; task and milestone records remain canonical and are projected read-only.',
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -782,6 +782,7 @@ const TOOL_NAME_ALIASES = new Map([
   ['goals_get', 'goals.get'],
   ['goals_update', 'goals.update'],
   ['goals_update_element', 'goals.update_element'],
+  ['goals_update_artifacts', 'goals.update_artifacts'],
   ['goals_update_connector', 'goals.update_connector'],
   ['goals_lifecycle', 'goals.lifecycle'],
   ['goals_gc', 'goals.gc'],

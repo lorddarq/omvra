@@ -53,7 +53,7 @@ function createGoalRuntimeService({ store, now = () => new Date().toISOString() 
 
   function get(goalId) {
     const goal = readArray(store, GOALS_KEY).find(item => item?.id === goalId) || null;
-    const execution = readArray(store, EXECUTIONS_KEY).find(item => item?.goalId === goalId) || null;
+    const execution = readArray(store, EXECUTIONS_KEY).findLast(item => item?.goalId === goalId) || null;
     const people = readArray(store, PEOPLE_KEY);
     const agentAvailability = (goal?.elements || [])
       .filter(element => element?.type === 'agent')

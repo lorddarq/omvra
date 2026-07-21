@@ -18,9 +18,9 @@ MCP-originated Goal writes publish an Electron IPC invalidation event. The rende
 
 Execution state is overseer-managed and separate from editable Goal graph definitions:
 
-- Active or committed nodes are not ordinary canvas-editable objects. A running node shows a progress overlay and spinner.
+- Active nodes are not ordinary canvas-editable objects. A running node shows a progress overlay and spinner; completed execution history remains immutable, but the Goal graph itself is reusable.
 - While active, a node's structure, assigned agent, inputs, conditions, upstream dependencies, accepted evidence, and committed execution data are locked.
-- Unlocking active work requires pause, cancellation, rollback, or a lifecycle amendment.
+- Unlocking active work requires pause, cancellation, rollback, or a lifecycle amendment. Completion unlocks the Goal for future runs.
 - Downstream nodes that have not started remain editable. Safe future edits, such as renaming, future instructions, future assignment, adding future nodes, and layout changes, apply to the future plan.
 - Future edits that affect the contract, such as evidence requirements, conditions consuming active output, handoff requirements, or future budgets, require explicit **Apply workflow change** confirmation and overseer recalculation.
 - Unsafe active edits, including changing a running agent, deleting the current subgoal, changing active inputs, editing evaluated conditions, editing accepted evidence, or rewiring upstream dependencies, are never ordinary canvas edits.
@@ -470,7 +470,7 @@ Every command includes `commandId`, `goalId`, `expectedGoalRevision`, `execution
 | `working` / `evidence-required` / `handoff-pending` | `fail` | Failure reason and preserved evidence recorded | `failed` |
 | `working` / `evidence-required` / `handoff-pending` / `failed` | `retry` | Retry budget and policy permit another attempt | `ready` |
 
-`complete` is terminal for an execution attempt. A changed objective, acceptance boundary, or semantic contract creates a new goal revision and execution attempt; it never reopens the completed attempt in place. A newly discovered cleanup failure does not downgrade completion. It updates the cleanup outcome and emits an operational event for retry or inspection.
+`complete` is terminal for an execution attempt, not for the Goal definition. Every Goal is re-runnable: starting a Goal whose latest execution is terminal creates a new execution record with a new `executionAttemptId`, preserves the prior execution and evidence as immutable history, and never reopens the completed attempt in place. A changed objective, acceptance boundary, or semantic contract additionally creates a new Goal revision and contract snapshot for that attempt. Only one execution may be active for a Goal by default. A newly discovered cleanup failure does not downgrade completion. It updates the cleanup outcome and emits an operational event for retry or inspection.
 
 ### Completion transaction
 
@@ -493,7 +493,7 @@ Synchronous lifecycle checks include revisions, command transitions, predecessor
 
 The minimum completion evidence record must identify the acceptance criteria checked, the evidence references used, the verifier, verification time, and whether the evidence belongs to the current contract revision. Evidence may be preserved from earlier attempts only when the impact gate explicitly marks it reusable; otherwise it cannot satisfy completion.
 
-The optional evidence archive should use a stable, analysis-friendly append format such as JSONL, with one normalized execution event or evidence record per line. It may live outside the app's user-data directory, but its configured path must be validated and its status must be observable. Exporting or archiving records must not move, delete, or rewrite the canonical lifecycle history.
+The optional Goal audit archive uses a stable, analysis-friendly append format: `goal-lifecycle-audit.jsonl`, with one immutable lifecycle event per line. When a `goalAuditArchiveDirectory` is configured, existing canonical events are backfilled and new lifecycle events are appended idempotently; cleanup attempts remain available in the separate `goal-cleanup-audit.jsonl` stream. The archive may live outside the app's user-data directory, but its configured path must be validated and its write status must be observable. Exporting or archiving records must not move, delete, or rewrite the canonical lifecycle history.
 
 ## MCP goal resources and writes
 

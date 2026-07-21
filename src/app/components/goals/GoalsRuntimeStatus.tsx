@@ -20,7 +20,7 @@ function runtimeDescription(state: string): string {
   if (state === 'blocked') return 'Execution is blocked and requires intervention before it can continue.';
   if (state === 'approval-required') return 'Execution is waiting for the configured approval decision.';
   if (state === 'evidence-required') return 'Execution is waiting for required evidence.';
-  if (state === 'complete') return 'Execution completed for the active revision.';
+  if (state === 'complete') return 'This execution fulfilled its contract. The Goal can be run again.';
   return 'The runtime has recorded this execution state for the active Goal revision.';
 }
 

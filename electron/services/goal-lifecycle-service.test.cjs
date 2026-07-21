@@ -58,6 +58,49 @@ test('lifecycle transitions require evidence, acceptance, and revisions', () => 
   assert.equal(store.get(EXECUTIONS_KEY)[0].state, 'complete');
 });
 
+test('Goal lifecycle events are backfilled and appended to the configured external audit archive', () => {
+  const store = makeStore();
+  const archiveDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'omvra-goal-lifecycle-audit-'));
+  store.set('omvra.preferences.v1', { goalAuditArchiveDirectory: archiveDirectory });
+  store.set(EVENTS_KEY, [{ id: 'historical-event', goalId: 'goal-1', type: 'goal.historical', createdAt: '2026-07-18T00:00:00.000Z' }]);
+
+  const lifecycle = createGoalLifecycleService({ store, now: makeClock(), cleanup: () => ({ status: 'skipped', ok: true }) });
+  const started = lifecycle.execute({ goalId: 'goal-1', command: 'start', expectedRevision: 0, commandId: 'archive-start' });
+  const archivePath = path.join(archiveDirectory, 'goal-lifecycle-audit.jsonl');
+  const readArchive = () => fs.readFileSync(archivePath, 'utf8').trim().split('\n').map(line => JSON.parse(line));
+
+  assert.equal(started.auditArchive.status, 'written');
+  assert.deepEqual(readArchive().map(item => item.eventId), ['historical-event', started.event.id]);
+
+  createGoalLifecycleService({ store, now: makeClock(), cleanup: () => ({ status: 'skipped', ok: true }) });
+  assert.equal(readArchive().length, 2);
+  fs.rmSync(archiveDirectory, { recursive: true, force: true });
+});
+
+test('completed Goals can start a new immutable execution attempt', () => {
+  const store = makeStore();
+  const lifecycle = createGoalLifecycleService({ store, now: makeClock(), cleanup: () => ({ status: 'skipped', ok: true }) });
+  lifecycle.execute({ goalId: 'goal-1', command: 'start', expectedRevision: 0, commandId: 'run-1-start' });
+  lifecycle.execute({ goalId: 'goal-1', command: 'acknowledge', expectedRevision: 1, commandId: 'run-1-ack', payload: { contractRevision: 0 } });
+  lifecycle.execute({ goalId: 'goal-1', command: 'dispatch', expectedRevision: 2, commandId: 'run-1-dispatch' });
+  lifecycle.execute({ goalId: 'goal-1', command: 'submit-evidence', expectedRevision: 3, commandId: 'run-1-evidence', payload: { evidenceRefs: ['run-1-evidence'] } });
+  lifecycle.execute({ goalId: 'goal-1', command: 'request-handoff', expectedRevision: 4, commandId: 'run-1-handoff' });
+  lifecycle.execute({ goalId: 'goal-1', command: 'accept', expectedRevision: 5, commandId: 'run-1-accept', payload: { finalEvidenceVerified: true } });
+  const completed = lifecycle.execute({ goalId: 'goal-1', command: 'complete', expectedRevision: 6, commandId: 'run-1-complete', payload: { finalEvidenceVerified: true } });
+
+  const rerun = lifecycle.execute({ goalId: 'goal-1', command: 'start', expectedRevision: 0, commandId: 'run-2-start' });
+
+  assert.equal(completed.execution.state, 'complete');
+  assert.equal(rerun.ok, true);
+  assert.equal(rerun.execution.state, 'ready');
+  assert.equal(rerun.execution.attempt, 2);
+  assert.equal(rerun.execution.supersedesExecutionId, completed.execution.id);
+  assert.equal(rerun.execution.id === completed.execution.id, false);
+  assert.equal(store.get(EXECUTIONS_KEY).length, 2);
+  assert.equal(store.get(EXECUTIONS_KEY)[0].state, 'complete');
+  assert.equal(store.get(EXECUTIONS_KEY)[1].id, rerun.execution.id);
+});
+
 test('acknowledgement remains valid for the following dispatch', () => {
   const store = makeStore();
   const lifecycle = createGoalLifecycleService({ store, now: makeClock(), cleanup: () => ({ status: 'skipped', ok: true }) });

@@ -992,7 +992,7 @@ function listGoals(store) {
 }
 
 function withGoalExecutionReadModel(store, goal) {
-  const execution = readArray(store, GOAL_EXECUTIONS_KEY).find(item => item?.goalId === goal?.id);
+  const execution = readArray(store, GOAL_EXECUTIONS_KEY).findLast(item => item?.goalId === goal?.id);
   const reconciliations = readArray(store, GOAL_RECONCILIATIONS_KEY)
     .filter(item => item?.goalId === goal?.id)
     .map(item => ({

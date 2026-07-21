@@ -6,6 +6,7 @@ import { getCanonicalJSON, safeReadJSON, setCanonicalJSON } from '../../utils/st
 import { goalRevision, readGoals } from '../../utils/goalPersistence.ts';
 import { goalCanvasElementHeight, goalConnectorPath, isGoalElementConnected, isValidRetryTarget, wouldCreateGoalCycle } from '../../utils/goalCanvas.ts';
 import { createAgentElement, createGoalElement, createStableId } from '../../utils/goalElements.ts';
+import { formatGoalDetailsForClipboard } from '../../utils/goalClipboard';
 import { createCustomArtifactReference, createSupportingSourceReference } from '../../utils/goalArtifacts.ts';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -25,7 +26,7 @@ import { GoalsAgentSection, GoalsConditionSection, GoalsConnectionsSection, Goal
 import { GoalsSidebar } from '../goals/GoalsSidebar';
 import { GoalsToolbar } from '../goals/GoalsToolbar';
 import { ARTIFACT_ITEMS, CONTROL_FLOW_ITEMS, TOOL_ITEMS } from '../goals/GoalsMetadata';
-import { ReadyIcon, StatusIcon, compactChipClass, conditionNegativeLabel, conditionPositiveLabel, elementIcon, getElementBody, getElementTitle, isCompletionElement, isExecutionLocked, nodeClass, readinessChipClass, readinessDescription, readinessForElement, readinessLabel, statusChipClass, statusDescription, statusLabel, statusNextStep } from '../goals/GoalsPresentation';
+import { ReadyIcon, StatusIcon, compactChipClass, conditionNegativeLabel, conditionPositiveLabel, elementIcon, getElementBody, getElementTitle, isCompletionElement, isExecutionLocked, nodeClass, readinessChipClass, readinessDescription, readinessForElement, readinessLabel, runtimeStatusForElement, statusChipClass, statusDescription, statusLabel, statusNextStep } from '../goals/GoalsPresentation';
 import { GOAL_SCHEDULES_STORAGE_KEY, normalizeGoalSchedules } from '../../utils/goalSchedules.ts';
 import { useGoalsInspectorSelection } from '../../hooks/useGoalsInspectorSelection';
 
@@ -83,6 +84,7 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
   const rendererWritesPendingRef = useRef(0);
   const scheduleWritesPendingRef = useRef(0);
   const [editNotice, setEditNotice] = useState<string | null>(null);
+  const [goalCopyState, setGoalCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const canvasRef = useRef<HTMLDivElement>(null);
   const {
     activeGoal, activeSchedule, selectedElement, selectedAgent, selectedAgentMissing, selectedAgentConfiguration, selectedAgentMode,
@@ -90,7 +92,46 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
     artifactOptions, supportingSourceOptions, connections, selectedConnections,
   } = useGoalsInspectorSelection({ goals, selectedGoalId, selectedElementId, schedules, people, tasks, milestones, workspacePolicy, runtimeProjection, policyImpacts, supportingArtifactType, supportingSourceSearch });
   activeGoalIdRef.current = activeGoal?.id ?? '';
-  const selectedElementLocked = isExecutionLocked(selectedElement);
+  const isRuntimeExecutionLocked = (element: GoalElement | undefined) => {
+    const executionState = runtimeProjection?.execution?.state;
+    const executionActive = Boolean(executionState && !['ready', 'paused', 'complete', 'failed'].includes(executionState));
+    return isExecutionLocked(element) || executionActive;
+  };
+  const selectedElementLocked = isRuntimeExecutionLocked(selectedElement);
+  const copyGoalDetails = async () => {
+    if (!activeGoal) return;
+    const goalElement = activeGoal.elements.find(element => element.type === 'goal');
+    const overseer = people.find(person => person.id === activeGoal.overseerAgentId);
+    const text = formatGoalDetailsForClipboard({
+      goalId: activeGoal.id,
+      title: activeGoal.title,
+      revision: goalRevision(activeGoal),
+      status: runtimeProjection?.execution?.state ?? goalElement?.status,
+      overseerLabel: overseer?.name,
+      agentLabels: activeGoal.elements.filter(element => element.type === 'agent').map(element => getElementTitle(element, people)),
+      deliverableLabels: activeGoal.elements.filter(element => element.type === 'deliverable').map(element => element.title),
+      nodeCount: activeGoal.elements.length,
+      notes: goalElement?.body,
+    });
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+      else if (typeof window !== 'undefined') {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      } else throw new Error('Clipboard is unavailable');
+      setGoalCopyState('copied');
+      window.setTimeout(() => setGoalCopyState('idle'), 1400);
+    } catch {
+      setGoalCopyState('failed');
+      window.setTimeout(() => setGoalCopyState('idle'), 1800);
+    }
+  };
 
   useEffect(() => {
     if (goals.length === 0) {
@@ -362,7 +403,7 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
   }, [drag, selectedGoalId, zoom]);
 
   const updateElement = (updates: Partial<GoalElement>) => {
-    if (selectedElementLocked) { setEditNotice('This node is locked while execution is active or committed. Pause, cancel, or amend the lifecycle before editing it.'); return; }
+    if (selectedElementLocked) { setEditNotice('This node is locked while execution is active. Pause or reconcile the lifecycle before editing it.'); return; }
     setGoals(current => current.map(goal => goal.id !== selectedGoalId ? goal : ({ ...goal, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString(), elements: goal.elements.map(element => element.id === selectedElement?.id ? { ...element, ...updates } : element) })));
   };
   const updateArtifactReferences = async (nextReferences: GoalArtifactReference[]) => {
@@ -406,7 +447,7 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
     updateElement({ title: name, agentConfiguration: { ...current, version: 1 as const, requestedName: name } });
   };
   const updateGoal = (updates: Partial<GoalRecord>) => {
-    if (selectedElementLocked) { setEditNotice('This Goal is locked while execution is active or committed. Pause, cancel, or amend the lifecycle before editing it.'); return; }
+    if (selectedElementLocked) { setEditNotice('This Goal is locked while execution is active. Pause or reconcile the lifecycle before editing it.'); return; }
     setGoals(current => current.map(goal => goal.id === selectedGoalId ? { ...goal, ...updates, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString() } : goal));
   };
   const createSchedule = () => {
@@ -455,7 +496,7 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
   };
   const deleteElement = () => {
     if (!selectedElement) return;
-    if (selectedElementLocked) { setEditNotice('This node cannot be deleted during active or committed execution.'); return; }
+    if (selectedElementLocked) { setEditNotice('This node cannot be deleted during active execution.'); return; }
     if (selectedElement.type === 'goal') {
       setDeleteDialogOpen(true);
       return;
@@ -531,7 +572,7 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
     const connection = activeGoal?.elements.find(element => element.id === connectionId);
     const source = activeGoal?.elements.find(element => element.id === connection?.sourceId);
     const target = activeGoal?.elements.find(element => element.id === connection?.targetId);
-    if (isExecutionLocked(connection) || isExecutionLocked(source) || isExecutionLocked(target)) { setEditNotice('This connection participates in active or committed execution and cannot be changed.'); return; }
+    if (isExecutionLocked(connection) || isExecutionLocked(source) || isExecutionLocked(target)) { setEditNotice('This connection participates in active execution and cannot be changed.'); return; }
     setGoals(current => current.map(goal => goal.id === selectedGoalId
       ? { ...goal, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString(), elements: goal.elements.filter(element => element.id !== connectionId) }
       : goal));
@@ -665,12 +706,12 @@ export function GoalsView({ people = [], tasks = [], milestones = [], workspaceP
         {runtimeProjection?.execution?.state && <div role="status" className="absolute left-4 top-4 z-10 rounded-md border border-blue-200 bg-white/95 px-3 py-2 text-xs text-slate-600 shadow-sm"><span className="font-semibold text-slate-800">Execution:</span> <span className="capitalize">{runtimeProjection.execution.state.replaceAll('-', ' ')}</span>{runtimeProjection.execution.state === 'working' && <span className="ml-1 text-blue-700">· Agent is working</span>}</div>}
         <GoalsConnectorLayer connections={connections} elements={activeGoal?.elements ?? []} selectedElementId={selectedElement?.id} connectorPath={connection => goalConnectorPath(activeGoal?.elements ?? [], connection, canvasElementHeights)} onSelectConnector={connectionId => { setSelectedElementId(connectionId); setConnectorMode(false); setConnectorSourceId(null); setConnectorSourceBranch(undefined); }} onMoveSelection={moveCanvasSelection} />
         {connectorError && <div role="alert" className="absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 shadow-sm">{connectorError}</div>}
-        <GoalsCanvasNodes elements={activeGoal?.elements ?? []} selectedElementId={selectedElement?.id} connectorMode={connectorMode} connectorSourceId={connectorSourceId} connectorSourceSide={connectorSourceSide} connectorSourceBranch={connectorSourceBranch} panMode={panMode} spaceHeld={spaceHeldRef.current} canvasElementHeight={element => goalCanvasElementHeight(element, canvasElementHeights)} getElementTitle={element => getElementTitle(element, people)} getElementBody={element => getElementBody(element, people)} isConnected={elementId => isGoalElementConnected(activeGoal?.elements ?? [], elementId)} isExecutionLocked={isExecutionLocked} nodeClass={nodeClass} elementIcon={elementIcon} conditionPositiveLabel={conditionPositiveLabel} conditionNegativeLabel={conditionNegativeLabel} readinessForElement={readinessForElement} readinessLabel={readinessLabel} readinessChipClass={readinessChipClass} isCompletionElement={isCompletionElement} compactChipClass={compactChipClass} statusChipClass={statusChipClass} statusLabel={statusLabel} StatusIcon={StatusIcon} onSelectElement={setSelectedElementId} onNodeClick={element => { if (connectorMode) { if (connectorSourceId) connectNodes(element.id); else beginConnection(element.id, 'right'); } else setSelectedElementId(element.id); }} onMoveSelection={moveCanvasSelection} onStartDrag={(element, event) => { if (spaceHeldRef.current || panMode || connectorMode || isExecutionLocked(element)) return; setSelectedElementId(element.id); setDrag({ id: element.id, startX: event.clientX, startY: event.clientY, originX: element.x, originY: element.y }); }} onConnectNode={connectNodes} onBeginConnection={beginConnection} />
+        <GoalsCanvasNodes elements={activeGoal?.elements ?? []} selectedElementId={selectedElement?.id} connectorMode={connectorMode} connectorSourceId={connectorSourceId} connectorSourceSide={connectorSourceSide} connectorSourceBranch={connectorSourceBranch} panMode={panMode} spaceHeld={spaceHeldRef.current} canvasElementHeight={element => goalCanvasElementHeight(element, canvasElementHeights)} getElementTitle={element => getElementTitle(element, people)} getElementBody={element => getElementBody(element, people)} isConnected={elementId => isGoalElementConnected(activeGoal?.elements ?? [], elementId)} isExecutionLocked={isRuntimeExecutionLocked} nodeClass={nodeClass} elementIcon={elementIcon} conditionPositiveLabel={conditionPositiveLabel} conditionNegativeLabel={conditionNegativeLabel} readinessForElement={readinessForElement} readinessLabel={readinessLabel} readinessChipClass={readinessChipClass} isCompletionElement={isCompletionElement} compactChipClass={compactChipClass} statusChipClass={statusChipClass} statusLabel={statusLabel} StatusIcon={StatusIcon} runtimeStatusForElement={element => runtimeStatusForElement(element, runtimeProjection)} onSelectElement={setSelectedElementId} onNodeClick={element => { if (connectorMode) { if (connectorSourceId) connectNodes(element.id); else beginConnection(element.id, 'right'); } else setSelectedElementId(element.id); }} onMoveSelection={moveCanvasSelection} onStartDrag={(element, event) => { if (spaceHeldRef.current || panMode || connectorMode || isRuntimeExecutionLocked(element)) return; setSelectedElementId(element.id); setDrag({ id: element.id, startX: event.clientX, startY: event.clientY, originX: element.x, originY: element.y }); }} onConnectNode={connectNodes} onBeginConnection={beginConnection} />
     </GoalsCanvasSurface>
     {editNotice && <div role="status" className="absolute bottom-16 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 shadow-sm"><LockKeyhole className="size-3.5 shrink-0" />{editNotice}<button type="button" className="ml-1 font-semibold text-amber-900" onClick={() => setEditNotice(null)}>Dismiss</button></div>}
 
     {selectedElement && (
-      <GoalsInspector selectedElement={selectedElement} selectedElementLocked={selectedElementLocked} onDelete={deleteElement}>
+      <GoalsInspector selectedElement={selectedElement} selectedElementLocked={selectedElementLocked} onDelete={deleteElement} goalCopyState={goalCopyState} onCopyGoalDetails={() => { void copyGoalDetails(); }}>
         <GoalsInspectorIdentity element={selectedElement} activeGoal={activeGoal} people={people} selectedAgent={selectedAgent} selectedAgentMissing={Boolean(selectedAgentMissing)} selectedAgentConfiguration={selectedAgentConfiguration} selectedAgentMode={selectedAgentMode} onUpdateElement={updateElement} onUpdateGoal={updateGoal} onUpdateAgentName={updateAgentName} />
         <GoalsAgentSection element={selectedElement} people={people} selectedAgent={selectedAgent} selectedAgentMissing={Boolean(selectedAgentMissing)} selectedAgentConfiguration={selectedAgentConfiguration} selectedAgentMode={selectedAgentMode} onUpdateConfiguration={updateAgentConfiguration} />
         <GoalsControlFlowSection element={selectedElement} retryTargetTitle={selectedRetryTarget ? activeGoal?.elements.find(element => element.id === selectedRetryTarget)?.title ?? 'Missing node' : undefined} onUpdateElement={updateElement} />

@@ -1,10 +1,11 @@
 import { AlertTriangle, CheckCircle2, CircleDot, ClipboardCheck, LockKeyhole, MessageSquareText, RotateCcw, ShieldCheck, Sparkles, Target, UserRoundCheck } from 'lucide-react';
-import type { GoalElement, GoalElementReadiness, GoalElementType, Person } from '../../types.ts';
+import type { GoalElement, GoalElementReadiness, GoalElementType, GoalRuntimeProjection, Person } from '../../types.ts';
 import { AgentIcon as Bot } from '../icons/AgentIcon';
 import { AttachmentIcon } from '../icons/AttachmentIcon';
 import { PuzzlePieceIcon } from '../icons/PuzzlePieceIcon';
 
-const EXECUTION_LOCKED_STATUSES = new Set(['working', 'blocked', 'evidence-required', 'approval-required', 'complete', 'permission-denied']);
+const EXECUTION_LOCKED_STATUSES = new Set(['working', 'blocked', 'evidence-required', 'approval-required', 'permission-denied']);
+export type GoalRuntimeNodeStatus = GoalElement['status'] | 'ready';
 
 export function compactChipClass(colorClass: string): string {
   return `${colorClass} !gap-0.5 !rounded-full !border !px-1.5 !py-0 !text-[10px] [&>svg]:!mr-0 [&>svg]:!size-2.5`;
@@ -71,6 +72,20 @@ export function statusDescription(status: GoalElement['status']): string {
 
 export function statusNextStep(status: GoalElement['status']): string | undefined {
   return status === 'blocked' ? 'Resolve the blocking reason, then ask the overseer to reassess this node.' : status === 'evidence-required' ? 'Attach the missing evidence before requesting handoff.' : status === 'approval-required' ? 'Request a decision from the configured approval actor.' : status === 'permission-denied' ? 'Ask an administrator to grant the required permission.' : status === 'human-review' ? 'Review the evidence and record an accept or reject decision.' : undefined;
+}
+
+export function runtimeStatusForElement(element: GoalElement, runtimeProjection?: GoalRuntimeProjection | null): GoalRuntimeNodeStatus | undefined {
+  const state = runtimeProjection?.execution?.state;
+  if (!state || !['goal', 'subgoal', 'agent', 'deliverable'].includes(element.type)) return undefined;
+  if (state === 'ready') return 'ready';
+  if (state === 'working') return 'working';
+  if (state === 'blocked') return 'blocked';
+  if (state === 'evidence-required') return 'evidence-required';
+  if (state === 'approval-required') return 'approval-required';
+  if (state === 'permission-denied') return 'permission-denied';
+  if (state === 'handoff-pending') return 'human-review';
+  if (state === 'complete') return 'complete';
+  return undefined;
 }
 
 export function readinessForElement(element: GoalElement, connected: boolean): GoalElementReadiness {

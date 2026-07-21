@@ -31,6 +31,7 @@ const STATES = [
 ];
 
 const CLEANUP_PENDING_STATUSES = new Set(['blocked', 'invalid', 'partial-failure', 'failed']);
+const TERMINAL_EXECUTION_STATES = new Set(['complete', 'failed']);
 
 const COMMANDS = [
   'start',
@@ -97,7 +98,7 @@ function findGoal(store, goalId) {
 }
 
 function findExecution(executions, goalId) {
-  return executions.find(execution => execution && execution.goalId === goalId) || null;
+  return executions.findLast(execution => execution && execution.goalId === goalId) || null;
 }
 
 function eventFor(execution, command, actor, payload, now) {
@@ -146,6 +147,34 @@ function failure(error, message, details = {}) {
 function getAuditArchiveDirectory(store, payload = {}) {
   const configured = payload.auditArchiveDirectory ?? store.get(PREFERENCES_KEY)?.goalAuditArchiveDirectory;
   return typeof configured === 'string' ? configured.trim() : '';
+}
+
+function archiveGoalEvents(store, events, payload = {}) {
+  const directory = getAuditArchiveDirectory(store, payload);
+  if (!directory) return { status: 'unconfigured', archived: 0 };
+  const filePath = path.join(directory, 'goal-lifecycle-audit.jsonl');
+  try {
+    fs.mkdirSync(directory, { recursive: true });
+    const existingEventIds = new Set();
+    if (fs.existsSync(filePath)) {
+      for (const line of fs.readFileSync(filePath, 'utf8').split('\n')) {
+        if (!line.trim()) continue;
+        try {
+          const record = JSON.parse(line);
+          if (typeof record?.eventId === 'string') existingEventIds.add(record.eventId);
+        } catch {
+          // Preserve malformed historical lines and continue exporting new records.
+        }
+      }
+    }
+    const records = (Array.isArray(events) ? events : [])
+      .filter(event => event && typeof event.id === 'string' && !existingEventIds.has(event.id))
+      .map(event => JSON.stringify({ schemaVersion: 1, kind: 'goal-lifecycle-event', eventId: event.id, archivedAt: new Date().toISOString(), event }));
+    if (records.length) fs.appendFileSync(filePath, `${records.join('\n')}\n`, 'utf8');
+    return { status: 'written', filePath, archived: records.length };
+  } catch (error) {
+    return { status: 'failed', filePath, archived: 0, error: error?.message || String(error) };
+  }
 }
 
 function buildAgentDelegations(store, goal) {
@@ -310,6 +339,8 @@ function createGoalLifecycleService({
     throw new TypeError('A synchronous store with get/set methods is required.');
   }
 
+  archiveGoalEvents(store, readArray(store, EVENTS_KEY));
+
   function notifyRuntime(change) {
     if (typeof onRuntimeChange === 'function') onRuntimeChange(change);
   }
@@ -340,15 +371,18 @@ function createGoalLifecycleService({
 
     const executions = readArray(store, EXECUTIONS_KEY);
     const events = readArray(store, EVENTS_KEY);
-    const existing = findExecution(executions, goalId);
+    const latestExecution = findExecution(executions, goalId);
+    const existing = command === 'start' && latestExecution && TERMINAL_EXECUTION_STATES.has(latestExecution.state)
+      ? null
+      : latestExecution;
     const prior = events.find(event => event && event.goalId === goalId && event.commandId === commandId);
     if (prior) {
-      return commandResult(existing, prior, { idempotent: true });
+      return commandResult(latestExecution, prior, { idempotent: true });
     }
 
     const expected = normalizeRevision(expectedRevision);
     if (expected === null) return failure('EXPECTED_REVISION_REQUIRED', 'expectedRevision is required and must be a non-negative integer.', { currentRevision: existing ? existing.revision : 0 });
-    if (existing && command === 'start') return failure('EXECUTION_EXISTS', `An execution already exists for goal "${goalId}".`);
+    if (existing && command === 'start') return failure('EXECUTION_EXISTS', `An execution is already active for goal "${goalId}".`);
     if (!existing && command !== 'start') return failure('EXECUTION_NOT_FOUND', `No execution exists for goal "${goalId}".`);
     if (existing && expected !== existing.revision) {
       return failure('REVISION_MISMATCH', 'Execution revision mismatch.', { currentRevision: existing.revision, expectedRevision: expected });
@@ -378,7 +412,7 @@ function createGoalLifecycleService({
       : {
           id: executionId,
           goalId,
-          attempt: 1,
+          attempt: (latestExecution?.attempt || 0) + 1,
           revision: 0,
           state: 'ready',
           evidenceRefs: [],
@@ -389,7 +423,8 @@ function createGoalLifecycleService({
           effectivePolicy,
           policyRevision: effectivePolicy.sourceRevision,
           executionAttemptId: executionId,
-          contractPacket: buildContractPacket(store, goal, effectivePolicy, 1, now, { skillsRoot, userDataPath, ...payload }),
+          ...(latestExecution?.id ? { supersedesExecutionId: latestExecution.id } : {}),
+          contractPacket: buildContractPacket(store, goal, effectivePolicy, (latestExecution?.attempt || 0) + 1, now, { skillsRoot, userDataPath, ...payload }),
           createdAt: now(),
         };
 
@@ -495,9 +530,10 @@ function createGoalLifecycleService({
     }
 
     const nextExecutions = existing
-      ? executions.map(item => item && item.goalId === goalId ? nextExecution : item)
+      ? executions.map(item => item && item.id === existing.id ? nextExecution : item)
       : executions.concat(nextExecution);
     writeExecutionState(store, nextExecutions, events.concat(event));
+    const auditArchive = archiveGoalEvents(store, readArray(store, EVENTS_KEY), payload);
 
     notifyRuntime({
       scope: command === 'reconcile' ? 'reconciliation' : 'execution',
@@ -511,10 +547,10 @@ function createGoalLifecycleService({
     if (pendingImpact && command === 'resume' && impactDecision === 'confirmed') resolveGoalPolicyImpact(store, goalId, 'confirmed', now);
 
     if (command === 'complete') {
-      return persistCleanupOutcome({ nextExecution, event, executions: nextExecutions, events: events.concat(event), payload });
+      return persistCleanupOutcome({ nextExecution, event, executions: nextExecutions, events: events.concat(event), payload, lifecycleAuditArchive: auditArchive });
     }
 
-    return commandResult(nextExecution, event);
+    return commandResult(nextExecution, event, { auditArchive });
   }
 
   function markPendingCommand({ goalId: rawGoalId, command, commandId, payload = {}, actor = 'overseer' } = {}) {
@@ -524,7 +560,7 @@ function createGoalLifecycleService({
     if (!commandId) return failure('COMMAND_ID_REQUIRED', 'commandId is required for a pending command.');
     const executions = readArray(store, EXECUTIONS_KEY);
     const next = { ...execution, pendingCommand: { command, commandId, payload, actor, recordedAt: now() }, updatedAt: now() };
-    store.set(EXECUTIONS_KEY, executions.map(item => item?.goalId === goalId ? next : item));
+    store.set(EXECUTIONS_KEY, executions.map(item => item?.id === execution.id ? next : item));
     notifyRuntime({ scope: 'execution', goalId, revision: execution.revision, actor, changeType: 'execution.command-pending' });
     return { ok: true, execution: next };
   }
@@ -566,6 +602,7 @@ function createGoalLifecycleService({
       nextExecutions.push(next);
     }
     writeExecutionState(store, nextExecutions, nextEvents);
+    archiveGoalEvents(store, nextEvents);
     store.set(RECONCILIATIONS_KEY, nextReconciliations);
     for (const execution of nextExecutions.filter(item => item?.reconciliationRequired)) {
       notifyRuntime({ scope: 'reconciliation', goalId: execution.goalId, revision: execution.revision, actor: 'lifecycle-service', changeType: 'reconciliation.required' });
@@ -573,7 +610,7 @@ function createGoalLifecycleService({
     return { ok: true, executions: nextExecutions, events: nextEvents, reconciliations: nextReconciliations };
   }
 
-  function persistCleanupOutcome({ nextExecution, event, executions, events, payload }) {
+  function persistCleanupOutcome({ nextExecution, event, executions, events, payload, lifecycleAuditArchive }) {
     const cleanupAttemptEvent = {
       id: randomUUID(),
       goalId: nextExecution.goalId,
@@ -585,6 +622,7 @@ function createGoalLifecycleService({
       createdAt: now(),
     };
     writeExecutionState(store, executions, events.concat(cleanupAttemptEvent));
+    archiveGoalEvents(store, [cleanupAttemptEvent], payload);
     let cleanupResult;
     try {
       cleanupResult = cleanup({
@@ -646,15 +684,17 @@ function createGoalLifecycleService({
         createdAt: now(),
       });
     }
-    writeExecutionState(store, executions.map(item => item && item.goalId === updated.goalId ? updated : item), events.concat(cleanupAttemptEvent, cleanupEvent));
+    writeExecutionState(store, executions.map(item => item && item.id === updated.id ? updated : item), events.concat(cleanupAttemptEvent, cleanupEvent));
+    archiveGoalEvents(store, [cleanupEvent], payload);
     store.set(RECONCILIATIONS_KEY, nextReconciliations);
     notifyRuntime({ scope: 'reconciliation', goalId: updated.goalId, revision: updated.revision, actor: 'lifecycle-service', changeType: 'reconciliation.cleanup' });
-    return commandResult(updated, event, { cleanup: cleanupResult, cleanupEvent });
+    return commandResult(updated, event, { cleanup: cleanupResult, cleanupEvent, auditArchive: lifecycleAuditArchive });
   }
 
   function retryCleanup({ goalId, execution, executions, events, commandId, actor, payload }) {
     const cleanupAttemptEvent = { id: randomUUID(), goalId, executionId: execution.id, executionRevision: execution.revision + 1, type: 'goal.artifacts.cleanup.attempted', actor, commandId, payload: { status: 'pending', cleanupPending: true, retry: true }, createdAt: now() };
     writeExecutionState(store, executions, events.concat(cleanupAttemptEvent));
+    archiveGoalEvents(store, [cleanupAttemptEvent], payload);
     let cleanupResult;
     try {
       cleanupResult = cleanup({
@@ -679,7 +719,8 @@ function createGoalLifecycleService({
     const nextReconciliations = readArray(store, RECONCILIATIONS_KEY).filter(item => !(item?.kind === 'cleanup' && item.goalId === goalId && item.executionId === execution.id));
     if (cleanupPending) nextReconciliations.push({ id: `reconciliation_${randomUUID()}`, kind: 'cleanup', goalId, executionId: execution.id, status: 'pending', cleanupStatus: cleanupResult.status, attemptCount: attempt, reason: cleanupResult.reason || 'cleanup-retry-available', createdAt: now() });
     updated.commandResults = { ...execution.commandResults, [commandId]: { revision: updated.revision, eventId: nextEvent.id } };
-    writeExecutionState(store, executions.map(item => item?.goalId === goalId ? updated : item), events.concat(cleanupAttemptEvent, nextEvent, cleanupEvent));
+    writeExecutionState(store, executions.map(item => item?.id === execution.id ? updated : item), events.concat(cleanupAttemptEvent, nextEvent, cleanupEvent));
+    archiveGoalEvents(store, [nextEvent, cleanupEvent], payload);
     store.set(RECONCILIATIONS_KEY, nextReconciliations);
     notifyRuntime({ scope: 'reconciliation', goalId, revision: updated.revision, actor, changeType: 'reconciliation.cleanup-retry' });
     return commandResult(updated, nextEvent, { cleanup: cleanupResult, cleanupEvent, auditArchive });

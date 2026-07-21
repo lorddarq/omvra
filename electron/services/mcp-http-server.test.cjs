@@ -745,6 +745,24 @@ test('underscore tool aliases dispatch to the canonical handlers', () => {
   assert.ok(response.result.structuredContent.some(task => task.id === 'task-1'));
 });
 
+test('tasks.list returns a successful Not found result for an empty filtered result set', () => {
+  const dispatch = createRequestDispatcher(makeStoreFromFixture('workspace-basic'));
+  const response = dispatch({
+    jsonrpc: '2.0',
+    id: 'tasks-not-found-1',
+    method: 'tools/call',
+    params: {
+      name: 'tasks_list',
+      arguments: { search: 'CNS' },
+    },
+  }, makeReq());
+
+  assert.equal(response.jsonrpc, '2.0');
+  assert.equal(response.result.isError, false);
+  assert.deepEqual(response.result.structuredContent, []);
+  assert.equal(response.result.content[0].text, 'Not found: no tasks matched the supplied filters.');
+});
+
 test('underscore goals_update_artifacts alias dispatches to the canonical handler', () => {
   const store = makeStoreFromFixture('workspace-basic', {
     [GOALS_KEY]: [{

@@ -943,13 +943,13 @@ function makeJsonRpcResponse(id, payload) {
   };
 }
 
-function makeToolResult(structuredContent, { isError = false, content = [] } = {}) {
+function makeToolResult(structuredContent, { isError = false, content = [], resultText } = {}) {
   return {
     structuredContent,
     content: [
       {
         type: 'text',
-        text: JSON.stringify(structuredContent),
+        text: typeof resultText === 'string' ? resultText : JSON.stringify(structuredContent),
       },
       ...content,
     ],
@@ -1500,8 +1500,17 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
     case 'workspace.get_snapshot':
       return { result: makeToolResult(getWorkspaceSnapshot(store)) };
 
-    case 'tasks.list':
-      return { result: makeToolResult(listTasks(store, args)) };
+    case 'tasks.list': {
+      const tasks = listTasks(store, args);
+      const hasFilters = ['status', 'assigneeId', 'projectId', 'search'].some(key => typeof args[key] === 'string' && args[key].trim());
+      return {
+        result: makeToolResult(tasks, {
+          resultText: tasks.length > 0 || !hasFilters
+            ? undefined
+            : 'Not found: no tasks matched the supplied filters.',
+        }),
+      };
+    }
 
     case 'goals.list':
       return { result: makeToolResult(listGoals(store)) };

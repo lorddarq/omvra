@@ -1,3 +1,5 @@
+import { APCAcontrast, sRGBtoY } from 'apca-w3';
+
 let contrastCache: Record<string, string> = {};
 
 export const computeLuminance = (r: number, g: number, b: number) => {
@@ -9,7 +11,7 @@ export const computeLuminance = (r: number, g: number, b: number) => {
 };
 
 const parseRGBString = (rgb: string) => {
-  const m = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+  const m = rgb.match(/rgba?\(\s*(\d+),\s*(\d+),\s*(\d+)/i);
   if (!m) return null;
   return [parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3], 10)];
 };
@@ -23,20 +25,19 @@ const parseHexColor = (color: string) => {
   return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
 };
 
-const getColorLuminance = (color?: string): number | null => {
+const parseColor = (color?: string) => {
   if (!color) return null;
-  const rgb = color.startsWith('#') ? parseHexColor(color) : parseRGBString(color);
-  if (!rgb) return null;
-  return computeLuminance(rgb[0], rgb[1], rgb[2]);
+  return color.startsWith('#') ? parseHexColor(color) : parseRGBString(color);
 };
 
 const getPreferredReadableTone = (color?: string): 'black' | 'white' => {
-  const luminance = getColorLuminance(color);
-  if (luminance === null) return 'white';
+  const rgb = parseColor(color);
+  if (!rgb) return 'white';
 
-  const whiteContrast = 1.05 / (luminance + 0.05);
-  const blackContrast = (luminance + 0.05) / 0.05;
-  return blackContrast >= whiteContrast ? 'black' : 'white';
+  const backgroundY = sRGBtoY(rgb);
+  const blackContrast = APCAcontrast(sRGBtoY([0, 0, 0]), backgroundY);
+  const whiteContrast = APCAcontrast(sRGBtoY([255, 255, 255]), backgroundY);
+  return Math.abs(blackContrast) >= Math.abs(whiteContrast) ? 'black' : 'white';
 };
 
 export function getReadableOutlineColorFor(backgroundColor?: string): string {
@@ -46,16 +47,17 @@ export function getReadableOutlineColorFor(backgroundColor?: string): string {
 }
 
 export function getReadableTextClassFor(key: string, fallbackColor?: string): string {
-  if (contrastCache[key]) return contrastCache[key];
+  const cacheKey = `${key}|${fallbackColor ?? ''}`;
+  if (contrastCache[cacheKey]) return contrastCache[cacheKey];
 
   if (fallbackColor) {
     const cls = getPreferredReadableTone(fallbackColor) === 'black' ? 'text-black' : 'text-white';
-    contrastCache[key] = cls;
+    contrastCache[cacheKey] = cls;
     return cls;
   }
 
   if (typeof window === 'undefined' || typeof document === 'undefined') {
-    contrastCache[key] = 'text-white';
+    contrastCache[cacheKey] = 'text-white';
     return 'text-white';
   }
 
@@ -73,13 +75,13 @@ export function getReadableTextClassFor(key: string, fallbackColor?: string): st
     const rgb = parseRGBString(bg);
     if (rgb) {
       const cls = getPreferredReadableTone(`rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`) === 'black' ? 'text-black' : 'text-white';
-      contrastCache[key] = cls;
+      contrastCache[cacheKey] = cls;
       return cls;
     }
   } catch (err) {
     // ignore
   }
 
-  contrastCache[key] = 'text-white';
+  contrastCache[cacheKey] = 'text-white';
   return 'text-white';
 }

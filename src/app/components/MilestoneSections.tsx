@@ -100,6 +100,15 @@ export function MilestoneSummaryCard({
                 </span>
               </div>
             </div>
+            <div>
+              <div className="text-[12px] font-medium text-[#71717a]">End Date</div>
+              <div className="mt-2 flex items-center gap-1.5">
+                <CalendarIcon className="size-4 text-[#71717a]" />
+                <span className="rounded-full border border-black/10 bg-white px-2 py-0.5 text-[11px] font-semibold text-[#71717a]">
+                  <DateRangeLabel endDate={endDate} className="" />
+                </span>
+              </div>
+            </div>
           </div>
           <div className="space-y-3">
             <div className="flex items-start justify-between gap-4">
@@ -117,15 +126,6 @@ export function MilestoneSummaryCard({
               <div className="text-[12px] font-medium text-[#71717a]">Completion</div>
               <div className="mt-2 text-[14px] font-medium text-[#1f2937]">
                 {summary.completionPercent}% ({summary.completedTasks} of {summary.totalTasks} tasks)
-              </div>
-            </div>
-            <div>
-              <div className="text-[12px] font-medium text-[#71717a]">End Date</div>
-              <div className="mt-2 flex items-center gap-1.5">
-                <CalendarIcon className="size-4 text-[#71717a]" />
-                <span className="rounded-full border border-black/10 bg-white px-2 py-0.5 text-[11px] font-semibold text-[#71717a]">
-                  <DateRangeLabel endDate={endDate} className="" />
-                </span>
               </div>
             </div>
           </div>
@@ -204,8 +204,8 @@ export function MilestoneLinkedTasksSection({
           description="Link task work to this milestone to populate rollout progress, dependency context, and date health."
         />
       ) : (
-        <DialogSurfaceSection className="relative h-[320px] overflow-hidden rounded-[18px] border border-black/6 bg-white p-3 shadow-[0_0_1px_rgba(0,0,0,0.05),0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06)]">
-          <div className="h-full overflow-y-auto pr-1">
+        <DialogSurfaceSection className="relative h-[320px] overflow-hidden rounded-[18px] border border-black/6 bg-white !p-0 shadow-[0_0_1px_rgba(0,0,0,0.05),0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06)]">
+          <div className="h-full overflow-y-auto">
             <div className="divide-y divide-black/5">
               {tasks.map(task => {
                 const isLate = lateTaskIds.has(task.id);
@@ -218,7 +218,7 @@ export function MilestoneLinkedTasksSection({
                     key={task.id}
                     type="button"
                     onClick={() => onTaskClick(task)}
-                    className="flex w-full items-start justify-between gap-3 px-0 py-3 text-left transition-colors hover:bg-[#f8fafc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gray-900/10"
+                    className="flex w-full items-start justify-between gap-3 p-3 text-left transition-colors hover:bg-[#f8fafc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gray-900/10"
                   >
                     <span className="min-w-0 pl-1">
                       <span className="block break-words text-[12px] font-medium leading-5 text-[#4a4a4f] [overflow-wrap:anywhere]">

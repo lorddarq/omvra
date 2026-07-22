@@ -55,6 +55,7 @@ export function MilestoneDetailsDialog({
 }: MilestoneDetailsDialogProps) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [taskSearchQuery, setTaskSearchQuery] = useState('');
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const enrichedMilestone = milestone ? readModel?.milestonesById.get(milestone.id) : undefined;
@@ -68,6 +69,8 @@ export function MilestoneDetailsDialog({
     ? [...summary.linkedTasks].sort((a, b) => (a.endDate || '').localeCompare(b.endDate || ''))
     : [];
   const canDelete = Boolean(milestone && onDelete);
+  const normalizedNotes = milestone?.notes?.trim() || '';
+  const isLongDescription = normalizedNotes.length > 900 || normalizedNotes.split('\n').length > 14;
   const filteredTasks = useMemo(() => {
     const normalizedSearch = taskSearchQuery.trim().toLowerCase();
     if (!normalizedSearch) return sortedTasks;
@@ -87,6 +90,7 @@ export function MilestoneDetailsDialog({
   useEffect(() => {
     if (!isOpen) return;
     setTaskSearchQuery('');
+    setIsDescriptionExpanded(false);
   }, [isOpen, milestone?.id]);
 
   const handleDelete = () => {
@@ -219,14 +223,28 @@ export function MilestoneDetailsDialog({
               />
 
               <section className="space-y-4">
-                <h3 className="text-[14px] font-semibold text-[#71717a]">Description</h3>
-                <DialogSurfaceSection className="relative overflow-hidden rounded-[12px] border border-black/10 bg-white px-4 py-4 shadow-none">
-                  {milestone.notes?.trim() ? (
-                    <MarkdownContent content={milestone.notes.trim()} />
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-[14px] font-semibold text-[#71717a]">Description</h3>
+                  {isLongDescription ? (
+                    <button
+                      type="button"
+                      className="rounded-full border border-black/10 px-3 py-1 text-xs font-medium text-[#71717a] hover:bg-[#71717a]/5"
+                      onClick={() => setIsDescriptionExpanded(value => !value)}
+                    >
+                      {isDescriptionExpanded ? 'Collapse' : 'Expand'}
+                    </button>
+                  ) : null}
+                </div>
+                <DialogSurfaceSection className={`relative overflow-hidden rounded-[12px] border border-black/10 bg-white px-4 py-4 shadow-none ${isLongDescription && !isDescriptionExpanded ? 'max-h-[300px]' : ''}`}>
+                  {normalizedNotes ? (
+                    <MarkdownContent content={normalizedNotes} />
                   ) : (
                     <div className="text-[12px] leading-6 text-[#6a7282]">No description provided.</div>
                   )}
                 </DialogSurfaceSection>
+                {isLongDescription && !isDescriptionExpanded && (
+                  <div className="-mt-8 h-8 rounded-b-xl bg-gradient-to-b from-white/0 to-white" aria-hidden="true" />
+                )}
               </section>
 
               {sortedTasks.length > 0 && filteredTasks.length === 0 ? (

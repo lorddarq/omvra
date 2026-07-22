@@ -102,9 +102,11 @@ function AppStoreShell() {
 
 function App() {
   return (
-    <WorkspaceStoreProvider>
-      <AppStoreShell />
-    </WorkspaceStoreProvider>
+    <div className="antialiased">
+      <WorkspaceStoreProvider>
+        <AppStoreShell />
+      </WorkspaceStoreProvider>
+    </div>
   );
 }
 

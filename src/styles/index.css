@@ -5,6 +5,34 @@
 @import './timeline.css';
 @import './components.css';
 
+/* Compact success toast style aligned with the agent workflow notification pattern. */
+[data-sonner-toast][data-type='success'] {
+  width: min(400px, calc(100vw - 32px)) !important;
+  min-height: 64px !important;
+  padding: 14px 20px !important;
+  border: 0 !important;
+  border-radius: 16px !important;
+  background: #ffffff !important;
+  color: #71717a !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14) !important;
+}
+
+[data-sonner-toast][data-type='success'] [data-icon] {
+  color: #16a34a !important;
+}
+
+[data-sonner-toast][data-type='success'] [data-title] {
+  color: #16a34a !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+[data-sonner-toast][data-type='success'] [data-description] {
+  color: #71717a !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+}
+
 * {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

@@ -88,6 +88,10 @@ contextBridge.exposeInMainWorld('electron', {
     exportPdf: (payload) => ipcRenderer.invoke('tasks/export-pdf', payload),
   },
 
+  agentConfigurations: {
+    export: (payload) => ipcRenderer.invoke('agent-configurations/export', payload),
+  },
+
   // MCP bridge (read-only, gated by mcpAgentAccessEnabled preference)
   mcp: {
     getCapabilities: () => ipcRenderer.invoke('mcp/get-capabilities'),

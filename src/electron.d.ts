@@ -255,6 +255,12 @@ declare global {
           defaultFileName?: string;
         }) => Promise<{ success: boolean; canceled?: boolean; filePath?: string; error?: string }>;
       };
+      agentConfigurations: {
+        export: (payload: {
+          json: string;
+          defaultFileName?: string;
+        }) => Promise<{ success: boolean; canceled?: boolean; filePath?: string; error?: string }>;
+      };
       mcp: {
         getCapabilities: () => Promise<McpBridgeResult<McpCapabilities>>;
         getListenerStatus: () => Promise<McpBridgeResult<McpListenerStatus>>;

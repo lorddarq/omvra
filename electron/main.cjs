@@ -576,6 +576,34 @@ registerUpdateIpcHandlers({
   setStoredUpdateChannel,
 });
 ipcMain.handle('tasks/export-pdf', exportHtmlToPdf);
+ipcMain.handle('agent-configurations/export', async (event, { json, defaultFileName = 'omvra-agent-configurations.json' } = {}) => {
+  if (typeof json !== 'string' || !json.trim()) {
+    return { success: false, error: 'Agent configuration data is missing.' };
+  }
+
+  const sourceWindow = BrowserWindow.fromWebContents(event.sender);
+  const saveDialogOptions = {
+    title: 'Export agents',
+    defaultPath: defaultFileName,
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+    properties: ['createDirectory', 'showOverwriteConfirmation'],
+  };
+  const saveResult = sourceWindow
+    ? await dialog.showSaveDialog(sourceWindow, saveDialogOptions)
+    : await dialog.showSaveDialog(saveDialogOptions);
+
+  if (saveResult.canceled || !saveResult.filePath) {
+    return { success: false, canceled: true };
+  }
+
+  try {
+    await fs.promises.writeFile(saveResult.filePath, json, 'utf8');
+    shell.showItemInFolder(saveResult.filePath);
+    return { success: true, filePath: saveResult.filePath };
+  } catch (err) {
+    return { success: false, error: err?.message || String(err) };
+  }
+});
 ipcMain.handle('mcp/restart-server', () => {
   try {
     restartMcpServer();

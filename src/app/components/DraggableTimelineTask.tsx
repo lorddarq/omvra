@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useDrag } from 'react-dnd';
 import { Trash2 } from 'lucide-react';
 import { Task } from '../types';
@@ -44,6 +44,7 @@ export function DraggableTimelineTask({
 }: DraggableTimelineTaskProps) {
   const ref = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
   const dragOffsetXRef = useRef(0);
 
@@ -97,8 +98,13 @@ export function DraggableTimelineTask({
 
   const isResizing = resizingTaskId === task.id;
 
+  function handleEditFromContextMenu() {
+    setContextMenuOpen(false);
+    window.setTimeout(() => onTaskEdit(task), 0);
+  }
+
   return (
-    <ContextMenu>
+    <ContextMenu open={contextMenuOpen} onOpenChange={setContextMenuOpen}>
       <ContextMenuTrigger asChild>
         <div
           ref={ref}
@@ -153,7 +159,7 @@ export function DraggableTimelineTask({
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent aria-label={`Actions for ${task.title}`}>
-        <ContextMenuItem onSelect={() => onTaskEdit(task)}>
+        <ContextMenuItem onSelect={handleEditFromContextMenu}>
           <PenWritingIcon />
           Edit
         </ContextMenuItem>

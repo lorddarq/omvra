@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { Download, Upload } from 'lucide-react';
+import { toast } from 'sonner';
 import { DesktopArrowDownIcon } from '../icons/DesktopArrowDownIcon';
 import type { GoalRecord, Person, PersonKind, StatusColumn, Task, TaskStatus, TimelineSwimlane } from '../../types';
 import { getStatusLabel, getTaskProjectIds } from '../../utils/roadmap';
@@ -20,6 +22,7 @@ import { AgentIcon } from '../icons/AgentIcon';
 import { PenWritingIcon } from '../icons/PenWritingIcon';
 import { UsersIcon } from '../icons/UsersIcon';
 import { TrashIcon } from '../icons/TrashIcon';
+import { buildAgentConfigurationFile, parseAgentConfigurationFile } from '../../utils/agentConfiguration';
 
 interface PeopleManagementSectionsProps {
   people: Person[];
@@ -65,6 +68,8 @@ export function PeopleManagementSections({
   const [pendingDeleteImpact, setPendingDeleteImpact] = useState<{ taskCount: number; goalCount: number; goalNodeCount: number; goalTitles: string[]; loading: boolean } | null>(null);
   const [activeActionPersonId, setActiveActionPersonId] = useState<string | null>(null);
   const [exportingPersonId, setExportingPersonId] = useState<string | null>(null);
+  const [exportingAgentConfigurations, setExportingAgentConfigurations] = useState(false);
+  const configurationInputRef = useRef<HTMLInputElement>(null);
 
   function getTaskCountForPerson(personId: string, status?: string): number {
     return tasks.filter(task => {
@@ -136,6 +141,60 @@ export function PeopleManagementSections({
       });
     } finally {
       setExportingPersonId(null);
+    }
+  }
+
+  async function handleExportAgentConfigurations() {
+    if (!window.electron?.agentConfigurations?.export || exportingAgentConfigurations) return;
+    setExportingAgentConfigurations(true);
+    try {
+      const result = await window.electron.agentConfigurations.export({
+        json: JSON.stringify(buildAgentConfigurationFile(agenticPeople), null, 2),
+        defaultFileName: 'omvra-agent-configurations.json',
+      });
+      if (result.success) {
+        toast.success('Successfully exported', {
+          description: `${agenticPeople.length} agent configuration${agenticPeople.length === 1 ? '' : 's'} saved to disk.`,
+        });
+      } else if (!result.canceled) {
+        toast.error(result.error || 'Agent configurations could not be saved.');
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Agent configurations could not be saved. Restart the app and try again.');
+    } finally {
+      setExportingAgentConfigurations(false);
+    }
+  }
+
+  function handleImportAgentConfigurations() {
+    configurationInputRef.current?.click();
+  }
+
+  async function handleConfigurationFile(file: File) {
+    try {
+      const parsed = parseAgentConfigurationFile(JSON.parse(await file.text()));
+      if (parsed.ok === false) {
+        toast.error(parsed.error);
+        return;
+      }
+      let updated = 0;
+      let added = 0;
+      parsed.agents.forEach(configuration => {
+        const target = (configuration.id && agenticPeople.find(person => person.id === configuration.id))
+          || agenticPeople.find(person => person.name.toLowerCase() === configuration.name.toLowerCase());
+        if (target) {
+          onUpdatePerson(target.id, { ...configuration, kind: 'agentic' });
+          updated += 1;
+          return;
+        }
+        onAddPerson({ ...configuration, kind: 'agentic' });
+        added += 1;
+      });
+      toast.success('Successfully imported', {
+        description: `${updated} agent${updated === 1 ? '' : 's'} updated and ${added} added. Existing task assignments were kept.`,
+      });
+    } catch {
+      toast.error('That file could not be read as JSON.');
     }
   }
 
@@ -353,7 +412,39 @@ export function PeopleManagementSections({
             onSubmit={handleAddPerson}
           />
         )}
+        secondaryAction={(
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleExportAgentConfigurations}
+              disabled={exportingAgentConfigurations}
+              className="inline-flex h-8 items-center gap-2 rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-[#67676f] outline-none hover:bg-[#71717a]/5 focus-visible:ring-2 focus-visible:ring-gray-300"
+            >
+              <Download className="size-4 shrink-0" />
+              Export Agents
+            </button>
+            <button
+              type="button"
+              onClick={handleImportAgentConfigurations}
+              className="inline-flex h-8 items-center gap-2 rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-[#67676f] outline-none hover:bg-[#71717a]/5 focus-visible:ring-2 focus-visible:ring-gray-300"
+            >
+              <Upload className="size-4 shrink-0" />
+              Import Agents
+            </button>
+          </div>
+        )}
       >
+        <input
+          ref={configurationInputRef}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) void handleConfigurationFile(file);
+            event.currentTarget.value = '';
+          }}
+        />
         <div className="space-y-3">
           {agenticPeople.map(renderPersonItem)}
         </div>
@@ -948,6 +1039,7 @@ interface PeopleSettingsSectionProps {
   children: ReactNode;
   empty?: boolean;
   action?: ReactNode;
+  secondaryAction?: ReactNode;
   popupOpen?: boolean;
 }
 
@@ -981,7 +1073,7 @@ export function PeopleSettingsSection({ children, empty = false, action, popupOp
   );
 }
 
-export function AgentsSettingsSection({ children, empty = false, action, popupOpen = false }: PeopleSettingsSectionProps) {
+export function AgentsSettingsSection({ children, empty = false, action, secondaryAction, popupOpen = false }: PeopleSettingsSectionProps) {
   return (
     <AnchoredPanelSection
       id="agents"
@@ -1006,6 +1098,12 @@ export function AgentsSettingsSection({ children, empty = false, action, popupOp
             description="Add an agentic teammate to configure assignment, load, and watcher behavior."
           />
         ) : children}
+        <div className="space-y-3">
+          <p className="max-w-[42rem] rounded-xl bg-[#f7f7f8] px-3 py-2 text-xs leading-4 text-[#6a7282]">
+            Export all agents to one editable JSON file, then import it after making changes. Matching IDs (or names when IDs are absent) are updated in place, while new entries are added; existing task assignments stay with their agents.
+          </p>
+          {secondaryAction}
+        </div>
       </div>
     </AnchoredPanelSection>
   );

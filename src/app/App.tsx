@@ -7,6 +7,7 @@ import { UpdateAvailablePopup } from './components/UpdateAvailablePopup';
 import { useAppShell } from './hooks/useAppShell.ts';
 import { UiLayoutStoreProvider } from './store/uiLayoutStore.tsx';
 import { WorkspaceStoreProvider, useWorkspaceStore } from './store/workspaceStore.tsx';
+import { Toaster } from './components/ui/sonner';
 
 function AppContent() {
   const appShell = useAppShell();
@@ -103,6 +104,7 @@ function AppStoreShell() {
 function App() {
   return (
     <div className="antialiased">
+      <Toaster />
       <WorkspaceStoreProvider>
         <AppStoreShell />
       </WorkspaceStoreProvider>

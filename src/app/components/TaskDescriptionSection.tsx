@@ -28,7 +28,7 @@ export function TaskDescriptionSection({ notes, isExpanded = false }: TaskDescri
         )}
       </div>
       {isLongDescription && !isExpanded && (
-        <div className="-mt-8 h-8 rounded-b-xl bg-gradient-to-b from-white/0 to-white" aria-hidden="true" />
+        <div className="-mt-[30px] h-8 rounded-b-xl bg-gradient-to-b from-white/0 to-white" aria-hidden="true" />
       )}
     </div>
   );

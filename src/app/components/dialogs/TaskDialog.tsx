@@ -42,6 +42,7 @@ import { DescriptionIcon } from '../icons/DescriptionIcon';
 import { FolderIcon } from '../icons/FolderIcon';
 import { CalendarIcon } from '../icons/CalendarIcon';
 import { TaskCheckboxControl } from '../TaskCheckboxControl';
+import { FeatheredScrollList } from '../FeatheredScrollList';
 import { LOAD_CLASSIFICATIONS, ROADMAP_STAGES, getDefaultColumnSemantics } from '../../utils/statusColumnSemantics';
 
 function getFileNameFromPath(filePath: string): string {
@@ -154,13 +155,19 @@ export function TaskDialog({
     [milestoneId, milestones, readModel]
   );
   const dependencyCandidates = useMemo(
-    () => selectedMilestone
-      ? (
-          readModel?.milestonesById.get(selectedMilestone.id)?.summary.linkedTasks
-          ?? getTasksForMilestone(selectedMilestone, tasks)
-        ).filter(candidate => candidate.id !== task?.id)
-      : [],
-    [readModel, selectedMilestone, task?.id, tasks]
+    () => {
+      if (!selectedMilestone) return [];
+      const milestoneCandidates = readModel?.milestonesById.get(selectedMilestone.id)?.summary.linkedTasks
+        ?? getTasksForMilestone(selectedMilestone, tasks);
+      const existingDependencyIds = new Set(task?.dependencyIds || []);
+      const existingDependencies = tasks.filter(candidate => existingDependencyIds.has(candidate.id));
+      return [...new Map(
+        [...milestoneCandidates, ...existingDependencies]
+          .filter(candidate => candidate.id !== task?.id)
+          .map(candidate => [candidate.id, candidate] as const)
+      ).values()];
+    },
+    [readModel, selectedMilestone, task?.id, task?.dependencyIds, tasks]
   );
   const taskById = useMemo(
     () => readModel?.tasksById
@@ -634,14 +641,17 @@ export function TaskDialog({
                 </div>
               </div>
 
-              <div className="max-h-36 overflow-y-auto rounded-[18px] border border-black/[0.06] bg-white p-3 shadow-[0_0_1px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.06),0_2px_4px_rgba(0,0,0,0.04)]">
+              <FeatheredScrollList
+                className="max-h-36 rounded-[18px] border border-black/[0.06] bg-white shadow-[0_0_1px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.06),0_2px_4px_rgba(0,0,0,0.04)]"
+                scrollClassName="max-h-36"
+              >
                 {filteredSwimlanes.length > 0 ? (
                   filteredSwimlanes.map(swimlane => {
                     const isChecked = projectIds.includes(swimlane.id);
                     return (
                       <label
                         key={swimlane.id}
-                        className="flex h-10 cursor-pointer items-center gap-2 border-b border-black/[0.06] px-2 last:border-b-0 hover:bg-[#71717a]/5"
+                        className="flex h-10 cursor-pointer items-center gap-2 border-b border-black/[0.06] px-3 last:border-b-0 hover:bg-[#71717a]/5"
                       >
                         <TaskCheckboxControl
                           checked={isChecked}
@@ -675,7 +685,7 @@ export function TaskDialog({
                     description="Try a different project name or clear the search to see all available timeline projects."
                   />
                 )}
-              </div>
+              </FeatheredScrollList>
 
               <div className="flex min-h-6 flex-wrap items-center gap-1.5 text-xs font-medium text-[#71717a]">
                 <span>Projects:</span>

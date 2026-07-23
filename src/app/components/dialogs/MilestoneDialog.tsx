@@ -18,6 +18,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { MagnifierIcon } from '../icons/MagnifierIcon';
 import { MilestoneTaskLinker } from '../MilestoneSections';
+import { FeatheredScrollList } from '../FeatheredScrollList';
 import { ProjectBadge } from '../ProjectBadge';
 import { FolderIcon } from '../icons/FolderIcon';
 import { TaskCheckboxControl } from '../TaskCheckboxControl';
@@ -29,7 +30,7 @@ import {
   taskEditLabelClassName,
 } from '../taskFormStyles';
 
-const milestoneDialogProjectListClassName = 'max-h-36 overflow-y-auto rounded-[18px] border border-black/[0.06] bg-white p-3 shadow-[0_0_1px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.06),0_2px_4px_rgba(0,0,0,0.04)]';
+const milestoneDialogProjectListClassName = 'max-h-36 rounded-[18px] border border-black/[0.06] bg-white p-0 shadow-[0_0_1px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.06),0_2px_4px_rgba(0,0,0,0.04)]';
 
 interface MilestoneDialogProps {
   isOpen: boolean;
@@ -317,7 +318,10 @@ export function MilestoneDialog({
                 </div>
               </div>
 
-              <div className={milestoneDialogProjectListClassName}>
+              <FeatheredScrollList
+                className={milestoneDialogProjectListClassName}
+                scrollClassName="max-h-36"
+              >
                 {filteredProjects.length > 0 ? (
                   filteredProjects.map(project => {
                     const isChecked = projectIds.includes(project.id);
@@ -325,7 +329,7 @@ export function MilestoneDialog({
                     return (
                       <label
                         key={project.id}
-                        className="flex h-10 cursor-pointer items-center gap-2 border-b border-black/[0.06] px-2 last:border-b-0 hover:bg-[#71717a]/5"
+                        className="flex h-10 cursor-pointer items-center gap-2 border-b border-black/[0.06] px-3 last:border-b-0 hover:bg-[#71717a]/5"
                       >
                         <TaskCheckboxControl
                           checked={isChecked}
@@ -347,7 +351,7 @@ export function MilestoneDialog({
                     description="Try a different project name or clear the search to see all available projects."
                   />
                 )}
-              </div>
+              </FeatheredScrollList>
 
               <div className="flex min-h-6 flex-wrap items-center gap-1.5 text-sm font-medium text-[#71717a]">
                 <span>Projects:</span>

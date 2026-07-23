@@ -207,7 +207,8 @@ export function MilestoneLinkedTasksSection({
         />
       ) : (
         <DialogSurfaceSection className="relative h-[320px] overflow-hidden rounded-[18px] border border-black/6 bg-white !p-0 shadow-[0_0_1px_rgba(0,0,0,0.05),0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06)]">
-          <div className="h-full overflow-y-auto">
+          <div className="feathered-scrollbar h-full overflow-y-scroll">
+            <div className="pointer-events-none sticky top-[calc(100%-1.5rem)] z-10 -mb-6 h-6 bg-gradient-to-t from-white via-white/92 to-transparent" />
             <div className="divide-y divide-black/5">
               {tasks.map(task => {
                 const isLate = lateTaskIds.has(task.id);
@@ -247,7 +248,6 @@ export function MilestoneLinkedTasksSection({
               })}
             </div>
           </div>
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-white via-white/92 to-transparent" />
         </DialogSurfaceSection>
       )}
     </section>

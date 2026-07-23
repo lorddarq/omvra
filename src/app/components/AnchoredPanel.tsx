@@ -266,7 +266,7 @@ export const AnchoredPanelScrollView = forwardRef<HTMLDivElement, AnchoredPanelS
     <div
       ref={ref}
       className={cn(
-        'h-full min-h-0 overflow-y-auto px-8 pb-8 pt-[104px]',
+        'feathered-scrollbar h-full min-h-0 overflow-y-auto px-8 pb-8 pt-[104px]',
         'omvra-settings-scroll',
         className
       )}

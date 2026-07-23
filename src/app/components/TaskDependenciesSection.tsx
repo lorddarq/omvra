@@ -5,6 +5,7 @@ import { getStatusLabel } from '../utils/roadmap';
 import { EmptyStateCard } from './EmptyStateCard';
 import { taskEditIconFieldClassName, taskEditLabelClassName } from './taskFormStyles';
 import { TaskCheckboxControl } from './TaskCheckboxControl';
+import { FeatheredScrollList } from './FeatheredScrollList';
 
 interface TaskDependenciesSectionProps {
   milestoneSelected: boolean;
@@ -81,34 +82,37 @@ export function TaskDependenciesSection({
           description="Try a different task title or status to find the milestone dependency you want."
         />
       ) : (
-        <div className="max-h-[368px] overflow-y-auto rounded-[18px] bg-white p-3 shadow-[0_0_1px_1px_rgba(0,0,0,0.05),0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06)]">
-          {filteredDependencyCandidates.map(candidate => {
-            const createsCycle = wouldCreateDependencyCycle(candidate.id);
-            return (
-              <label
-                key={candidate.id}
-                className={`flex h-9 cursor-pointer items-center gap-2 border-b border-black/5 px-3 py-2 text-sm last:border-b-0 ${
-                  createsCycle ? 'cursor-not-allowed opacity-60' : 'hover:bg-[#71717a]/5'
-                }`}
-              >
-                <TaskCheckboxControl
-                  checked={dependencyIds.includes(candidate.id)}
-                  disabled={createsCycle}
-                  onCheckedChange={() => onToggleDependency(candidate.id)}
-                  ariaLabel={`${taskTitle || 'Task'} depends on ${candidate.title}`}
-                />
-                <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                  <span className="min-w-0 truncate text-xs font-medium leading-5 text-[#4a4a4f]">
-                    {candidate.title}
+        <FeatheredScrollList
+          className="h-[144px] max-h-[368px] rounded-[18px] bg-white shadow-[0_0_1px_1px_rgba(0,0,0,0.05),0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06)]"
+          scrollClassName="h-full"
+        >
+            {filteredDependencyCandidates.map(candidate => {
+              const createsCycle = wouldCreateDependencyCycle(candidate.id);
+              return (
+                <label
+                  key={candidate.id}
+                  className={`flex h-9 cursor-pointer items-center gap-2 border-b border-black/5 px-3 py-2 text-sm last:border-b-0 ${
+                    createsCycle ? 'cursor-not-allowed opacity-60' : 'hover:bg-[#71717a]/5'
+                  }`}
+                >
+                  <TaskCheckboxControl
+                    checked={dependencyIds.includes(candidate.id)}
+                    disabled={createsCycle}
+                    onCheckedChange={() => onToggleDependency(candidate.id)}
+                    ariaLabel={`${taskTitle || 'Task'} depends on ${candidate.title}`}
+                  />
+                  <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                    <span className="min-w-0 truncate text-xs font-medium leading-5 text-[#4a4a4f]">
+                      {candidate.title}
+                    </span>
+                    <span className="shrink-0 rounded-full border border-black/10 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-[#71717a]">
+                      {createsCycle ? 'Cycle' : getStatusLabel(statusColumns, candidate.status)}
+                    </span>
                   </span>
-                  <span className="shrink-0 rounded-full border border-black/10 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-[#71717a]">
-                    {createsCycle ? 'Cycle' : getStatusLabel(statusColumns, candidate.status)}
-                  </span>
-                </span>
-              </label>
-            );
-          })}
-        </div>
+                </label>
+              );
+            })}
+        </FeatheredScrollList>
       )}
     </div>
   );

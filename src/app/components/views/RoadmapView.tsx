@@ -38,6 +38,7 @@ interface RoadmapViewProps {
   projects: TimelineSwimlane[];
   statusColumns: StatusColumn[];
   customScrollbarsEnabled?: boolean;
+  condensedUI?: boolean;
   readModel?: WorkspaceReadModel;
   showCompleted: boolean;
   onAddMilestone: () => void;
@@ -164,6 +165,7 @@ export function RoadmapView({
   projects,
   statusColumns,
   customScrollbarsEnabled = true,
+  condensedUI = false,
   readModel,
   showCompleted,
   onAddMilestone,
@@ -316,6 +318,7 @@ export function RoadmapView({
         projectFilter={projectFilter}
         healthFilter={healthFilter}
         dateWindow={dateWindow}
+        condensedUI={condensedUI}
         hasActiveFilters={hasActiveFilters}
         projects={projects}
         showTimelineNavigation={todayLeft !== null}

@@ -1,4 +1,4 @@
-import { Search, TriangleAlert } from 'lucide-react';
+import { TriangleAlert } from 'lucide-react';
 import {
   getMilestoneHealthVisual,
   getStatusLabel,
@@ -17,6 +17,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { taskEditIconFieldClassName } from './taskFormStyles';
 import { CalendarIcon } from './icons/CalendarIcon';
+import { MagnifierIcon } from './icons/MagnifierIcon';
 
 type MilestoneStatusColumn = StatusColumn[];
 
@@ -186,13 +187,14 @@ export function MilestoneLinkedTasksSection({
           Search task:
         </label>
         <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#b5b5ba]" />
+          <MagnifierIcon className="pointer-events-none absolute left-3 top-1/2 z-10 size-[18px] -translate-y-1/2" />
           <Input
+            type="search"
             id="milestone-task-search"
             value={searchQuery}
             onChange={(event) => onSearchQueryChange(event.target.value)}
             placeholder="Task name"
-            className="h-10 rounded-[12px] border-black/10 bg-white pl-9 text-sm font-normal text-[#4a4a4f] shadow-none placeholder:text-[#b5b5ba] focus-visible:ring-[#71717a]/15"
+            className="h-10 rounded-[12px] border-black/10 bg-white pl-8 text-sm font-normal text-[#4a4a4f] shadow-none placeholder:text-[#b5b5ba] focus-visible:ring-[#71717a]/15"
           />
         </div>
       </div>
@@ -281,8 +283,9 @@ export function MilestoneTaskLinker({
       <div className="max-w-[300px] space-y-1">
         <Label htmlFor="milestone-task-search" className="text-[12px] font-medium text-[#71717a]">Search task:</Label>
         <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#b5b5ba]" />
+          <MagnifierIcon className="pointer-events-none absolute left-3 top-1/2 z-10 size-[18px] -translate-y-1/2" />
           <Input
+            type="search"
             id="milestone-task-search"
             value={taskSearchQuery}
             onChange={(event) => onTaskSearchQueryChange(event.target.value)}

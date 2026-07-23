@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Filter, Plus, Search, X } from 'lucide-react';
+import { Filter, Plus, X } from 'lucide-react';
 import type { Person, TaskPriority, TimelineSwimlane } from '../types';
 import {
   Select,
@@ -12,6 +12,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { UNASSIGNED_ASSIGNEE_FILTER_VALUE, type KanbanTaskFilterKey } from '../utils/taskFilters';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
+import { MagnifierIcon } from './icons/MagnifierIcon';
 
 const ALL_FILTER_VALUE = '__omvra_all__';
 
@@ -27,6 +28,7 @@ interface KanbanToolbarProps {
   projectFilterValue: string;
   priorityFilterValue: string;
   assigneeFilterValue: string;
+  condensedUI: boolean;
   hasActiveFilters: boolean;
   activeProjectId?: string;
   activePriority?: string;
@@ -45,6 +47,7 @@ export function KanbanToolbar({
   projectFilterValue,
   priorityFilterValue,
   assigneeFilterValue,
+  condensedUI,
   hasActiveFilters,
   activeProjectId,
   activePriority,
@@ -60,10 +63,10 @@ export function KanbanToolbar({
   return (
     <div className="kanban-toolbar">
       <div className="kanban-toolbar-search">
-        <Search className="kanban-toolbar-search-icon" />
+        <MagnifierIcon className="kanban-toolbar-search-icon" />
         <Tooltip>
           <TooltipTrigger asChild>
-            <Input value={searchQuery} onChange={(event) => onSearchQueryChange(event.target.value)} placeholder="Search tasks..." className="kanban-toolbar-search-input" />
+            <Input type="search" value={searchQuery} onChange={(event) => onSearchQueryChange(event.target.value)} placeholder="Search" className="kanban-toolbar-search-input" />
           </TooltipTrigger>
           <TooltipContent side="bottom">Search tasks</TooltipContent>
         </Tooltip>
@@ -77,7 +80,7 @@ export function KanbanToolbar({
           onValueChange={(value) => onFilterValueChange('projectId', value)}
           onClear={() => onClearFilter('projectId')}
         >
-          <SelectItem value={ALL_FILTER_VALUE}>All projects</SelectItem>
+          <SelectItem value={ALL_FILTER_VALUE}>{condensedUI ? 'Projects' : 'All projects'}</SelectItem>
           {projects.map(project => (
             <SelectItem key={project.id} value={project.id}>
               {project.name}
@@ -92,7 +95,7 @@ export function KanbanToolbar({
           onValueChange={(value) => onFilterValueChange('priority', value)}
           onClear={() => onClearFilter('priority')}
         >
-          <SelectItem value={ALL_FILTER_VALUE}>All priorities</SelectItem>
+          <SelectItem value={ALL_FILTER_VALUE}>{condensedUI ? 'Priorities' : 'All priorities'}</SelectItem>
           {PRIORITY_FILTERS.map(priority => (
             <SelectItem key={priority.value} value={priority.value}>
               {priority.label}
@@ -107,7 +110,7 @@ export function KanbanToolbar({
           onValueChange={(value) => onFilterValueChange('assigneeId', value)}
           onClear={() => onClearFilter('assigneeId')}
         >
-          <SelectItem value={ALL_FILTER_VALUE}>All assignees</SelectItem>
+          <SelectItem value={ALL_FILTER_VALUE}>{condensedUI ? 'Assignees' : 'All assignees'}</SelectItem>
           <SelectItem value={UNASSIGNED_ASSIGNEE_FILTER_VALUE}>Unassigned</SelectItem>
           {people.map(person => (
             <SelectItem key={person.id} value={person.id}>
@@ -116,7 +119,7 @@ export function KanbanToolbar({
           ))}
         </KanbanFilterSelect>
 
-        {hasActiveFilters && (
+        {hasActiveFilters && !condensedUI && (
           <Button
             type="button"
             variant="outline"
@@ -133,7 +136,7 @@ export function KanbanToolbar({
           <TooltipTrigger asChild>
             <button type="button" onClick={onAddColumn} className="kanban-toolbar-add-board" disabled={!onAddColumn}>
               <Plus className="size-4" />
-              <span>Add Board</span>
+              {condensedUI ? null : <span>Add Board</span>}
             </button>
           </TooltipTrigger>
           <TooltipContent side="bottom">Add board column</TooltipContent>

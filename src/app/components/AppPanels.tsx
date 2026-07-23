@@ -55,6 +55,7 @@ export interface PreferencesPanelState {
   goalAuditArchiveDirectory: string;
   externalSkillsDirectory: string;
   customScrollbarsEnabled: boolean;
+  condensedUI: boolean;
   goalPolicy: GoalPolicyV1;
   executionLoadStatusIds: TaskStatus[];
   pipelineLoadStatusIds: TaskStatus[];
@@ -128,6 +129,7 @@ export interface WorkspaceAdminActions {
   onGoalAuditArchiveDirectoryChange: (directory: string) => void;
   onExternalSkillsDirectoryChange: (directory: string) => void;
   onCustomScrollbarsEnabledChange: (enabled: boolean) => void;
+  onCondensedUIChange: (enabled: boolean) => void;
   onGoalPolicyChange: (updates: {
     currency?: string;
     acceptance?: GoalPolicyV1['acceptance'];
@@ -269,6 +271,7 @@ export function AppPanels({
         goalAuditArchiveDirectory={preferences.goalAuditArchiveDirectory}
         externalSkillsDirectory={preferences.externalSkillsDirectory}
         customScrollbarsEnabled={preferences.customScrollbarsEnabled}
+        condensedUI={preferences.condensedUI}
         goalPolicy={preferences.goalPolicy}
         executionLoadStatusIds={preferences.executionLoadStatusIds}
         pipelineLoadStatusIds={preferences.pipelineLoadStatusIds}
@@ -294,6 +297,7 @@ export function AppPanels({
         onGoalAuditArchiveDirectoryChange={adminActions.onGoalAuditArchiveDirectoryChange}
         onExternalSkillsDirectoryChange={adminActions.onExternalSkillsDirectoryChange}
         onCustomScrollbarsEnabledChange={adminActions.onCustomScrollbarsEnabledChange}
+        onCondensedUIChange={adminActions.onCondensedUIChange}
         onGoalPolicyChange={adminActions.onGoalPolicyChange}
         onResetGoalPolicy={adminActions.onResetGoalPolicy}
         onUpdateStatusColumn={adminActions.onUpdateStatusColumn}

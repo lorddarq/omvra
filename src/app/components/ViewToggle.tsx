@@ -18,12 +18,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 interface ViewToggleProps {
   currentView: ViewType;
   onViewChange: (view: ViewType) => void;
+  showLabels?: boolean;
   disabled?: boolean;
 }
 
 export function ViewToggle({
   currentView,
   onViewChange,
+  showLabels = true,
   disabled = false,
 }: ViewToggleProps) {
   const views: { value: ViewType; label: string; icon: React.ReactNode }[] = [
@@ -100,7 +102,7 @@ export function ViewToggle({
               aria-label={`Switch to ${view.label} view`}
             >
               {view.icon}
-              {view.label}
+              {showLabels ? view.label : null}
             </button>
           </TooltipTrigger>
           <TooltipContent side="bottom">Switch to {view.label} view</TooltipContent>

@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 interface AppHeaderProps {
   currentView: ViewType;
   onViewChange: (view: ViewType) => void;
+  condensedUI: boolean;
   onOpenPreferences: () => void;
   onOpenPeople: () => void;
   onOpenAgents: () => void;
@@ -16,6 +17,7 @@ interface AppHeaderProps {
 export function AppHeader({
   currentView,
   onViewChange,
+  condensedUI,
   onOpenPreferences,
   onOpenPeople,
   onOpenAgents,
@@ -43,7 +45,7 @@ export function AppHeader({
             </defs>
           </svg>
         </div>
-        <ViewToggle currentView={currentView} onViewChange={onViewChange} />
+        <ViewToggle currentView={currentView} onViewChange={onViewChange} showLabels={!condensedUI} />
       </div>
 
       <div className="flex items-center gap-2">

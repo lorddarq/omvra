@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { Search } from 'lucide-react';
+import { MagnifierIcon } from './icons/MagnifierIcon';
 import type { StatusColumn, Task } from '../types';
 import { getStatusLabel } from '../utils/roadmap';
 import { EmptyStateCard } from './EmptyStateCard';
@@ -48,7 +48,7 @@ export function TaskDependenciesSection({
         <div className="space-y-1">
           <div className={taskEditLabelClassName}>Search task:</div>
           <div className="relative">
-            <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-[#71717a]" />
+            <MagnifierIcon className="pointer-events-none absolute left-2 top-1/2 z-10 size-[18px] -translate-y-1/2" />
             <input
               type="search"
               value={searchQuery}

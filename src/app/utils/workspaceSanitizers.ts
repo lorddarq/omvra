@@ -16,6 +16,7 @@ export interface AppPreferencesLike {
   goalAuditArchiveDirectory: string;
   skillRoots?: Array<{ root: string; source?: string }>;
   customScrollbarsEnabled: boolean;
+  condensedUI?: boolean;
   executionLoadStatusId?: TaskStatus;
   pipelineLoadStatusId?: TaskStatus;
   updateChannel: 'stable' | 'rc';
@@ -417,6 +418,7 @@ export function sanitizePreferences(
           .map(item => ({ root: item.root.trim(), source: typeof item.source === 'string' ? item.source : 'omvra-configured' }))
       : (fallback.skillRoots || []),
     customScrollbarsEnabled: preferences.customScrollbarsEnabled !== false,
+    condensedUI: preferences.condensedUI === true,
     updateChannel: preferences.updateChannel === 'rc' ? 'rc' : 'stable',
     markdownAppearance: sanitizeMarkdownAppearance(preferences.markdownAppearance, fallback.markdownAppearance || DEFAULT_MARKDOWN_APPEARANCE),
     mcpAgentAccessEnabled: Boolean(preferences.mcpAgentAccessEnabled),

@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronsUpDown, Search, Trash2 } from 'lucide-react';
+import { CalendarDays, ChevronsUpDown, Trash2 } from 'lucide-react';
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { ProjectMilestone, StatusColumn, Task, TimelineSwimlane } from '../../types';
 import { resolveProjectColor } from '../../utils/projectVisual';
@@ -16,6 +16,7 @@ import { DeleteConfirmDialog } from './DeleteConfirmDialog';
 import { EmptyStateCard } from '../EmptyStateCard';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { MagnifierIcon } from '../icons/MagnifierIcon';
 import { MilestoneTaskLinker } from '../MilestoneSections';
 import { ProjectBadge } from '../ProjectBadge';
 import { FolderIcon } from '../icons/FolderIcon';
@@ -304,8 +305,9 @@ export function MilestoneDialog({
               <div className="max-w-[300px] space-y-1">
                 <Label htmlFor="project-search" className={taskEditLabelClassName}>Search Project:</Label>
                 <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#71717a]" />
+                  <MagnifierIcon className="pointer-events-none absolute left-2 top-1/2 z-10 size-[18px] -translate-y-1/2" />
                   <Input
+                    type="search"
                     id="project-search"
                     value={projectSearchQuery}
                     onChange={(event) => setProjectSearchQuery(event.target.value)}

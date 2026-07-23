@@ -33,6 +33,7 @@ interface KanbanViewProps {
   projects: TimelineSwimlane[];
   people: Person[];
   customScrollbarsEnabled?: boolean;
+  condensedUI?: boolean;
   initialFilters?: KanbanTaskFilters;
   scrollContainerRef?: RefObject<HTMLDivElement | null>;
   initialScrollLeft?: number;
@@ -54,6 +55,7 @@ export function KanbanView({
   projects,
   people,
   customScrollbarsEnabled = true,
+  condensedUI = false,
   initialFilters,
   scrollContainerRef,
   initialScrollLeft = 0,
@@ -195,6 +197,7 @@ export function KanbanView({
         projectFilterValue={projectFilterValue}
         priorityFilterValue={priorityFilterValue}
         assigneeFilterValue={assigneeFilterValue}
+        condensedUI={condensedUI}
         hasActiveFilters={hasActiveFilters}
         activeProjectId={activeFilters.projectId}
         activePriority={activeFilters.priority}

@@ -28,6 +28,7 @@ export interface AppViewDataProps {
   goalAuditArchiveDirectory: string;
   onGoalAuditArchiveDirectoryChange: (directory: string) => void;
   customScrollbarsEnabled: boolean;
+  condensedUI: boolean;
   readModel: WorkspaceReadModel;
 }
 
@@ -98,6 +99,7 @@ export function AppMainViews({
             people={data.people}
             statusColumns={data.statusColumns}
             customScrollbarsEnabled={data.customScrollbarsEnabled}
+            condensedUI={data.condensedUI}
             initialScrollLeft={timeline.timelineInitialScrollLeft}
             initialLayoutState={timeline.timelineInitialLayoutState}
             onLayoutStateChange={timeline.onTimelineLayoutStateChange}
@@ -126,6 +128,7 @@ export function AppMainViews({
               projects={data.timelineSwimlanes}
               people={data.people}
               customScrollbarsEnabled={data.customScrollbarsEnabled}
+              condensedUI={data.condensedUI}
               initialFilters={kanban.kanbanInitialFilters}
               scrollContainerRef={frame.kanbanContainerRef}
               initialScrollLeft={kanban.kanbanInitialScrollLeft}
@@ -152,6 +155,7 @@ export function AppMainViews({
             projects={data.timelineSwimlanes}
             statusColumns={data.statusColumns}
             customScrollbarsEnabled={data.customScrollbarsEnabled}
+            condensedUI={data.condensedUI}
             readModel={data.readModel}
             showCompleted={roadmap.showCompleted}
             onAddMilestone={roadmap.onRoadmapAddMilestone}

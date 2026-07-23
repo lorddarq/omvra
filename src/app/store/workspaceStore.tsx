@@ -84,6 +84,7 @@ export interface AppPreferences {
   goalAuditArchiveDirectory: string;
   skillRoots: Array<{ root: string; source?: string }>;
   customScrollbarsEnabled: boolean;
+  condensedUI: boolean;
   updateChannel: 'stable' | 'rc';
   markdownAppearance: MarkdownAppearance;
   mcpAgentAccessEnabled: boolean;
@@ -134,6 +135,7 @@ interface WorkspaceStoreValue {
   setGoalAuditArchiveDirectory: (directory: string) => void;
   setExternalSkillsDirectory: (directory: string) => void;
   setCustomScrollbarsEnabled: (enabled: boolean) => void;
+  setCondensedUI: (enabled: boolean) => void;
   updateGoalPolicy: (updates: Parameters<typeof updateGoalPolicy>[1]) => void;
   resetGoalPolicy: () => void;
   setUpdateChannel: (channel: AppPreferences['updateChannel']) => void;
@@ -198,6 +200,7 @@ export function createDefaultAppPreferences(
     goalAuditArchiveDirectory: '',
     skillRoots: [],
     customScrollbarsEnabled: true,
+    condensedUI: false,
     updateChannel: 'stable',
     markdownAppearance: { ...DEFAULT_MARKDOWN_APPEARANCE },
     mcpAgentAccessEnabled: false,
@@ -271,6 +274,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
         ? stored.skillRoots.filter(item => item && typeof item.root === 'string' && item.root.trim()).map(item => ({ root: item.root.trim(), source: typeof item.source === 'string' ? item.source : 'omvra-configured' }))
         : [],
       customScrollbarsEnabled: stored.customScrollbarsEnabled !== false,
+      condensedUI: stored.condensedUI === true,
       updateChannel: stored.updateChannel === 'rc' ? 'rc' : 'stable',
       markdownAppearance: sanitizeMarkdownAppearance(stored.markdownAppearance, DEFAULT_MARKDOWN_APPEARANCE),
       mcpAgentAccessEnabled: Boolean(stored.mcpAgentAccessEnabled),
@@ -661,6 +665,10 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     setPreferences(previous => ({ ...previous, customScrollbarsEnabled: enabled }));
   }, []);
 
+  const setCondensedUI = useCallback((enabled: boolean) => {
+    setPreferences(previous => ({ ...previous, condensedUI: enabled }));
+  }, []);
+
   const handleUpdateGoalPolicy = useCallback((updates: Parameters<typeof updateGoalPolicy>[1]) => {
     setGoalPolicy(previous => updateGoalPolicy(previous, updates));
   }, []);
@@ -749,6 +757,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     setGoalAuditArchiveDirectory,
     setExternalSkillsDirectory,
     setCustomScrollbarsEnabled,
+    setCondensedUI,
     updateGoalPolicy: handleUpdateGoalPolicy,
     resetGoalPolicy,
     setUpdateChannel,
@@ -789,6 +798,7 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
     setCleanupGoalArtifacts,
     setGoalAuditArchiveDirectory,
     setCustomScrollbarsEnabled,
+    setCondensedUI,
     handleUpdateGoalPolicy,
     resetGoalPolicy,
     statusColumns,

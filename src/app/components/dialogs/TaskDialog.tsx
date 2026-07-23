@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { AlertTriangle, ChevronsUpDown, FileText, RefreshCw, Search, Trash2 } from 'lucide-react';
+import { AlertTriangle, ChevronsUpDown, FileText, RefreshCw, Trash2 } from 'lucide-react';
 import { Task, TaskStatus, TimelineSwimlane, Person, TaskSize, TaskComplexity, TaskPriority, StatusColumn, ProjectMilestone, TaskAttachment } from '../../types';
 import type { WorkspaceReadModel } from '../../domain/workspaceReadModel';
 import { toLocalISODate } from '../../utils/date';
@@ -13,6 +13,7 @@ import { Button } from '@/app/components/ui/button';
 import { Badge } from '@/app/components/ui/badge';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
+import { MagnifierIcon } from '../icons/MagnifierIcon';
 import {
   Select,
   SelectContent,
@@ -595,8 +596,9 @@ export function TaskDialog({
                 <div className="space-y-1">
                   <Label htmlFor="project-search" className={taskEditLabelClassName}>Search Project:</Label>
                   <div className="relative">
-                    <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-[#71717a]" />
+                    <MagnifierIcon className="pointer-events-none absolute left-2 top-1/2 z-10 size-[18px] -translate-y-1/2" />
                     <Input
+                      type="search"
                       id="project-search"
                       value={projectSearchQuery}
                       onChange={(event) => setProjectSearchQuery(event.target.value)}

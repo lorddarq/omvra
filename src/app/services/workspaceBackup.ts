@@ -48,6 +48,7 @@ export interface WorkspacePreferences {
   pipelineLoadStatusId?: TaskStatus;
   updateChannel: 'stable' | 'rc';
   markdownAppearance: MarkdownAppearance;
+  condensedUI?: boolean;
   mcpAgentAccessEnabled: boolean;
   mcpCapabilityProfile: 'read_only' | 'task_write' | 'admin';
   mcpBindHost: string;
@@ -483,6 +484,7 @@ export function sanitizePreferences(
     pipelineLoadStatusIds,
     updateChannel: preferences.updateChannel === 'rc' ? 'rc' : 'stable',
     markdownAppearance: sanitizeMarkdownAppearance(preferences.markdownAppearance, fallback.markdownAppearance || DEFAULT_MARKDOWN_APPEARANCE),
+    condensedUI: preferences.condensedUI === true,
     mcpAgentAccessEnabled: Boolean(preferences.mcpAgentAccessEnabled),
     mcpCapabilityProfile:
       preferences.mcpCapabilityProfile === 'task_write' || preferences.mcpCapabilityProfile === 'admin'
@@ -873,6 +875,7 @@ export function createDefaultWorkspacePreferences(
     pipelineLoadStatusIds,
     updateChannel: overrides.updateChannel === 'rc' ? 'rc' : 'stable',
     markdownAppearance: sanitizeMarkdownAppearance(overrides.markdownAppearance, DEFAULT_MARKDOWN_APPEARANCE),
+    condensedUI: overrides.condensedUI === true,
     mcpAgentAccessEnabled: Boolean(overrides.mcpAgentAccessEnabled),
     mcpCapabilityProfile:
       overrides.mcpCapabilityProfile === 'task_write' || overrides.mcpCapabilityProfile === 'admin'

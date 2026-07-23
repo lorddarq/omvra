@@ -673,9 +673,9 @@
 
 .kanban-toolbar-search {
   position: relative;
-  min-width: 220px;
-  max-width: 320px;
-  flex: 1 1 260px;
+  min-width: 132px;
+  max-width: 192px;
+  flex: 0 1 156px;
 }
 
 .kanban-toolbar-search > [data-slot="tooltip"] {
@@ -687,10 +687,11 @@
 .kanban-toolbar-search-icon {
   pointer-events: none;
   position: absolute;
+  z-index: 1;
   left: 0.75rem;
   top: 50%;
-  width: 1rem;
-  height: 1rem;
+  width: 1.125rem;
+  height: 1.125rem;
   transform: translateY(-50%);
   color: #a1a1aa;
 }

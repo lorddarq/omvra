@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, Filter, Plus, Search, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Filter, Plus, X } from 'lucide-react';
 import type { MilestoneHealth } from '../utils/roadmap';
 import type { TimelineSwimlane } from '../types';
 import { MILESTONE_HEALTH_VISUALS } from '../utils/roadmap';
@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from './ui/select';
+import { MagnifierIcon } from './icons/MagnifierIcon';
 
 export type RoadmapDateWindow = 'all' | '30' | '90' | 'overdue';
 
@@ -22,6 +23,7 @@ interface RoadmapToolbarProps {
   projectFilter: string;
   healthFilter: MilestoneHealth | 'all';
   dateWindow: RoadmapDateWindow;
+  condensedUI: boolean;
   hasActiveFilters: boolean;
   projects: TimelineSwimlane[];
   showTimelineNavigation: boolean;
@@ -41,6 +43,7 @@ export function RoadmapToolbar({
   projectFilter,
   healthFilter,
   dateWindow,
+  condensedUI,
   hasActiveFilters,
   projects,
   showTimelineNavigation,
@@ -57,10 +60,10 @@ export function RoadmapToolbar({
   return (
     <div className="kanban-toolbar">
       <div className="kanban-toolbar-search">
-        <Search className="kanban-toolbar-search-icon" />
+        <MagnifierIcon className="kanban-toolbar-search-icon" />
         <Tooltip>
           <TooltipTrigger asChild>
-            <Input value={searchQuery} onChange={(event) => onSearchQueryChange(event.target.value)} placeholder="Search milestones, projects, or linked tasks..." className="kanban-toolbar-search-input" />
+            <Input type="search" value={searchQuery} onChange={(event) => onSearchQueryChange(event.target.value)} placeholder="Search" className="kanban-toolbar-search-input" />
           </TooltipTrigger>
           <TooltipContent side="bottom">Search milestones, projects, or linked tasks</TooltipContent>
         </Tooltip>
@@ -97,7 +100,7 @@ export function RoadmapToolbar({
           onValueChange={onProjectFilterChange}
           onClear={() => onProjectFilterChange('all')}
         >
-          <SelectItem value="all">All projects</SelectItem>
+          <SelectItem value="all">{condensedUI ? 'Projects' : 'All projects'}</SelectItem>
           {projects.map(project => (
             <SelectItem key={project.id} value={project.id}>
               {project.name}
@@ -113,7 +116,7 @@ export function RoadmapToolbar({
           onValueChange={(value) => onHealthFilterChange(value as MilestoneHealth | 'all')}
           onClear={() => onHealthFilterChange('all')}
         >
-          <SelectItem value="all">All health</SelectItem>
+          <SelectItem value="all">{condensedUI ? 'Health' : 'All health'}</SelectItem>
           {(Object.keys(MILESTONE_HEALTH_VISUALS) as MilestoneHealth[]).map(health => (
             <SelectItem key={health} value={health}>
               {MILESTONE_HEALTH_VISUALS[health].label}
@@ -129,13 +132,13 @@ export function RoadmapToolbar({
           onValueChange={(value) => onDateWindowChange(value as RoadmapDateWindow)}
           onClear={() => onDateWindowChange('all')}
         >
-          <SelectItem value="all">All dates</SelectItem>
+          <SelectItem value="all">{condensedUI ? 'Dates' : 'All dates'}</SelectItem>
           <SelectItem value="30">Next 30 days</SelectItem>
           <SelectItem value="90">Next 90 days</SelectItem>
           <SelectItem value="overdue">Overdue</SelectItem>
         </RoadmapFilterSelect>
 
-        {hasActiveFilters ? (
+        {hasActiveFilters && !condensedUI ? (
           <Button
             type="button"
             variant="outline"
@@ -152,7 +155,7 @@ export function RoadmapToolbar({
           <TooltipTrigger asChild>
             <button type="button" onClick={onAddMilestone} className="kanban-toolbar-add-board">
               <Plus className="size-4" />
-              <span>Add milestone</span>
+              {condensedUI ? null : <span>Add milestone</span>}
             </button>
           </TooltipTrigger>
           <TooltipContent side="bottom">Add milestone</TooltipContent>

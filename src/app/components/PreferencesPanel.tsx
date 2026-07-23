@@ -32,6 +32,7 @@ interface PreferencesPanelProps {
   goalAuditArchiveDirectory: string;
   externalSkillsDirectory: string;
   customScrollbarsEnabled: boolean;
+  condensedUI: boolean;
   goalPolicy: GoalPolicyV1;
   executionLoadStatusIds: TaskStatus[];
   pipelineLoadStatusIds: TaskStatus[];
@@ -48,6 +49,7 @@ interface PreferencesPanelProps {
   onGoalAuditArchiveDirectoryChange: (directory: string) => void;
   onExternalSkillsDirectoryChange: (directory: string) => void;
   onCustomScrollbarsEnabledChange: (enabled: boolean) => void;
+  onCondensedUIChange: (enabled: boolean) => void;
   onGoalPolicyChange: (updates: {
     currency?: string;
     acceptance?: GoalPolicyV1['acceptance'];
@@ -110,6 +112,7 @@ export function PreferencesPanel({
   goalAuditArchiveDirectory,
   externalSkillsDirectory,
   customScrollbarsEnabled,
+  condensedUI,
   goalPolicy,
   executionLoadStatusIds,
   pipelineLoadStatusIds,
@@ -126,6 +129,7 @@ export function PreferencesPanel({
   onGoalAuditArchiveDirectoryChange,
   onExternalSkillsDirectoryChange,
   onCustomScrollbarsEnabledChange,
+  onCondensedUIChange,
   onGoalPolicyChange,
   onResetGoalPolicy,
   onUpdateStatusColumn,
@@ -324,6 +328,15 @@ export function PreferencesPanel({
   return (
     <SettingsPanel isOpen={isOpen} onClose={onClose} initialAnchor={initialAnchor}>
       <GeneralSettingsSection>
+        <div className="flex items-center justify-between gap-4 border-b border-black/5 pb-4">
+          <div>
+            <div className="text-sm font-semibold leading-5 text-[#71717a]">Condensed UI</div>
+            <p className="mt-1 text-xs leading-4 text-[#6a7282]">
+              Use icon-only navigation and shorter filter controls across the workspace.
+            </p>
+          </div>
+          <Switch aria-label="Condensed UI" checked={condensedUI} onCheckedChange={onCondensedUIChange} />
+        </div>
         <div className="flex items-center justify-between gap-4 border-b border-black/5 pb-4">
           <div>
             <div className="text-sm font-semibold leading-5 text-[#71717a]">Custom horizontal scrollbars</div>

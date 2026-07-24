@@ -7,7 +7,8 @@
     "shell-quote": "1.9.0",
     "form-data": "4.0.6",
     "undici": "6.27.0",
-    "js-yaml": "4.3.0"
+    "js-yaml": "4.3.0",
+    "sharp": "0.35.3"
   },
   "main": "electron/main.cjs",
   "description": "A modern task management and planning tool",
@@ -69,9 +70,9 @@
     "concurrently": "^9.2.1",
     "electron": "39.8.10",
     "electron-builder": "^26.15.3",
-    "icon-gen": "^2.1.0",
+    "icon-gen": "^5.0.0",
     "react-test-renderer": "^18.3.1",
-    "sharp": "^0.35.3",
+    "sharp": "0.35.3",
     "tailwindcss": "4.3.0",
     "typescript": "^5.9.3",
     "vite": "8.0.16",

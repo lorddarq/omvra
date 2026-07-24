@@ -127,6 +127,8 @@ jobs:
     needs: prepare_release
     runs-on: ${{ matrix.os }}
     environment: release
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -155,6 +157,7 @@ jobs:
         run: npm run generate:icons
 
       - name: Commit generated icons
+        if: matrix.os == 'ubuntu-latest'
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

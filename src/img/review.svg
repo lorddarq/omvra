@@ -21,9 +21,27 @@
 <path d="M363 154H191C189.343 154 188 155.343 188 157C188 158.657 189.343 160 191 160H363C364.657 160 366 158.657 366 157C366 155.343 364.657 154 363 154Z" fill="#E4E4E7"/>
 <path d="M297 166H191C189.343 166 188 167.343 188 169C188 170.657 189.343 172 191 172H297C298.657 172 300 170.657 300 169C300 167.343 298.657 166 297 166Z" fill="#E4E4E7"/>
 <path d="M300 197H256C250.477 197 246 201.477 246 207C246 212.523 250.477 217 256 217H300C305.523 217 310 212.523 310 207C310 201.477 305.523 197 300 197Z" stroke="#E4E4E7" stroke-width="1.2"/>
+<g filter="url(#filter0_dd_1029_2304)">
 <path d="M374 197H328C322.477 197 318 201.477 318 207C318 212.523 322.477 217 328 217H374C379.523 217 384 212.523 384 207C384 201.477 379.523 197 374 197Z" fill="#2563EB"/>
 </g>
+</g>
 <defs>
+<filter id="filter0_dd_1029_2304" x="316" y="196" width="70" height="24" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="1"/>
+<feGaussianBlur stdDeviation="1"/>
+<feComposite in2="hardAlpha" operator="out"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.1 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1029_2304"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset/>
+<feGaussianBlur stdDeviation="0.5"/>
+<feComposite in2="hardAlpha" operator="out"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.2 0"/>
+<feBlend mode="normal" in2="effect1_dropShadow_1029_2304" result="effect2_dropShadow_1029_2304"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect2_dropShadow_1029_2304" result="shape"/>
+</filter>
 <linearGradient id="paint0_linear_1029_2304" x1="240" y1="15" x2="240" y2="276" gradientUnits="userSpaceOnUse">
 <stop stop-opacity="0.05"/>
 <stop offset="1" stop-color="#F4F4F5" stop-opacity="0"/>

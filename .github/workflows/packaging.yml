@@ -220,8 +220,8 @@ jobs:
           done < <(security list-keychains -d user)
           security list-keychains -d user -s "${keychain_file}" "${existing_keychains[@]}"
 
-          echo "CSC_LINK=${resolved_csc_link}" >> "${GITHUB_ENV}"
-          echo "CSC_KEY_PASSWORD=${RAW_CSC_KEY_PASSWORD}" >> "${GITHUB_ENV}"
+          # Reuse the imported identity instead of asking electron-builder to create a second keychain.
+          echo "CSC_KEYCHAIN=${keychain_file}" >> "${GITHUB_ENV}"
           echo "KEYCHAIN_PATH=${keychain_file}" >> "${GITHUB_ENV}"
           echo "KEYCHAIN_PASSWORD=${keychain_password}" >> "${GITHUB_ENV}"
 

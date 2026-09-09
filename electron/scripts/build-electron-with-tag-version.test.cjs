@@ -1,6 +1,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+test('packaging reuses the prepared keychain instead of importing the certificate twice', () => {
+  const workflow = require('node:fs').readFileSync(require('node:path').join(__dirname, '../../.github/workflows/packaging.yml'), 'utf8');
+  assert.match(workflow, /echo "CSC_KEYCHAIN=\$\{keychain_file\}" >> "\$\{GITHUB_ENV\}"/);
+  assert.doesNotMatch(workflow, /echo "CSC_(?:LINK|KEY_PASSWORD)=/);
+});
+
 const {
   hasExplicitMacNotarizationConfiguration,
   parseCodesignDetails,

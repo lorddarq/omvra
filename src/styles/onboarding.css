@@ -28,3 +28,7 @@
 @media (max-height: 620px) { .omvra-onboarding-dialog { height: calc(100dvh - 16px); padding: 20px 24px; } .omvra-onboarding-content { gap: 12px; padding: 8px 0 12px; } }
 @media (max-width: 560px) { .omvra-onboarding-dialog { padding: 24px 20px; } .omvra-onboarding-footer { align-items: flex-end; flex-direction: column; } .omvra-onboarding-actions { width: 100%; justify-content: flex-end; } }
 @media (prefers-reduced-motion: reduce) { .omvra-onboarding-overlay *, .omvra-onboarding-overlay { animation: none !important; transition: none !important; } }
+.omvra-onboarding-welcome-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.omvra-onboarding-tour { border: 0; background: transparent; color: #667085; padding: 10px 14px; border-radius: 10px; font-size: 14px; }
+.omvra-onboarding-tour:hover { text-decoration: underline; }
+.omvra-onboarding-welcome-actions button:focus-visible { outline: 2px solid #76879d; outline-offset: 2px; }

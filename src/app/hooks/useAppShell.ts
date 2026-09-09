@@ -59,6 +59,11 @@ function normalizeLoadStatusIds(
 
 export interface AppShellState {
   isHydrated: boolean;
+  onboardingActions: {
+    onAddTask: () => void;
+    onOpenPeople: () => void;
+    onOpenAgents: () => void;
+  };
   headerProps: ComponentProps<typeof AppHeader>;
   mainViewsProps: AppMainViewsProps;
   statusBarProps: AppStatusBarProps;
@@ -167,6 +172,7 @@ export function useAppShell(): AppShellState {
     handleEditTaskFromDetails,
     handleAddTaskFromTimeline,
     handleAddTaskFromSwimlane,
+    handleAddTaskFromOnboarding,
     handleCloseTaskDialog,
     handleEditSwimlane,
     handleAddSwimlane,
@@ -581,6 +587,11 @@ export function useAppShell(): AppShellState {
         onRoadmapMilestoneClick: openMilestoneDetails,
         onRoadmapTaskClick: handleTaskClick,
       },
+    },
+    onboardingActions: {
+      onAddTask: handleAddTaskFromOnboarding,
+      onOpenPeople: openPeoplePanel,
+      onOpenAgents: openAgentsPanel,
     },
     statusBarProps: {
       tasks,

@@ -70,6 +70,16 @@ export function useWorkspaceDialogs(tasks: Task[]) {
     setIsTaskDialogOpen(true);
   }, []);
 
+  const handleAddTaskFromOnboarding = useCallback(() => {
+    setSelectedTask(null);
+    setDefaultStatus('open');
+    setDefaultDate(undefined);
+    setDefaultEndDate(undefined);
+    setDefaultSwimlaneId(undefined);
+    setDefaultAssigneeId(undefined);
+    setIsTaskDialogOpen(true);
+  }, []);
+
   const handleCloseTaskDialog = useCallback(() => {
     setIsTaskDialogOpen(false);
     setSelectedTask(null);
@@ -125,6 +135,7 @@ export function useWorkspaceDialogs(tasks: Task[]) {
     handleEditTaskFromDetails,
     handleAddTaskFromTimeline,
     handleAddTaskFromSwimlane,
+    handleAddTaskFromOnboarding,
     handleCloseTaskDialog,
     handleEditSwimlane,
     handleAddSwimlane,

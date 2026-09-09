@@ -103,6 +103,7 @@ interface UiLayoutStoreValue {
   handleEditTaskFromDetails: (task: Task) => void;
   handleAddTaskFromTimeline: (date: Date, swimlaneId: string, endDate?: Date, mode?: 'projects' | 'people') => void;
   handleAddTaskFromSwimlane: (status: TaskStatus) => void;
+  handleAddTaskFromOnboarding: () => void;
   handleCloseTaskDialog: () => void;
   handleEditSwimlane: (swimlane: TimelineSwimlane) => void;
   handleAddSwimlane: () => void;
@@ -427,6 +428,7 @@ export function UiLayoutStoreProvider({
     handleEditTaskFromDetails: dialogs.handleEditTaskFromDetails,
     handleAddTaskFromTimeline: dialogs.handleAddTaskFromTimeline,
     handleAddTaskFromSwimlane: dialogs.handleAddTaskFromSwimlane,
+    handleAddTaskFromOnboarding: dialogs.handleAddTaskFromOnboarding,
     handleCloseTaskDialog: dialogs.handleCloseTaskDialog,
     handleEditSwimlane: dialogs.handleEditSwimlane,
     handleAddSwimlane: dialogs.handleAddSwimlane,
@@ -447,6 +449,7 @@ export function UiLayoutStoreProvider({
     dialogs.detailsTask,
     dialogs.handleAddSwimlane,
     dialogs.handleAddTaskFromSwimlane,
+    dialogs.handleAddTaskFromOnboarding,
     dialogs.handleAddTaskFromTimeline,
     dialogs.handleCloseSwimlaneDialog,
     dialogs.handleCloseTaskDialog,

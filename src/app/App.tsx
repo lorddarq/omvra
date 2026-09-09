@@ -15,6 +15,7 @@ import { AgentSessionSupervisorProvider } from './components/AgentSessionSupervi
 import { usePerformanceLogging } from './hooks/usePerformanceLogging.ts';
 import { recordReactCommit } from './services/performanceLogging.ts';
 import { areShallowValuesEqual } from './store/workspaceSelectors.ts';
+import { OnboardingChecklist } from './components/OnboardingChecklist.tsx';
 
 function AppContent({ performanceLoggingEnabled }: { performanceLoggingEnabled: boolean }) {
   const appShell = useAppShell();
@@ -106,7 +107,20 @@ function AppContent({ performanceLoggingEnabled }: { performanceLoggingEnabled: 
       </div>
 
       <DeleteConfirmDialog {...appShell.deleteConfirmProps} />
-      <OnboardingDialog open={onboardingOpen} onClose={closeOnboarding} />
+      <OnboardingChecklist
+        tasks={appShell.panelsProps.workspace.tasks}
+        people={appShell.panelsProps.workspace.people}
+        visible={!onboardingOpen}
+        onAddTask={appShell.onboardingActions.onAddTask}
+        onOpenPeople={appShell.onboardingActions.onOpenPeople}
+        onOpenAgents={appShell.onboardingActions.onOpenAgents}
+        onOpenWorkspace={() => appShell.headerProps.onViewChange('kanban')}
+      />
+      <OnboardingDialog
+        open={onboardingOpen}
+        onClose={closeOnboarding}
+        onStartFirstTask={appShell.onboardingActions.onAddTask}
+      />
     </>
   );
 }

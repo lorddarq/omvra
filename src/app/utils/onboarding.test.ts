@@ -7,6 +7,13 @@ import { hasCompletedOnboarding, persistOnboardingStatus } from './onboarding.ts
 
 const utilsDirectory = dirname(fileURLToPath(import.meta.url));
 
+test('UI store exposes the first-task callback consumed by both onboarding entry points', () => {
+  const store = readFileSync(resolve(utilsDirectory, '../store/uiLayoutStore.tsx'), 'utf8');
+  assert.match(store, /handleAddTaskFromOnboarding:\s*dialogs\.handleAddTaskFromOnboarding/);
+  const shell = readFileSync(resolve(utilsDirectory, '../hooks/useAppShell.ts'), 'utf8');
+  assert.match(shell, /onAddTask:\s*handleAddTaskFromOnboarding/);
+});
+
 test('onboarding completion is versioned and dismissals suppress first-run replay', async () => {
   const values = new Map<string, string>();
   (globalThis as any).window = {

@@ -204,6 +204,7 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
   const historyBinding = [...bindings].reverse().find(binding => HISTORY_SESSION_STATES.has(binding.state));
   const dockBinding = activeBinding || readyBinding || historyBinding;
   const dockTask = dockBinding?.scope?.taskId ? tasks.find(task => task.id === dockBinding.scope?.taskId) : undefined;
+  // TODO: cap persisted historical runs in the runtime service; this eight-item UI limit only bounds rendering.
   const dockItems = [...bindings]
     .filter(binding => binding.scope?.kind === 'task' && tasks.some(task => task.id === binding.scope?.taskId))
     .sort((left, right) => Date.parse(right.updatedAt || '') - Date.parse(left.updatedAt || ''))

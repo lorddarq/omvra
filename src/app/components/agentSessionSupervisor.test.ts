@@ -64,7 +64,7 @@ test('the supervisor owns a live session registry and a reopenable active-sessio
   assert.match(execution, /Minimize supervision/);
   assert.match(execution, /Preparing your work session/);
   assert.match(execution, /Ready to start/);
-  assert.ok(execution.indexOf('{error && <ExecutionNotice') < execution.indexOf('{binding && ('));
+  assert.ok(execution.indexOf('{error && <div') < execution.indexOf('<TaskSessionComposer'), 'Errors remain above the anchored composer');
   assert.match(execution, /TASK_ALREADY_COMPLETE/);
   assert.match(execution, /Reopen it or move it back to In progress before starting new work/);
   assert.match(execution, /new Set\(\[/);
@@ -88,7 +88,10 @@ test('the supervisor owns a live session registry and a reopenable active-sessio
   assert.match(statusBar, /No active work/);
   assert.match(statusBar, /getSessionAttentionState/);
   assert.match(statusBar, /outcome-review/);
-  assert.match(statusBar, /No action pending/);
+  assert.match(statusBar, /Popover open=\{expanded && hasSessions\} onOpenChange=\{setExpanded\}/);
+  assert.match(statusBar, /FeatheredScrollList/);
+  assert.match(statusBar, /h-\[30px\]/);
+  assert.doesNotMatch(statusBar, /Latest and recent task sessions/);
   assert.match(statusBar, /getAttentionState\('blocked'\)/);
   assert.match(statusBar, /Open supervision:/);
   assert.match(statusBar, /pendingRequest\.message/);

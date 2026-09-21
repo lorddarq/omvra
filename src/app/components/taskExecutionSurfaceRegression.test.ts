@@ -45,7 +45,7 @@ test('[Task Execution] a blocked task keeps its primary action visible and disab
   );
   assert.match(
     source,
-    /disabled=\{operationBusy \|\| loading \|\| blockers\.length > 0 \|\| !resolvedRepositoryFolder\}/,
+    /disabled=\{operationBusy \|\| loading \|\| blockers\.length > 0 \|\| !resolvedRepositoryFolder \|\| isAgentRuntimeTurnInFlight\(binding\)\}/,
     'The Restart work button must remain visible and disable (not unmount) when blockers are present',
   );
 });
@@ -59,11 +59,11 @@ test('[Task Execution] a failed run surfaces an explicit danger notice naming th
   );
 });
 
-test('[Task Execution] the ready state explains why work can start, not just that it can', () => {
+test('[Task Execution] the simplified modal retains diagnostics and anchors requests above the composer', () => {
   const source = readComponent('TaskExecutionAction.tsx');
-  assert.match(
-    source,
-    /!binding && !loading && preflight && blockers\.length === 0 && <ExecutionNotice tone="info" title=\{getAttentionState\('ready'\)\.label\} nextStep=\{getAttentionState\('ready'\)\.nextStep\}>/,
-    'The ready-to-start notice must include both the state label and its next step so the surface never shows a bare "ready" with no guidance',
-  );
+  assert.match(source, /title=\{task.title\}>\{task.title\}/);
+  assert.match(source, /<div hidden>/);
+  assert.match(source, /getTaskExecutionPresentation/);
+  assert.ok(source.indexOf('<RuntimePermissionCard') < source.indexOf('<TaskSessionComposer'));
+  assert.match(source, /pendingRequests.length === 0/);
 });

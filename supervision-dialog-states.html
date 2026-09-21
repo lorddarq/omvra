@@ -5,17 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Omvra supervision dialog · state board</title>
   <style>
-    :root { color-scheme: light; font: 14px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; --ink:#27364f; --muted:#71809a; --line:#dfe7f2; --surface:#f6f8fb; --navy:#111427; --blue:#1769ff; --green:#11b981; --amber:#f59e0b; --red:#e11d48; }
+    :root { color-scheme: light; font: 14px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; --ink:#27364f; --muted:#71809a; --line:#dfe7f2; --surface:#f6f8fb; --navy:#111427; --blue:#1769ff; --green:#11b981; --amber:#f59e0b; --red:#e11d48; --you:#7c3aed; }
     * { box-sizing:border-box; }
     body { margin:0; min-width:1040px; color:var(--ink); background:#eef1f5; }
     header { padding:28px 34px 20px; background:#fff; border-bottom:1px solid var(--line); }
     h1 { margin:0 0 6px; font-size:24px; letter-spacing:-.02em; }
     header p { margin:0; color:var(--muted); }
     .layout { display:grid; grid-template-columns:270px minmax(620px, 760px); gap:28px; padding:28px 34px 50px; align-items:start; }
-    nav { position:sticky; top:20px; padding:14px; background:#fff; border:1px solid var(--line); border-radius:16px; box-shadow:0 8px 24px #24324b0d; }
-    nav h2 { margin:3px 8px 12px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
-    nav button { display:block; width:100%; padding:9px 10px; border:0; border-radius:9px; text-align:left; color:var(--ink); background:transparent; cursor:pointer; }
+    nav { position:sticky; top:20px; max-height:calc(100vh - 40px); overflow:auto; padding:14px; background:#fff; border:1px solid var(--line); border-radius:16px; box-shadow:0 8px 24px #24324b0d; }
+    nav h2 { margin:3px 8px 8px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
+    nav h2 + h2 { margin-top:16px; }
+    nav button { display:flex; align-items:center; gap:8px; width:100%; padding:8px 10px; border:0; border-radius:9px; text-align:left; color:var(--ink); background:transparent; cursor:pointer; font:inherit; }
     nav button:hover, nav button.active { color:var(--blue); background:#edf4ff; }
+    nav button .dot { flex:none; }
+    .stack { display:grid; gap:18px; }
     .dialog { overflow:hidden; background:#fff; border:1px solid #d8e0ec; border-radius:18px; box-shadow:0 18px 50px #24324b1c; }
     .dialog-head { padding:22px 24px 19px; border-bottom:1px solid var(--line); }
     .dialog-head h2 { margin:0; font-size:20px; letter-spacing:-.02em; }
@@ -24,23 +27,28 @@
     .badges { display:flex; flex-wrap:wrap; gap:16px; margin-bottom:12px; color:#556a87; }
     .badge { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
     .pill { display:inline-flex; align-items:center; gap:5px; padding:2px 9px; border:1px solid var(--line); border-radius:99px; font-size:12px; color:#778296; background:#fff; }
+    .pill .count { padding:0 5px; border-radius:99px; color:#61708a; background:#eef2f8; font-size:11px; }
     .dot { width:8px; height:8px; border-radius:50%; background:#c7d1df; }
     .dot.green { background:var(--green); } .dot.amber { background:var(--amber); } .dot.red { background:var(--red); } .dot.blue { background:var(--blue); }
+    .dot.you { background:var(--you); box-shadow:0 0 0 3px #7c3aed26; }
+    .dot.live { background:var(--blue); animation:pulse 1.6s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { box-shadow:0 0 0 0 #1769ff40; } 50% { box-shadow:0 0 0 4px #1769ff00; } }
     .notice { margin:12px 0 16px; color:var(--blue); font-size:13px; }
-    .notice.error { color:var(--red); }
+    .notice.warn { color:#b45309; } .notice.error { color:var(--red); } .notice.you { color:var(--you); } .notice.good { color:#047857; }
+    .notice:empty { display:none; }
     .section { margin:16px 0; }
     .section-title { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-weight:600; }
     .section-title small { color:#94a1b7; font-weight:400; }
-    .stages, .activity, .permission, .input-request { padding:14px; border:1px solid var(--line); border-radius:12px; background:var(--surface); }
+    .stages, .activity, .permission, .input-request, .reconcile { padding:14px; border:1px solid var(--line); border-radius:12px; background:var(--surface); }
     .stage { display:flex; justify-content:space-between; gap:20px; padding:4px 0; }
     .stage span:first-child { display:flex; align-items:center; gap:9px; } .stage span:last-child { color:#637695; }
     .output { padding:14px; border:1px solid var(--line); border-radius:12px; background:#fff; }
     .eyebrow { display:flex; justify-content:space-between; color:#526886; font-size:11px; letter-spacing:.08em; text-transform:uppercase; }
     .output p { margin:12px 0 0; white-space:pre-line; }
     .output-actions { display:flex; gap:16px; margin-top:12px; padding-top:10px; border-top:1px solid var(--line); color:#637695; font-size:12px; }
-    .permission { background:#fff; border-color:#cbd7e8; }
-    .permission h3, .input-request h3 { margin:0 0 5px; font-size:15px; }
-    .permission p, .input-request p { margin:0; color:var(--muted); }
+    .permission, .reconcile { background:#fff; border-color:#cbd7e8; }
+    .permission h3, .input-request h3, .reconcile h3 { margin:0 0 5px; font-size:15px; }
+    .permission p, .input-request p, .reconcile p { margin:0; color:var(--muted); }
     .permission code { display:block; margin:12px 0; padding:10px; overflow:auto; border-radius:8px; color:#3d4d67; background:#f1f4f8; }
     .fields { display:grid; gap:9px; margin-top:12px; }
     input, textarea { width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font:inherit; color:var(--ink); background:#fff; }
@@ -48,69 +56,175 @@
     .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
     .button { padding:9px 13px; border:1px solid var(--line); border-radius:8px; color:#52627c; background:#fff; font:inherit; cursor:pointer; }
     .button.primary { border-color:var(--navy); color:#fff; background:var(--navy); }
+    .button.you { border-color:var(--you); color:#fff; background:var(--you); }
     .button.danger { border-color:#fecdd3; color:#be123c; background:#fff1f2; }
     .composer { margin:16px 0 20px; padding:14px; border:1px solid var(--line); border-radius:12px; color:#98a5b9; }
+    .composer.off { color:#b9c3d2; background:var(--surface); }
     .footer { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 24px; border-top:1px solid var(--line); }
     .footer-copy { color:#637695; font-size:12px; }
     .footer-actions { display:flex; justify-content:flex-end; gap:8px; }
     .hidden { display:none; }
-    .legend { margin-top:14px; padding:13px 14px; border:1px dashed #cbd7e8; border-radius:12px; color:#637695; font-size:12px; background:#fff; }
-    @media (max-width: 900px) { body { min-width:0; } .layout { grid-template-columns:1fr; } nav { position:static; } }
+    .legend { margin-top:16px; padding:13px 14px; border:1px dashed #cbd7e8; border-radius:12px; color:#637695; font-size:12px; background:#fff; }
+    .legend b { color:var(--ink); }
+    .legend .key { display:flex; align-items:center; gap:7px; margin-top:6px; }
+    .behind { padding:16px 18px; background:#fff; border:1px solid var(--line); border-radius:16px; box-shadow:0 8px 24px #24324b0d; }
+    .behind h3 { margin:0 0 3px; font-size:13px; }
+    .behind > p { margin:0 0 12px; color:var(--muted); font-size:12px; }
+    .tuple { display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; }
+    .tuple div { padding:9px 10px; border:1px solid var(--line); border-radius:10px; background:var(--surface); }
+    .tuple dt { margin:0 0 4px; color:#8c99ae; font-size:10px; letter-spacing:.07em; text-transform:uppercase; }
+    .tuple dd { margin:0; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; color:#3d4d67; word-break:break-all; }
+    .behind .note { margin:12px 0 0; padding-top:11px; border-top:1px solid var(--line); color:#637695; font-size:12px; }
+    .behind .note b { color:var(--ink); }
+    @media (max-width: 900px) { body { min-width:0; } .layout { grid-template-columns:1fr; } nav { position:static; max-height:none; } .tuple { grid-template-columns:1fr 1fr; } }
   </style>
 </head>
 <body>
   <header>
     <h1>Supervision dialog · state board</h1>
-    <p>Static design reference for task execution, provider sessions, permissions, input, MCP, and completion states.</p>
+    <p>Every state the ACP runtime can put the agent in, mapped to the dialog. Four independent axes — session, turn, task execution, terminal cause — resolved into one screen.</p>
   </header>
   <main class="layout">
     <nav aria-label="Dialog states">
-      <h2>States</h2>
-      <button class="active" data-state="starting">Starting</button>
-      <button data-state="working">Working</button>
-      <button data-state="permission">Permission request</button>
-      <button data-state="input">Input request</button>
-      <button data-state="batch">Batch completed</button>
-      <button data-state="interrupted">Interrupted / resume</button>
-      <button data-state="failed">Failed / restart</button>
-      <button data-state="mcp">MCP unavailable</button>
-      <button data-state="completed">Task completed</button>
-      <button data-state="blocked">Blocked by task state</button>
-      <div class="legend"><strong>Action rule</strong><br>One contextual primary action. Session controls belong in an overflow menu.</div>
+      <h2>Moving</h2>
+      <button data-state="queued"><i class="dot"></i>Queued</button>
+      <button class="active" data-state="starting"><i class="dot blue"></i>Starting</button>
+      <button data-state="working"><i class="dot blue"></i>Working</button>
+      <button data-state="continuing"><i class="dot blue"></i>Continuing · next batch</button>
+      <button data-state="cancelling"><i class="dot amber"></i>Stopping</button>
+      <button data-state="catchup"><i class="dot blue"></i>Catch-up after minimize</button>
+
+      <h2>Yours to act on</h2>
+      <button data-state="permission"><i class="dot you"></i>Permission request</button>
+      <button data-state="input"><i class="dot you"></i>Input request</button>
+      <button data-state="input-orphaned"><i class="dot you"></i>Input request lost</button>
+      <button data-state="batch"><i class="dot you"></i>Batch completed</button>
+      <button data-state="unreconciled"><i class="dot you"></i>Outcome needs review</button>
+      <button data-state="review"><i class="dot you"></i>Ready for review</button>
+      <button data-state="blocked"><i class="dot you"></i>Blocked before start</button>
+      <button data-state="mcp"><i class="dot amber"></i>MCP unavailable</button>
+
+      <h2>Idle</h2>
+      <button data-state="ready"><i class="dot green"></i>Connected, idle</button>
+      <button data-state="closed"><i class="dot"></i>Closed · history</button>
+
+      <h2>Ended</h2>
+      <button data-state="interrupted"><i class="dot amber"></i>Interrupted · resumable</button>
+      <button data-state="complete"><i class="dot green"></i>Task complete</button>
+
+      <h2>Failed · by cause</h2>
+      <button data-state="failed-unauthorized"><i class="dot red"></i>Re-authentication</button>
+      <button data-state="failed-missing"><i class="dot red"></i>Runtime missing</button>
+      <button data-state="failed-conflict"><i class="dot red"></i>Session conflict</button>
+      <button data-state="failed-protocol"><i class="dot red"></i>Protocol error</button>
+
+      <div class="legend">
+        <b>Tone key</b>
+        <div class="key"><i class="dot live"></i>Moving — the agent owns it</div>
+        <div class="key"><i class="dot you"></i>Yours — nothing moves until you act</div>
+        <div class="key"><i class="dot green"></i>Settled and healthy</div>
+        <div class="key"><i class="dot amber"></i>Recoverable, needs a decision</div>
+        <div class="key"><i class="dot red"></i>Dead session, cause named</div>
+        <div class="key"><i class="dot"></i>Inert — no session activity</div>
+        <p style="margin:11px 0 0"><b>Action rule</b> — one contextual primary action. Violet primary means the agent is stalled on you. Session controls belong in an overflow menu.</p>
+      </div>
     </nav>
 
-    <section class="dialog" aria-live="polite">
-      <div class="dialog-head"><h2>Open supervision</h2><p>Follow the agent’s task progress, blockers, and outcome. Guidance is optional.</p></div>
-      <div class="body">
-        <div class="badges"><span class="badge">Agent status <span class="pill" data-value="agent"><i class="dot green"></i>Agent is starting</span></span><span class="badge">Execution status <span class="pill" data-value="execution"><i class="dot amber"></i>Starting batch 1</span></span><span class="badge">Task status <span class="pill"><i class="dot green"></i>In progress</span></span></div>
-        <div class="notice" data-value="notice">ⓘ Connecting to the agent</div>
-        <div class="section"><div class="section-title">Work stages</div><div class="stages"><div class="stage"><span><i class="dot green"></i>Agent connection</span><span data-value="connection">Connecting</span></div><div class="stage"><span><i class="dot"></i>Task instructions</span><span data-value="instructions">Not sent yet</span></div><div class="stage"><span><i class="dot"></i>Agent work</span><span data-value="work">Not started</span></div></div></div>
-        <div class="section"><div class="section-title">Agent activity <small>Task progress only</small></div><div class="activity">
-          <div class="output" data-panel="output"><div class="eyebrow"><span>Agent output</span><span>Latest response</span></div><p data-value="output">The runtime is starting. Detailed activity will appear when the provider reports it.</p><div class="output-actions"><span>▢ Copy output</span><span>⊞ Use as follow-up</span></div></div>
-          <div class="permission hidden" data-panel="permission"><h3>Permission needed</h3><p>The agent is requesting access before continuing.</p><code>mcp__omvra__tasks_update<br>Update the current task description</code><div class="actions"><button class="button">Deny</button><button class="button primary">Allow</button></div></div>
-          <div class="input-request hidden" data-panel="input"><h3>Agent needs input</h3><p>Answer the question below to let the agent continue.</p><div class="fields"><textarea placeholder="Your response"></textarea></div><div class="actions"><button class="button primary">Send response</button></div></div>
-        </div></div>
-        <div class="composer">Start an optional follow-up</div>
-      </div>
-      <footer class="footer"><div class="footer-copy" data-value="footer">Omvra is starting this task turn.</div><div class="footer-actions"><button class="button">Minimize supervision</button><button class="button primary" data-value="primary">Continue work</button></div></footer>
-    </section>
+    <div class="stack">
+      <section class="dialog" aria-live="polite">
+        <div class="dialog-head"><h2>Open supervision</h2><p>Follow the agent’s task progress, blockers, and outcome. Guidance is optional.</p></div>
+        <div class="body">
+          <div class="badges">
+            <span class="badge">Agent status <span class="pill"><i class="dot" data-dot="agent"></i><span data-value="agent">Agent is starting</span></span></span>
+            <span class="badge">Execution status <span class="pill"><i class="dot" data-dot="execution"></i><span data-value="execution">Starting</span><span class="count" data-value="batch">Batch 1</span></span></span>
+            <span class="badge">Task status <span class="pill"><i class="dot" data-dot="task"></i><span data-value="task">In progress</span></span></span>
+          </div>
+          <div class="notice" data-value="notice">Connecting to the agent</div>
+          <div class="section"><div class="section-title">Work stages</div><div class="stages">
+            <div class="stage"><span><i class="dot" data-dot="connection"></i>Agent connection</span><span data-value="connection">Connecting</span></div>
+            <div class="stage"><span><i class="dot" data-dot="instructions"></i>Task instructions</span><span data-value="instructions">Not sent yet</span></div>
+            <div class="stage"><span><i class="dot" data-dot="work"></i>Agent work</span><span data-value="work">Not started</span></div>
+          </div></div>
+          <div class="section"><div class="section-title">Agent activity <small data-value="activity-note">Task progress only</small></div><div class="activity">
+            <div class="output" data-panel="output"><div class="eyebrow"><span>Agent output</span><span data-value="output-eyebrow">Latest response</span></div><p data-value="output">The runtime is starting. Detailed activity will appear when the provider reports it.</p><div class="output-actions"><span>▢ Copy output</span><span>⊞ Use as follow-up</span></div></div>
+            <div class="permission hidden" data-panel="permission"><h3>Permission needed</h3><p>The agent is requesting access before continuing.</p><code>mcp__omvra__tasks_update<br>Update the current task description</code><div class="actions"><button class="button">Deny</button><button class="button you">Allow</button></div></div>
+            <div class="input-request hidden" data-panel="input"><h3>Agent needs input</h3><p>Answer the question below to let the agent continue.</p><div class="fields"><textarea placeholder="Your response"></textarea></div><div class="actions"><button class="button you">Send response</button></div></div>
+            <div class="reconcile hidden" data-panel="reconcile"><h3 data-value="reconcile-title">Outcome needs review</h3><p data-value="reconcile-body">The agent delivered an outcome, but the task status was not updated. Review the result and move the task forward.</p><div class="actions"><button class="button">Keep in progress</button><button class="button you" data-value="reconcile-action">Move to Under review</button></div></div>
+          </div></div>
+          <div class="composer" data-value="composer">Start an optional follow-up</div>
+        </div>
+        <footer class="footer"><div class="footer-copy" data-value="footer">Omvra is starting this task turn.</div><div class="footer-actions"><button class="button" data-value="secondary">Minimize supervision</button><button class="button primary" data-value="primary">Continue work</button></div></footer>
+      </section>
+
+      <section class="behind">
+        <h3>Behind this state</h3>
+        <p>The four ACP axes this screen is resolving, as stored on the session binding.</p>
+        <dl class="tuple">
+          <div><dt>Session state</dt><dd data-value="acp-session">starting</dd></div>
+          <div><dt>Turn state</dt><dd data-value="acp-turn">queued</dd></div>
+          <div><dt>Task execution</dt><dd data-value="acp-exec">starting</dd></div>
+          <div><dt>Terminal cause</dt><dd data-value="acp-reason">—</dd></div>
+        </dl>
+        <p class="note" data-value="acp-note"><b>Design note</b> — the dialog must not claim work has started until the turn leaves <code>queued</code>.</p>
+      </section>
+    </div>
   </main>
   <script>
+    // tone → dot class. `you` is reserved for states where the agent is stalled on the user.
+    const D = { idle:'', live:'live', blue:'blue', good:'green', warn:'amber', bad:'red', you:'you' };
     const states = {
-      starting:{agent:'Agent is starting',execution:'Starting batch 1',notice:'ⓘ Connecting to the agent',connection:'Connecting',instructions:'Not sent yet',work:'Not started',output:'The runtime is starting. Detailed activity will appear when the provider reports it.',footer:'Omvra is starting this task turn.',primary:'Cancel start',panel:'output'},
-      working:{agent:'Working',execution:'Batch 1 in progress',notice:'',connection:'Connected',instructions:'Sent and accepted',work:'In progress',output:'The agent is working on the task. New activity will appear here as it is reported.',footer:'The agent is working on this task.',primary:'Minimize',panel:'output'},
-      permission:{agent:'Waiting for permission',execution:'Blocked by approval',notice:'⚠ The agent is waiting for permission',connection:'Connected',instructions:'Sent and accepted',work:'Waiting for approval',output:'',footer:'Allow or deny the request to continue.',primary:'',panel:'permission'},
-      input:{agent:'Waiting for input',execution:'Blocked by input',notice:'ⓘ The agent needs your input',connection:'Connected',instructions:'Sent and accepted',work:'Waiting for input',output:'',footer:'Answer the agent’s question to continue.',primary:'',panel:'input'},
-      batch:{agent:'Last batch completed',execution:'Batch finished · Batch 5',notice:'ⓘ Last batch completed',connection:'Connected',instructions:'Sent and accepted',work:'Batch finished',output:'The latest batch completed successfully. The task remains open for more work.',footer:'The agent completed its latest work batch.',primary:'Continue work',panel:'output'},
-      interrupted:{agent:'Session interrupted',execution:'Paused',notice:'⚠ The provider session is no longer connected',connection:'Disconnected',instructions:'Previously accepted',work:'Interrupted',output:'The provider session ended unexpectedly. Task context is preserved.',footer:'Resume work to reconnect the provider session.',primary:'Resume work',panel:'output'},
-      failed:{agent:'Previous runtime unavailable',execution:'Failed',notice:'⚠ Failed execution',connection:'Unavailable',instructions:'Not sent',work:'Not started',output:'The previous provider session failed before completing this turn. Task context is preserved.',footer:'Restart work to create a fresh provider session.',primary:'Restart work',panel:'output'},
-      mcp:{agent:'MCP unavailable',execution:'Blocked before start',notice:'⚠ Omvra MCP could not be reached',connection:'Connected',instructions:'Not sent',work:'Blocked',output:'The provider started, but the Omvra MCP server did not become available. Review runtime diagnostics before retrying.',footer:'Fix MCP connectivity, then restart work.',primary:'Restart work',panel:'output'},
-      completed:{agent:'Completed',execution:'Batch finished',notice:'✓ Task completed',connection:'Closed',instructions:'Accepted',work:'Completed',output:'The agent reported a completed outcome for this task.',footer:'This task is complete. Follow-up is unavailable unless the task is reopened.',primary:'Close',panel:'output'},
-      blocked:{agent:'Ready',execution:'Not started',notice:'⚠ Task cannot start',connection:'Not started',instructions:'Not sent',work:'Blocked',output:'Resolve the task blocker or required repository/runtime configuration before starting work.',footer:'No provider session has been created.',primary:'Review blockers',panel:'output'}
+      queued:{agent:['Queued at the provider','idle'],execution:['Starting','idle'],batch:'Batch 1',task:['In progress','good'],notice:['The provider has not picked up this turn yet.','info'],connection:['Connected','good'],instructions:['Sent, awaiting pickup','idle'],work:['Not started','idle'],output:'The turn is queued. The provider has accepted the session but has not begun this run.',footer:'Waiting for the provider to accept the turn.',primary:'Cancel turn',secondary:'Minimize supervision',panel:'output',acp:['ready','queued','starting','—'],note:'<b>Design note</b> — provider back-pressure, not our latency. Say so, or it reads as a hang.'},
+      starting:{agent:['Agent is starting','live'],execution:['Starting','live'],batch:'Batch 1',task:['In progress','good'],notice:['Connecting to the agent','info'],connection:['Connecting','live'],instructions:['Not sent yet','idle'],work:['Not started','idle'],output:'The runtime is starting. Detailed activity will appear when the provider reports it.',footer:'Omvra is starting this task turn.',primary:'Cancel start',secondary:'Minimize supervision',panel:'output',acp:['starting','starting','starting','—'],note:'<b>Design note</b> — the only state where all three stages are still grey. Keep the stage list visible here; it is the progress bar.'},
+      working:{agent:['Agent is working','live'],execution:['Working','live'],batch:'Batch 1',task:['In progress','good'],notice:['','info'],connection:['Connected','good'],instructions:['Sent and accepted','good'],work:['In progress','live'],output:'The agent is working on the task. New activity will appear here as it is reported.',footer:'The agent is working on this task.',primary:'Stop work',secondary:'Minimize supervision',panel:'output',acp:['active','active','working','—'],note:'<b>Design note</b> — the default. Everything else on this board is defined by how it differs from here.'},
+      continuing:{agent:['Agent is working','live'],execution:['Continuing','live'],batch:'Batch 4',task:['In progress','good'],notice:['The agent finished batch 3 and continued on its own.','info'],connection:['Connected','good'],instructions:['Carried into batch 4','good'],work:['In progress','live'],output:'Continuing with the next work batch. The previous batch ended without completing the task.',footer:'Automatic continuation · batch 4 of an allowed 5.',primary:'Stop work',secondary:'Minimize supervision',panel:'output',acp:['active','active','continuing','—'],note:'<b>Design note</b> — distinct from Working: the agent chose to keep going. The batch counter is the story, not the spinner. Show the continuation budget before it runs out.'},
+      cancelling:{agent:['Agent is stopping','warn'],execution:['Stopping','warn'],batch:'Batch 2',task:['In progress','good'],notice:['Stop requested — waiting for the agent to wind down.','warn'],connection:['Connected','good'],instructions:['Sent and accepted','good'],work:['Stopping','warn'],output:'The agent was asked to stop. It is finishing the current step before the turn ends.',footer:'The stop request was sent. This can take a few seconds.',primary:'',secondary:'Minimize supervision',panel:'output',acp:['cancelling','cancelling','stopping','—'],note:'<b>Design note</b> — a real state with duration, currently indistinguishable from Working. No primary action: the only honest affordance is waiting.'},
+      catchup:{agent:['Agent is working','live'],execution:['Working','live'],batch:'Batch 2',task:['In progress','good'],notice:['12 steps ran while supervision was minimized.','info'],connection:['Connected','good'],instructions:['Sent and accepted','good'],work:['In progress','live'],output:'The agent kept working while this view was closed. The activity list starts from where you left off.',footer:'Reopened mid-run · 12 steps since you last looked.',primary:'Stop work',secondary:'Jump to latest',panel:'output',acp:['active','active','working','—'],note:'<b>Design note</b> — the dock’s <code>hidden-active</code> resolved back into the dialog. Reopening into a moving screen with no context is disorienting; name what was missed.'},
+      permission:{agent:['Waiting on you','you'],execution:['Waiting for input','you'],batch:'Batch 1',task:['In progress','good'],notice:['The agent is blocked on a permission request.','you'],connection:['Connected','good'],instructions:['Sent and accepted','good'],work:['Waiting for approval','you'],output:'',footer:'Allow or deny the request to continue.',primary:'',secondary:'Minimize supervision',panel:'permission',acp:['needs-input','waiting-input','waiting','—'],note:'<b>Design note</b> — one of two request kinds. Carries a tool name, so it gets Allow/Deny rather than a text field.'},
+      input:{agent:['Waiting on you','you'],execution:['Waiting for input','you'],batch:'Batch 1',task:['In progress','good'],notice:['The agent needs your answer to continue.','you'],connection:['Connected','good'],instructions:['Sent and accepted','good'],work:['Waiting for input','you'],output:'',footer:'Answer the agent’s question to continue.',primary:'',secondary:'Minimize supervision',panel:'input',acp:['needs-input','waiting-input','waiting','—'],note:'<b>Design note</b> — free-text reply. Same session state as a permission request, different affordance; the dialog must read the request kind, not the state.'},
+      'input-orphaned':{agent:['Waiting on you','you'],execution:['Waiting for input','warn'],batch:'Batch 1',task:['In progress','good'],notice:['The agent is waiting, but Omvra no longer holds an answerable request.','warn'],connection:['Connected','good'],instructions:['Sent and accepted','good'],work:['Waiting for input','warn'],output:'The session reports that it is waiting for input, but the request itself was lost. Reconnect to recover the pending request.',footer:'Reconnect the session to continue.',primary:'Reconnect session',secondary:'Minimize supervision',panel:'output',acp:['needs-input','waiting-input','waiting','—'],note:'<b>Design note</b> — a genuine desync: turn says waiting, request list is empty. Real and reachable today; it needs its own screen rather than an empty request panel.'},
+      batch:{agent:['Last batch completed','you'],execution:['Batch finished','you'],batch:'Batch 5',task:['In progress','good'],notice:['The agent stopped between batches — the task is not finished.','you'],connection:['Connected','good'],instructions:['Sent and accepted','good'],work:['Batch finished','you'],output:'The latest batch completed successfully. The task remains open and the session is still connected.',footer:'Continue to start batch 6 from the saved context.',primary:'Continue work',secondary:'Minimize supervision',panel:'output',acp:['ready','completed','batch-finished','—'],note:'<b>Design note</b> — the most misread state on the board. A green “completed” turn does <em>not</em> mean a finished task; lead with what is still owed.'},
+      unreconciled:{agent:['Outcome needs review','you'],execution:['Outcome needs review','you'],batch:'Batch 3',task:['In progress','warn'],notice:['Work is done — the task status was never moved.','you'],connection:['Closed','idle'],instructions:['Accepted','good'],work:['Delivered','good'],output:'',footer:'Accept the outcome to move the task forward.',primary:'',secondary:'Minimize supervision',panel:'reconcile',acp:['closed','completed','outcome-unreconciled','closed'],note:'<b>Design note</b> — the highest-value state in the set: the work is finished and one click away from settled. Currently rendered as generic danger, which buries it.'},
+      review:{agent:['Task work complete','good'],execution:['Ready for review','you'],batch:'Batch 3',task:['Under review','warn'],notice:['The outcome landed and the task moved to Under review.','good'],connection:['Closed','idle'],instructions:['Accepted','good'],work:['Delivered','good'],output:'',footer:'Verify the result against the acceptance checklist.',primary:'',secondary:'Close',panel:'reconcile',acp:['closed','completed','ready-for-review','closed'],note:'<b>Design note</b> — reconciled twin of the state above. Same panel, different ask: verify rather than settle.'},
+      blocked:{agent:['Not started','you'],execution:['Not started','idle'],batch:'',task:['Todo','idle'],notice:['This task cannot start yet.','you'],connection:['Not started','idle'],instructions:['Not sent','idle'],work:['Blocked','you'],output:'Resolve the task blocker or the required repository and runtime configuration before starting work.',footer:'No provider session has been created.',primary:'Review blockers',secondary:'Close',panel:'output',acp:['—','—','—','—'],note:'<b>Design note</b> — preflight, before any binding exists. Every other axis is empty; the stage list should be dimmed rather than shown as failing.'},
+      mcp:{agent:['Task access is read-only','warn'],execution:['Blocked before start','warn'],batch:'',task:['In progress','good'],notice:['The agent can read this task but cannot change it.','warn'],connection:['Connected','good'],instructions:['Not sent','idle'],work:['Blocked','warn'],output:'The provider started, but the Omvra MCP server is unavailable or read-only. Enable Task Write under Settings → MCP Access and restart the listener.',footer:'Fix MCP connectivity, then restart work.',primary:'Open MCP settings',secondary:'Minimize supervision',panel:'output',acp:['ready','—','ready','—'],note:'<b>Design note</b> — the session is healthy; the capability is not. Do not paint this as a runtime failure, and route to the exact setting.'},
+      ready:{agent:['Connected, no run active','good'],execution:['Ready','idle'],batch:'',task:['In progress','good'],notice:['The session is live and idle — work can resume in place.','info'],connection:['Connected','good'],instructions:['Sent and accepted','good'],work:['Not running','idle'],output:'The agent is connected but is not currently doing work. Continue to start another batch on the same session.',footer:'Session is live · resuming costs nothing.',primary:'Continue work',secondary:'End session',panel:'output',acp:['ready','—','ready','—'],note:'<b>Design note</b> — reads as “nothing happening”, but it is the only idle state that resumes <em>in place</em>. Worth distinguishing from Closed.'},
+      closed:{agent:['No agent is working','idle'],execution:['Stopped','idle'],batch:'Batch 2',task:['In progress','good'],notice:['You are looking at a closed session.','warn'],connection:['Closed','idle'],instructions:['Previously accepted','idle'],work:['Ended','idle'],output:'This session was closed cleanly. The task is still in progress — starting again creates a new session from the saved task context.',footer:'Read-only history · no live session.',primary:'Start new session',secondary:'Close',panel:'output',acp:['closed','completed','stopped','closed'],note:'<b>Design note</b> — history, not failure. The composer should be visibly disabled here rather than absent, so the view does not look broken.'},
+      interrupted:{agent:['Work was interrupted','warn'],execution:['Interrupted','warn'],batch:'Batch 2',task:['In progress','good'],notice:['The runtime was lost — task context is preserved.','warn'],connection:['Disconnected','warn'],instructions:['Previously accepted','idle'],work:['Interrupted','warn'],output:'The provider session ended unexpectedly, often because it belongs to another app process. Resume to reconnect, or start fresh.',footer:'Resume to reconnect the provider session.',primary:'Resume work',secondary:'Start new session',panel:'output',acp:['interrupted','interrupted','interrupted','process-exit'],note:'<b>Design note</b> — the one terminal state with a legal path back (<code>interrupted → starting</code>). It must look recoverable, not fatal — amber, never red.'},
+      complete:{agent:['Task work complete','good'],execution:['Complete','good'],batch:'Batch 3',task:['Done','good'],notice:['The agent completed this task.','good'],connection:['Closed','idle'],instructions:['Accepted','good'],work:['Completed','good'],output:'The agent reported a completed outcome and the task was moved to Done.',footer:'This task is complete. Reopen it to allow follow-up work.',primary:'Close',secondary:'Reopen task',panel:'output',acp:['closed','completed','complete','closed'],note:'<b>Design note</b> — the only unambiguous green on the board. Guard it: nothing else should be allowed to look this settled.'},
+      'failed-unauthorized':{agent:['Re-authentication required','bad'],execution:['Failed','bad'],batch:'Batch 1',task:['In progress','good'],notice:['The provider rejected the session credentials.','error'],connection:['Unauthorized','bad'],instructions:['Not sent','idle'],work:['Not started','idle'],output:'The provider refused this session because its credentials expired. Sign in again, then restart work — the task context is preserved.',footer:'One sign-in away from resuming.',primary:'Sign in to provider',secondary:'Close',panel:'output',acp:['failed','failed','failed','protocol-error · unauthorized'],note:'<b>Design note</b> — captured today, never surfaced. A one-click fix currently presented as a dead end. Failure class must drive the primary action.'},
+      'failed-missing':{agent:['Runtime not found','bad'],execution:['Failed','bad'],batch:'',task:['In progress','good'],notice:['The configured agent runtime could not be launched.','error'],connection:['Unavailable','bad'],instructions:['Not sent','idle'],work:['Not started','idle'],output:'Omvra could not start the configured agent binary. Check the runtime path under Settings → Agent runtime, then restart work.',footer:'Configuration problem — not a task problem.',primary:'Open runtime settings',secondary:'Close',panel:'output',acp:['failed','—','failed','runtime-missing'],note:'<b>Design note</b> — nothing about the task is wrong. Routing to settings is the entire remedy.'},
+      'failed-conflict':{agent:['Session already active','bad'],execution:['Failed','bad'],batch:'Batch 2',task:['In progress','good'],notice:['Another session is already holding this task.','error'],connection:['Conflict','bad'],instructions:['Not sent','idle'],work:['Not started','idle'],output:'The provider reported that a session for this task is already running, likely in another window or app process. Take it over, or wait for it to finish.',footer:'Two supervisors, one task.',primary:'Take over session',secondary:'Close',panel:'output',acp:['failed','—','failed','protocol-error · conflict'],note:'<b>Design note</b> — recoverable, and the recovery is specific. Generic “restart work” here just reproduces the conflict.'},
+      'failed-protocol':{agent:['Previous runtime unavailable','bad'],execution:['Failed','bad'],batch:'Batch 1',task:['In progress','good'],notice:['The provider session failed and cannot be recovered.','error'],connection:['Unavailable','bad'],instructions:['Not sent','idle'],work:['Not started','idle'],output:'The provider session failed for an unclassified reason. Restarting creates a fresh session; the current task context is preserved.',footer:'Restart work to create a fresh provider session.',primary:'Restart work',secondary:'View diagnostics',panel:'output',acp:['failed','failed','failed','protocol-error · internal'],note:'<b>Design note</b> — the genuine catch-all, and the only failure that should carry this generic copy. Today all seven classes land here.'}
     };
     const setText=(key,value)=>document.querySelectorAll(`[data-value="${key}"]`).forEach(el=>el.textContent=value);
-    function show(name){const s=states[name]; document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.state===name)); ['permission','input'].forEach(panel=>document.querySelector(`[data-panel="${panel}"]`).classList.toggle('hidden',s.panel!==panel)); document.querySelector('[data-panel="output"]').classList.toggle('hidden',s.panel!=='output'); Object.entries(s).forEach(([k,v])=>setText(k,v)); document.querySelector('[data-value="notice"]').classList.toggle('error',['failed','mcp'].includes(name)); document.querySelector('[data-value="primary"]').classList.toggle('hidden',!s.primary); }
+    const setDot=(key,tone)=>document.querySelectorAll(`[data-dot="${key}"]`).forEach(el=>{el.className=`dot ${D[tone]||''}`.trim();});
+    const setPair=(key,pair)=>{setText(key,pair[0]);setDot(key,pair[1]);};
+    function show(name){
+      const s=states[name];
+      document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.state===name));
+      ['output','permission','input','reconcile'].forEach(panel=>document.querySelector(`[data-panel="${panel}"]`).classList.toggle('hidden',s.panel!==panel));
+      ['agent','execution','task','connection','instructions','work'].forEach(key=>setPair(key,s[key]));
+      setText('batch',s.batch); document.querySelector('[data-value="batch"]').classList.toggle('hidden',!s.batch);
+      setText('output',s.output); setText('footer',s.footer); setText('primary',s.primary); setText('secondary',s.secondary);
+      const notice=document.querySelector('[data-value="notice"]');
+      notice.textContent=s.notice[0]?`${{info:'ⓘ',warn:'⚠',error:'⚠',you:'◆',good:'✓'}[s.notice[1]]} ${s.notice[0]}`:'';
+      notice.className=`notice ${s.notice[1]==='info'?'':s.notice[1]}`.trim();
+      const primary=document.querySelector('[data-value="primary"]');
+      primary.className=`button ${s.agent[1]==='you'||s.work[1]==='you'?'you':'primary'}${s.primary?'':' hidden'}`;
+      document.querySelector('[data-value="secondary"]').classList.toggle('hidden',!s.secondary);
+      const settled=['closed','complete','blocked'].includes(name);
+      const composer=document.querySelector('[data-value="composer"]');
+      composer.textContent=settled?'Follow-up unavailable for this session':'Start an optional follow-up';
+      composer.className=`composer${settled?' off':''}`;
+      setText('reconcile-title',name==='review'?'Ready for review':'Outcome needs review');
+      setText('reconcile-body',name==='review'?'The agent delivered an outcome and the task moved to Under review. Verify the result against the acceptance checklist, then mark it complete.':'The agent delivered an outcome, but the task status was not updated. Review the result and move the task forward.');
+      setText('reconcile-action',name==='review'?'Mark complete':'Move to Under review');
+      setText('activity-note',s.panel==='output'?'Task progress only':'Waiting on your response');
+      ['session','turn','exec','reason'].forEach((key,index)=>setText(`acp-${key}`,s.acp[index]));
+      document.querySelector('[data-value="acp-note"]').innerHTML=s.note;
+    }
     document.querySelectorAll('nav button').forEach(button=>button.addEventListener('click',()=>show(button.dataset.state)));
+    show('starting');
   </script>
 </body>
 </html>

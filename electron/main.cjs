@@ -513,7 +513,14 @@ function createWindow() {
 
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  const { startAutoArchiveService } = await import('./services/auto-archive-service.mjs');
+  const stopAutoArchive = startAutoArchiveService(store, () => new Set(
+    (listAgentRuntimeSessions(store, { limit: 200 })?.bindings || [])
+      .filter(binding => ['queued', 'starting', 'active', 'waiting-input', 'cancelling'].includes(binding.turn?.state))
+      .map(binding => binding.scope?.taskId).filter(Boolean)
+  ));
+  app.once('will-quit', stopAutoArchive);
   // Bind MCP endpoint to localhost only; no external interface exposure.
   store.onDidAnyChange((nextStore, previousStore) => {
     const hintedRendererKeys = new Set(pendingRendererStoreMutationKeys);

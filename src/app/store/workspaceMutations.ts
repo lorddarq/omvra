@@ -46,7 +46,7 @@ export function restoreTaskRecords(tasks: Task[], taskIds: string[]): Task[] {
   });
 
   return tasks.map(task => restoreIds.has(task.id)
-    ? { ...task, archived: false, archivedAt: undefined }
+    ? { ...task, archived: false, archivedAt: undefined, autoArchiveSuppressed: true }
     : task);
 }
 

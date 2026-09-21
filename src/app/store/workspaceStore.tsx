@@ -1,3 +1,6 @@
+import { useAutoArchive } from '../hooks/useAutoArchive.ts';
+import type { AutoArchivePolicy } from '../types.ts';
+import { normalizeAutoArchivePolicy } from '../../../electron/domain/auto-archive.mjs';
 import {
   createContext,
   type Dispatch,
@@ -51,6 +54,7 @@ const WORKSPACE_SEEDS: WorkspaceSeeds = {
 };
 
 export interface AppPreferences {
+  autoArchivePolicy?: AutoArchivePolicy;
   executionLoadStatusIds: TaskStatus[];
   pipelineLoadStatusIds: TaskStatus[];
   cleanupGoalArtifacts: boolean;
@@ -128,6 +132,7 @@ export function createDefaultAppPreferences(
   return {
     executionLoadStatusIds: [getDefaultStatusId(statusColumns, 'in-progress')],
     pipelineLoadStatusIds: [getDefaultStatusId(statusColumns, 'open')],
+    autoArchivePolicy: normalizeAutoArchivePolicy(undefined),
     cleanupGoalArtifacts: false,
     goalAuditArchiveDirectory: '',
     skillRoots: [],
@@ -164,6 +169,8 @@ export function WorkspaceStoreProvider({ children }: PropsWithChildren) {
   const [hasHydratedCanonicalWorkspace, setHasHydratedCanonicalWorkspace] = useState(
     initialState.hasHydratedCanonicalWorkspace
   );
+
+  useAutoArchive(tasks, statusColumns, preferences.autoArchivePolicy, hasHydratedCanonicalWorkspace, setTasks);
 
   const persistence = useWorkspacePersistence({
     tasks,

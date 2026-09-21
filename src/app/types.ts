@@ -112,7 +112,15 @@ export interface TaskCollaborationEventV1 {
   [extension: string]: unknown;
 }
 
+export interface AutoArchivePolicy {
+  mode: 'off' | 'after-completion' | 'on-completion';
+  days: number;
+  enabledAt?: string;
+}
+
 export interface Task {
+  completedAt?: string;
+  autoArchiveSuppressed?: boolean;
   id: string;
   __mcpRevision?: number;
   title: string;

@@ -26,30 +26,7 @@ export function filterMilestonesByArchiveVisibility(
   return filterByArchiveVisibility(milestones, visibility);
 }
 
-export function getBlockedArchiveTaskIds(tasks: Task[], requestedIds: ReadonlySet<string>): Set<string> {
-  const active = new Map(tasks.filter(task => !isArchived(task)).map(task => [task.id, task]));
-  const neighbors = new Map<string, Set<string>>();
-  for (const task of active.values()) {
-    for (const id of task.dependencyIds || []) {
-      if (!active.has(id)) continue;
-      if (!neighbors.has(task.id)) neighbors.set(task.id, new Set());
-      if (!neighbors.has(id)) neighbors.set(id, new Set());
-      neighbors.get(task.id)!.add(id);
-      neighbors.get(id)!.add(task.id);
-    }
-  }
-  // Any active dependency outside the batch blocks its whole selected component.
-  const blocked = new Set<string>();
-  const queue = [...active.keys()].filter(id => !requestedIds.has(id));
-  for (let index = 0; index < queue.length; index += 1) {
-    for (const id of neighbors.get(queue[index]) || []) {
-      if (!requestedIds.has(id) || blocked.has(id)) continue;
-      blocked.add(id);
-      queue.push(id);
-    }
-  }
-  return blocked;
-}
+export { getBlockedArchiveTaskIds } from '../../../electron/domain/auto-archive.mjs';
 
 export function getRequiredArchivedDependencyIds(task: Task, tasksById: ReadonlyMap<string, Task>): string[] {
   const required = new Set<string>();

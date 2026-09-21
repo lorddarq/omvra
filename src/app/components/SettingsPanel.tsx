@@ -1,3 +1,5 @@
+import { normalizeAutoArchivePolicy } from '../../../electron/domain/auto-archive.mjs';
+import type { AutoArchivePolicy } from '../types';
 import { FeatheredScrollList } from './FeatheredScrollList';
 import { TaskCheckboxControl } from './TaskCheckboxControl';
 import { MagnifierIcon } from './icons/MagnifierIcon';
@@ -584,6 +586,8 @@ export function TasksSettingsSection({
 interface DataSettingsSectionProps {
   tasks: Task[];
   milestones: ProjectMilestone[];
+  autoArchivePolicy?: AutoArchivePolicy;
+  onAutoArchivePolicyChange: (policy: AutoArchivePolicy) => void;
   onRestoreTasks: (taskIds: string[]) => void;
   onRestoreMilestones: (milestoneIds: string[]) => void;
   onExportArchive: () => Promise<boolean>;
@@ -601,6 +605,8 @@ interface DataSettingsSectionProps {
 export function DataSettingsSection({
   tasks,
   milestones,
+  autoArchivePolicy,
+  onAutoArchivePolicyChange,
   onRestoreTasks,
   onRestoreMilestones,
   onExportArchive,
@@ -618,6 +624,7 @@ export function DataSettingsSection({
   const archivedTasks = tasks.filter(task => task.archived);
   const archivedMilestones = milestones.filter(milestone => milestone.archived);
   const archiveInputRef = useRef<HTMLInputElement>(null);
+  const policy = normalizeAutoArchivePolicy(autoArchivePolicy);
   const [archiveSearch, setArchiveSearch] = useState('');
   const query = archiveSearch.trim().toLocaleLowerCase();
   const visibleTasks = archivedTasks.filter(task => `${task.title} ${task.project || ''}`.toLocaleLowerCase().includes(query));
@@ -631,20 +638,42 @@ export function DataSettingsSection({
         <div className="space-y-3">
           <div className="text-sm font-semibold leading-5 text-[#71717a]">Archiving</div>
           <p className="text-xs leading-4 text-[#6a7282]">Restore archived tasks and milestones without deleting their history or relationships.</p>
+          <div className="space-y-2 rounded-xl border border-black/[0.06] p-3">
+            <label htmlFor="auto-archive-mode" className="text-xs font-medium text-[#71717a]">Auto-archive tasks</label>
+            <Select value={policy.mode} onValueChange={(mode: AutoArchivePolicy['mode']) => onAutoArchivePolicyChange({ ...policy, mode, enabledAt: new Date().toISOString() })}>
+              <SelectTrigger id="auto-archive-mode" aria-label="Auto-archive tasks"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="off">Off</SelectItem>
+                <SelectItem value="after-completion">After time spent Completed</SelectItem>
+                <SelectItem value="on-completion">On status change to Completed</SelectItem>
+              </SelectContent>
+            </Select>
+            {policy.mode === 'after-completion' && <label className="flex items-center gap-2 text-xs text-[#71717a]">
+              Auto-archive after
+              <Input aria-label="Days after completion" type="number" min={1} max={36500} step={1} value={policy.days} className="w-24" onChange={event => {
+                const days = event.target.valueAsNumber;
+                if (Number.isInteger(days) && days >= 1 && days <= 36500) onAutoArchivePolicyChange({ ...policy, days });
+              }} />
+              days Completed
+            </label>}
+            <p className="text-xs leading-4 text-[#6a7282]">Completed means a status in the Done workflow category. Checks run on changes, at startup, and every minute while Omvra is running. Active dependencies and running work prevent archiving.</p>
+            <p className="text-xs leading-4 text-[#6a7282]">Tasks without a recorded completion date are skipped. Unarchived tasks stay visible until reopened and completed again.</p>
+          </div>
           <div className="relative">
             <MagnifierIcon className="pointer-events-none absolute left-2 top-1/2 z-10 size-[18px] -translate-y-1/2" />
             <Input type="search" aria-label="Search archived work" placeholder="Search archived work..." value={archiveSearch} onChange={event => setArchiveSearch(event.target.value)} className={taskEditIconFieldClassName} />
           </div>
           <FeatheredScrollList className="max-h-60 rounded-[18px] border border-black/[0.06] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.06)]" scrollClassName="max-h-60">
             {[
-              ...visibleTasks.map(task => ({ record: task, kind: 'Task', selected: selectedTaskIds, select: setSelectedTaskIds, restore: onRestoreTasks })),
-              ...visibleMilestones.map(milestone => ({ record: milestone, kind: 'Milestone', selected: selectedMilestoneIds, select: setSelectedMilestoneIds, restore: onRestoreMilestones })),
-            ].map(({ record, kind, selected, select, restore }) => (
+              ...visibleTasks.map(task => ({ record: task, kind: 'Task', selected: selectedTaskIds, select: setSelectedTaskIds })),
+              ...visibleMilestones.map(milestone => ({ record: milestone, kind: 'Milestone', selected: selectedMilestoneIds, select: setSelectedMilestoneIds })),
+            ].map(({ record, kind, selected, select }) => (
               <div key={`${kind}-${record.id}`} className="flex min-h-10 items-center gap-2 border-b border-black/[0.06] px-3 last:border-b-0 hover:bg-[#71717a]/5">
-                <TaskCheckboxControl ariaLabel={`Select ${kind.toLowerCase()}: ${record.title}`} checked={selected.includes(record.id)} onCheckedChange={checked => select(current => checked ? [...current, record.id] : current.filter(id => id !== record.id))} />
-                <span className="shrink-0 text-xs text-[#71717a]">{kind}</span>
-                <span className="min-w-0 flex-1 truncate text-sm text-[#3f3f46]" title={record.title}>{record.title}</span>
-                <Button type="button" variant="ghost" size="sm" onClick={() => restore([record.id])}>Unarchive</Button>
+                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 self-stretch">
+                  <TaskCheckboxControl ariaLabel={`Select ${kind.toLowerCase()}: ${record.title}`} checked={selected.includes(record.id)} onCheckedChange={checked => select(current => checked ? [...current, record.id] : current.filter(id => id !== record.id))} />
+                  <span className="shrink-0 text-xs text-[#71717a]">{kind}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm text-[#3f3f46]" title={record.title}>{record.title}</span>
+                </label>
               </div>
             ))}
             {!visibleTasks.length && !visibleMilestones.length && <p className="px-3 py-4 text-xs text-[#6a7282]">{query ? 'No archived work matches your search.' : 'No archived work.'}</p>}

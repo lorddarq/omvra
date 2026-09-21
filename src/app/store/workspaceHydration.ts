@@ -1,4 +1,5 @@
 import { type Dispatch, type RefObject, type SetStateAction, useCallback, useEffect } from 'react';
+import { normalizeAutoArchivePolicy } from '../../../electron/domain/auto-archive.mjs';
 import type { Person, ProjectMilestone, Task, TaskStatus, TimelineSwimlane } from '../types.ts';
 import { swimlanes as defaultSwimlanes } from '../constants/swimlanes.ts';
 import { buildLocalMcpAddress, DEFAULT_MCP_BIND_HOST, DEFAULT_MCP_PORT } from '../constants/mcp.ts';
@@ -104,6 +105,7 @@ export function readInitialWorkspaceState(seeds: WorkspaceSeeds): InitialWorkspa
   const executionDefault = getDefaultStatusId(defaultSwimlanes, 'in-progress');
   const pipelineDefault = getDefaultStatusId(defaultSwimlanes, 'open');
   const preferences: AppPreferences = {
+    autoArchivePolicy: normalizeAutoArchivePolicy(storedPreferences.autoArchivePolicy),
     executionLoadStatusIds: normalizeLoadStatusIds(
       storedPreferences.executionLoadStatusIds ?? storedPreferences.executionLoadStatusId,
       [executionDefault],

@@ -1,3 +1,4 @@
+import type { AutoArchivePolicy } from '../types';
 import { useState } from 'react';
 import { Person, ProjectMilestone, StorageMeter, Task, TaskStatus, StatusColumn, TimelineSwimlane } from '../types';
 import { McpHealthCheckResult } from '../services/mcp/types';
@@ -67,6 +68,8 @@ interface PreferencesPanelProps {
   onExportGoalPolicyBackup: () => Promise<boolean>;
   onImportTasksAndProjects: (file: File) => void;
   onImportGoalPolicyBackup: (file: File) => void;
+  autoArchivePolicy?: AutoArchivePolicy;
+  onAutoArchivePolicyChange: (policy: AutoArchivePolicy) => void;
   onRestoreTasks: (taskIds: string[]) => void;
   onRestoreMilestones: (milestoneIds: string[]) => void;
   onExportArchive: () => Promise<boolean>;
@@ -142,6 +145,8 @@ export function PreferencesPanel({
   onExportGoalPolicyBackup,
   onImportTasksAndProjects,
   onImportGoalPolicyBackup,
+  autoArchivePolicy,
+  onAutoArchivePolicyChange,
   onRestoreTasks,
   onRestoreMilestones,
   onExportArchive,
@@ -489,6 +494,8 @@ export function PreferencesPanel({
         storageMeter={storageMeter}
         tasks={tasks}
         milestones={milestones}
+        autoArchivePolicy={autoArchivePolicy}
+        onAutoArchivePolicyChange={onAutoArchivePolicyChange}
         onRestoreTasks={onRestoreTasks}
         onRestoreMilestones={onRestoreMilestones}
         onExportArchive={onExportArchive}

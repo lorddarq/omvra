@@ -729,6 +729,8 @@ export function useAppShell(): AppShellState {
         onRestoreMilestone: handleRestoreMilestone,
       },
       adminActions: {
+        autoArchivePolicy: preferences.autoArchivePolicy,
+        onAutoArchivePolicyChange: policy => setPreferences(current => ({ ...current, autoArchivePolicy: policy })),
         onExportArchive: handleExportArchive,
         onImportArchive: handleImportArchive,
         onRestoreTasks: restoreTasks,

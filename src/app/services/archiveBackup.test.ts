@@ -39,3 +39,17 @@ test('archive-heavy restore preserves 10,000 historical tasks and their Timeline
   assert.equal(restored[0].startDate, fixture.tasks[0].startDate);
   assert.equal(restored[restored.length - 1].endDate, fixture.tasks[fixture.tasks.length - 1].endDate);
 });
+
+test('workspace backups preserve policy and completion timing while archive imports do not enable a policy', async () => {
+  const { buildWorkspaceBackupPayload, createDefaultWorkspacePreferences, repairWorkspaceBackupPayload } = await import('./workspaceBackup.ts');
+  const preferences = createDefaultWorkspacePreferences([]);
+  preferences.autoArchivePolicy = { mode: 'after-completion', days: 30, enabledAt: '2026-09-22T00:00:00.000Z' };
+  const completedAt = '2026-08-01T00:00:00.000Z';
+  const payload = buildWorkspaceBackupPayload({ ...workspace, tasks: [{ ...archived, completedAt, autoArchiveSuppressed: true }], preferences });
+  const repaired = repairWorkspaceBackupPayload(payload, { fallbackPreferences: preferences, fallbackProjects: [], fallbackPeople: [], fallbackStatusColumns: [] });
+  assert.equal(repaired.ok, true);
+  assert.deepEqual(repaired.preferences.autoArchivePolicy, preferences.autoArchivePolicy);
+  assert.equal(repaired.tasks[0].completedAt, completedAt);
+  assert.equal(repaired.tasks[0].autoArchiveSuppressed, true);
+  assert.equal('preferences' in buildArchiveBackup(workspace), false);
+});

@@ -1,3 +1,5 @@
+import type { AutoArchivePolicy } from '../types.ts';
+import { normalizeAutoArchivePolicy } from '../../../electron/domain/auto-archive.mjs';
 import type { Task, TaskAttachment, TaskStatus, TimelineSwimlane, Person, StatusColumn, ProjectMilestone } from '../types.ts';
 import type {
   KanbanViewState,
@@ -43,6 +45,7 @@ export interface GoalPolicyBackupRepairResult {
 }
 
 export interface WorkspacePreferences {
+  autoArchivePolicy?: AutoArchivePolicy;
   executionLoadStatusIds: TaskStatus[];
   pipelineLoadStatusIds: TaskStatus[];
   executionLoadStatusId?: TaskStatus;
@@ -264,6 +267,8 @@ function normalizeTask(task: Task, swimlanes: TimelineSwimlane[]): Task {
       : [],
     attachments: normalizeTaskAttachments(task.attachments),
     collaboration: normalizeTaskCollaboration(task.collaboration),
+    completedAt: typeof task.completedAt === 'string' && Number.isFinite(Date.parse(task.completedAt)) ? task.completedAt : undefined,
+    autoArchiveSuppressed: task.autoArchiveSuppressed === true,
     archived: task.archived === true,
     archivedAt: typeof task.archivedAt === 'string' ? task.archivedAt : undefined,
   };
@@ -488,6 +493,7 @@ export function sanitizePreferences(
   return {
     executionLoadStatusIds,
     pipelineLoadStatusIds,
+    autoArchivePolicy: normalizeAutoArchivePolicy(preferences.autoArchivePolicy),
     updateChannel: preferences.updateChannel === 'rc' ? 'rc' : 'stable',
     markdownAppearance: sanitizeMarkdownAppearance(preferences.markdownAppearance, fallback.markdownAppearance || DEFAULT_MARKDOWN_APPEARANCE),
     skillRoots: Array.isArray(preferences.skillRoots)
@@ -893,6 +899,7 @@ export function createDefaultWorkspacePreferences(
   return {
     executionLoadStatusIds,
     pipelineLoadStatusIds,
+    autoArchivePolicy: normalizeAutoArchivePolicy(undefined),
     updateChannel: overrides.updateChannel === 'rc' ? 'rc' : 'stable',
     markdownAppearance: sanitizeMarkdownAppearance(overrides.markdownAppearance, DEFAULT_MARKDOWN_APPEARANCE),
     skillRoots: Array.isArray(overrides.skillRoots)

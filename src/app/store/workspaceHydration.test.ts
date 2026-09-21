@@ -7,6 +7,7 @@ import {
 } from './workspaceHydration.ts';
 import {
   STATUS_COLUMNS_KEY,
+  PREFERENCES_KEY,
   SWIMLANES_KEY,
   TASKS_KEY,
 } from './workspacePersistence.ts';
@@ -40,6 +41,7 @@ test('restart hydration restores portable local workspace data in dependency ord
         [SWIMLANES_KEY]: JSON.stringify([project]),
         [STATUS_COLUMNS_KEY]: JSON.stringify([{ id: 'open', title: 'Open', color: '#64748b' }]),
         [TASKS_KEY]: JSON.stringify([task]),
+        [PREFERENCES_KEY]: JSON.stringify({ autoArchivePolicy: { mode: 'after-completion', days: 30 } }),
       }),
     },
   });
@@ -55,6 +57,7 @@ test('restart hydration restores portable local workspace data in dependency ord
     assert.equal(state.timelineSwimlanes[0]?.id, project.id);
     assert.equal(state.tasks[0]?.title, task.title);
     assert.equal(state.tasks[0]?.swimlaneId, project.id);
+    assert.deepEqual(state.preferences.autoArchivePolicy, { mode: 'after-completion', days: 30, enabledAt: undefined });
   } finally {
     if (originalWindow === undefined) {
       Reflect.deleteProperty(globalThis, 'window');

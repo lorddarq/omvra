@@ -1,3 +1,4 @@
+import type { AutoArchivePolicy } from '../types';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import {
   Person,
@@ -108,6 +109,8 @@ export interface MilestonePanelActions {
 }
 
 export interface WorkspaceAdminActions {
+  autoArchivePolicy?: AutoArchivePolicy;
+  onAutoArchivePolicyChange: (policy: AutoArchivePolicy) => void;
   onRestoreTasks: (taskIds: string[]) => void;
   onRestoreMilestones: (milestoneIds: string[]) => void;
   onExportArchive: () => Promise<boolean>;
@@ -281,6 +284,8 @@ export function AppPanels({
         onExportGoalPolicyBackup: adminActions.onExportGoalPolicyBackup,
         onImportTasksAndProjects: adminActions.onImportTasksAndProjects,
         onImportGoalPolicyBackup: adminActions.onImportGoalPolicyBackup,
+        autoArchivePolicy: adminActions.autoArchivePolicy,
+        onAutoArchivePolicyChange: adminActions.onAutoArchivePolicyChange,
         onRestoreTasks: adminActions.onRestoreTasks,
         onRestoreMilestones: adminActions.onRestoreMilestones,
         onExportArchive: adminActions.onExportArchive,

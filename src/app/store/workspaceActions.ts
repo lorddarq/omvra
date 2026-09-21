@@ -12,11 +12,15 @@ import {
 import type { StatusColumnState } from '../utils/workspaceSanitizers.ts';
 import {
   deleteMilestoneFromWorkspace,
+  archiveMilestoneRecords,
+  archiveTaskRecords,
   linkTaskToMilestones,
   removeTaskFromMilestones,
   saveMilestoneRecord,
   syncMilestoneTaskLinks,
   updateRoadmapTaskDependencies,
+  restoreMilestoneRecords,
+  restoreTaskRecords,
 } from './workspaceMutations.ts';
 import type { AppPreferences } from './workspaceStore.tsx';
 
@@ -88,6 +92,21 @@ export function useWorkspaceActions(options: WorkspaceActionOptions) {
   const applyRoadmapTaskDependencies = useCallback((updates: Array<{ taskId: string; dependencyIds: string[] }>) => {
     setTasks(previous => updateRoadmapTaskDependencies(previous, updates));
   }, [setTasks]);
+  const archiveTasks = useCallback((taskIds: string[], archivedAt = new Date().toISOString()) => {
+    const result = archiveTaskRecords(tasksRef.current || [], taskIds, archivedAt);
+    setTasks(result.tasks);
+    return result.blockedTaskIds;
+  }, [setTasks, tasksRef]);
+  const restoreTasks = useCallback((taskIds: string[]) => {
+    setTasks(previous => restoreTaskRecords(previous, taskIds));
+  }, [setTasks]);
+  const archiveMilestones = useCallback((milestoneIds: string[], archivedAt = new Date().toISOString()) => {
+    setMilestones(previous => archiveMilestoneRecords(previous, milestoneIds, archivedAt));
+  }, [setMilestones]);
+  const restoreMilestones = useCallback((milestoneIds: string[]) => {
+    setTasks(previous => restoreMilestoneRecords(previous, milestones, milestoneIds).tasks);
+    setMilestones(previous => restoreMilestoneRecords([], previous, milestoneIds).milestones);
+  }, [milestones, setMilestones, setTasks]);
 
   const toggleExecutionLoadStatus = useCallback((statusId: TaskStatus) => {
     setPreferences(previous => ({
@@ -199,6 +218,10 @@ export function useWorkspaceActions(options: WorkspaceActionOptions) {
     linkTaskMilestone,
     removeTaskMilestoneLinks,
     applyRoadmapTaskDependencies,
+    archiveTasks,
+    restoreTasks,
+    archiveMilestones,
+    restoreMilestones,
     toggleExecutionLoadStatus,
     togglePipelineLoadStatus,
     setCleanupGoalArtifacts,

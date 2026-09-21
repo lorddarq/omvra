@@ -39,6 +39,8 @@ interface TaskDetailsDialogProps {
   onMoveAgentTaskToReview?: (taskId: string) => void;
   onAddComment?: (taskId: string, content: string) => void;
   onUpdateAttachments?: (taskId: string, attachments: TaskAttachment[]) => void;
+  onArchive?: (taskId: string) => void;
+  onRestore?: (taskId: string) => void;
   task?: Task | null;
   swimlanes: TimelineSwimlane[];
   people: Person[];
@@ -62,6 +64,8 @@ export function TaskDetailsDialog({
   onMoveAgentTaskToReview,
   onAddComment,
   onUpdateAttachments,
+  onArchive,
+  onRestore,
   task,
   swimlanes,
   people,
@@ -324,6 +328,9 @@ export function TaskDetailsDialog({
               onEdit={handleEditTask}
               onCopy={handleCopyTaskDetails}
               onExportPdf={handleExportPdf}
+              onArchive={!task.archived && onArchive ? () => onArchive(task.id) : undefined}
+              onRestore={task.archived && onRestore ? () => onRestore(task.id) : undefined}
+              isArchived={Boolean(task.archived)}
               onStartWork={() => {
                 if (task) requestTask(task, { repositoryFolder: swimlanes.find(project => project.id === task.swimlaneId || task.projectIds?.includes(project.id))?.repositoryFolder });
                 onClose();

@@ -1207,12 +1207,14 @@ function getWorkspaceSnapshot(store) {
 }
 
 function listKanbanCards(store, filters = {}) {
-  const tasks = listTasks(store, filters);
+  const tasks = listTasks(store, { ...filters, archiveVisibility: filters.archiveVisibility || 'active' });
   const statusColumns = readArray(store, STATUS_COLUMNS_KEY).map(normalizeStatusColumnForMcp);
   const statusById = new Map(statusColumns.map(column => [normalizeString(column.id), column]));
 
   return tasks.map(task => ({
     id: task.id,
+    archived: task.archived === true,
+    archivedAt: task.archivedAt,
     status: task.status,
     statusTitle: statusById.get(normalizeString(task.status))?.title,
     statusDescription: statusById.get(normalizeString(task.status))?.description,
@@ -1224,7 +1226,7 @@ function listKanbanCards(store, filters = {}) {
 }
 
 function listTimelineCards(store, filters = {}) {
-  const tasks = readArray(store, TASKS_KEY).map(normalizeTaskForMcp);
+  const tasks = listTasks(store, { archiveVisibility: filters.archiveVisibility || 'active' });
   const projects = readArray(store, SWIMLANES_KEY).map(normalizeProjectForMcp);
   const projectById = new Map(projects.map(project => [normalizeString(project.id), project]));
   const laneId = normalizeString(filters.laneId);
@@ -1244,6 +1246,8 @@ function listTimelineCards(store, filters = {}) {
     })
     .map(task => ({
       id: task.id,
+      archived: task.archived === true,
+      archivedAt: task.archivedAt,
       title: task.title,
       swimlaneId: task.swimlaneId,
       swimlaneName: projectById.get(normalizeString(task.swimlaneId))?.name,

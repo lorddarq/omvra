@@ -182,6 +182,7 @@ export function TaskDialog({
       return [...new Map(
         [...milestoneCandidates, ...existingDependencies]
           .filter(candidate => candidate.id !== task?.id)
+          .filter(candidate => !candidate.archived || existingDependencyIds.has(candidate.id))
           .map(candidate => [candidate.id, candidate] as const)
       ).values()];
     },

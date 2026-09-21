@@ -163,6 +163,8 @@ export function normalizeTask(task: Task, swimlanes: TimelineSwimlane[]): Task {
       : [],
     attachments: normalizeTaskAttachments(task.attachments),
     collaboration: normalizeTaskCollaboration(task.collaboration),
+    archived: task.archived === true,
+    archivedAt: typeof task.archivedAt === 'string' ? task.archivedAt : undefined,
   };
 }
 
@@ -197,6 +199,8 @@ export function sanitizeMilestones(
         notes: typeof item.notes === 'string' ? item.notes : undefined,
         color: typeof item.color === 'string' ? item.color : undefined,
         linkedTaskIds: Array.isArray(item.linkedTaskIds) ? item.linkedTaskIds.map(String) : [],
+        archived: item.archived === true,
+        archivedAt: typeof item.archivedAt === 'string' ? item.archivedAt : undefined,
       };
     })
     .filter((item): item is ProjectMilestone => Boolean(item));

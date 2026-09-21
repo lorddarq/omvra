@@ -21,6 +21,7 @@ import {
 } from '../../utils/timeSurface';
 import type { WorkspaceReadModel } from '../../domain/workspaceReadModel';
 import { getRoadmapStage, getRoadmapStageProgress } from '../../utils/statusColumnSemantics';
+import { filterMilestonesByArchiveVisibility, filterTasksByArchiveVisibility } from '../../utils/archiving';
 import { useFixedTimeSurfaceNavigation } from '../../hooks/useFixedTimeSurfaceNavigation.ts';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -32,6 +33,7 @@ import { RoadmapMilestoneSidebar } from '../RoadmapMilestoneSidebar';
 import { RoadmapToolbar, type RoadmapDateWindow } from '../RoadmapToolbar';
 import { HorizontalScrollbar } from '../HorizontalScrollbar';
 import { getAttentionState, type AttentionKind } from '../../utils/attention';
+import type { ArchiveVisibility } from '../../utils/archiving';
 
 interface RoadmapViewProps {
   milestones: ProjectMilestone[];
@@ -51,6 +53,7 @@ interface RoadmapRow {
   milestone: ProjectMilestone;
   projects: TimelineSwimlane[];
   summary: ReturnType<typeof summarizeMilestone>;
+  visibleLinkedTasks: Task[];
   top: number;
   height: number;
 }
@@ -181,12 +184,13 @@ export function RoadmapView({
   const [projectFilter, setProjectFilter] = useState('all');
   const [healthFilter, setHealthFilter] = useState<MilestoneHealth | 'all'>('all');
   const [dateWindow, setDateWindow] = useState<RoadmapDateWindow>('all');
+  const [archiveVisibility, setArchiveVisibility] = useState<ArchiveVisibility>('active');
   const [chartViewportHeight, setChartViewportHeight] = useState(0);
   const enrichedMilestoneById = readModel?.milestonesById;
 
   const filteredMilestones = useMemo(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
-    return milestones
+    return filterMilestonesByArchiveVisibility(milestones, archiveVisibility)
       .filter(milestone => showCompleted || !isMilestoneComplete(milestone, tasks, statusColumns))
       .filter(milestone => {
         if (!normalizedSearch) return true;
@@ -215,9 +219,9 @@ export function RoadmapView({
       })
       .filter(milestone => isMilestoneInDateWindow(milestone, dateWindow))
       .sort((a, b) => a.endDate.localeCompare(b.endDate));
-  }, [dateWindow, enrichedMilestoneById, healthFilter, milestones, projectFilter, projects, searchQuery, showCompleted, statusColumns, tasks]);
+  }, [archiveVisibility, dateWindow, enrichedMilestoneById, healthFilter, milestones, projectFilter, projects, searchQuery, showCompleted, statusColumns, tasks]);
 
-  const hasActiveFilters = searchQuery.trim() !== '' || projectFilter !== 'all' || healthFilter !== 'all' || dateWindow !== 'all';
+  const hasActiveFilters = archiveVisibility !== 'active' || searchQuery.trim() !== '' || projectFilter !== 'all' || healthFilter !== 'all' || dateWindow !== 'all';
   const range = useMemo(() => getDateRange(filteredMilestones, tasks), [filteredMilestones, tasks]);
   const allDates = useMemo(() => buildDateSequence(range), [range]);
   const monthGroups = useMemo(() => {
@@ -247,12 +251,13 @@ export function RoadmapView({
         projects: enrichedMilestone?.projects
           ?? projects.filter(project => getMilestoneProjectIds(milestone).includes(project.id)),
         summary,
+        visibleLinkedTasks: filterTasksByArchiveVisibility(summary.linkedTasks, archiveVisibility === 'active' ? 'active' : 'all'),
       };
     });
-  }, [enrichedMilestoneById, filteredMilestones, projects, statusColumns, tasks]);
+  }, [archiveVisibility, enrichedMilestoneById, filteredMilestones, projects, statusColumns, tasks]);
   const rows = useMemo<RoadmapRow[]>(() => {
     const availableRowsHeight = Math.max(0, chartViewportHeight - HEADER_HEIGHT);
-    const baseHeights = rowSummaries.map(row => getRoadmapRowHeight(row.summary.linkedTasks.length));
+    const baseHeights = rowSummaries.map(row => getRoadmapRowHeight(row.visibleLinkedTasks.length));
     const totalBaseHeight = baseHeights.reduce((total, height) => total + height, 0);
     const extraHeightPerRow = rowSummaries.length > 0 && totalBaseHeight < availableRowsHeight
       ? (availableRowsHeight - totalBaseHeight) / rowSummaries.length
@@ -302,6 +307,7 @@ export function RoadmapView({
     setProjectFilter('all');
     setHealthFilter('all');
     setDateWindow('all');
+    setArchiveVisibility('active');
   };
 
   useLayoutEffect(() => {
@@ -328,6 +334,7 @@ export function RoadmapView({
         projectFilter={projectFilter}
         healthFilter={healthFilter}
         dateWindow={dateWindow}
+        archiveVisibility={archiveVisibility}
         condensedUI={condensedUI}
         hasActiveFilters={hasActiveFilters}
         projects={projects}
@@ -336,6 +343,7 @@ export function RoadmapView({
         onProjectFilterChange={setProjectFilter}
         onHealthFilterChange={setHealthFilter}
         onDateWindowChange={setDateWindow}
+        onArchiveVisibilityChange={setArchiveVisibility}
         onResetFilters={resetFilters}
         onAddMilestone={onAddMilestone}
         onScrollTimelineLeft={navigation.scrollLeftByStep}
@@ -465,7 +473,7 @@ export function RoadmapView({
                     </marker>
                   </defs>
                   {rows.flatMap(row => {
-                    const sortedTasks = sortRoadmapTasks(row.summary.linkedTasks);
+                    const sortedTasks = sortRoadmapTasks(row.visibleLinkedTasks);
                     const taskById = new Map(sortedTasks.map(task => [task.id, task]));
                     const taskIndexById = new Map(sortedTasks.map((task, index) => [task.id, index]));
                     return sortedTasks.flatMap(task =>
@@ -498,7 +506,7 @@ export function RoadmapView({
                 {rows.map(row => {
                   const milestoneLeft = daysBetweenLocal(range.start, parseISODateLocal(row.milestone.endDate) || range.start) * DAY_WIDTH + DAY_WIDTH / 2;
                   const lateTaskIds = new Set(row.summary.lateTasks.map(task => task.id));
-                  const sortedTasks = sortRoadmapTasks(row.summary.linkedTasks);
+                  const sortedTasks = sortRoadmapTasks(row.visibleLinkedTasks);
                   const milestoneProjectVisual = getProjectVisual(row.projects[0], {
                     explicitColor: row.milestone.color,
                   });

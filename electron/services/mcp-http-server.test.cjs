@@ -1039,6 +1039,30 @@ test('list tools return record-shaped structured content', () => {
   }
 });
 
+test('milestones.list supports explicit archive visibility', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const milestones = store.get(MILESTONES_KEY) || [];
+  store.set(MILESTONES_KEY, milestones.concat({
+    id: 'milestone-archived',
+    title: 'Historical release',
+    endDate: '2025-01-01',
+    archived: true,
+    archivedAt: '2025-01-02T00:00:00.000Z',
+    linkedTaskIds: [],
+  }));
+  const dispatch = createRequestDispatcher(store);
+  const call = archiveVisibility => dispatch({
+    jsonrpc: '2.0',
+    id: `milestones-${archiveVisibility}`,
+    method: 'tools/call',
+    params: { name: 'milestones_list', arguments: { archiveVisibility } },
+  }, makeReq());
+
+  assert.ok(!call('active').result.structuredContent.milestones.some(item => item.id === 'milestone-archived'));
+  assert.ok(call('archived').result.structuredContent.milestones.some(item => item.id === 'milestone-archived'));
+  assert.ok(call('all').result.structuredContent.milestones.some(item => item.id === 'milestone-archived'));
+});
+
 test('tasks.list returns a successful Not found result for an empty filtered result set', () => {
   const dispatch = createRequestDispatcher(makeStoreFromFixture('workspace-basic'));
   const response = dispatch({
@@ -2550,4 +2574,19 @@ test('read_only profile rejects task deletion attempts', () => {
   assert.ok(response.error);
   assert.equal(response.error.code, -32003);
   assert.match(response.error.message, /read-only/i);
+});
+
+test('task and card MCP reads default to active and expose archived history explicitly', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const tasks = store.get(TASKS_KEY);
+  store.set(TASKS_KEY, [...tasks, { ...tasks[0], id: 'archive-read-test', archived: true, archivedAt: '2026-09-21T00:00:00.000Z' }]);
+  const dispatch = createRequestDispatcher(store);
+  for (const [name, field] of [['tasks_list', 'tasks'], ['cards_kanban_list', 'cards'], ['cards_timeline_list', 'cards']]) {
+    const call = archiveVisibility => dispatch({ jsonrpc: '2.0', id: name, method: 'tools/call', params: { name, arguments: { archiveVisibility } } }, makeReq()).result.structuredContent[field];
+    assert.equal(call(undefined).some(task => task.id === 'archive-read-test'), false);
+    const archived = call('archived');
+    assert.equal(archived.length, 1);
+    assert.equal(archived[0].archivedAt, '2026-09-21T00:00:00.000Z');
+    assert.equal(call('all').length, tasks.length + 1);
+  }
 });

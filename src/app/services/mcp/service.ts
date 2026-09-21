@@ -1,5 +1,6 @@
 import { McpClient, McpClientDisabledError } from './client.ts';
 import { getTaskProjectIds } from '../../utils/roadmap.ts';
+import { filterTasksByArchiveVisibility } from '../../utils/archiving.ts';
 import type {
   McpCard,
   McpClientConfig,
@@ -419,8 +420,9 @@ export function createMcpReadService(config: McpClientConfig): McpReadService {
       const assigneeId = typeof filters.assigneeId === 'string' ? filters.assigneeId : null;
       const search = typeof filters.search === 'string' ? filters.search.trim().toLowerCase() : '';
       const projectId = typeof filters.projectId === 'string' ? filters.projectId : null;
+      const archiveVisibility = filters.archiveVisibility === 'archived' || filters.archiveVisibility === 'all' ? filters.archiveVisibility : 'active';
 
-      return tasks.filter(task => {
+      return filterTasksByArchiveVisibility(tasks, archiveVisibility).filter(task => {
         if (status && task.status !== status) return false;
         if (assigneeId && (task as any).assigneeId !== assigneeId) return false;
         if (projectId && !getTaskProjectIds(task as any).includes(projectId)) return false;
@@ -452,7 +454,8 @@ export function createMcpReadService(config: McpClientConfig): McpReadService {
       const assigneeId = typeof filters.assigneeId === 'string' ? filters.assigneeId : null;
       const search = typeof filters.search === 'string' ? filters.search.trim().toLowerCase() : '';
 
-      return tasks
+      const archiveVisibility = filters.archiveVisibility === 'archived' || filters.archiveVisibility === 'all' ? filters.archiveVisibility : 'active';
+      return filterTasksByArchiveVisibility(tasks, archiveVisibility)
         .filter(task => {
           if (statusId && task.status !== statusId) return false;
           if (assigneeId && (task as any).assigneeId !== assigneeId) return false;
@@ -470,6 +473,8 @@ export function createMcpReadService(config: McpClientConfig): McpReadService {
           assigneeId: (task as any).assigneeId,
           notes: (task as any).notes,
           projectIds: (task as any).projectIds,
+          archived: Boolean((task as any).archived),
+          archivedAt: (task as any).archivedAt,
         }));
     },
 
@@ -483,8 +488,9 @@ export function createMcpReadService(config: McpClientConfig): McpReadService {
       const laneId = typeof filters.laneId === 'string' ? filters.laneId : null;
       const startDate = typeof filters.startDate === 'string' ? filters.startDate : null;
       const endDate = typeof filters.endDate === 'string' ? filters.endDate : null;
+      const archiveVisibility = filters.archiveVisibility === 'archived' || filters.archiveVisibility === 'all' ? filters.archiveVisibility : 'active';
 
-      return tasks
+      return filterTasksByArchiveVisibility(tasks, archiveVisibility)
         .filter(task => {
           const taskStart = String((task as any).startDate || '');
           const taskEnd = String((task as any).endDate || taskStart);
@@ -501,6 +507,8 @@ export function createMcpReadService(config: McpClientConfig): McpReadService {
           endDate: (task as any).endDate,
           assigneeId: (task as any).assigneeId,
           status: task.status,
+          archived: Boolean((task as any).archived),
+          archivedAt: (task as any).archivedAt,
         }));
     },
   };

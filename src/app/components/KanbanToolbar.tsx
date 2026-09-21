@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Filter, Plus, X } from 'lucide-react';
 import type { Person, TaskPriority, TimelineSwimlane } from '../types';
+import type { ArchiveVisibility } from '../utils/archiving';
 import {
   Select,
   SelectContent,
@@ -35,6 +36,7 @@ interface KanbanToolbarProps {
   activeProjectId?: string;
   activePriority?: string;
   activeAssigneeId?: string;
+  archiveVisibility: ArchiveVisibility;
   projects: TimelineSwimlane[];
   people: Person[];
   onSearchQueryChange: (value: string) => void;
@@ -56,6 +58,7 @@ export function KanbanToolbar({
   activeProjectId,
   activePriority,
   activeAssigneeId,
+  archiveVisibility,
   projects,
   people,
   onSearchQueryChange,
@@ -78,6 +81,18 @@ export function KanbanToolbar({
       </div>
 
       <div className="kanban-toolbar-actions">
+        <KanbanFilterSelect
+          value={archiveVisibility}
+          active={archiveVisibility !== 'active'}
+          placeholder="Archive"
+          onValueChange={(value) => onFilterValueChange('archiveVisibility', value)}
+          onClear={() => onClearFilter('archiveVisibility')}
+        >
+          <SelectItem value="active">Active</SelectItem>
+          <SelectItem value="archived">Archived</SelectItem>
+          <SelectItem value="all">All work</SelectItem>
+        </KanbanFilterSelect>
+
         <KanbanFilterSelect
           value={projectFilterValue}
           active={Boolean(activeProjectId)}

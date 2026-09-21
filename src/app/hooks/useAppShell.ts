@@ -1,3 +1,4 @@
+import { buildArchiveBackup, mergeArchiveBackup } from '../services/archiveBackup.ts';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { Task, TaskStatus } from '../types.ts';
 import type { GoalPolicyV1 } from '../utils/goalPolicy.ts';
@@ -112,6 +113,10 @@ export function useAppShell(): AppShellState {
     setMcpCapabilityProfile,
     hasHydratedCanonicalWorkspace,
     resetWorkspaceData,
+    archiveTasks,
+    restoreTasks,
+    archiveMilestones,
+    restoreMilestones,
   } = useWorkspaceStore();
   const executionLoadStatusIds = useMemo(() => [
     ...getStatusIdsForLoad(statusColumns, 'in-progress'),
@@ -222,6 +227,21 @@ export function useAppShell(): AppShellState {
     onTaskMilestoneChange: linkTaskMilestone,
     onTaskDeleted: removeTaskMilestoneLinks,
   });
+  const handleArchiveTask = useCallback((taskId: string) => {
+    const blockedTaskIds = archiveTasks([taskId]);
+    if (blockedTaskIds.includes(taskId)) {
+      window.alert('This task cannot be archived while it has active dependencies.');
+    }
+  }, [archiveTasks]);
+  const handleRestoreTask = useCallback((taskId: string) => {
+    restoreTasks([taskId]);
+  }, [restoreTasks]);
+  const handleArchiveMilestone = useCallback((milestoneId: string) => {
+    archiveMilestones([milestoneId]);
+  }, [archiveMilestones]);
+  const handleRestoreMilestone = useCallback((milestoneId: string) => {
+    restoreMilestones([milestoneId]);
+  }, [restoreMilestones]);
   const {
     saveSwimlane: handleSaveSwimlane,
     deleteSwimlane: deleteSwimlaneBase,
@@ -379,6 +399,30 @@ export function useAppShell(): AppShellState {
     goalPolicy,
   ]);
 
+  const archiveWorkspaceRef = useRef({ tasks, milestones, projects: timelineSwimlanes, people, statusColumns, preferences, goalPolicy });
+  archiveWorkspaceRef.current = { tasks, milestones, projects: timelineSwimlanes, people, statusColumns, preferences, goalPolicy };
+
+  const handleExportArchive = useCallback(async () => {
+    const exported = await downloadWorkspaceBackupPayload(
+      buildArchiveBackup({ tasks, milestones, projects: timelineSwimlanes, people, statusColumns }),
+      { fileNamePrefix: 'omvra-archive' },
+    );
+    setImportFeedback({ type: exported ? 'success' : 'error', message: exported ? 'Archive exported as JSON.' : 'Could not export archive.' });
+    return exported;
+  }, [tasks, milestones, timelineSwimlanes, people, statusColumns, setImportFeedback]);
+
+  const handleImportArchive = useCallback(async (file: File) => {
+    try {
+      const payload = JSON.parse(await file.text());
+      const current = archiveWorkspaceRef.current;
+      const imported = mergeArchiveBackup(payload, current);
+      replaceWorkspaceSnapshot({ tasks: imported.tasks, milestones: imported.milestones, timelineSwimlanes: imported.projects, people: imported.people, statusColumns: imported.statusColumns, preferences: current.preferences, goalPolicy: current.goalPolicy });
+      setImportFeedback({ type: 'success', message: `Imported ${imported.tasks.length - current.tasks.length} archived tasks and ${imported.milestones.length - current.milestones.length} archived milestones. Existing records were kept.` });
+    } catch (error) {
+      setImportFeedback({ type: 'error', message: error instanceof Error ? error.message : 'Could not import archive.' });
+    }
+  }, [tasks, milestones, timelineSwimlanes, people, statusColumns, preferences, goalPolicy, replaceWorkspaceSnapshot, setImportFeedback]);
+
   const handleExportGoalPolicyBackup = useCallback(async () => (
     downloadWorkspaceBackupPayload(
       buildGoalPolicyBackupPayload(goalPolicy),
@@ -426,6 +470,10 @@ export function useAppShell(): AppShellState {
       }
 
       const parsedPayload = parsed.payload as Record<string, unknown>;
+      if (parsedPayload.kind === 'omvra-archive') {
+        setImportFeedback({ type: 'error', message: 'Use Import archive JSON to merge this archive into your workspace.' });
+        return;
+      }
 
       if (!Array.isArray(parsedPayload.tasks) || !Array.isArray(parsedPayload.projects)) {
         setImportFeedback({
@@ -666,6 +714,8 @@ export function useAppShell(): AppShellState {
         onMoveAgentTaskToReview: handleMoveAgentTaskToReview,
         onAddTaskComment: handleAddTaskComment,
         onUpdateTaskAttachments: handleUpdateTaskAttachments,
+        onArchiveTask: handleArchiveTask,
+        onRestoreTask: handleRestoreTask,
       },
       milestoneActions: {
         onCloseMilestoneDialog: closeMilestoneDialog,
@@ -675,8 +725,14 @@ export function useAppShell(): AppShellState {
         onCloseMilestoneDetails: closeMilestoneDetails,
         onEditMilestoneFromDetails: editMilestoneFromDetails,
         onMilestoneTaskClick: handleMilestoneTaskClick,
+        onArchiveMilestone: handleArchiveMilestone,
+        onRestoreMilestone: handleRestoreMilestone,
       },
       adminActions: {
+        onExportArchive: handleExportArchive,
+        onImportArchive: handleImportArchive,
+        onRestoreTasks: restoreTasks,
+        onRestoreMilestones: restoreMilestones,
         onCloseSwimlaneDialog: handleCloseSwimlaneDialog,
         onSaveSwimlane: handleSaveSwimlane,
         onDeleteSwimlane: handleDeleteSwimlane,

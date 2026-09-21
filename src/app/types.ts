@@ -143,6 +143,8 @@ export interface Task {
   repositoryFolder?: string;
   mcpUpdatedAt?: string;
   mcpLastActor?: string;
+  archived?: boolean;
+  archivedAt?: string;
 }
 
 export interface ProjectMilestone {
@@ -156,6 +158,8 @@ export interface ProjectMilestone {
   notes?: string;
   color?: string;
   linkedTaskIds?: string[];
+  archived?: boolean;
+  archivedAt?: string;
 }
 
 export type GoalElementType = 'goal' | 'subgoal' | 'agent' | 'connector' | 'instructions' | 'condition' | 'approval-gate' | 'human-input' | 'retry' | 'artifact' | 'deliverable';

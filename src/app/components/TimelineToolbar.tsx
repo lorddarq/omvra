@@ -2,13 +2,16 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { TodayButton } from './TodayButton';
 import { UsersIcon } from './icons/UsersIcon';
 import { Button } from './ui/button';
+import type { ArchiveVisibility } from '../utils/archiving';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 interface TimelineToolbarProps {
   mode: 'projects' | 'people';
   showWeekends: boolean;
+  archiveVisibility: ArchiveVisibility;
   onModeChange: (mode: 'projects' | 'people') => void;
   onShowWeekendsChange: (showWeekends: boolean) => void;
+  onArchiveVisibilityChange: (visibility: ArchiveVisibility) => void;
   onScrollLeft: () => void;
   onScrollRight: () => void;
   onScrollToToday: () => void;
@@ -17,8 +20,10 @@ interface TimelineToolbarProps {
 export function TimelineToolbar({
   mode,
   showWeekends,
+  archiveVisibility,
   onModeChange,
   onShowWeekendsChange,
+  onArchiveVisibilityChange,
   onScrollLeft,
   onScrollRight,
   onScrollToToday,
@@ -42,6 +47,9 @@ export function TimelineToolbar({
           </TooltipTrigger>
           <TooltipContent side="bottom">Show people</TooltipContent>
         </Tooltip>
+        <Button type="button" variant="ghost" onClick={() => onArchiveVisibilityChange(archiveVisibility === 'active' ? 'archived' : archiveVisibility === 'archived' ? 'all' : 'active')} aria-label="Change archive visibility">
+          {archiveVisibility === 'active' ? 'Active' : archiveVisibility === 'archived' ? 'Archived' : 'All work'}
+        </Button>
       </div>
 
       <h3 className="timeline-toolbar-title">{mode === 'people' ? 'People' : 'Projects'}</h3>

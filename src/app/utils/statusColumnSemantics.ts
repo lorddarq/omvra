@@ -1,4 +1,5 @@
 import type { LoadClassification, RoadmapStage, StatusColumn, Task } from '../types.ts';
+import { filterTasksByArchiveVisibility, type ArchiveVisibility } from './archiving.ts';
 
 export function getDefaultColumnSemantics(id: string): Pick<StatusColumn, 'loadClassification' | 'roadmapStage'> {
   switch (id) {
@@ -23,10 +24,11 @@ export function getRoadmapStage(columns: StatusColumn[], statusId: string): Road
   return columns.find(column => column.id === statusId)?.roadmapStage ?? getDefaultColumnSemantics(statusId).roadmapStage;
 }
 
-export function filterTimelineTasks(tasks: Task[], columns: StatusColumn[], showCompleted: boolean): Task[] {
+export function filterTimelineTasks(tasks: Task[], columns: StatusColumn[], showCompleted: boolean, archiveVisibility: ArchiveVisibility = 'active'): Task[] {
+  const activeTasks = filterTasksByArchiveVisibility(tasks, archiveVisibility);
   return showCompleted
-    ? tasks
-    : tasks.filter(task => getRoadmapStage(columns, task.status) !== 'complete');
+    ? activeTasks
+    : activeTasks.filter(task => getRoadmapStage(columns, task.status) !== 'complete');
 }
 
 export function getRoadmapStageProgress(stage: RoadmapStage): number {

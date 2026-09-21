@@ -127,6 +127,8 @@ export interface McpWorkspaceSnapshot {
 
 export interface McpTaskSummary {
   id: string;
+  archived?: boolean;
+  archivedAt?: string;
   title?: string;
   status?: string;
   [key: string]: unknown;

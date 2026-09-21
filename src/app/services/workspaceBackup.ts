@@ -264,6 +264,8 @@ function normalizeTask(task: Task, swimlanes: TimelineSwimlane[]): Task {
       : [],
     attachments: normalizeTaskAttachments(task.attachments),
     collaboration: normalizeTaskCollaboration(task.collaboration),
+    archived: task.archived === true,
+    archivedAt: typeof task.archivedAt === 'string' ? task.archivedAt : undefined,
   };
 }
 
@@ -299,6 +301,8 @@ export function sanitizeMilestones(
         notes: typeof candidate.notes === 'string' ? candidate.notes : undefined,
         color: typeof candidate.color === 'string' ? candidate.color : undefined,
         linkedTaskIds: Array.isArray(candidate.linkedTaskIds) ? candidate.linkedTaskIds.map(String) : [],
+        archived: candidate.archived === true,
+        archivedAt: typeof candidate.archivedAt === 'string' ? candidate.archivedAt : undefined,
       };
     })
     .filter((item): item is ProjectMilestone => Boolean(item));

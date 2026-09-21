@@ -91,6 +91,8 @@ export interface TaskPanelActions {
   onMoveAgentTaskToReview: (taskId: string) => void;
   onAddTaskComment: (taskId: string, content: string) => void;
   onUpdateTaskAttachments: (taskId: string, attachments: Task['attachments']) => void;
+  onArchiveTask: (taskId: string) => void;
+  onRestoreTask: (taskId: string) => void;
 }
 
 export interface MilestonePanelActions {
@@ -101,9 +103,15 @@ export interface MilestonePanelActions {
   onCloseMilestoneDetails: () => void;
   onEditMilestoneFromDetails: (milestone: ProjectMilestone) => void;
   onMilestoneTaskClick: (task: Task) => void;
+  onArchiveMilestone: (milestoneId: string) => void;
+  onRestoreMilestone: (milestoneId: string) => void;
 }
 
 export interface WorkspaceAdminActions {
+  onRestoreTasks: (taskIds: string[]) => void;
+  onRestoreMilestones: (milestoneIds: string[]) => void;
+  onExportArchive: () => Promise<boolean>;
+  onImportArchive: (file: File) => Promise<void>;
   onCloseSwimlaneDialog: () => void;
   onSaveSwimlane: (swimlaneData: Partial<TimelineSwimlane>) => void;
   onDeleteSwimlane: (swimlaneId: string) => void;
@@ -222,7 +230,9 @@ export function AppPanels({
             onMoveAgentTaskToReview={taskActions.onMoveAgentTaskToReview}
             onAddComment={taskActions.onAddTaskComment}
             onUpdateAttachments={taskActions.onUpdateTaskAttachments}
-            task={dialogs.detailsTask}
+            onArchive={taskActions.onArchiveTask}
+            onRestore={taskActions.onRestoreTask}
+            task={workspace.tasks.find(task => task.id === dialogs.detailsTask?.id) ?? dialogs.detailsTask}
             swimlanes={workspace.timelineSwimlanes}
             people={workspace.people}
             statusColumns={workspace.statusColumns}
@@ -234,7 +244,7 @@ export function AppPanels({
       </Suspense>
 
       {shouldRenderMilestoneDetailsDialog && <DeferredSurface load={loadMilestoneDetailsDialog} errorLabel="Milestone details" fallback={<div role="status" className="p-6 text-sm text-gray-500">Loading milestone details...</div>} componentProps={{
-        isOpen: Boolean(dialogs.detailsMilestone), onClose: milestoneActions.onCloseMilestoneDetails, onEdit: milestoneActions.onEditMilestoneFromDetails, onDelete: milestoneActions.onDeleteMilestone, onTaskClick: milestoneActions.onMilestoneTaskClick, milestone: dialogs.detailsMilestone, projects: workspace.timelineSwimlanes, tasks: workspace.tasks, statusColumns: workspace.statusColumns, readModel: workspace.readModel,
+        isOpen: Boolean(dialogs.detailsMilestone), onClose: milestoneActions.onCloseMilestoneDetails, onEdit: milestoneActions.onEditMilestoneFromDetails, onDelete: milestoneActions.onDeleteMilestone, onArchive: milestoneActions.onArchiveMilestone, onRestore: milestoneActions.onRestoreMilestone, onTaskClick: milestoneActions.onMilestoneTaskClick, milestone: workspace.milestones.find(milestone => milestone.id === dialogs.detailsMilestone?.id) ?? dialogs.detailsMilestone, projects: workspace.timelineSwimlanes, tasks: workspace.tasks, statusColumns: workspace.statusColumns, readModel: workspace.readModel,
       }} />}
 
       {shouldRenderMilestoneDialog && <DeferredSurface load={loadMilestoneDialog} errorLabel="Milestone dialog" fallback={<div role="status" className="p-6 text-sm text-gray-500">Loading milestone dialog...</div>} componentProps={{
@@ -262,6 +272,7 @@ export function AppPanels({
         showCompletedTimelineTasks: preferences.showCompletedTimelineTasks,
         people: workspace.people,
         tasks: workspace.tasks,
+        milestones: workspace.milestones,
         timelineSwimlanes: workspace.timelineSwimlanes,
         storageMeter: preferences.storageMeter,
         importFeedback: preferences.importFeedback,
@@ -270,6 +281,10 @@ export function AppPanels({
         onExportGoalPolicyBackup: adminActions.onExportGoalPolicyBackup,
         onImportTasksAndProjects: adminActions.onImportTasksAndProjects,
         onImportGoalPolicyBackup: adminActions.onImportGoalPolicyBackup,
+        onRestoreTasks: adminActions.onRestoreTasks,
+        onRestoreMilestones: adminActions.onRestoreMilestones,
+        onExportArchive: adminActions.onExportArchive,
+        onImportArchive: adminActions.onImportArchive,
         onUpdateChannelChange: adminActions.onUpdateChannelChange,
         onMarkdownAppearanceChange: adminActions.onMarkdownAppearanceChange,
         onShowCompletedTimelineTasksChange: adminActions.onShowCompletedTimelineTasksChange,

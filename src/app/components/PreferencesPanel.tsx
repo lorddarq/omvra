@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Person, StorageMeter, Task, TaskStatus, StatusColumn, TimelineSwimlane } from '../types';
+import { Person, ProjectMilestone, StorageMeter, Task, TaskStatus, StatusColumn, TimelineSwimlane } from '../types';
 import { McpHealthCheckResult } from '../services/mcp/types';
 import type { MarkdownAppearance } from '../utils/markdownAppearance';
 import type { GoalPolicyV1 } from '../utils/goalPolicy';
@@ -42,6 +42,7 @@ interface PreferencesPanelProps {
   markdownAppearance: MarkdownAppearance;
   people: Person[];
   tasks: Task[];
+  milestones: ProjectMilestone[];
   timelineSwimlanes: TimelineSwimlane[];
   onMarkdownAppearanceChange: (updates: Partial<MarkdownAppearance>) => void;
   onShowCompletedTimelineTasksChange: (show: boolean) => void;
@@ -66,6 +67,10 @@ interface PreferencesPanelProps {
   onExportGoalPolicyBackup: () => Promise<boolean>;
   onImportTasksAndProjects: (file: File) => void;
   onImportGoalPolicyBackup: (file: File) => void;
+  onRestoreTasks: (taskIds: string[]) => void;
+  onRestoreMilestones: (milestoneIds: string[]) => void;
+  onExportArchive: () => Promise<boolean>;
+  onImportArchive: (file: File) => Promise<void>;
   importFeedback?: {
     type: 'success' | 'error';
     message: string;
@@ -117,6 +122,7 @@ export function PreferencesPanel({
   markdownAppearance,
   people,
   tasks,
+  milestones,
   timelineSwimlanes,
   onMarkdownAppearanceChange,
   onShowCompletedTimelineTasksChange,
@@ -136,6 +142,10 @@ export function PreferencesPanel({
   onExportGoalPolicyBackup,
   onImportTasksAndProjects,
   onImportGoalPolicyBackup,
+  onRestoreTasks,
+  onRestoreMilestones,
+  onExportArchive,
+  onImportArchive,
   importFeedback,
   mcpAgentAccessEnabled,
   mcpAddress,
@@ -477,6 +487,12 @@ export function PreferencesPanel({
 
       <DataSettingsSection
         storageMeter={storageMeter}
+        tasks={tasks}
+        milestones={milestones}
+        onRestoreTasks={onRestoreTasks}
+        onRestoreMilestones={onRestoreMilestones}
+        onExportArchive={onExportArchive}
+        onImportArchive={onImportArchive}
         onNukeLocalData={onNukeLocalData}
         onExportWorkspaceBackup={onExportWorkspaceBackup}
         onImportTasksAndProjects={onImportTasksAndProjects}

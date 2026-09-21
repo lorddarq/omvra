@@ -1,4 +1,4 @@
-import { Check, TriangleAlert } from 'lucide-react';
+import { Archive, ArchiveRestore, Check, TriangleAlert } from 'lucide-react';
 import { OverflowActionMenu } from './OverflowActionMenu';
 import { PenWritingIcon } from './icons/PenWritingIcon';
 import { FilesCopyIcon } from './icons/FilesCopyIcon';
@@ -18,6 +18,11 @@ interface TaskDetailsActionMenuProps {
   onCopy: () => void;
   onExportPdf?: () => void;
   onStartWork?: () => void;
+  onArchive?: () => void;
+  onRestore?: () => void;
+  isArchived?: boolean;
+  archiveLabel?: string;
+  restoreLabel?: string;
 }
 
 export function TaskDetailsActionMenu({
@@ -31,6 +36,11 @@ export function TaskDetailsActionMenu({
   onCopy,
   onExportPdf,
   onStartWork,
+  onArchive,
+  onRestore,
+  isArchived = false,
+  archiveLabel = 'Archive task',
+  restoreLabel = 'Unarchive task',
 }: TaskDetailsActionMenuProps) {
   const CopyIcon = copyState === 'copied' ? Check : copyState === 'failed' ? TriangleAlert : FilesCopyIcon;
 
@@ -40,6 +50,8 @@ export function TaskDetailsActionMenu({
       items={[
         ...(canEdit ? [{ label: 'Edit', icon: PenWritingIcon, onSelect: onEdit }] : []),
         ...(onStartWork ? [{ label: 'Start work', icon: Play, onSelect: onStartWork }] : []),
+        ...(isArchived && onRestore ? [{ label: restoreLabel, icon: ArchiveRestore, onSelect: onRestore }] : []),
+        ...(!isArchived && onArchive ? [{ label: archiveLabel, icon: Archive, onSelect: onArchive }] : []),
         {
           label: copyLabel,
           icon: CopyIcon,

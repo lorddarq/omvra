@@ -1,0 +1,7 @@
+interface:
+  display_name: "Agent-ready roadmap shaping"
+  short_description: "Turn vague ideas into approved executable roadmaps"
+  default_prompt: "Use $agent-ready-roadmap-shaping to shape this idea into a PRD, architecture plan, milestone, and dependency-ordered tasks."
+
+policy:
+  allow_implicit_invocation: true

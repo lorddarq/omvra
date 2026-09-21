@@ -179,6 +179,8 @@ function createTaskService({
   
     return tasks.filter(task => {
       if (!task || typeof task !== 'object') return false;
+      if (filters.archiveVisibility === 'active' && task.archived === true) return false;
+      if (filters.archiveVisibility === 'archived' && task.archived !== true) return false;
       if (status && task.status !== status) return false;
       if (assigneeId && task.assigneeId !== assigneeId) return false;
   

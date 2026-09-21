@@ -1,9 +1,12 @@
+import { FeatheredScrollList } from './FeatheredScrollList';
+import { TaskCheckboxControl } from './TaskCheckboxControl';
+import { MagnifierIcon } from './icons/MagnifierIcon';
+import { taskEditIconFieldClassName } from './taskFormStyles';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AlertTriangle, Check, CheckCircle2, Download, Upload } from 'lucide-react';
-import { Person, RoadmapStage, StatusColumn, StorageMeter } from '../types';
+import { Person, ProjectMilestone, RoadmapStage, StatusColumn, StorageMeter, Task } from '../types';
 import { getDefaultGoalBudgetDimension, type GoalPolicyBudgetMode, type GoalPolicyDimension, type GoalPolicyV1 } from '../utils/goalPolicy';
 import { AnchoredPanel, AnchoredPanelSection } from './AnchoredPanel';
-import { AgentBoardWatchSettings } from './settings/AgentBoardWatchSettings';
 import { AgentIcon } from './icons/AgentIcon';
 import { FolderIcon } from './icons/FolderIcon';
 import { UsersIcon } from './icons/UsersIcon';
@@ -579,6 +582,12 @@ export function TasksSettingsSection({
 }
 
 interface DataSettingsSectionProps {
+  tasks: Task[];
+  milestones: ProjectMilestone[];
+  onRestoreTasks: (taskIds: string[]) => void;
+  onRestoreMilestones: (milestoneIds: string[]) => void;
+  onExportArchive: () => Promise<boolean>;
+  onImportArchive: (file: File) => Promise<void>;
   storageMeter: StorageMeter;
   onNukeLocalData: () => void;
   onExportWorkspaceBackup: () => Promise<boolean>;
@@ -590,6 +599,12 @@ interface DataSettingsSectionProps {
 }
 
 export function DataSettingsSection({
+  tasks,
+  milestones,
+  onRestoreTasks,
+  onRestoreMilestones,
+  onExportArchive,
+  onImportArchive,
   storageMeter,
   onNukeLocalData,
   onExportWorkspaceBackup,
@@ -598,10 +613,51 @@ export function DataSettingsSection({
 }: DataSettingsSectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const usagePercent = Math.min(100, Math.max(0, storageMeter.usagePercent));
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [selectedMilestoneIds, setSelectedMilestoneIds] = useState<string[]>([]);
+  const archivedTasks = tasks.filter(task => task.archived);
+  const archivedMilestones = milestones.filter(milestone => milestone.archived);
+  const archiveInputRef = useRef<HTMLInputElement>(null);
+  const [archiveSearch, setArchiveSearch] = useState('');
+  const query = archiveSearch.trim().toLocaleLowerCase();
+  const visibleTasks = archivedTasks.filter(task => `${task.title} ${task.project || ''}`.toLocaleLowerCase().includes(query));
+  const visibleMilestones = archivedMilestones.filter(milestone => milestone.title.toLocaleLowerCase().includes(query));
+  const selectedTasks = visibleTasks.filter(task => selectedTaskIds.includes(task.id));
+  const selectedMilestones = visibleMilestones.filter(milestone => selectedMilestoneIds.includes(milestone.id));
 
   return (
     <AnchoredPanelSection id="storage" title="Local data & backup" icon={LayersIcon} description="Find local workspace data, storage usage, and backup controls.">
       <div className="min-w-0 space-y-8">
+        <div className="space-y-3">
+          <div className="text-sm font-semibold leading-5 text-[#71717a]">Archiving</div>
+          <p className="text-xs leading-4 text-[#6a7282]">Restore archived tasks and milestones without deleting their history or relationships.</p>
+          <div className="relative">
+            <MagnifierIcon className="pointer-events-none absolute left-2 top-1/2 z-10 size-[18px] -translate-y-1/2" />
+            <Input type="search" aria-label="Search archived work" placeholder="Search archived work..." value={archiveSearch} onChange={event => setArchiveSearch(event.target.value)} className={taskEditIconFieldClassName} />
+          </div>
+          <FeatheredScrollList className="max-h-60 rounded-[18px] border border-black/[0.06] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.06)]" scrollClassName="max-h-60">
+            {[
+              ...visibleTasks.map(task => ({ record: task, kind: 'Task', selected: selectedTaskIds, select: setSelectedTaskIds, restore: onRestoreTasks })),
+              ...visibleMilestones.map(milestone => ({ record: milestone, kind: 'Milestone', selected: selectedMilestoneIds, select: setSelectedMilestoneIds, restore: onRestoreMilestones })),
+            ].map(({ record, kind, selected, select, restore }) => (
+              <div key={`${kind}-${record.id}`} className="flex min-h-10 items-center gap-2 border-b border-black/[0.06] px-3 last:border-b-0 hover:bg-[#71717a]/5">
+                <TaskCheckboxControl ariaLabel={`Select ${kind.toLowerCase()}: ${record.title}`} checked={selected.includes(record.id)} onCheckedChange={checked => select(current => checked ? [...current, record.id] : current.filter(id => id !== record.id))} />
+                <span className="shrink-0 text-xs text-[#71717a]">{kind}</span>
+                <span className="min-w-0 flex-1 truncate text-sm text-[#3f3f46]" title={record.title}>{record.title}</span>
+                <Button type="button" variant="ghost" size="sm" onClick={() => restore([record.id])}>Unarchive</Button>
+              </div>
+            ))}
+            {!visibleTasks.length && !visibleMilestones.length && <p className="px-3 py-4 text-xs text-[#6a7282]">{query ? 'No archived work matches your search.' : 'No archived work.'}</p>}
+          </FeatheredScrollList>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" disabled={!visibleTasks.length && !visibleMilestones.length} onClick={() => { setSelectedTaskIds(visibleTasks.map(task => task.id)); setSelectedMilestoneIds(visibleMilestones.map(milestone => milestone.id)); }}>Select all matching</Button>
+            <Button type="button" variant="outline" size="sm" disabled={!selectedTasks.length && !selectedMilestones.length} onClick={() => { onRestoreTasks(selectedTasks.map(task => task.id)); onRestoreMilestones(selectedMilestones.map(milestone => milestone.id)); setSelectedTaskIds([]); setSelectedMilestoneIds([]); }}>Unarchive selected</Button>
+            <Button type="button" variant="outline" size="sm" disabled={!archivedTasks.length && !archivedMilestones.length} onClick={() => { void onExportArchive(); }}><Download className="size-4" />Export archive JSON</Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => archiveInputRef.current?.click()}><Upload className="size-4" />Import archive JSON</Button>
+            <input ref={archiveInputRef} type="file" accept=".json,application/json" className="hidden" aria-label="Import archive JSON" onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void onImportArchive(file); }} />
+          </div>
+          <p className="text-xs text-[#6a7282]">Imported records stay archived. Existing records are kept when IDs match.</p>
+        </div>
         <div className="space-y-3">
           <div className="text-sm font-semibold leading-5 text-[#71717a]">Storage Usage</div>
           <div className="space-y-2">
@@ -654,7 +710,7 @@ export function DataSettingsSection({
             <EmptyStateCard
               compact
               icon={importFeedback.type === 'error' ? <AlertTriangle className="size-4" /> : <CheckCircle2 className="size-4" />}
-              title={importFeedback.type === 'error' ? 'Backup restore failed' : 'Backup restored'}
+              title={importFeedback.type === 'error' ? 'Data operation failed' : 'Data operation complete'}
               description={importFeedback.message}
               className={importFeedback.type === 'error' ? 'border-red-200 bg-red-50/70' : 'border-emerald-200 bg-emerald-50/70'}
             />

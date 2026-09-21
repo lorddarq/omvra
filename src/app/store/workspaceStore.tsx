@@ -93,6 +93,10 @@ export interface WorkspaceStoreValue {
   linkTaskMilestone: (taskId: string, nextMilestoneId?: string) => void;
   removeTaskMilestoneLinks: (taskId: string) => void;
   applyRoadmapTaskDependencies: (updates: Array<{ taskId: string; dependencyIds: string[] }>) => void;
+  archiveTasks: (taskIds: string[], archivedAt?: string) => string[];
+  restoreTasks: (taskIds: string[]) => void;
+  archiveMilestones: (milestoneIds: string[], archivedAt?: string) => void;
+  restoreMilestones: (milestoneIds: string[]) => void;
   toggleExecutionLoadStatus: (statusId: TaskStatus) => void;
   togglePipelineLoadStatus: (statusId: TaskStatus) => void;
   setCleanupGoalArtifacts: (enabled: boolean) => void;

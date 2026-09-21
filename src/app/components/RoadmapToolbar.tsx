@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, Filter, Plus, X } from 'lucide-react';
 import type { MilestoneHealth } from '../utils/roadmap';
 import type { TimelineSwimlane } from '../types';
+import type { ArchiveVisibility } from '../utils/archiving';
 import { MILESTONE_HEALTH_VISUALS } from '../utils/roadmap';
 import { TodayButton } from './TodayButton';
 import { Button } from './ui/button';
@@ -23,6 +24,7 @@ interface RoadmapToolbarProps {
   projectFilter: string;
   healthFilter: MilestoneHealth | 'all';
   dateWindow: RoadmapDateWindow;
+  archiveVisibility: ArchiveVisibility;
   condensedUI: boolean;
   hasActiveFilters: boolean;
   projects: TimelineSwimlane[];
@@ -31,6 +33,7 @@ interface RoadmapToolbarProps {
   onProjectFilterChange: (value: string) => void;
   onHealthFilterChange: (value: MilestoneHealth | 'all') => void;
   onDateWindowChange: (value: RoadmapDateWindow) => void;
+  onArchiveVisibilityChange: (value: ArchiveVisibility) => void;
   onResetFilters: () => void;
   onAddMilestone: () => void;
   onScrollTimelineLeft: () => void;
@@ -43,6 +46,7 @@ export function RoadmapToolbar({
   projectFilter,
   healthFilter,
   dateWindow,
+  archiveVisibility,
   condensedUI,
   hasActiveFilters,
   projects,
@@ -51,6 +55,7 @@ export function RoadmapToolbar({
   onProjectFilterChange,
   onHealthFilterChange,
   onDateWindowChange,
+  onArchiveVisibilityChange,
   onResetFilters,
   onAddMilestone,
   onScrollTimelineLeft,
@@ -92,6 +97,19 @@ export function RoadmapToolbar({
         ) : null}
       </div>
       <div className="kanban-toolbar-actions">
+        <RoadmapFilterSelect
+          value={archiveVisibility}
+          active={archiveVisibility !== 'active'}
+          placeholder="Archive"
+          clearLabel="Show active work"
+          onValueChange={(value) => onArchiveVisibilityChange(value as ArchiveVisibility)}
+          onClear={() => onArchiveVisibilityChange('active')}
+        >
+          <SelectItem value="active">Active work</SelectItem>
+          <SelectItem value="archived">Archived work</SelectItem>
+          <SelectItem value="all">All work</SelectItem>
+        </RoadmapFilterSelect>
+
         <RoadmapFilterSelect
           value={projectFilter}
           active={projectFilter !== 'all'}

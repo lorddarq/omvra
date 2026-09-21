@@ -39,6 +39,8 @@ interface MilestoneDetailsDialogProps {
   onClose: () => void;
   onEdit: (milestone: ProjectMilestone) => void;
   onDelete?: (milestoneId: string) => void;
+  onArchive?: (milestoneId: string) => void;
+  onRestore?: (milestoneId: string) => void;
   onTaskClick: (task: Task) => void;
 }
 
@@ -52,6 +54,8 @@ export function MilestoneDetailsDialog({
   onClose,
   onEdit,
   onDelete,
+  onArchive,
+  onRestore,
   onTaskClick,
 }: MilestoneDetailsDialogProps) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -209,6 +213,11 @@ export function MilestoneDetailsDialog({
                 copyLabel="Copy info"
                 exportLabel="Export details"
                 onEdit={milestone ? () => onEdit(milestone) : undefined}
+                onArchive={milestone && !milestone.archived && onArchive ? () => onArchive(milestone.id) : undefined}
+                onRestore={milestone?.archived && onRestore ? () => onRestore(milestone.id) : undefined}
+                isArchived={Boolean(milestone?.archived)}
+                archiveLabel="Archive milestone"
+                restoreLabel="Unarchive milestone"
                 onCopy={handleCopyMilestoneDetails}
                 onExportPdf={handleExportPdf}
                 onStartWork={() => setStartWorkRequest(request => request + 1)}

@@ -64,6 +64,38 @@ test('restart hydration restores portable local workspace data in dependency ord
   }
 });
 
+test('restart hydration preserves archive metadata for tasks and milestones', () => {
+  const originalWindow = globalThis.window;
+  const project = { id: 'project-1', name: 'Project One', color: '#0ea5e9' };
+  const archivedAt = '2026-09-21T00:00:00.000Z';
+
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: {
+      localStorage: makeLocalStorage({
+        [SWIMLANES_KEY]: JSON.stringify([project]),
+        [TASKS_KEY]: JSON.stringify([{
+          id: 'task-1', title: 'Archived task', status: 'done', swimlaneId: project.id, archived: true, archivedAt,
+        }]),
+        ['omvra.milestones.v1']: JSON.stringify([{
+          id: 'milestone-1', title: 'Archived milestone', projectIds: [project.id], endDate: '2026-09-21', archived: true, archivedAt,
+        }]),
+      }),
+    },
+  });
+
+  try {
+    const state = readInitialWorkspaceState({ tasks: [], timelineSwimlanes: [], people: [], milestones: [] });
+    assert.equal(state.tasks[0]?.archived, true);
+    assert.equal(state.tasks[0]?.archivedAt, archivedAt);
+    assert.equal(state.milestones[0]?.archived, true);
+    assert.equal(state.milestones[0]?.archivedAt, archivedAt);
+  } finally {
+    if (originalWindow === undefined) Reflect.deleteProperty(globalThis, 'window');
+    else Object.defineProperty(globalThis, 'window', { configurable: true, value: originalWindow });
+  }
+});
+
 test('initial hydration parses each repeated workspace key once', () => {
   const originalWindow = globalThis.window;
   const reads = new Map<string, number>();

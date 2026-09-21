@@ -15,6 +15,7 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import { CalendarDays } from 'lucide-react';
 import { TimelineHeader } from '../headers/TimelineHeader';
 import { TimelineToolbar } from '../TimelineToolbar';
+import type { ArchiveVisibility } from '../../utils/archiving';
 import { PlusIcon } from '../icons/PlusIcon';
 import { UsersIcon } from '../icons/UsersIcon';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
@@ -217,9 +218,10 @@ export function TimelineView({
   // Weekend visibility toggle
   const [showWeekends, setShowWeekends] = useState<boolean>(true);
   const showCompleted = initialLayoutState?.showCompleted ?? false;
+  const [archiveVisibility, setArchiveVisibility] = useState<ArchiveVisibility>('active');
   const timelineTasks = useMemo(
-    () => filterTimelineTasks(tasks, statusColumns, showCompleted),
-    [showCompleted, statusColumns, tasks]
+    () => filterTimelineTasks(tasks, statusColumns, showCompleted, archiveVisibility),
+    [archiveVisibility, showCompleted, statusColumns, tasks]
   );
   const [horizontalMetrics, setHorizontalMetrics] = useState<{ scrollLeft: number; viewportWidth: number }>({
     scrollLeft: 0,
@@ -1131,8 +1133,10 @@ export function TimelineView({
         <TimelineToolbar
           mode={mode}
           showWeekends={showWeekends}
+          archiveVisibility={archiveVisibility}
           onModeChange={setMode}
           onShowWeekendsChange={setShowWeekends}
+          onArchiveVisibilityChange={setArchiveVisibility}
           onScrollLeft={handleScrollLeft}
           onScrollRight={handleScrollRight}
           onScrollToToday={() => scrollToToday({ smooth: false })}

@@ -100,7 +100,7 @@ A user restores an archived task or milestone and it re-enters active planning s
 - It should list archived tasks and archived milestones with enough identifying context to restore them confidently.
 - It should support direct unarchive actions.
 - Unarchiving from settings should restore a record to normal product visibility, including Timeline visibility for tasks that belong there.
-- Bulk archive and bulk restore actions should be supported here for practical workspace cleanup and recovery.
+- Bulk unarchive is supported here. Archiving belongs in task and milestone contextual menus, not Settings.
 - Restoring a standalone task should also restore any archived dependencies required for that task to re-enter active planning safely.
 
 ## Data Model Direction
@@ -248,7 +248,7 @@ Mitigation: phase the work so archive metadata and filters land before richer re
 - Default active views exclude archived items.
 - Users can explicitly include archived items when needed.
 - `Settings -> Data -> Archiving` lists archived items and supports restore/unarchive actions.
-- `Settings -> Data -> Archiving` supports bulk archive/restore actions.
+- `Settings -> Data -> Archiving` supports searchable archived-only lists, bulk unarchive, and JSON archive export/import.
 - Restoring a milestone restores its linked tasks as part of the same action.
 - Restoring a standalone task restores any archived dependencies required to make it active safely.
 - Archive metadata survives restart, backup/import, and MCP reads.
@@ -260,3 +260,18 @@ Mitigation: phase the work so archive metadata and filters land before richer re
 
 - Should archived tasks be assignable/editable by default, or should some actions be visually reduced?
 - Do we need a dedicated archive report screen now, or is archive-aware export enough for the first release?
+
+
+## UX correction and archive JSON contract (2026-09-21)
+
+The current user request supersedes the earlier Settings bulk-archive direction:
+
+- Task and milestone contextual menus own Archive/Unarchive.
+- Settings lists only archived tasks and milestones, using the existing feathered list, checkboxes, and search pattern, without a project dropdown.
+- Settings supports individual and selected unarchive actions.
+- Export archive JSON writes a versioned `omvra-archive` document containing archived tasks/milestones and project, person, and status context. Task descriptions, todos, status, dates, dependencies, and archive metadata remain in the records.
+- Import archive JSON validates the format and merges missing IDs. Existing records win; imported records remain archived. It does not restore preferences, runtime settings, or credentials. Full workspace Restore Data rejects this archive-only format to prevent accidental workspace replacement.
+- Archive files preserve relationship IDs. References to active tasks/milestones outside the archive require those records in the destination workspace; use a full workspace backup for complete migration. File attachments retain their existing portability limitations.
+- MCP task/card/milestone lists default to active and accept `archiveVisibility: active | archived | all`. Targeted reads and workspace snapshots retain history. Internal dependency/preflight reads continue to see all tasks.
+
+The wider milestone still requires automatic one-year archival policy decisions, a complete historical reporting contract, and archive-heavy runtime/release acceptance. See `specs/omvra-archiving-review-2026-09-21.md` for evidence and remaining work.

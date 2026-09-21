@@ -6,8 +6,8 @@ export type SupportingSourceOption = { value: string; label: string; searchText:
 
 export function buildArtifactOptions(tasks: Task[], milestones: ProjectMilestone[], goals: GoalRecord[], activeGoalId?: string): GoalArtifactOption[] {
   return [
-    ...tasks.map(task => ({ value: `task:${task.id}`, label: `Task · ${task.title}`, searchText: task.title, artifactType: 'task' as const, artifactId: task.id })),
-    ...milestones.map(milestone => ({ value: `milestone:${milestone.id}`, label: `Milestone · ${milestone.title}`, searchText: milestone.title, artifactType: 'milestone' as const, artifactId: milestone.id })),
+    ...tasks.filter(task => !task.archived).map(task => ({ value: `task:${task.id}`, label: `Task · ${task.title}`, searchText: task.title, artifactType: 'task' as const, artifactId: task.id })),
+    ...milestones.filter(milestone => !milestone.archived).map(milestone => ({ value: `milestone:${milestone.id}`, label: `Milestone · ${milestone.title}`, searchText: milestone.title, artifactType: 'milestone' as const, artifactId: milestone.id })),
     ...goals.filter(goal => goal.id !== activeGoalId).map(goal => ({ value: `goal:${goal.id}`, label: `Goal · ${goal.title}`, searchText: goal.title, artifactType: 'goal' as const, artifactId: goal.id })),
   ];
 }

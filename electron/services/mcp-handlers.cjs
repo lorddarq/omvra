@@ -151,7 +151,7 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
       return { result: makeToolResult(getWorkspaceSnapshot(store)) };
 
     case 'tasks.list': {
-      const tasks = listTasks(store, args);
+      const tasks = listTasks(store, { ...args, archiveVisibility: args.archiveVisibility || 'active' });
       const hasFilters = ['status', 'assigneeId', 'projectId', 'search'].some(key => typeof args[key] === 'string' && args[key].trim());
       return {
         result: makeToolResult({ tasks }, {
@@ -230,6 +230,7 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
     case 'cards.kanban.list': {
       const filters = {
         status: args.statusId,
+        archiveVisibility: args.archiveVisibility,
         assigneeId: args.assigneeId,
         search: args.search,
       };
@@ -240,7 +241,14 @@ function handleToolCall(store, req, params, { skillsRoot, userSkillsRoot, emitRu
       return { result: makeToolResult({ cards: listTimelineCards(store, args) }) };
 
     case 'milestones.list':
-      return { result: makeToolResult({ milestones: listMilestones(store) }) };
+      {
+        const archiveVisibility = args.archiveVisibility === 'archived' || args.archiveVisibility === 'all'
+          ? args.archiveVisibility
+          : 'active';
+        const milestones = listMilestones(store).filter(milestone => archiveVisibility === 'all'
+          || (archiveVisibility === 'archived' ? milestone.archived === true : milestone.archived !== true));
+        return { result: makeToolResult({ milestones }) };
+      }
 
     case 'milestones.get': {
       const milestoneId = parseMilestoneId(args);

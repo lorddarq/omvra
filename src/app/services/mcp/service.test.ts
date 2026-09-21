@@ -103,3 +103,26 @@ test('validateHealth treats underscore MCP tool aliases as canonical tools', asy
     restoreWindow();
   }
 });
+
+test('snapshot fallback filters archived task and card reads consistently', async () => {
+  const restoreWindow = setWindowMock();
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(String(init?.body || '{}'));
+    if (body.method === 'initialize') return jsonRpcResponse({ protocolVersion: '2024-11-05', capabilities: {} });
+    if (body.method === 'notifications/initialized') return new Response(null, { status: 202 });
+    const snapshot = { workspace: { ...workspaceSnapshot.workspace, tasks: [...workspaceSnapshot.workspace.tasks, { id: 'archived', title: 'Historical task', status: 'done', archived: true, archivedAt: '2026-09-21T00:00:00.000Z' }] } };
+    return jsonRpcResponse({ contents: [{ uri: body.params?.uri, text: JSON.stringify(snapshot) }] });
+  };
+  try {
+    const service = createMcpReadService({ enabled: true, endpoint: 'http://localhost:3456/mcp' });
+    for (const read of [service.listTasks, service.listKanbanCards, service.listTimelineCards]) {
+      assert.deepEqual((await read({ archiveVisibility: 'active' })).map(task => task.id), ['task-1']);
+      assert.deepEqual((await read({ archiveVisibility: 'archived' })).map(task => task.id), ['archived']);
+      assert.equal((await read({ archiveVisibility: 'all' })).length, 2);
+    }
+  } finally {
+    globalThis.fetch = previousFetch;
+    restoreWindow();
+  }
+});

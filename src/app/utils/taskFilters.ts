@@ -1,6 +1,8 @@
 import type { Person, Task, TaskPriority, TimelineSwimlane } from '../types.ts';
 import { getTaskProjectIds } from './roadmap.ts';
 import { persistJSONWithElectronMirror } from './storage.ts';
+import { filterTasksByArchiveVisibility } from './archiving.ts';
+import type { ArchiveVisibility } from './archiving.ts';
 
 export const KANBAN_TASK_FILTERS_STORAGE_KEY = 'omvra.filters.v1';
 export const UNASSIGNED_ASSIGNEE_FILTER_VALUE = '__omvra_unassigned__';
@@ -13,6 +15,7 @@ export interface KanbanTaskFilters {
   projectId?: string;
   priority?: TaskPriority;
   assigneeId?: TaskAssigneeFilterValue;
+  archiveVisibility?: ArchiveVisibility;
 }
 
 export type KanbanTaskFilterKey = keyof KanbanTaskFilters;
@@ -64,6 +67,10 @@ export function sanitizeKanbanTaskFilters(
     nextFilters.assigneeId = assigneeId;
   }
 
+  if (value.archiveVisibility === 'active' || value.archiveVisibility === 'archived' || value.archiveVisibility === 'all') {
+    nextFilters.archiveVisibility = value.archiveVisibility;
+  }
+
   return nextFilters;
 }
 
@@ -84,7 +91,7 @@ export function clearAllKanbanTaskFilters(): KanbanTaskFilters {
 }
 
 export function hasActiveKanbanTaskFilters(filters: KanbanTaskFilters): boolean {
-  return Boolean(filters.projectId || filters.priority || filters.assigneeId);
+  return Boolean(filters.projectId || filters.priority || filters.assigneeId || filters.archiveVisibility);
 }
 
 export function taskMatchesKanbanFilters(task: Task, filters: KanbanTaskFilters): boolean {
@@ -110,6 +117,7 @@ export function taskMatchesKanbanFilters(task: Task, filters: KanbanTaskFilters)
 }
 
 export function filterKanbanTasks(tasks: Task[], filters: KanbanTaskFilters): Task[] {
-  if (!hasActiveKanbanTaskFilters(filters)) return tasks;
-  return tasks.filter(task => taskMatchesKanbanFilters(task, filters));
+  const visibleTasks = filterTasksByArchiveVisibility(tasks, filters.archiveVisibility ?? 'active');
+  if (!filters.projectId && !filters.priority && !filters.assigneeId) return visibleTasks;
+  return visibleTasks.filter(task => taskMatchesKanbanFilters(task, filters));
 }

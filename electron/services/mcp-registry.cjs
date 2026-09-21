@@ -17,6 +17,7 @@ const READ_TOOL_DEFINITIONS = [
       type: 'object',
       additionalProperties: true,
       properties: {
+        archiveVisibility: { type: 'string', enum: ['active', 'archived', 'all'], default: 'active' },
         status: { type: 'string' },
         assigneeId: { type: 'string' },
         search: { type: 'string' },
@@ -128,6 +129,7 @@ const READ_TOOL_DEFINITIONS = [
       type: 'object',
       additionalProperties: true,
       properties: {
+        archiveVisibility: { type: 'string', enum: ['active', 'archived', 'all'], default: 'active' },
         statusId: { type: 'string' },
         assigneeId: { type: 'string' },
         search: { type: 'string' },
@@ -141,6 +143,7 @@ const READ_TOOL_DEFINITIONS = [
       type: 'object',
       additionalProperties: true,
       properties: {
+        archiveVisibility: { type: 'string', enum: ['active', 'archived', 'all'], default: 'active' },
         laneId: { type: 'string' },
         startDate: { type: 'string' },
         endDate: { type: 'string' },
@@ -153,7 +156,14 @@ const READ_TOOL_DEFINITIONS = [
     inputSchema: {
       type: 'object',
       additionalProperties: false,
-      properties: {},
+      properties: {
+        archiveVisibility: {
+          type: 'string',
+          enum: ['active', 'archived', 'all'],
+          default: 'active',
+          description: 'Choose active milestones, archived milestones, or both.',
+        },
+      },
     },
   },
   {

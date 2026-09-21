@@ -133,6 +133,22 @@ test('filterKanbanTasks returns tasks matching all active filters', () => {
   );
 });
 
+test('filterKanbanTasks applies archive visibility with active as the default', () => {
+  const archivedTasks = tasks.map(task =>
+    task.id === 'task-2' ? { ...task, archived: true } : task
+  );
+
+  assert.deepEqual(filterKanbanTasks(archivedTasks, {}).map(task => task.id), ['task-1', 'task-3']);
+  assert.deepEqual(
+    filterKanbanTasks(archivedTasks, { archiveVisibility: 'archived' }).map(task => task.id),
+    ['task-2']
+  );
+  assert.deepEqual(
+    filterKanbanTasks(archivedTasks, { archiveVisibility: 'all' }).map(task => task.id),
+    ['task-1', 'task-2', 'task-3']
+  );
+});
+
 test('clear helpers support individual clear and clear all', () => {
   const filters = {
     projectId: 'project-1',

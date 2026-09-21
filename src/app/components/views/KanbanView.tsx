@@ -128,6 +128,7 @@ export function KanbanView({
   const projectFilterValue = activeFilters.projectId || ALL_FILTER_VALUE;
   const priorityFilterValue = activeFilters.priority || ALL_FILTER_VALUE;
   const assigneeFilterValue = activeFilters.assigneeId || ALL_FILTER_VALUE;
+  const archiveVisibility = activeFilters.archiveVisibility || 'active';
 
   const setFilterValue = (key: KanbanTaskFilterKey, value: string) => {
     setFilters(previousFilters => {
@@ -207,6 +208,7 @@ export function KanbanView({
         activeProjectId={activeFilters.projectId}
         activePriority={activeFilters.priority}
         activeAssigneeId={activeFilters.assigneeId}
+        archiveVisibility={archiveVisibility}
         projects={projects}
         people={people}
         onSearchQueryChange={setSearchQuery}

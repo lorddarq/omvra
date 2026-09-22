@@ -37,14 +37,21 @@ test('delay is measured from completion, inclusive at the UTC duration boundary'
   assert.equal(next[2].archived, undefined);
 });
 
-test('immediate mode applies to completion after policy enablement, not historical work', async () => {
+test('immediate mode includes historical completion without inventing missing dates', async () => {
   const { reconcileAutoArchive } = await modulePromise;
   const policy = { mode: 'on-completion', enabledAt: new Date(now).toISOString() };
   const historical = task('old');
   const before = task('new', { status: 'open', completedAt: undefined });
   const next = reconcileAutoArchive([historical, { ...before, status: 'shipped' }], [historical, before], columns, policy, now + 1);
-  assert.equal(next[0].archived, undefined);
+  assert.equal(next[0].archived, true);
   assert.equal(next[1].archived, true);
+  const legacy = task('legacy', { completedAt: undefined });
+  const suppressed = task('restored', { autoArchiveSuppressed: true });
+  const result = reconcileAutoArchive([legacy, suppressed], [legacy, suppressed], columns, { mode: 'on-completion' }, now);
+  assert.equal(result[0].archived, true);
+  assert.equal(result[0].completedAt, undefined);
+  assert.equal(result[1].archived, undefined);
+  assert.equal(reconcileAutoArchive(result, result, columns, policy, now), result);
 });
 
 test('active dependencies, running work, pending evidence and blocked tasks remain visible', async () => {

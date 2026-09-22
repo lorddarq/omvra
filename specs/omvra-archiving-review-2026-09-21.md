@@ -46,7 +46,7 @@ Reviewed the live milestone `milestone-d9fc4816-d8b2-4395-bc88-0ff14c4aad15`, al
 
 - Settings offers Off (default), After time spent Completed, and On status change to Completed. Delayed mode accepts 1–36,500 days and starts at 365 days; a day is 24 elapsed hours.
 - The user confirmed the timer starts when a task becomes Completed. Observed transitions into the Done workflow category record `completedAt`, including custom status columns. Moving out clears the timestamp; moving between completed columns retains it. Older/imported completed tasks without a known timestamp are skipped.
-- Immediate mode applies to completions on or after enabling that mode, not historical completed work. Delayed mode evaluates recorded completion timestamps. Neither mode automatically archives milestones.
+- Immediate mode includes already-completed tasks when enabled, even without a recorded completion date; it does not invent completion timestamps. Delayed mode evaluates recorded completion timestamps. Neither mode automatically archives milestones.
 - Main-process checks cover task/preferences/status/runtime-binding changes, startup, and every minute while Electron remains running, including closed windows. No OS job runs after quitting. Browser preview reuses the same pure rules.
 - Active dependency groups must all be eligible. Blocked tasks, tasks with working/submitted contributions, and tasks with active task-scoped runtime turns are skipped. They are reconsidered on subsequent checks.
 - Manual unarchive suppresses automatic re-archiving until the task is reopened and completed again. Full backup preserves policy and task metadata; archive-only import does not change workspace policy.

@@ -56,12 +56,10 @@ export function reconcileAutoArchive(tasks, previousTasks, columns, rawPolicy, n
     for (const task of prepared) {
       if (task.archived || task.autoArchiveSuppressed || task.blocked || !complete(task.status) || busyTaskIds.has(task.id)) continue;
       if (task.collaboration?.contributions?.some(item => item.state === 'working' || item.state === 'submitted')) continue;
-      const completed = Date.parse(task.completedAt);
-      if (!Number.isFinite(completed) || completed > now) continue;
-      if (policy.mode === 'on-completion') {
-        const enabled = Date.parse(policy.enabledAt);
-        if (!Number.isFinite(enabled) || completed < enabled) continue;
-      } else if (now - completed < policy.days * 86400000) continue;
+      if (policy.mode === 'after-completion') {
+        const completed = Date.parse(task.completedAt);
+        if (!Number.isFinite(completed) || now - completed < policy.days * 86400000) continue;
+      }
       candidates.add(task.id);
     }
   }

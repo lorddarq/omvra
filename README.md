@@ -10,6 +10,11 @@
 
 Omvra is a desktop workspace for planning work, running local coding agents, and reviewing their results. Tasks, projects, people, and schedules stay on your computer. Ordinary planning works without an Omvra account or an internet connection; agent providers and optional online actions may require their own authentication and network access.
 
+## Demo videos
+
+- [Watch the Omvra demo](https://www.youtube.com/watch?v=UcG_fFDlbZo&feature=youtu.be)
+- [Watch the ACP demo](https://www.youtube.com/watch?v=1xwRX2UrDs8)
+
 ## What you can do
 
 - **Plan across shared views.** Timeline schedules work by project or person, Kanban organizes statuses, and Milestones groups related tasks and dependencies.

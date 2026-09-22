@@ -657,7 +657,7 @@ export function DataSettingsSection({
               days Completed
             </label>}
             <p className="text-xs leading-4 text-[#6a7282]">Completed means a status in the Done workflow category. Checks run on changes, at startup, and every minute while Omvra is running. Active dependencies and running work prevent archiving.</p>
-            <p className="text-xs leading-4 text-[#6a7282]">Tasks without a recorded completion date are skipped. Unarchived tasks stay visible until reopened and completed again.</p>
+            <p className="text-xs leading-4 text-[#6a7282]">On status change to Completed also archives already-completed tasks when enabled. Time-based archiving skips tasks without a recorded completion date. Unarchived tasks stay visible until reopened and completed again.</p>
           </div>
           <div className="relative">
             <MagnifierIcon className="pointer-events-none absolute left-2 top-1/2 z-10 size-[18px] -translate-y-1/2" />

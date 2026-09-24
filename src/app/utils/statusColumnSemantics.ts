@@ -1,5 +1,6 @@
 import type { LoadClassification, RoadmapStage, StatusColumn, Task } from '../types.ts';
 import { filterTasksByArchiveVisibility, type ArchiveVisibility } from './archiving.ts';
+import { hasScheduledDateRange } from './date.ts';
 
 export function getDefaultColumnSemantics(id: string): Pick<StatusColumn, 'loadClassification' | 'roadmapStage'> {
   switch (id) {
@@ -25,10 +26,11 @@ export function getRoadmapStage(columns: StatusColumn[], statusId: string): Road
 }
 
 export function filterTimelineTasks(tasks: Task[], columns: StatusColumn[], showCompleted: boolean, archiveVisibility: ArchiveVisibility = 'active'): Task[] {
-  const activeTasks = filterTasksByArchiveVisibility(tasks, archiveVisibility);
+  // Unscheduled tasks stay in every other surface; only the Timeline needs a date range.
+  const scheduledTasks = filterTasksByArchiveVisibility(tasks, archiveVisibility).filter(hasScheduledDateRange);
   return showCompleted
-    ? activeTasks
-    : activeTasks.filter(task => getRoadmapStage(columns, task.status) !== 'complete');
+    ? scheduledTasks
+    : scheduledTasks.filter(task => getRoadmapStage(columns, task.status) !== 'complete');
 }
 
 export function getRoadmapStageProgress(stage: RoadmapStage): number {

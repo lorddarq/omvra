@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { AlertTriangle, ChevronsUpDown, FileText, RefreshCw, Trash2 } from 'lucide-react';
 import { Task, TaskStatus, TimelineSwimlane, Person, TaskSize, TaskComplexity, TaskPriority, StatusColumn, ProjectMilestone, TaskAttachment, TaskCollaborationV1 } from '../../types';
 import type { WorkspaceReadModel } from '../../domain/workspaceReadModel';
-import { toLocalISODate } from '../../utils/date';
+import { normalizeTaskDateRangeForSave, toLocalISODate } from '../../utils/date';
 import { getMilestoneForTask, getMilestoneProjectIds, getTaskProjectIds, getTasksForMilestone, wouldCreateDependencyCycle } from '../../utils/roadmap';
 import {
   Dialog,
@@ -142,6 +142,7 @@ export function TaskDialog({
   const [attachmentAvailabilityByPath, setAttachmentAvailabilityByPath] = useState<Record<string, boolean | undefined>>({});
   const [projectSearchQuery, setProjectSearchQuery] = useState('');
   const hasInvalidDateRange = Boolean(startDate && endDate && endDate < startDate);
+  const isUnscheduled = !startDate && !endDate;
   const currentPersistedTask = task?.id ? tasks.find(candidate => candidate.id === task.id) : undefined;
   const currentAssignmentSourceToken = getAssignmentSourceToken(currentPersistedTask);
   const hasAssignmentConflict = Boolean(task && assignmentSourceToken && currentAssignmentSourceToken !== assignmentSourceToken);
@@ -207,8 +208,6 @@ export function TaskDialog({
   useEffect(() => {
     if (task) {
       const initialProjectIds = getTaskProjectIds(task);
-      const existingStart = task.startDate || todayISO;
-      const existingEnd = task.endDate || existingStart;
       setTitle(task.title);
       setStatus(task.status);
       setNotes(task.notes || '');
@@ -216,8 +215,9 @@ export function TaskDialog({
       setComplexity(task.complexity || 'medium');
       setPriority(task.priority || 'normal');
       setBlocked(Boolean(task.blocked));
-      setStartDate(existingStart);
-      setEndDate(existingEnd);
+      // Empty dates are an intentional unscheduled state; keep them empty on reopen.
+      setStartDate(task.startDate || '');
+      setEndDate(task.endDate || '');
       setProjectIds(initialProjectIds);
       setSwimlaneId(task.swimlaneId || (initialProjectIds[0] || NO_TIMELINE_VALUE));
       setMilestoneId(
@@ -369,8 +369,7 @@ export function TaskDialog({
       repositoryFolder: repositoryFolder.trim() || undefined,
     };
 
-    taskData.startDate = startDate || todayISO;
-    taskData.endDate = endDate || taskData.startDate;
+    Object.assign(taskData, normalizeTaskDateRangeForSave(startDate, endDate));
 
     onSave(taskData);
     onClose();
@@ -503,35 +502,57 @@ export function TaskDialog({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-x-2 gap-y-5 md:grid-cols-2">
-                <TaskDateSelectField
-                  id="startDate"
-                  label="Start Date:"
-                  value={startDate}
-                  onChange={(nextStart) => {
-                    setStartDate(nextStart);
-                    if (endDate && nextStart && endDate < nextStart) {
-                      setEndDate(nextStart);
-                    }
-                  }}
-                />
-
-                <div>
+              <div className="space-y-1">
+                <div className="grid grid-cols-1 gap-x-2 gap-y-5 md:grid-cols-2">
                   <TaskDateSelectField
-                    id="endDate"
-                    label="End Date:"
-                    value={endDate}
-                    min={startDate || undefined}
-                    onChange={(nextEnd) => {
-                      if (startDate && nextEnd && nextEnd < startDate) {
-                        setEndDate(startDate);
-                        return;
+                    id="startDate"
+                    label="Start Date:"
+                    value={startDate}
+                    onChange={(nextStart) => {
+                      setStartDate(nextStart);
+                      if (endDate && nextStart && endDate < nextStart) {
+                        setEndDate(nextStart);
                       }
-                      setEndDate(nextEnd);
                     }}
                   />
-                  {hasInvalidDateRange && (
-                    <p className="mt-1 text-xs text-red-600">End date cannot be earlier than start date.</p>
+
+                  <div>
+                    <TaskDateSelectField
+                      id="endDate"
+                      label="End Date:"
+                      value={endDate}
+                      min={startDate || undefined}
+                      onChange={(nextEnd) => {
+                        if (startDate && nextEnd && nextEnd < startDate) {
+                          setEndDate(startDate);
+                          return;
+                        }
+                        setEndDate(nextEnd);
+                      }}
+                    />
+                    {hasInvalidDateRange && (
+                      <p className="mt-1 text-xs text-red-600">End date cannot be earlier than start date.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex min-h-6 items-center justify-between gap-2">
+                  <p className="text-xs leading-4 text-[#71717a]" aria-live="polite">
+                    {isUnscheduled ? 'Unscheduled. This task stays off the Timeline until it has dates.' : ''}
+                  </p>
+                  {!isUnscheduled && (
+                    <Button
+                      type="button"
+                      variant="link"
+                      onClick={() => {
+                        setStartDate('');
+                        setEndDate('');
+                        // The button unmounts once dates are empty; keep keyboard focus in the date group.
+                        document.getElementById('startDate-trigger')?.focus();
+                      }}
+                    >
+                      Clear dates
+                    </Button>
                   )}
                 </div>
               </div>
@@ -943,6 +964,7 @@ function TaskDateSelectField({ id, label, value, min, onChange }: TaskDateSelect
     <div className="space-y-1">
       <Label htmlFor={id} className={taskEditLabelClassName}>{label}</Label>
       <div
+        id={`${id}-trigger`}
         role="button"
         tabIndex={0}
         aria-label={label.replace(':', '')}
@@ -956,7 +978,7 @@ function TaskDateSelectField({ id, label, value, min, onChange }: TaskDateSelect
       >
         <CalendarIcon className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-[#71717a]" />
         <span className="min-w-0 flex-1 truncate text-[#67676f]">
-          {formatTaskDateDisplay(value)}
+          {formatTaskDateDisplay(value) || 'No date'}
         </span>
         <ChevronsUpDown className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-[#71717a]" />
         <input

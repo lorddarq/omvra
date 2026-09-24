@@ -1236,8 +1236,10 @@ function listTimelineCards(store, filters = {}) {
   return tasks
     .filter(task => {
       if (!task || typeof task !== 'object') return false;
-      const taskStart = normalizeString(task.startDate);
-      const taskEnd = normalizeString(task.endDate || task.startDate);
+      // Unscheduled tasks (no valid date range) never appear on the Timeline.
+      const taskStart = normalizeOptionalDate(task.startDate);
+      const taskEnd = task.endDate ? normalizeOptionalDate(task.endDate) : taskStart;
+      if (!taskStart || !taskEnd || taskEnd < taskStart) return false;
 
       if (laneId && task.swimlaneId !== laneId) return false;
       if (startDate && taskEnd && taskEnd < startDate) return false;

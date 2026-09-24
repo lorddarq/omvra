@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { AlertTriangle, Folder, Info, Play, Server, Minimize2, ShieldCheck, LoaderCircle, Hourglass } from 'lucide-react';
+import { AlertTriangle, Folder, Info, Play, Server, Minimize2, ShieldCheck, Hourglass } from 'lucide-react';
+import { AtomSpinner } from './ui/AtomSpinner';
 import { toast } from 'sonner';
 import type { Task } from '../types';
 import { agentRuntimeTurnState, hasAgentRuntimeTaskStarted, isAgentRuntimeTurnInFlight, projectAgentRuntimeSession, selectCurrentAgentRuntimeTurnEvents, summarizeAgentRuntimeActivity, type AgentRuntimeActivityEvent, type AgentRuntimeTurnProjection } from '../utils/agentRuntimeActivity';
@@ -717,7 +718,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                     <span className={`flex size-4 items-center justify-center rounded-full ${presentation.connection === 'Connected' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-400/10 text-slate-400'}`}><span className="size-2 rounded-full bg-current" /></span>{presentation.connection}
                   </span>
                   <span className="inline-flex items-center gap-1.5">
-                    {presentation.status === 'Working' ? <LoaderCircle className="size-4 motion-safe:animate-spin" strokeWidth={1.25} aria-hidden="true" /> : presentation.status === 'Waiting for approval' || presentation.status === 'Waiting for input' ? <Hourglass className="size-4" strokeWidth={1.25} aria-hidden="true" /> : null}{presentation.status}
+                    {presentation.status === 'Working' ? <AtomSpinner size={16} /> : presentation.status === 'Waiting for approval' || presentation.status === 'Waiting for input' ? <Hourglass className="size-4" strokeWidth={1.25} aria-hidden="true" /> : null}{presentation.status}
                   </span>
                 </div>
                 <div className="ml-auto flex items-center gap-1">

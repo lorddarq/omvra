@@ -70,3 +70,37 @@ export function updateTimelineDateRangeByKeyboard(
   if (nextEnd < startDate) return null;
   return { startDate: toLocalISODate(startDate), endDate: toLocalISODate(nextEnd) };
 }
+
+export interface TaskDateFields {
+  startDate?: string;
+  endDate?: string;
+}
+
+/**
+ * Returns the range a task occupies on the Timeline, or null when the task is
+ * intentionally unscheduled. A missing end date follows the existing one-day
+ * policy (end = start); an unparseable or inverted range is not schedulable.
+ */
+export function getScheduledDateRange(task: TaskDateFields): { start: Date; end: Date } | null {
+  const start = parseISODateLocal(task.startDate);
+  if (!start) return null;
+  if (!task.endDate) return { start, end: start };
+  const end = parseISODateLocal(task.endDate);
+  if (!end || end < start) return null;
+  return { start, end };
+}
+
+export function hasScheduledDateRange(task: TaskDateFields): boolean {
+  return getScheduledDateRange(task) !== null;
+}
+
+/**
+ * Normalizes task-editor date input for persistence. Both dates empty keeps the
+ * task unscheduled; a single date becomes a one-day range instead of being
+ * padded with today.
+ */
+export function normalizeTaskDateRangeForSave(startDate: string, endDate: string): TaskDateFields {
+  const start = startDate.trim() || undefined;
+  const end = endDate.trim() || undefined;
+  return { startDate: start ?? end, endDate: end ?? start };
+}

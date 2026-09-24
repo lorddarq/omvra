@@ -1,6 +1,7 @@
 import { McpClient, McpClientDisabledError } from './client.ts';
 import { getTaskProjectIds } from '../../utils/roadmap.ts';
 import { filterTasksByArchiveVisibility } from '../../utils/archiving.ts';
+import { hasScheduledDateRange, type TaskDateFields } from '../../utils/date.ts';
 import type {
   McpCard,
   McpClientConfig,
@@ -492,6 +493,7 @@ export function createMcpReadService(config: McpClientConfig): McpReadService {
 
       return filterTasksByArchiveVisibility(tasks, archiveVisibility)
         .filter(task => {
+          if (!hasScheduledDateRange(task as TaskDateFields)) return false;
           const taskStart = String((task as any).startDate || '');
           const taskEnd = String((task as any).endDate || taskStart);
           if (laneId && (task as any).swimlaneId !== laneId) return false;

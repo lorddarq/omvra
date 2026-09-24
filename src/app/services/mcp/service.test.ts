@@ -4,7 +4,7 @@ import { createMcpReadService } from './service.ts';
 
 const workspaceSnapshot = {
   workspace: {
-    tasks: [{ id: 'task-1', title: 'Test task', status: 'open' }],
+    tasks: [{ id: 'task-1', title: 'Test task', status: 'open', startDate: '2026-09-21', endDate: '2026-09-22' }],
     people: [],
     swimlanes: [],
     statusColumns: [{ id: 'open', title: 'Open', color: '#999999' }],
@@ -111,7 +111,7 @@ test('snapshot fallback filters archived task and card reads consistently', asyn
     const body = JSON.parse(String(init?.body || '{}'));
     if (body.method === 'initialize') return jsonRpcResponse({ protocolVersion: '2024-11-05', capabilities: {} });
     if (body.method === 'notifications/initialized') return new Response(null, { status: 202 });
-    const snapshot = { workspace: { ...workspaceSnapshot.workspace, tasks: [...workspaceSnapshot.workspace.tasks, { id: 'archived', title: 'Historical task', status: 'done', archived: true, archivedAt: '2026-09-21T00:00:00.000Z' }] } };
+    const snapshot = { workspace: { ...workspaceSnapshot.workspace, tasks: [...workspaceSnapshot.workspace.tasks, { id: 'archived', title: 'Historical task', status: 'done', startDate: '2026-09-20', endDate: '2026-09-21', archived: true, archivedAt: '2026-09-21T00:00:00.000Z' }] } };
     return jsonRpcResponse({ contents: [{ uri: body.params?.uri, text: JSON.stringify(snapshot) }] });
   };
   try {
@@ -121,6 +121,27 @@ test('snapshot fallback filters archived task and card reads consistently', asyn
       assert.deepEqual((await read({ archiveVisibility: 'archived' })).map(task => task.id), ['archived']);
       assert.equal((await read({ archiveVisibility: 'all' })).length, 2);
     }
+  } finally {
+    globalThis.fetch = previousFetch;
+    restoreWindow();
+  }
+});
+
+test('snapshot fallback keeps unscheduled tasks out of timeline cards only', async () => {
+  const restoreWindow = setWindowMock();
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(String(init?.body || '{}'));
+    if (body.method === 'initialize') return jsonRpcResponse({ protocolVersion: '2024-11-05', capabilities: {} });
+    if (body.method === 'notifications/initialized') return new Response(null, { status: 202 });
+    const snapshot = { workspace: { ...workspaceSnapshot.workspace, tasks: [...workspaceSnapshot.workspace.tasks, { id: 'unscheduled', title: 'Parked task', status: 'open' }] } };
+    return jsonRpcResponse({ contents: [{ uri: body.params?.uri, text: JSON.stringify(snapshot) }] });
+  };
+  try {
+    const service = createMcpReadService({ enabled: true, endpoint: 'http://localhost:3456/mcp' });
+    assert.deepEqual((await service.listTasks({})).map(task => task.id), ['task-1', 'unscheduled']);
+    assert.deepEqual((await service.listKanbanCards({})).map(card => card.id), ['task-1', 'unscheduled']);
+    assert.deepEqual((await service.listTimelineCards({})).map(card => card.id), ['task-1']);
   } finally {
     globalThis.fetch = previousFetch;
     restoreWindow();

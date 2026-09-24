@@ -368,6 +368,18 @@ test('timeline cards parity: cards.timeline.list aligns with lane/date semantics
   assert.deepEqual(timelineIds, ['task-1']);
 });
 
+test('timeline cards exclude unscheduled tasks while listTasks keeps them', () => {
+  const store = makeStoreFromFixture('workspace-basic');
+  const tasks = store.get(TASKS_KEY);
+  store.set(TASKS_KEY, [
+    ...tasks,
+    { id: 'task-unscheduled', title: 'Parked idea', status: 'open', swimlaneId: 'lane-1', projectIds: ['lane-1'] },
+  ]);
+
+  assert.equal(listTasks(store, {}).some(task => task.id === 'task-unscheduled'), true);
+  assert.equal(listTimelineCards(store, {}).some(card => card.id === 'task-unscheduled'), false);
+});
+
 test('safe write transition uses optimistic revision and agentic constraints', () => {
   const store = makeStoreFromFixture('workspace-basic');
   const firstRead = listTasks(store, { status: 'in-progress', assigneeId: 'agent-1' })[0];

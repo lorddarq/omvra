@@ -2,7 +2,7 @@ const { createAgentRuntimeSessionService } = require('../domain/agent-runtime-se
 
 const DAY = 86_400_000;
 const DEFAULT_POLICY = Object.freeze({ eventDays: 7, eventsPerSession: 2000, events: 20000, notificationDays: 7, notifications: 500, sessionDays: 30, sessions: 1000, turns: 10000, summaryDays: 30, projections: 1000, automatic: true });
-const LIMITS = Object.freeze({ queue: 256, reserved: 32, bytes: 1048576, batch: 32, prune: 200, databaseBytes: 256 * 1048576, walBytes: 64 * 1048576 });
+const LIMITS = Object.freeze({ queue: 256, reserved: 32, bytes: 1048576, batch: 32, prune: 200, databaseBytes: 512 * 1048576, walBytes: 256 * 1048576 });
 function fail(code) { throw Object.assign(new Error(code), { code }); }
 function object(value, keys) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => !keys.includes(key))) fail('INVALID_AGENT_WORK_INPUT');

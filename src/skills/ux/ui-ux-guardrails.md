@@ -24,7 +24,7 @@ description: Enforce strict UX/UI implementation guardrails for web and app inte
 
 Apply these principles during every design or implementation pass:
 
-- Aesthetic Usability Effect
+- **Aesthetic Usability Effect**: Users are more tolerant of minor usability issues when they find an interface visually appealing, and this effect can mask UI problems during usability testing.
 - Avoid Choice Overload
 - Chunk Information
 - Avoid Cognitive Bias

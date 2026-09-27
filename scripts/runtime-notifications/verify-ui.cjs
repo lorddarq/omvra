@@ -1,0 +1,42 @@
+// Isolated actual Electron/preload/supervisor/toast check; no user store or provider.
+const {app,BrowserWindow,ipcMain}=require('electron');
+const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
+const {registerAgentRuntimeIpcHandlers}=require('../../electron/ipc/agent-runtime.cjs');
+const {createRuntimeNotificationScheduler}=require('../../electron/services/agent-runtime-notifications.cjs');
+const root=path.resolve(__dirname,'../..');app.on('window-all-closed',()=>{});
+(async()=>{
+ const dir=await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'omvra-notifications-ui-')));app.setPath('userData',path.join(dir,'user-data'));let win,scheduler;
+ try {
+  await fs.writeFile(path.join(dir,'index.html'),'<html><body><div id="root"></div><script type="module" src="/entry.tsx"></script></body></html>');
+  await fs.writeFile(path.join(dir,'entry.tsx'),`import React from 'react';import {createRoot} from 'react-dom/client';import {Toaster} from 'sonner';import {AgentSessionSupervisorProvider,useAgentSessionSupervisor} from ${JSON.stringify(path.join(root,'src/app/components/AgentSessionSupervisor.tsx'))};function Probe(){const {sessionDock}=useAgentSessionSupervisor();return <output id="dock">{sessionDock.state}</output>;}createRoot(document.getElementById('root')).render(<AgentSessionSupervisorProvider tasks={[]} projects={[]}><Probe/><Toaster/></AgentSessionSupervisorProvider>);`);
+  const {build}=await import('vite');await build({configFile:path.join(root,'vite.config.ts'),root:dir,resolve:{alias:{react:path.join(root,'node_modules/react'),'react-dom':path.join(root,'node_modules/react-dom'),sonner:path.join(root,'node_modules/sonner')}},build:{outDir:path.join(dir,'dist'),emptyOutDir:true},logLevel:'error'});
+  let visible=false;const bindings=[];
+  registerAgentRuntimeIpcHandlers({ipcMain,store:{get:()=>undefined},listAgentRuntimeSessions:()=>({ok:true,bindings}),listAgentRuntimeSessionRequests:()=>[],setNotificationVisibility:(_sender,taskId)=>{visible=Boolean(taskId);scheduler.visibilityChanged();return {ok:true};}});
+  await app.whenReady();win=new BrowserWindow({show:false,width:900,height:700,webPreferences:{preload:path.join(root,'electron/preload.cjs'),contextIsolation:true,nodeIntegration:false,partition:'runtime-notifications-test'}});
+  const errors=[];win.webContents.on('console-message',event=>{if(event.level==='error')errors.push(event.message);});
+  scheduler=createRuntimeNotificationScheduler({isTaskVisible:()=>visible,send:notification=>{win.webContents.send('agent-runtime/event',{kind:'notification',notification});return true;}});
+  await win.loadFile(path.join(dir,'dist/index.html'));const js=code=>win.webContents.executeJavaScript(code,true);
+  async function waitFor(expression){for(let i=0;i<200;i++){if(await js(expression))return;await new Promise(r=>setTimeout(r,30));}throw new Error('UI timeout: '+expression);}
+  await waitFor("!!document.querySelector('#dock')");await new Promise(r=>setTimeout(r,150));
+  const b={id:'binding',state:'ready',scope:{kind:'task',taskId:'task'},turn:{id:'turn',state:'active'},snapshotVersion:1};
+  const publish=payload=>{win.webContents.send('agent-runtime/event',payload);scheduler.accept(payload);};
+  publish({kind:'binding',binding:b});
+  for(let i=0;i<50;i++)publish({kind:'event',binding:b,event:{id:'tool-'+i,type:'tool-state'}});
+  await waitFor("document.body.textContent.includes('Agent activity updated')");
+  assert.equal(await js("document.querySelectorAll('[data-sonner-toast]').length"),1);
+  const waiting={...b,turn:{...b.turn,state:'waiting-input'},snapshotVersion:2};publish({kind:'binding',binding:waiting,requestId:1});publish({kind:'binding',binding:waiting,requestId:1});
+  await waitFor("document.body.textContent.includes('Agent needs permission')");
+  assert.equal(await js("document.querySelectorAll('[data-sonner-toast]').length"),1);
+  await waitFor("document.querySelector('#dock').textContent==='needs-input'");
+  await js("window.electron.agentRuntime.sessions.setNotificationVisibility({taskId:'task',visible:true})");
+  for(let i=0;i<50;i++)scheduler.accept({kind:'event',binding:{...b,snapshotVersion:3},event:{id:'hidden-'+i,type:'tool-state'}});
+  assert.equal(scheduler.diagnostics().pending,0);
+  publish({kind:'storage-failure',bindingId:b.id,error:'SQLITE_FULL'});
+  await waitFor("document.body.textContent.includes('Cancel and pending input remain available')");
+  publish({kind:'storage-recovered',bindingId:b.id});
+  const completed={...b,turn:{...b.turn,state:'completed'},snapshotVersion:4};publish({kind:'binding',binding:completed});
+  await waitFor("document.body.textContent.includes('Agent run finished')");
+  assert.equal(errors.length,0,errors.join('\n'));
+  console.log(JSON.stringify({passed:true,checks:['actual preload and supervisor','aggregated activity','single runtime toast','urgent typed request dedupe','dock needs-input','visibility IPC suppression','storage failure guidance','committed completion presentation']},null,2));
+ }finally{scheduler?.dispose();win?.destroy();await fs.rm(dir,{recursive:true,force:true,maxRetries:10,retryDelay:100});}app.exit(0);
+})().catch(error=>{console.error(error);app.exit(1);});

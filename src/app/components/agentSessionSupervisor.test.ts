@@ -52,7 +52,7 @@ test('the supervisor owns a live session registry and a reopenable active-sessio
   assert.match(source, /sessions\?\.list/);
   assert.match(source, /agentRuntime\?\.getState/);
   assert.match(source, /acpRuntimeAccessEnabled === false/);
-  assert.match(source, /includeEvents: !notificationsInitialized/);
+  assert.match(source, /includeEvents: false/);
   assert.match(source, /setInterval\(\(\) => void refresh\(\), 10000\)/);
   assert.match(source, /sessions\?\.onEvent/);
   assert.match(source, /sessions\?\.requests/);
@@ -86,16 +86,19 @@ test('the supervisor owns a live session registry and a reopenable active-sessio
   const statusBar = readComponent('statuses/AppStatusBar.tsx');
   assert.match(statusBar, /useAgentSessionSupervisor/);
   assert.match(statusBar, /No active work/);
-  assert.match(statusBar, /getSessionAttentionState/);
+  // Attention is resolved once by the supervisor (see resolveAgentTaskAttention tests); the status bar only presents it.
+  assert.match(source, /resolveAgentTaskAttention/);
+  assert.match(statusBar, /sessionDock\.attention/);
+  assert.doesNotMatch(statusBar, /getSessionAttentionState|agentRuntimeTurnState/);
   assert.match(statusBar, /outcome-review/);
   assert.match(statusBar, /Popover open=\{expanded && hasSessions\} onOpenChange=\{setExpanded\}/);
   assert.match(statusBar, /FeatheredScrollList/);
   assert.match(statusBar, /h-\[30px\]/);
   assert.doesNotMatch(statusBar, /Latest and recent task sessions/);
-  assert.match(statusBar, /getAttentionState\('blocked'\)/);
+  assert.match(statusBar, /attention\.kind === 'blocked'/);
   assert.match(statusBar, /Open supervision:/);
-  assert.match(statusBar, /pendingRequest\.message/);
-  assert.match(statusBar, /Input request unavailable/);
+  assert.match(statusBar, /ShieldAlert/);
+  assert.match(statusBar, /CircleStop/);
   const activityIndex = execution.indexOf('Agent activity');
   const pendingActionsIndex = execution.indexOf("onRespond={(request, action) => void respondToRequest(request, action)}");
   assert.ok(pendingActionsIndex > activityIndex, 'Pending request actions must remain beside the anchored composer area');
@@ -129,8 +132,41 @@ test('dock and task supervision consume one shared session status projection', (
   const execution = readComponent('TaskExecutionAction.tsx');
 
   assert.match(supervisor, /projectAgentRuntimeSession\(activeBinding/);
-  assert.match(execution, /projectAgentRuntimeSession\(binding \|\| undefined, events\)/);
+  assert.match(execution, /projectAgentRuntimeSession\(binding \|\| undefined, \[\], \{ turnCompleted: latestTurnCompleted \}\)/);
   assert.match(supervisor, /setBindings\(current =>/);
   assert.match(supervisor, /refreshPendingRequest\(nextBinding\)/);
   assert.doesNotMatch(supervisor, /notifyCompletedRuns\(\[payload\.event as RuntimeEvent\][\s\S]{0,200}void refresh\(\)/);
+});
+
+test('supervision consumes one supervisor-owned bounded projection instead of accumulating events', () => {
+  const supervisor = readComponent('AgentSessionSupervisor.tsx');
+  const execution = readComponent('TaskExecutionAction.tsx');
+  assert.equal(supervisor.match(/useAgentRuntimeDelivery\(/g)?.length, 1, 'exactly one renderer delivery subscription');
+  assert.match(supervisor, /useAgentRuntimeDelivery\(supervisedBindingId, supervisionVisible && Boolean\(request\)\)/);
+  assert.match(supervisor, /delivery=\{delivery\}/);
+  assert.match(supervisor, /onBindingChange=\{setSupervisedBindingId\}/);
+  assert.doesNotMatch(execution, /useAgentRuntimeDelivery/, 'the modal never opens its own subscription');
+  assert.doesNotMatch(execution, /setEvents|\[\.\.\.current, nextEvent\]|getLatestTaskAgentOutput/, 'no task-local event log');
+  assert.match(execution, /projectDeliveryActivity\(deliveryControl\?\.activity\)/);
+  assert.match(execution, /delivery\?\.bindingId === binding\.id/, 'a projection for another binding is never shown');
+});
+
+test('hiding supervision never ends the session and cancel stays an explicit command', () => {
+  const execution = readComponent('TaskExecutionAction.tsx');
+  const hook = readFileSync(resolve(componentsDirectory, '../hooks/useAgentRuntimeDelivery.ts'), 'utf8');
+  assert.match(execution, /onOpenChange=\{nextOpen => \{ setOpen\(nextOpen\); if \(!nextOpen\) setStartRequested\(false\); \}\}/);
+  assert.equal(execution.match(/sessions\?\.cancel\?\./g)?.length, 1, 'cancel is only reachable from the explicit Stop control');
+  assert.match(execution, /onStop=\{\(\) => void runSessionOperation\('cancel'\)\}/);
+  assert.doesNotMatch(hook, /sessions\.(cancel|close)/);
+  assert.match(hook, /setDeliveryOutputSuppressed\(cursorRef\.current, !visible\)/);
+  // Subscription lifetime follows the binding, not visibility, so hidden supervision still receives attention.
+  assert.match(hook, /\}, \[bindingId\]\);/);
+});
+
+test('supervision surfaces never gate on task dates', () => {
+  for (const name of ['AgentSessionSupervisor.tsx', 'TaskExecutionAction.tsx', 'statuses/AppStatusBar.tsx', 'dialogs/TaskDetailsDialog.tsx']) {
+    const source = readComponent(name);
+    const launchPath = name === 'dialogs/TaskDetailsDialog.tsx' ? source.slice(source.indexOf('requestTask(task'), source.indexOf('requestTask(task') + 400) : source;
+    assert.doesNotMatch(launchPath, /startDate|endDate|getScheduledDateRange|hasScheduledDateRange/, `${name} must not require dates to supervise`);
+  }
 });

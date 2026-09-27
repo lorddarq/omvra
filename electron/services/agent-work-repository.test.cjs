@@ -1,0 +1,318 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const os = require('node:os');
+const { DatabaseSync } = require('node:sqlite');
+const { spawn } = require('node:child_process');
+const { createAgentWorkRepository } = require('./agent-work-repository.cjs');
+const { DAY } = require('./agent-work-contract.cjs');
+
+async function fixture(t, policy) {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'omvra-sqlite-test-'));
+  const storePath = path.join(dir, 'workspace.json');
+  const databasePath = path.join(dir, 'workspace', 'agent-work-v1.sqlite');
+  const state = { storePath, databasePath, repo: await createAgentWorkRepository({storePath, policy}) };
+  t.after(async()=>{ await state.repo.close().catch(()=>{}); await fs.rm(dir,{recursive:true,force:true}); });
+  state.reopen = async()=>{await state.repo.close();state.repo=await createAgentWorkRepository({storePath,policy});return state.repo;};
+  return state;
+}
+const create = (id='1')=>({runtimeProfileId:'runtime-1',scope:{kind:'task',taskId:`task-${id}`,executionAttemptId:`attempt-${id}`,taskRevision:4},idempotencyKey:`session-${id}`,turn:{id:`turn-${id}`,state:'active'}});
+const event = (bindingId,index,extra={})=>({bindingId,runtimeProfileId:'runtime-1',turnId:'turn-1',kind:'tool',idempotencyKey:`event-${index}`,...extra});
+async function makeSession(repo) { return (await repo.createSession(create())).binding; }
+async function finish(repo,b) { return repo.completeTurn({bindingId:b.id,expectedRevision:b.revision,turnId:b.turn.id,outcome:'completed',idempotencyKey:`finish-${b.id}`}); }
+
+ test('six-table migration, WAL, single owner, recovery and privacy survive reopening', async t=>{
+  const f=await fixture(t);
+  const b=await makeSession(f.repo);
+  await assert.rejects(createAgentWorkRepository({storePath:f.storePath}),{code:'AGENT_WORK_ALREADY_OPEN'});
+  for(const field of ['messagePreview','prompt','response','providerDetail','summary','transcript','hiddenReasoning'])
+    await assert.rejects(f.repo.appendEvent(event(b.id,1,{[field]:'DO_NOT_PERSIST_SECRET'})),{code:'INVALID_AGENT_WORK_INPUT'});
+  await f.repo.appendEvent(event(b.id,1));
+  const before=await f.repo.snapshot({bindingId:b.id});
+  await f.reopen();
+  const after=await f.repo.snapshot({bindingId:b.id});
+  assert.equal(after.binding.state,'interrupted');
+  assert.equal(after.turn.state,'interrupted');
+  assert.equal(after.events.length,1);
+  assert.equal(after.session.recovery_required,1);
+  assert.equal(after.session.last_event_seq,before.session.last_event_seq);
+  assert.equal(after.session.source_revision,4);
+  const m=await f.repo.metrics();
+  assert.equal(m.schemaVersion,1);
+  assert.equal(m.driver,'node:sqlite');
+  const sql=new DatabaseSync(f.databasePath);
+  assert.equal(sql.prepare('PRAGMA user_version').get().user_version,1);
+  assert.equal(sql.prepare('PRAGMA auto_vacuum').get().auto_vacuum,2);
+  assert.equal(sql.prepare('PRAGMA journal_mode').get().journal_mode,'wal');
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM sqlite_master WHERE type='table' AND name LIKE 'agent_%'").get().n,6);
+  assert.deepEqual(sql.prepare('PRAGMA foreign_key_check').all(),[]);
+  sql.close();
+  for(const suffix of ['','-wal']) {
+    const data=await fs.readFile(f.databasePath+suffix).catch(()=>Buffer.alloc(0));
+    assert.equal(data.includes(Buffer.from('DO_NOT_PERSIST_SECRET')),false);
+  }
+ });
+ test('idempotency, sequence conflicts, cross-session turns and monotonic cursor after prune',async t=>{
+  const f=await fixture(t,{eventsPerSession:2,events:3});
+  const b=await makeSession(f.repo);
+  const first=await f.repo.appendEvent(event(b.id,1));
+  assert.equal((await f.repo.appendEvent(event(b.id,1))).seq,first.seq);
+  await assert.rejects(f.repo.appendEvent(event(b.id,2,{seq:1})),{code:'IDEMPOTENCY_CONFLICT'});
+  await assert.rejects(f.repo.appendEvent(event(b.id,2,{seq:9})),{code:'AGENT_WORK_SEQUENCE_GAP'});
+  await assert.rejects(f.repo.appendEvent(event(b.id,2,{turnId:'missing-turn'})),{code:'SQLITE_CONSTRAINT'});
+  await f.repo.appendEvent(event(b.id,2));
+  await f.repo.appendEvent(event(b.id,3));
+  let snapshot=await f.repo.snapshot({bindingId:b.id});
+  assert.deepEqual(snapshot.events.map(e=>e.seq),[2,3]);
+  assert.equal(snapshot.session.pruned_through_seq,1);
+  const retry=await f.repo.appendEvent(event(b.id,1,{seq:1}));
+  assert.equal(retry.alreadyPruned,true);
+  assert.equal(JSON.parse(snapshot.session.governance_json).toolCalls,3);
+  assert.equal((await f.repo.appendEvent(event(b.id,4))).seq,4);
+  snapshot=await f.repo.snapshot({bindingId:b.id});
+  assert.equal(JSON.parse(snapshot.session.governance_json).toolCalls,4);
+  const removed=(await f.repo.metrics()).maintenance.deletedRows;
+  await assert.rejects(f.repo.appendEvent(event(b.id,5,{turnId:'missing-turn'})),{code:'SQLITE_CONSTRAINT'});
+  assert.equal((await f.repo.metrics()).maintenance.deletedRows,removed);
+  assert.equal((await f.repo.snapshot({bindingId:b.id})).session.pruned_through_seq,2);
+ });
+ test('completion commits summary, projection and notification before resolving, including retries',async t=>{
+  const f=await fixture(t);
+  const b=await makeSession(f.repo);
+  const pending=Array.from({length:30},(_,i)=>f.repo.appendEvent(event(b.id,i)));
+  const completion=finish(f.repo,b);
+  await Promise.all(pending);
+  const result=await completion;
+  assert.match(result.snapshot.turn.final_summary,/30 tool observations/);
+  assert.equal(result.snapshot.projection.latest_summary,result.snapshot.turn.final_summary);
+  assert.equal(result.notification.summary,result.snapshot.turn.final_summary);
+  assert.equal((await finish(f.repo,b)).idempotent,true);
+  await assert.rejects(f.repo.appendEvent(event(b.id,999)),{code:'AGENT_WORK_TURN_FINISHED'});
+  assert.equal((await f.repo.snapshot({bindingId:b.id})).notifications.length,1);
+  const sql=new DatabaseSync(f.databasePath);
+  sql.exec('DELETE FROM agent_notifications');
+  sql.close();
+  assert.equal((await finish(f.repo,b)).idempotent,true);
+  await assert.rejects(f.repo.completeTurn({bindingId:b.id,expectedRevision:0,turnId:'turn-1',outcome:'failed',idempotencyKey:'other'}),{code:'INVALID_ACP_TURN_TRANSITION'});
+  await f.reopen();
+  assert.match((await f.repo.snapshot({bindingId:b.id})).turn.final_summary,/30 tool observations/);
+ });
+ test('revision, global active-turn guard and task/Goal scope validation reuse domain rules',async t=>{
+  const f=await fixture(t);
+  const b=await makeSession(f.repo);
+  await assert.rejects(f.repo.createSession(create('2')),{code:'ACP_EXECUTION_ALREADY_ACTIVE'});
+  await assert.rejects(f.repo.updateSession({bindingId:b.id,expectedRevision:9,state:'ready',opaqueSessionRef:'resume-id'}),{code:'REVISION_MISMATCH'});
+  await assert.rejects(f.repo.updateSession({bindingId:b.id,expectedRevision:0,recoveryRequired:false}),{code:'AGENT_WORK_RECOVERY_PROTECTED'});
+  await finish(f.repo,b);
+  const second=await f.repo.createSession({...create('2'),scope:{kind:'goal-node',goalId:'goal-1',goalElementId:'node-1',goalExecutionId:'execution-1',executionAttempt:0,goalRevision:2}});
+  assert.equal((await f.repo.snapshot({bindingId:second.binding.id})).projection,null);
+  await assert.rejects(f.repo.appendEvent(event(second.binding.id,99)),{code:'SQLITE_CONSTRAINT'});
+  assert.equal((await f.repo.listSessions({limit:1})).hasMore,true);
+ });
+ test('count retention stays bounded during a sustained producer and governance survives pruning',async t=>{
+  const f=await fixture(t,{eventsPerSession:5,events:5});
+  const b=await makeSession(f.repo);
+  for(let start=0;start<300;start+=50) await Promise.all(Array.from({length:50},(_,i)=>f.repo.appendEvent(event(b.id,start+i,{kind:'usage',usageAggregation:'delta',inputTokens:0,outputTokens:1,cost:0}))));
+  const snapshot=await f.repo.snapshot({bindingId:b.id});
+  assert.equal(snapshot.events.length,5);
+  const g=JSON.parse(snapshot.session.governance_json);
+  assert.equal(g.usageTokens,300);
+  assert.equal(g.usageCost,0);
+  assert.equal(g.coveredSeq,300);
+  assert.equal(snapshot.session.pruned_through_seq,295);
+  await f.repo.appendEvent(event(b.id,301,{kind:'usage',usageAggregation:'unknown'}));
+  assert.equal(JSON.parse((await f.repo.snapshot({bindingId:b.id})).session.governance_json).usageTokens,null);
+  assert.ok((await f.repo.metrics()).queue.coalescedCommands>0);
+ });
+ test('bounded 200-row prune batches protect recovery while removing expired detail and closed history',async t=>{
+  const f=await fixture(t,{automatic:false});
+  const b=await makeSession(f.repo);
+  for(let start=0;start<450;start+=50) await Promise.all(Array.from({length:50},(_,i)=>f.repo.appendEvent(event(b.id,start+i))));
+  const sql=new DatabaseSync(f.databasePath);
+  sql.prepare('UPDATE agent_events SET created_at=?').run(Date.now()-40*DAY);
+  sql.close();
+  const first=await f.repo.prune();
+  assert.equal(first.deletedRows,200);
+  assert.equal(first.more,true);
+  assert.equal((await f.repo.snapshot({bindingId:b.id})).binding.state,'starting');
+  while((await f.repo.prune()).more) {}
+  assert.equal((await f.repo.metrics()).counts.events,0);
+  const completion=await finish(f.repo,b);
+  await f.repo.updateSession({bindingId:b.id,expectedRevision:completion.snapshot.binding.revision,state:'closed',terminalReason:'closed',recoveryRequired:false});
+  const age=new DatabaseSync(f.databasePath);
+  const old=Date.now()-40*DAY;
+  age.prepare('UPDATE agent_sessions SET created_at=?,updated_at=?,finished_at=?').run(old,old,old);
+  age.prepare('UPDATE agent_turns SET created_at=?,updated_at=?,finished_at=?').run(old,old,old);
+  age.prepare('UPDATE agent_work_projections SET finished_at=?,updated_at=?').run(old,old);
+  age.close();
+  while((await f.repo.prune()).more) {}
+  assert.equal((await f.repo.metrics()).counts.sessions,0);
+  const second=await makeSession(f.repo);
+  const ended=await finish(f.repo,second);
+  await f.repo.updateSession({bindingId:second.id,expectedRevision:ended.snapshot.binding.revision,state:'closed',recoveryRequired:false});
+  await f.repo.setPolicy({automatic:false,summaryDays:1});
+  const summaries=new DatabaseSync(f.databasePath);
+  const insert=summaries.prepare('INSERT INTO agent_turns(id,session_id,turn_index,state,created_at,updated_at,finished_at,final_summary,governance_json) VALUES(?,?,?,?,?,?,?,?,?)');
+  const twoDaysAgo=Date.now()-2*DAY;
+  summaries.exec('BEGIN');
+  for(let i=1;i<=250;i++) insert.run(`summary-${i}`,second.id,i,'completed',twoDaysAgo,twoDaysAgo,twoDaysAgo,'Completed.','{}');
+  summaries.exec('COMMIT');
+  assert.equal((await f.repo.prune()).more,true);
+  assert.equal((await f.repo.prune()).more,false);
+  assert.equal(summaries.prepare("SELECT count(*) AS n FROM agent_turns WHERE id LIKE 'summary-%' AND final_summary IS NOT NULL").get().n,0);
+  summaries.close();
+ });
+ test('queue saturation is bounded, rejects explicitly and reserves capacity for completion',async t=>{
+  const f=await fixture(t);
+  const b=await makeSession(f.repo);
+  const lock=new DatabaseSync(f.databasePath);
+  lock.exec('BEGIN IMMEDIATE');
+  const work=Array.from({length:400},(_,i)=>f.repo.appendEvent(event(b.id,i)).then(value=>({value}),error=>({error})));
+  const completed=finish(f.repo,b);
+  setTimeout(()=>{lock.exec('ROLLBACK');lock.close();},120);
+  const results=await Promise.all(work);
+  assert.ok(results.some(r=>r.error?.code==='AGENT_WORK_QUEUE_FULL'));
+  await completed;
+  const m=await f.repo.metrics();
+  assert.ok(m.queue.peakQueue<=256);
+  assert.ok(m.queue.peakBytes<=1048576);
+  assert.ok(m.maintenance.busyRetries>0);
+  assert.ok((await f.repo.snapshot({bindingId:b.id})).turn.final_summary);
+ });
+ test('busy final commit cannot publish completion or partially persist it',async t=>{
+  const f=await fixture(t);
+  const b=await makeSession(f.repo);
+  const lock=new DatabaseSync(f.databasePath);
+  lock.exec('BEGIN IMMEDIATE');
+  let heartbeats=0;
+  const heartbeat=setInterval(()=>heartbeats++,10);
+  try { await assert.rejects(finish(f.repo,b),{code:'SQLITE_BUSY'}); } finally { clearInterval(heartbeat); }
+  assert.ok(heartbeats>=10,'worker lock waits must not block the main event loop');
+  lock.exec('ROLLBACK');lock.close();
+  const snapshot=await f.repo.snapshot({bindingId:b.id});
+  assert.equal(snapshot.turn.state,'active');
+  assert.equal(snapshot.turn.final_summary,null);
+  assert.equal(snapshot.notifications.length,0);
+  await finish(f.repo,b);
+ });
+ test('WAL checkpoint metrics, compaction deferral and delivery cursor validation',async t=>{
+  const f=await fixture(t);
+  const b=await makeSession(f.repo);
+  await f.repo.appendEvent(event(b.id,1));
+  const snapshot=await f.repo.snapshot({bindingId:b.id});
+  await f.repo.saveDelivery({bindingId:b.id,surface:'supervisor',lastSnapshotVersion:snapshot.session.snapshot_version,lastSentSeq:1});
+  await assert.rejects(f.repo.saveDelivery({bindingId:b.id,surface:'supervisor',lastSnapshotVersion:999,lastSentSeq:1}),{code:'INVALID_DELIVERY_CURSOR'});
+  const checkpoint=await f.repo.checkpoint();
+  assert.equal(checkpoint.busy,0);
+  assert.equal((await f.repo.compact()).deferred,true);
+  const m=await f.repo.metrics();
+  assert.ok(m.databaseBytes>0);
+  assert.ok(m.maintenance.lastCheckpoint.at>0);
+  assert.equal(m.counts.delivery_state,1);
+  await assert.rejects(f.repo.setPolicy({events:0}),{code:'INVALID_AGENT_WORK_NUMBER'});
+  await assert.rejects(f.repo.setPolicy({summaryDays:90,sessionDays:7}),{code:'INVALID_RETENTION_POLICY'});
+ });
+ test('newer schema and corruption fail closed without creating a JSON fallback',async t=>{
+  const f=await fixture(t);
+  await f.repo.close();
+  let sql=new DatabaseSync(f.databasePath);sql.exec('PRAGMA user_version=99');sql.close();
+  await assert.rejects(createAgentWorkRepository({storePath:f.storePath}),{code:'AGENT_WORK_SCHEMA_TOO_NEW'});
+  await fs.writeFile(f.databasePath,'not a sqlite database');
+  await assert.rejects(createAgentWorkRepository({storePath:f.storePath}),{code:'SQLITE_CORRUPT'});
+  await assert.rejects(fs.access(f.storePath),{code:'ENOENT'});
+ });
+ test('the public update path cannot bypass the durable completion barrier',async t=>{
+  const f=await fixture(t);
+  const b=await makeSession(f.repo);
+  await assert.rejects(f.repo.updateSession({bindingId:b.id,expectedRevision:0,turn:{id:'turn-1',state:'completed'}}),{code:'AGENT_WORK_COMPLETION_REQUIRED'});
+  await assert.rejects(f.repo.updateSession({bindingId:b.id,expectedRevision:0,state:'closed'}),{code:'AGENT_WORK_COMPLETION_REQUIRED'});
+  await assert.rejects(f.repo.appendEvent(event(b.id,'early-final',{kind:'turn',state:'completed'})),{code:'AGENT_WORK_COMPLETION_REQUIRED'});
+  const before=await f.repo.snapshot({bindingId:b.id});
+  assert.equal(before.turn.state,'active');
+  assert.equal(before.notifications.length,0);
+ });
+ test('hard process exit recovers committed rows without inventing completion or approval',async t=>{
+  const f=await fixture(t);
+  await f.repo.close();
+  const script=`const {createAgentWorkRepository}=require(${JSON.stringify(path.join(__dirname,'agent-work-repository.cjs'))});
+    (async()=>{const r=await createAgentWorkRepository({storePath:${JSON.stringify(f.storePath)}});const b=(await r.createSession(${JSON.stringify(create())})).binding;
+    await r.appendEvent({bindingId:b.id,runtimeProfileId:'runtime-1',turnId:'turn-1',kind:'permission',requestId:'request-1',idempotencyKey:'permission-1'});process.stdout.write(b.id+'\\n');})().catch(()=>process.exit(2));`;
+  const child=spawn(process.execPath,['-e',script],{stdio:['ignore','pipe','pipe']});
+  t.after(()=>child.kill('SIGKILL'));
+  let stderr=''; child.stderr.on('data',chunk=>{stderr+=chunk;});
+  const id=await new Promise((resolve,reject)=>{
+    const timeout=setTimeout(()=>reject(new Error('Child repository startup timed out')),10000);
+    child.once('error',error=>{clearTimeout(timeout);reject(error);});
+    child.once('exit',code=>{if(code) {clearTimeout(timeout);reject(new Error(stderr));}});
+    child.stdout.once('data',chunk=>{clearTimeout(timeout);resolve(String(chunk).trim());});
+  });
+  const exited=new Promise(resolve=>child.once('exit',resolve));
+  child.kill('SIGKILL'); await exited;
+  f.repo=await createAgentWorkRepository({storePath:f.storePath});
+  const snapshot=await f.repo.snapshot({bindingId:id});
+  assert.equal(snapshot.binding.state,'interrupted');
+  assert.equal(snapshot.turn.final_summary,'Runtime interrupted; reopen supervision before resuming.');
+  assert.equal(snapshot.turn.outcome,'interrupted');
+  assert.equal(snapshot.events[0].kind,'permission-request');
+  assert.equal(JSON.parse(snapshot.session.governance_json).pendingAttention,undefined);
+ });
+ test('incremental compaction reclaims pages only after idle, without deleting history',async t=>{
+  const f=await fixture(t,{automatic:false});
+  const b=await makeSession(f.repo);
+  const result=await finish(f.repo,b);
+  await f.repo.updateSession({bindingId:b.id,expectedRevision:result.snapshot.binding.revision,state:'closed',terminalReason:'closed',recoveryRequired:false});
+  const sql=new DatabaseSync(f.databasePath);
+  const insert=sql.prepare('INSERT INTO agent_events VALUES(?,?,?,?,?,?,?,?,?,?,?,?)');
+  sql.exec('BEGIN');
+  for(let i=1;i<=24000;i++) insert.run(`filler-${i}`,b.id,'turn-1',i,`filler-${i}`,'tool-state','tool',2,'x'.repeat(1024),'{}',Date.now(),Date.now());
+  sql.exec('COMMIT');
+  sql.prepare('UPDATE agent_sessions SET last_event_seq=24000 WHERE id=?').run(b.id);
+  sql.exec('DELETE FROM agent_events');
+  sql.prepare('UPDATE agent_sessions SET pruned_through_seq=24000 WHERE id=?').run(b.id);
+  sql.close();
+  await f.repo.checkpoint();
+  const before=await f.repo.metrics();
+  assert.ok(before.freeBytes>16*1048576);
+  // Real idle scheduling is part of the contract; do not bypass it with a production test hook.
+  await new Promise(resolve=>setTimeout(resolve,30500));
+  const compact=await f.repo.compact();
+  assert.equal(compact.deletedRows,0);
+  assert.ok(compact.reclaimedBytes>0);
+  const after=await f.repo.metrics();
+  assert.deepEqual(after.counts,before.counts);
+  assert.ok(after.maintenance.lastCompaction.at>0);
+  assert.ok((await f.repo.snapshot({bindingId:b.id})).turn.final_summary);
+ });
+ test('completion failure after summary update rolls back the entire barrier',async t=>{
+  const f=await fixture(t);
+  const b=await makeSession(f.repo);
+  const sql=new DatabaseSync(f.databasePath);
+  sql.exec("CREATE TRIGGER reject_notification BEFORE INSERT ON agent_notifications BEGIN SELECT RAISE(ABORT,'injected failure'); END");
+  await assert.rejects(finish(f.repo,b),{code:'SQLITE_CONSTRAINT',message:'SQLITE_CONSTRAINT'});
+  const snapshot=await f.repo.snapshot({bindingId:b.id});
+  assert.equal(snapshot.turn.state,'active');
+  assert.equal(snapshot.turn.final_summary,null);
+  assert.equal(snapshot.projection.latest_summary,null);
+  assert.equal(snapshot.notifications.length,0);
+  assert.equal(snapshot.binding.revision,0);
+  sql.exec('DROP TRIGGER reject_notification'); sql.close();
+  assert.ok((await finish(f.repo,b)).notification);
+ });
+
+ test('disabled automatic maintenance preserves aged events across ingestion and reopen while manual prune remains available', async t => {
+  const f = await fixture(t, { automatic: false });
+  const b = await makeSession(f.repo);
+  for (let i = 0; i < 110; i++) await f.repo.appendEvent(event(b.id, i));
+  const sql = new DatabaseSync(f.databasePath);
+  sql.prepare('UPDATE agent_events SET created_at=?').run(Date.now() - 40 * DAY);
+  sql.close();
+  f.repo.resumeMaintenance();
+  await new Promise(resolve => setTimeout(resolve, 120));
+  assert.equal((await f.repo.metrics()).counts.events, 110);
+  await f.reopen();
+  await new Promise(resolve => setTimeout(resolve, 120));
+  assert.equal((await f.repo.metrics()).counts.events, 110);
+  assert.equal((await f.repo.metrics()).policy.automatic, false);
+  assert.equal((await f.repo.prune()).deletedRows, 110);
+ });

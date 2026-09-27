@@ -3,7 +3,7 @@ import test from 'node:test';
 import { getAttentionState, getExecutionAttentionState, getSessionAttentionState } from './attention.ts';
 
 test('attention states always explain the state and next step', () => {
-  for (const kind of ['blocked', 'review', 'active', 'failed', 'needs-input', 'overdue', 'ready', 'complete', 'batch-finished', 'outcome-review', 'interrupted', 'closed', 'starting', 'stopping'] as const) {
+  for (const kind of ['blocked', 'review', 'active', 'failed', 'needs-input', 'permission-required', 'overdue', 'ready', 'complete', 'batch-finished', 'outcome-review', 'interrupted', 'cancelled', 'closed', 'starting', 'stopping'] as const) {
     const state = getAttentionState(kind);
     assert.equal(state.kind, kind);
     assert.ok(state.label.length > 0);

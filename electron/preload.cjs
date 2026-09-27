@@ -3,6 +3,7 @@ const STORE_DID_CHANGE_CHANNEL = 'store/did-change';
 const UPDATE_STATE_CHANNEL = 'updates/state-changed';
 const GOAL_RUNTIME_CHANGED_CHANNEL = 'goals/runtime-changed';
 const AGENT_RUNTIME_EVENT_CHANNEL = 'agent-runtime/event';
+const AGENT_RUNTIME_DELIVERY_CHANNEL = 'agent-runtime/delivery';
 const RENDERER_DIAGNOSTIC_CHANNEL = 'renderer/diagnostic';
 
 function reportRendererDiagnostic(kind, error) {
@@ -109,6 +110,12 @@ contextBridge.exposeInMainWorld('electron', {
   // Open external (validated in main)
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
 
+  agentWork: {
+    status: () => ipcRenderer.invoke('agent-work/status'),
+    preview: input => ipcRenderer.invoke('agent-work/preview',input),
+    execute: id => ipcRenderer.invoke('agent-work/execute',id),
+    cancel: id => ipcRenderer.invoke('agent-work/cancel',id),
+  },
   agentRuntime: {
     getState: () => ipcRenderer.invoke('agent-runtime/get-state'),
     saveProfile: (profile) => ipcRenderer.invoke('agent-runtime/save-profile', profile),
@@ -121,12 +128,25 @@ contextBridge.exposeInMainWorld('electron', {
     testConnection: (payload) => ipcRenderer.invoke('agent-runtime/test-connection', payload),
     openExternal: (payload) => ipcRenderer.invoke('agent-runtime/open-external', payload),
     sessions: {
+      setNotificationVisibility: (payload) => ipcRenderer.invoke('agent-runtime/sessions/notification-visibility', payload),
       list: (payload) => ipcRenderer.invoke('agent-runtime/sessions/list', payload),
       onEvent: (listener) => {
         if (typeof listener !== 'function') return () => {};
         const wrappedListener = (_event, payload) => listener(payload);
         ipcRenderer.on(AGENT_RUNTIME_EVENT_CHANNEL, wrappedListener);
         return () => ipcRenderer.removeListener(AGENT_RUNTIME_EVENT_CHANNEL, wrappedListener);
+      },
+      subscribeDelivery: (payload) => ipcRenderer.invoke('agent-runtime/sessions/delivery/subscribe', payload),
+      setDeliveryVisibility: (payload) => ipcRenderer.invoke('agent-runtime/sessions/delivery/visibility', payload),
+      getDeliverySnapshot: (payload) => ipcRenderer.invoke('agent-runtime/sessions/delivery/snapshot', payload),
+      ackDelivery: (payload) => ipcRenderer.invoke('agent-runtime/sessions/delivery/ack', payload),
+      unsubscribeDelivery: (payload) => ipcRenderer.invoke('agent-runtime/sessions/delivery/unsubscribe', payload),
+      getDeliveryDiagnostics: () => ipcRenderer.invoke('agent-runtime/sessions/delivery/diagnostics'),
+      onDelivery: (listener) => {
+        if (typeof listener !== 'function') return () => {};
+        const wrappedListener = (_event, envelope) => listener(envelope);
+        ipcRenderer.on(AGENT_RUNTIME_DELIVERY_CHANNEL, wrappedListener);
+        return () => ipcRenderer.removeListener(AGENT_RUNTIME_DELIVERY_CHANNEL, wrappedListener);
       },
       requests: (bindingId) => ipcRenderer.invoke('agent-runtime/sessions/requests', bindingId),
       createBinding: (payload) => ipcRenderer.invoke('agent-runtime/sessions/create-binding', payload),

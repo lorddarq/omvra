@@ -59,12 +59,12 @@ test('runner disposal closes live resources and reconciles session state exactly
   });
 
   assert.equal((await runner.resume(binding.id, { workspacePath: '/tmp/workspace' })).ok, true);
-  notify({ method: 'mcpServer/elicitation/request', id: 7, params: { message: 'Confirm?', requestedSchema: { type: 'object', properties: {} } } });
+  await notify({ method: 'mcpServer/elicitation/request', id: 7, params: { message: 'Confirm?', requestedSchema: { type: 'object', properties: {} } } });
   assert.equal(runner.listRequests(binding.id).length, 1);
   assert.equal((await runner.invoke(binding.id, 'cancel')).ok, true);
   assert.equal(timers.length, 1);
 
-  const disposed = runner.dispose();
+  const disposed = await runner.dispose();
   assert.deepEqual(disposed, { ok: true, idempotent: false, closedClientCount: 1 });
   assert.equal(closeCount, 1);
   assert.equal(unsubscribeCount, 2);
@@ -72,12 +72,12 @@ test('runner disposal closes live resources and reconciles session state exactly
   assert.equal(runner.listRequests(binding.id).length, 0);
   assert.equal(runner.hasLiveSessions(), false);
   assert.equal(binding.state, 'interrupted');
-  assert.equal(binding.terminalReason, 'app-shutdown');
+  assert.equal(binding.terminalReason, 'process-exit');
   assert.equal(binding.turn.state, 'interrupted');
   assert.equal(interruptedSessionTransitions, 1);
   assert.equal(events.filter(event => event.nativeEventType === 'omvra/runtime/connection-lost').length, 1);
 
-  assert.deepEqual(runner.dispose(), { ok: true, idempotent: true, closedClientCount: 0 });
+  assert.deepEqual(await runner.dispose(), { ok: true, idempotent: true, closedClientCount: 0 });
   assert.equal(closeCount, 1);
   assert.equal(interruptedSessionTransitions, 1);
   await timers[0].callback();
@@ -197,7 +197,7 @@ test('explains that a persisted session needs a new app-process session when its
   assert.match(result.message, /current task context/);
 });
 
-test('reconciliation interrupts persisted input state when its answerable request belongs to a previous app process', () => {
+test('reconciliation interrupts persisted input state when its answerable request belongs to a previous app process', async () => {
   const events = [];
   let storedBinding = {
     id: 'binding-1',
@@ -223,14 +223,14 @@ test('reconciliation interrupts persisted input state when its answerable reques
     listSessions: () => ({ bindings: [storedBinding], events: [] }),
   });
 
-  runner.reconcile();
+  await runner.reconcile();
 
   assert.equal(storedBinding.state, 'interrupted');
   assert.equal(storedBinding.terminalReason, 'runtime-missing');
   assert.equal(events.at(-1).nativeEventType, 'omvra/runtime/connection-lost');
 });
 
-test('idle reconciliation reads one lightweight session projection', () => {
+test('idle reconciliation reads one lightweight session projection', async () => {
   const listInputs = [];
   const runner = createAgentRuntimeSessionRunner({
     store: {},
@@ -246,7 +246,7 @@ test('idle reconciliation reads one lightweight session projection', () => {
     },
   });
 
-  const result = runner.reconcile();
+  const result = await runner.reconcile();
 
   assert.deepEqual(listInputs, [{ limit: 100, includeEvents: false }]);
   assert.equal(result.ok, true);
@@ -271,12 +271,12 @@ test('injects the bounded Omvra context pack while leaving MCP configuration to 
     startSession: async (configuration) => {
       mcpConfiguration = configuration;
       assert.equal(typeof notify, 'function');
-      notify({ method: 'mcpServer/startupStatus/updated', params: { name: 'figma', status: 'failed', failureReason: 'reauthenticationRequired', error: 'Login required' } });
+      await notify({ method: 'mcpServer/startupStatus/updated', params: { name: 'figma', status: 'failed', failureReason: 'reauthenticationRequired', error: 'Login required' } });
       return { sessionId: 'native-session-1' };
     },
     prompt: async (_sessionId, text) => {
       prompts.push(text);
-      notify({ method: 'turn/started', params: { turn: { status: 'inProgress' } } });
+      await notify({ method: 'turn/started', params: { turn: { status: 'inProgress' } } });
       return { accepted: true };
     },
     onNotification: callback => { notify = callback; },
@@ -355,35 +355,35 @@ test('injects the bounded Omvra context pack while leaving MCP configuration to 
   assert.equal(mcpEvent.outcome, 'reauthenticationRequired');
   assert.equal(events.some(event => event.nativeEventType === 'omvra/taskInstructions/sent'), true);
   assert.equal(logs.some(entry => entry.message === '[agent-runtime] session.ready' && entry.details.bindingId === 'binding-1'), true);
-  assert.equal(logs.some(entry => entry.message === '[agent-runtime] notification' && entry.details.subject === 'figma'), true);
-  notify({ method: 'mcpServer/elicitation/request', id: 41, params: { serverName: 'omvra', mode: 'form', message: 'Allow the omvra MCP server to run tool "tasks_get"?', requestedSchema: { type: 'object', properties: { approval: { type: 'string', enum: ['deny', 'allow'] } } }, _meta: { codex_approval_kind: 'mcp_tool_call' } } });
+  assert.equal(logs.some(entry => entry.message === '[agent-runtime] notification' && entry.details.kind === 'session'), true);
+  await notify({ method: 'mcpServer/elicitation/request', id: 41, params: { serverName: 'omvra', mode: 'form', message: 'Allow the omvra MCP server to run tool "tasks_get"?', requestedSchema: { type: 'object', properties: { approval: { type: 'string', enum: ['deny', 'allow'] } } }, _meta: { codex_approval_kind: 'mcp_tool_call' } } });
   assert.equal(runner.listRequests('binding-1').length, 0);
   assert.equal(storedBinding.turn.state, 'active');
   assert.deepEqual(responses[0], { requestId: 41, response: { action: 'accept', content: { approval: 'allow' } }, error: undefined });
   assert.equal(events.at(-1).nativeEventType, 'omvra/mcpToolApproval/policy-accepted');
-  notify({ method: 'mcpServer/elicitation/request', id: 42, params: { serverName: 'omvra_testing_mcp', mode: 'form', message: 'Allow the task preflight?', requestedSchema: { type: 'object', properties: { confirmed: { type: 'boolean', title: 'Confirm', default: true } }, required: ['confirmed'] } } });
+  await notify({ method: 'mcpServer/elicitation/request', id: 42, params: { serverName: 'omvra_testing_mcp', mode: 'form', message: 'Allow the task preflight?', requestedSchema: { type: 'object', properties: { confirmed: { type: 'boolean', title: 'Confirm', default: true } }, required: ['confirmed'] } } });
   assert.equal(runner.listRequests('binding-1')[0].message, 'Allow the task preflight?');
   assert.equal(storedBinding.turn.state, 'waiting-input');
   assert.equal((await runner.respond('binding-1', 42, { action: 'accept', content: { confirmed: true }, _meta: null })).ok, true);
   assert.equal(runner.listRequests('binding-1').length, 0);
   assert.equal(responses[1].requestId, 42);
   assert.equal(storedBinding.turn.state, 'active');
-  notify({ method: 'item/commandExecution/requestApproval', id: 'approval-1', params: { reason: 'Write the requested implementation.' } });
+  await notify({ method: 'item/commandExecution/requestApproval', id: 'approval-1', params: { reason: 'Write the requested implementation.' } });
   assert.equal(runner.listRequests('binding-1')[0].responseKind, 'codex-approval');
   assert.equal(storedBinding.turn.state, 'waiting-input');
   assert.equal((await runner.respond('binding-1', 'approval-1', { decision: 'accept' })).ok, true);
   assert.deepEqual(responses.at(-1), { requestId: 'approval-1', response: { decision: 'accept' }, error: undefined });
   assert.equal(storedBinding.turn.state, 'active');
-  notify({ method: 'error', params: { error: { message: 'Task tool failed.' }, willRetry: false } });
+  await notify({ method: 'error', params: { error: { message: 'Task tool failed.' }, willRetry: false } });
   assert.equal(events.at(-1).outcome, 'Task tool failed.');
-  notify({ method: 'thread/inputTokens/updated', params: { inputTokens: 12 } });
+  await notify({ method: 'thread/inputTokens/updated', params: { inputTokens: 12 } });
   assert.equal(storedBinding.turn.state, 'active');
   assert.equal(runner.listRequests('binding-1').length, 0);
-  lifecycle({ kind: 'exit', code: 'ACP_SESSION_INTERRUPTED' });
+  await lifecycle({ kind: 'exit', code: 'ACP_SESSION_INTERRUPTED' });
   assert.equal(storedBinding.state, 'interrupted');
   assert.equal(events.at(-1).nativeEventType, 'omvra/runtime/connection-lost');
   assert.equal(runner.listRequests('binding-1').length, 0);
-  notify({ method: 'turn/completed', params: { turn: { status: 'interrupted' } } });
+  await notify({ method: 'turn/completed', params: { turn: { status: 'interrupted' } } });
 });
 
 test('resuming interrupted task work immediately sends the current authoritative task context', async () => {
@@ -420,7 +420,7 @@ test('resuming interrupted task work immediately sends the current authoritative
       initialize: async () => ({ capabilities: { prompt: true } }),
       onNotification: callback => { notify = callback; },
       resumeSession: async () => ({ sessionId: 'thread-1' }),
-      prompt: async (_sessionId, text) => { prompts.push(text); notify({ method: 'turn/started', params: { turn: { status: 'inProgress' } } }); return { turnId: 'turn-1' }; },
+      prompt: async (_sessionId, text) => { prompts.push(text); await notify({ method: 'turn/started', params: { turn: { status: 'inProgress' } } }); return { turnId: 'turn-1' }; },
       close: () => {},
     }),
   });
@@ -434,7 +434,7 @@ test('resuming interrupted task work immediately sends the current authoritative
   assert.match(prompts[0], /Update the task description with the agent details/);
   assert.ok(prompts[0].indexOf('Review evidence before making claims.') < prompts[0].indexOf('Title: Test task'));
   assert.equal(events.some(event => event.nativeEventType === 'omvra/taskInstructions/sent'), true);
-  notify({ method: 'turn/completed', params: { turn: { status: 'completed' } } });
+  await notify({ method: 'turn/completed', params: { turn: { status: 'completed' } } });
   await new Promise(resolve => setTimeout(resolve, 10));
   assert.equal(prompts.length, 1, 'completed turns remain idle until the user continues work');
   assert.equal((await runner.continueTask('binding-resume')).ok, true);
@@ -456,7 +456,7 @@ test('automatically starts the next bounded batch after a completed turn', async
     startSession: async () => ({ sessionId: 'thread-auto' }),
     prompt: async () => {
       prompts.push(true);
-      notify({ method: 'turn/started', params: { turn: { status: 'inProgress' } } });
+      await notify({ method: 'turn/started', params: { turn: { status: 'inProgress' } } });
       return { turnId: `turn-${prompts.length}` };
     },
     close: () => {},
@@ -480,13 +480,13 @@ test('automatically starts the next bounded batch after a completed turn', async
   assert.equal(started.ok, true, JSON.stringify(started));
   await runner.continueTask('binding-auto');
   assert.equal(prompts.length, 1);
-  notify({ method: 'turn/completed', params: { turn: { status: 'completed' } } });
+  await notify({ method: 'turn/completed', params: { turn: { status: 'completed' } } });
   await new Promise(resolve => setTimeout(resolve, 10));
   assert.equal(prompts.length, 2);
   assert.equal(events.some(event => event.nativeEventType === 'omvra/taskBatch/automatic-continuing'), true);
   assert.equal(binding.state, 'ready');
   assert.equal(binding.turn.state, 'active');
-  notify({ method: 'turn/completed', params: { turn: { status: 'completed' } } });
+  await notify({ method: 'turn/completed', params: { turn: { status: 'completed' } } });
   await new Promise(resolve => setTimeout(resolve, 10));
   assert.equal(binding.state, 'closed');
   assert.equal(events.some(event => event.nativeEventType === 'omvra/taskExecution/finalized-for-review'), true);
@@ -672,4 +672,45 @@ test('switching providers starts a fresh session from the same durable checkpoin
   assert.equal(prompts.length, 2);
   assert.match(prompts[0].text, /Continue from the accepted durable checkpoint/);
   assert.match(prompts[1].text, /Continue from the accepted durable checkpoint/);
+});
+
+test('storage notification failures retain the client and reconciliation restores admission without logging provider errors', async () => {
+  let binding = { id: 'binding-recovery', revision: 0, runtimeProfileId: 'runtime-1', state: 'interrupted', opaqueSessionRef: 'thread-1', scope: { kind: 'task', taskId: 'task-1' } };
+  let rejectNext = false;
+  const callbacks = [], events = [], logs = [];
+  const runner = createAgentRuntimeSessionRunner({
+    store: {}, resolveProfile: () => ({ ok: true, profile: { id: 'runtime-1' } }),
+    listSessions: () => ({ bindings: [binding], events }),
+    updateBinding: (_store, input) => { binding = { ...binding, ...input, revision: binding.revision + 1 }; return { ok: true, binding }; },
+    appendEvent: (_store, event) => {
+      if (rejectNext) { rejectNext = false; throw Object.assign(new Error('private database detail'), { code: 'SQLITE_BUSY' }); }
+      events.push(event); return { ok: true };
+    },
+    createClient: () => ({
+      onNotification: callback => { callbacks.push(callback); return () => {}; },
+      initialize: async () => ({ capabilities: { resume: true, prompt: true } }),
+      resumeSession: async () => ({ sessionId: 'thread-1' }),
+      prompt: async () => {}, close: () => {},
+    }),
+    logger: Object.fromEntries(['debug','info','warn','error'].map(level => [level, (...args) => logs.push(args)])),
+  });
+  assert.equal((await runner.resume(binding.id, { workspacePath: '/tmp/workspace' })).ok, true);
+  rejectNext = true;
+  const failed = callbacks[0]({ method: 'item/agentMessage/delta', params: { delta: 'old output' } });
+  const stale = callbacks[0]({ method: 'turn/started', params: {} });
+  assert.equal((await failed).error, 'SQLITE_BUSY');
+  assert.notEqual((await stale)?.ok, false);
+  await assert.rejects(runner.flush(), { code: 'SQLITE_BUSY' });
+  await runner.reconcile();
+  assert.equal(binding.state, 'ready');
+  const marker = 'DO_NOT_LOG_PRIVATE_PROVIDER_ERROR';
+  await callbacks[0]({ method: 'turn/started', params: { mcpServers: [{ name: marker, status: 'failed', error: marker }] } });
+  await callbacks[0]({ method: 'warning', params: { error: marker, failureReason: marker, toolName: marker } });
+  await callbacks[0]({ method: 'mcpServer/elicitation/request', id: 12, params: { message: 'Input needed', requestedSchema: { type: 'object', properties: {} } } });
+  await runner.flush();
+  assert.equal(binding.turn.state, 'waiting-input');
+  assert.equal(runner.listRequests(binding.id).length, 1);
+  assert.equal(JSON.stringify(logs).includes(marker), false);
+  assert.equal(runner.hasLiveSessions(), true);
+  await runner.dispose();
 });

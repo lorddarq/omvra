@@ -30,7 +30,9 @@ import { AttachmentIcon } from '../icons/AttachmentIcon';
 import { BasicInfoIcon } from '../icons/BasicInfoIcon';
 import { DescriptionIcon } from '../icons/DescriptionIcon';
 import { ExecutionNotice } from '../ExecutionNotice';
-import { getAttentionState, type AttentionKind } from '../../utils/attention';
+import type { AttentionKind } from '../../utils/attention';
+
+const SESSION_NOTICE_KINDS = new Set<AttentionKind>(['active', 'failed', 'needs-input', 'permission-required', 'blocked', 'cancelled']);
 
 interface TaskDetailsDialogProps {
   isOpen: boolean;
@@ -129,16 +131,9 @@ export function TaskDetailsDialog({
     assignee.kind === 'agentic' &&
     task.status === 'in-progress'
   );
-  const sessionAttentionKind: AttentionKind | undefined = sessionDock.task?.id === task?.id
-    ? sessionDock.state === 'working' || sessionDock.state === 'hidden-active'
-      ? 'active'
-      : sessionDock.state === 'failed'
-        ? 'failed'
-        : sessionDock.state === 'needs-input'
-          ? 'needs-input'
-          : sessionDock.state === 'blocked'
-            ? 'blocked'
-            : undefined
+  // Same resolved attention as the Agent tasks area; only states that ask for a decision get a notice here.
+  const sessionAttention = sessionDock.task?.id === task?.id && sessionDock.attention && SESSION_NOTICE_KINDS.has(sessionDock.attention.kind)
+    ? sessionDock.attention
     : undefined;
   const sortedComments = useMemo(
     () => [...(task?.comments || [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
@@ -366,15 +361,15 @@ export function TaskDetailsDialog({
                 milestoneLabel={milestoneLabel}
               />
             )}
-            {sessionAttentionKind && (
+            {sessionAttention && (
               <div className="mt-4">
                 <ExecutionNotice
-                  tone={getAttentionState(sessionAttentionKind).tone === 'danger' ? 'danger' : getAttentionState(sessionAttentionKind).tone === 'warning' ? 'warning' : 'info'}
-                  title={getAttentionState(sessionAttentionKind).label}
-                  nextStep={getAttentionState(sessionAttentionKind).nextStep}
-                  assertive={sessionAttentionKind === 'failed' || sessionAttentionKind === 'blocked'}
+                  tone={sessionAttention.tone === 'danger' ? 'danger' : sessionAttention.tone === 'warning' ? 'warning' : 'info'}
+                  title={sessionAttention.label}
+                  nextStep={sessionAttention.nextStep}
+                  assertive={sessionAttention.kind === 'failed' || sessionAttention.kind === 'blocked'}
                 >
-                  {getAttentionState(sessionAttentionKind).description}
+                  {sessionAttention.description}
                 </ExecutionNotice>
               </div>
             )}

@@ -88,13 +88,13 @@ class JsonLineTransport {
     this.handleStdoutData = chunk => this.#receive(chunk);
     this.handleStderrData = chunk => { this.stderr = `${this.stderr}${chunk}`.slice(-2048); };
     this.handleChildError = error => {
-      this.logger?.error?.('[agent-runtime:transport] process.error', { code: error.code || null, message: error.message || String(error) });
+      this.logger?.error?.('[agent-runtime:transport] process.error', { failed: true });
       this.#fail(runtimeError(error.code === 'ENOENT' ? 'ACP_RUNTIME_MISSING' : 'ACP_RUNTIME_UNAVAILABLE', error.message), { kind: 'error', processCode: error.code || null });
     };
     this.handleChildExit = code => {
       if (!this.closed) {
         const detail = this.stderr.trim();
-        this.logger?.error?.('[agent-runtime:transport] process.exited', { code: code ?? null, stderr: detail || null });
+        this.logger?.error?.('[agent-runtime:transport] process.exited', { code: code ?? null, hasStderr: Boolean(detail) });
         this.#fail(runtimeError('ACP_SESSION_INTERRUPTED', `Runtime exited unexpectedly (${code ?? 'unknown'}).${detail ? ` ${detail}` : ''}`), { kind: 'exit', processCode: code ?? null });
       }
     };
@@ -197,7 +197,7 @@ class JsonLineTransport {
         this.pending.delete(message.id);
         clearTimeout(pending.timer);
         if (message.error) {
-          this.logger?.error?.('[agent-runtime:transport] request.failed', { id: message.id, method: pending.method, message: message.error.message || 'Runtime request failed.' });
+          this.logger?.error?.('[agent-runtime:transport] request.failed', { id: message.id, method: pending.method, failed: true });
           pending.reject(runtimeError('ACP_PROTOCOL_INCOMPATIBLE', message.error.message || 'Runtime request failed.'));
         } else {
           this.logger?.debug?.('[agent-runtime:transport] request.completed', { id: message.id, method: pending.method });
@@ -275,9 +275,31 @@ class AcpStdioClient {
     this.transport = new JsonLineTransport(profile.executablePath, profile.fixedArgs || [], { ...options, jsonRpc: true });
     this.workspacePath = validateWorkspacePath(options.workspacePath);
     this.capabilities = null;
+    this.sessionId = null;
+    this.prompting = false;
+    this.notificationListeners = new Set();
+    this.transport.onNotification(message => {
+      if (message.method !== 'session/update') { this.emitNotification(message); return; }
+      // Session loads may replay history. Only current-turn updates are live output.
+      if (!this.prompting || message.params?.sessionId !== this.sessionId) return;
+      const update = message.params?.update;
+      if (!update || typeof update !== 'object') return;
+      if (update.sessionUpdate === 'agent_message_chunk' && update.content?.type === 'text' && typeof update.content.text === 'string') {
+        this.emitNotification({method:'item/agentMessage/delta',params:{delta:update.content.text}});
+      } else if (['tool_call','tool_call_update'].includes(update.sessionUpdate)) {
+        this.emitNotification({method:'item/toolCall/updated',params:{
+          ...(typeof update.toolCallId === 'string' ? {requestId:update.toolCallId} : {}),
+          ...(['pending','in_progress','completed','failed'].includes(update.status) ? {state:update.status} : {}),
+          ...(['read','edit','delete','move','search','execute','think','fetch','switch_mode','other'].includes(update.kind) ? {toolName:update.kind} : {}),
+        }});
+      }
+      if (update.sessionUpdate === 'plan') this.emitNotification({method:'item/plan/updated',params:{state:'active'}});
+      // User echoes, hidden reasoning, tool bodies and unknown updates are not output.
+    });
   }
 
-  onNotification(listener) { return this.transport.onNotification(listener); }
+  onNotification(listener) { this.notificationListeners.add(listener); return () => this.notificationListeners.delete(listener); }
+  emitNotification(message) { for (const listener of this.notificationListeners) listener(message); }
   onLifecycle(listener) { return this.transport.onLifecycle(listener); }
   isAlive() { return !this.transport.closed; }
   respond(id, result, error) { return this.transport.respond(id, result, error); }
@@ -307,7 +329,8 @@ class AcpStdioClient {
     const selectedModel = requestedModel(this.profile, model);
     assertAdvertisedModel(selectedModel, this.models || []);
     const result = await this.transport.request('session/new', { cwd: this.workspacePath, ...(mcpServers === undefined ? {} : { mcpServers: validateMcpServers(mcpServers) }), ...(selectedModel ? { model: selectedModel } : {}) });
-    return { sessionId: validateSessionRef(result?.sessionId), configuration: result };
+    this.sessionId = validateSessionRef(result?.sessionId);
+    return { sessionId: this.sessionId, configuration: result };
   }
 
   async resumeSession(sessionId, { mcpServers } = {}) {
@@ -315,20 +338,33 @@ class AcpStdioClient {
     const mcpConfiguration = mcpServers === undefined ? {} : { mcpServers: validateMcpServers(mcpServers) };
     if (this.capabilities?.resume) {
       await this.transport.request('session/resume', { sessionId: id, cwd: this.workspacePath, ...mcpConfiguration });
+      this.sessionId = id;
       return { sessionId: id, mode: 'resume' };
     }
     if (this.capabilities?.load) {
       await this.transport.request('session/load', { sessionId: id, cwd: this.workspacePath, ...mcpConfiguration });
+      this.sessionId = id;
       return { sessionId: id, mode: 'load' };
     }
     throw runtimeError('ACP_SESSION_RESUME_UNSUPPORTED', 'The ACP runtime does not advertise session resume or load.');
   }
 
-  prompt(sessionId, text) {
-    return this.transport.request('session/prompt', {
-      sessionId: validateSessionRef(sessionId),
-      prompt: [{ type: 'text', text: validateInputText(text) }],
-    }, 0);
+  async prompt(sessionId, text) {
+    const id = validateSessionRef(sessionId);
+    const prompt = [{ type: 'text', text: validateInputText(text) }];
+    if (this.prompting) throw runtimeError('ACP_SESSION_BUSY', 'An ACP turn is already running.');
+    if (id !== this.sessionId) throw runtimeError('ACP_SESSION_NOT_FOUND', 'The ACP session is not loaded.');
+    this.prompting = true;
+    this.emitNotification({method:'turn/started',params:{state:'active'}});
+    try {
+      const result = await this.transport.request('session/prompt', {sessionId:id,prompt}, 0);
+      const status = result?.stopReason === 'end_turn' ? 'completed' : 'interrupted';
+      this.emitNotification({method:'turn/completed',params:{status}});
+      return result;
+    } catch (error) {
+      this.emitNotification({method:'turn/completed',params:{status:'failed'}});
+      throw error;
+    } finally { this.prompting = false; }
   }
 
   steer() {
@@ -346,7 +382,7 @@ class AcpStdioClient {
     return { acknowledged: true };
   }
 
-  close() { this.transport.close(); }
+  close() { this.notificationListeners.clear(); this.transport.close(); }
 }
 
 class CodexAppServerClient {

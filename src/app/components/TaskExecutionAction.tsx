@@ -3,7 +3,8 @@ import { AlertTriangle, Folder, Info, Play, Server, Minimize2, ShieldCheck, Hour
 import { AtomSpinner } from './ui/AtomSpinner';
 import { toast } from 'sonner';
 import type { Task } from '../types';
-import { agentRuntimeTurnState, hasAgentRuntimeTaskStarted, isAgentRuntimeTurnInFlight, projectAgentRuntimeSession, selectCurrentAgentRuntimeTurnEvents, summarizeAgentRuntimeActivity, type AgentRuntimeActivityEvent, type AgentRuntimeTurnProjection } from '../utils/agentRuntimeActivity';
+import { agentRuntimeTurnState, hasAgentRuntimeTaskStarted, isAgentRuntimeTurnInFlight, projectAgentRuntimeSession, projectDeliveryActivity, type AgentRuntimeTurnProjection } from '../utils/agentRuntimeActivity';
+import { primaryDeliveryAttention, type DeliveryControl, type DeliveryOutput } from '../utils/agentRuntimeDelivery.ts';
 import {
   agentRuntimeWorkspaceSourceLabel,
   resolveAgentRuntimeWorkspace,
@@ -12,7 +13,7 @@ import {
 import {
   ContextMenuItem,
 } from './ui/context-menu';
-import { getLatestTaskAgentOutput, getTaskExecutionPresentation, taskNeedsProviderSignIn } from '../utils/taskExecutionPresentation.ts';
+import { getTaskExecutionPresentation, taskNeedsProviderSignIn } from '../utils/taskExecutionPresentation.ts';
 import { TaskSessionComposer } from './TaskSessionComposer';
 import { RuntimePermissionCard, requestValueKey, type RuntimePermissionField, type RuntimePermissionRequest } from './RuntimePermissionCard';
 import { buildPermissionResponse } from './runtimePermissionResponse';
@@ -51,7 +52,8 @@ interface SessionBinding {
   state: string;
   revision: number;
   workspacePath?: string;
-  opaqueSessionRef?: string;
+  latestSummary?: string | null;
+  recoveryRequired?: boolean;
   capabilities?: Array<{ id: string; support: string }>;
   scope?: { kind?: string; taskId?: string };
   updatedAt?: string;
@@ -60,11 +62,15 @@ interface SessionBinding {
   turn?: AgentRuntimeTurnProjection & { updatedAt?: string };
 }
 
-interface SessionEvent extends AgentRuntimeActivityEvent {
+interface SessionFailureEvent {
   failureClass?: string;
-  requestId?: string | number;
-  bindingId?: string;
-  workScope?: string;
+}
+
+/** Bounded supervision projection owned by the app-level supervisor. Hidden supervision receives control only. */
+export interface TaskSupervisionDelivery {
+  bindingId: string | null;
+  control: (DeliveryControl & { turnId: string | null }) | null;
+  output: (DeliveryOutput & { turnId: string | null }) | null;
 }
 
 const requestFieldValue = (request: RuntimePermissionRequest, field: RuntimePermissionField, values: Record<string, unknown>) =>
@@ -84,6 +90,8 @@ interface TaskExecutionActionProps {
   openRequest?: number;
   onOpenRequestHandled?: () => void;
   onVisibilityChange?: (visible: boolean) => void;
+  onBindingChange?: (bindingId: string | undefined) => void;
+  delivery?: TaskSupervisionDelivery;
   onBlockedByBinding?: (binding: SessionBinding) => void;
   startOnTrigger?: boolean;
   startOnOpenRequest?: boolean;
@@ -122,7 +130,7 @@ function ExecutionHint({ tone, title, body }: { tone: 'info' | 'warning' | 'dang
   </Tooltip>;
 }
 
-export function TaskExecutionAction({ task, repositoryFolder, trigger, openRequest, onOpenRequestHandled, onVisibilityChange, onBlockedByBinding, startOnTrigger = false, startOnOpenRequest = true, onOpen }: TaskExecutionActionProps) {
+export function TaskExecutionAction({ task, repositoryFolder, trigger, openRequest, onOpenRequestHandled, onVisibilityChange, onBindingChange, delivery, onBlockedByBinding, startOnTrigger = false, startOnOpenRequest = true, onOpen }: TaskExecutionActionProps) {
   const [open, setOpen] = useState(false);
   const [startRequested, setStartRequested] = useState(false);
   const [sessionLoaded, setSessionLoaded] = useState(false);
@@ -133,11 +141,15 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   const [preflight, setPreflight] = useState<ExecutionPreflight | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [binding, setBinding] = useState<SessionBinding | null>(null);
-  const [events, setEvents] = useState<SessionEvent[]>([]);
+  // Only the projection for this task's binding applies; a stale one from a previous request is ignored.
+  const deliveryControl = binding && delivery?.bindingId === binding.id ? delivery.control : null;
+  const deliveredOutput = deliveryControl ? delivery?.output ?? null : null;
+  const deliveryAttention = primaryDeliveryAttention(deliveryControl);
+  // A safe failure classification, not an event log; ordinary output never accumulates here.
+  const [latestFailureClass, setLatestFailureClass] = useState<string | undefined>();
   const [pendingRequests, setPendingRequests] = useState<RuntimePermissionRequest[]>([]);
   const [requestValues, setRequestValues] = useState<Record<string, unknown>>({});
   const [mcpReadOnly, setMcpReadOnly] = useState<boolean | null>(null);
-  const [, setHasMoreEvents] = useState(false);
   const [operationBusy, setOperationBusy] = useState(false);
   const [requestBusy, setRequestBusy] = useState(false);
   const [steerText, setSteerText] = useState('');
@@ -169,6 +181,11 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   useEffect(() => {
     onVisibilityChange?.(open);
   }, [onVisibilityChange, open]);
+
+  useEffect(() => {
+    onBindingChange?.(binding?.id);
+  }, [binding?.id, onBindingChange]);
+  useEffect(() => () => onBindingChange?.(undefined), [onBindingChange]);
 
   useEffect(() => {
     if (openRequest) {
@@ -232,10 +249,9 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   useEffect(() => {
     if (!open) return;
     void refreshSession();
+    // Lifecycle only: output and activity arrive through the supervisor's bounded projection.
     const unsubscribe = window.electron?.agentRuntime?.sessions?.onEvent?.((payload) => {
       const nextBinding = payload?.binding as SessionBinding | undefined;
-      const nextEvent = payload?.event as SessionEvent | undefined;
-      if (nextBinding?.scope?.taskId !== task.id && nextEvent?.workScope !== 'task') return;
       if (nextBinding?.scope?.taskId === task.id) {
         refreshSequence.current += 1;
         setBinding(nextBinding);
@@ -243,14 +259,27 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
           setPendingRequests([]);
           setRequestValues({});
         }
-        if (agentRuntimeTurnState(nextBinding) === 'waiting-input') void refreshSession();
-      }
-      if (nextEvent?.bindingId && (nextBinding?.scope?.taskId === task.id || binding?.id === nextEvent.bindingId)) {
-        setEvents(current => current.some(event => event.id === nextEvent.id) ? current : [...current, nextEvent].slice(-100));
+        if (agentRuntimeTurnState(nextBinding) === 'waiting-input') {
+          const sequence = refreshSequence.current;
+          void window.electron?.agentRuntime?.sessions?.requests?.(nextBinding.id).then(requests => {
+            if (sequence === refreshSequence.current && Array.isArray(requests)) setPendingRequests(requests as RuntimePermissionRequest[]);
+          });
+        }
       }
     });
     return () => unsubscribe?.();
-  }, [open, task.id, binding?.id]);
+  }, [open, task.id]);
+
+  // The projection can report a request before the binding update lands; load its details once per request.
+  const deliveryRequestKey = deliveryAttention?.request ? `${deliveryAttention.id}:${deliveryAttention.pendingCount ?? 1}` : null;
+  useEffect(() => {
+    const bindingId = binding?.id;
+    if (!open || !deliveryRequestKey || !bindingId) return;
+    const sequence = refreshSequence.current;
+    void window.electron?.agentRuntime?.sessions?.requests?.(bindingId).then(requests => {
+      if (sequence === refreshSequence.current && Array.isArray(requests)) setPendingRequests(requests as RuntimePermissionRequest[]);
+    }).catch(() => {});
+  }, [binding?.id, deliveryRequestKey, open]);
 
   const observation = resolution?.profile ? runtimeState?.observations?.[resolution.profile.id] : undefined;
   const blockers = [...new Set([
@@ -264,18 +293,16 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   const warnings = preflight?.warnings || [];
   const hasCapability = (id: string) => binding?.capabilities?.some(capability => capability.id === id && capability.support === 'supported') ?? false;
   const taskExecutionState = binding?.taskExecution?.state;
-  const sessionProjection = projectAgentRuntimeSession(binding || undefined, events);
+  const latestTurnCompleted = deliveryAttention?.category === 'completed' || binding?.turn?.state === 'completed';
+  const sessionProjection = projectAgentRuntimeSession(binding || undefined, [], { turnCompleted: latestTurnCompleted });
   const { lastBatchCompleted, turnState } = sessionProjection;
   const sessionSummary = sessionProjection.summary;
   const taskExecutionLabel: Record<string, string> = { starting: 'Starting', ready: 'Ready', working: 'Working', continuing: 'Continuing', waiting: 'Waiting for input', stopping: 'Stopping', 'batch-finished': 'Batch finished', interrupted: 'Interrupted', stopped: 'Stopped', failed: 'Failed', 'ready-for-review': 'Ready for review', 'outcome-unreconciled': 'Outcome needs review', complete: 'Complete' };
-  const latestRunEvents = selectCurrentAgentRuntimeTurnEvents(events, binding?.turn?.id).filter(event =>
-    ['turn/started', 'turn/completed', 'item/agentMessage/delta', 'item/started', 'item/completed', 'warning', 'error', 'omvra/taskBatch/automatic-continuing', 'omvra/taskBatch/automatic-limit-reached'].includes(event.nativeEventType || '')
-  );
-  const activity = summarizeAgentRuntimeActivity(latestRunEvents);
-  const agentOutput = getLatestTaskAgentOutput(events);
-  const activityWithoutOutput = activity.filter(item => item.label !== 'Agent shared an update');
-  const taskStarted = hasAgentRuntimeTaskStarted(turnState, events);
-  const visibleActivity = activityWithoutOutput.length > 0 ? activityWithoutOutput : binding?.state === 'interrupted'
+  // Model output and activity arrive only as bounded main-process projections, never as per-event streams.
+  const agentOutput = deliveredOutput?.text ?? '';
+  const activity = projectDeliveryActivity(deliveryControl?.activity);
+  const taskStarted = hasAgentRuntimeTaskStarted(turnState, []) || Boolean(binding?.turn?.id);
+  const visibleActivity = activity.length > 0 ? activity : binding?.state === 'interrupted'
     ? [{ id: `${binding.id}-interrupted`, label: 'Work was interrupted', detail: 'Start work again to reconnect and continue with the task instructions.', count: 1, tone: 'warning' as const }]
     : binding?.state === 'failed'
       ? [{ id: `${binding.id}-failed`, label: 'Previous runtime unavailable', detail: 'Start a new session to reconnect; the current task context is preserved.', count: 1, tone: 'danger' as const }]
@@ -284,7 +311,6 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
         : [];
   const isTurnActive = sessionSummary?.isTurnActive === true;
   const instructionsSent = taskStarted;
-  const latestTurnCompleted = latestRunEvents.some(event => event.nativeEventType === 'turn/completed');
   const lastObservedAt = binding?.lastObservedAt || binding?.updatedAt;
   const lastObservedLabel = lastObservedAt
     ? new Date(lastObservedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -342,7 +368,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
       return null;
     }
     const index = await measurePerformanceOperation('acp', 'task-execution.sessions.index', async () => (
-      listSessions({ limit: 100 })
+      listSessions({ taskId: task.id, limit: 100 })
     ));
     if (sequence !== refreshSequence.current) return null;
     if (!index?.ok) {
@@ -357,9 +383,8 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
       || null;
     if (!nextBinding) {
       setBinding(null);
-      setEvents([]);
+      setLatestFailureClass(undefined);
       setPendingRequests([]);
-      setHasMoreEvents(false);
       setSessionLoaded(true);
       return null;
     }
@@ -374,9 +399,9 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
       : [];
     if (sequence !== refreshSequence.current) return null;
     setBinding(resolvedBinding);
-    setEvents((detail?.events || []) as SessionEvent[]);
+    // One bounded read keeps only the latest safe failure class; the event list itself is not retained.
+    setLatestFailureClass([...((detail?.events || []) as SessionFailureEvent[])].reverse().find(event => event.failureClass)?.failureClass);
     setPendingRequests(Array.isArray(requests) ? requests as RuntimePermissionRequest[] : []);
-    setHasMoreEvents(Boolean(detail?.hasMore));
     setSessionLoaded(true);
     return resolvedBinding;
   };
@@ -385,7 +410,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     const closed = await window.electron?.agentRuntime?.sessions?.close?.(bindingId);
     if (!closed?.ok) throw new Error(closed?.message || closed?.error || 'The unavailable runtime session could not be replaced.');
     setBinding(null);
-    setEvents([]);
+    setLatestFailureClass(undefined);
     setPendingRequests([]);
     const replacement = await refreshSession();
     // Re-enter the normal launch effect: it continues a recovered `ready`
@@ -495,7 +520,9 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
         }
         throw new Error(result.message || result.error || 'Your response could not be submitted.');
       }
+      setPendingRequests(current=>current.filter(item=>item.requestId!==request.requestId));
       setRequestValues({});
+      if (result.storageFailure) setError('Response sent. Agent history still needs reconciliation.');
       await refreshSession();
     } catch (caught) {
       reportRuntimeError('request-response', caught, 'Your response could not be submitted.');
@@ -589,10 +616,9 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     void startWork();
   }, [activeAttempt, binding?.id, binding?.state, binding?.workspacePath, loading, open, operationBusy, preflight, resolution?.profile?.id, resolvedRepositoryFolder, sessionLoaded, startRequested, workspace]);
 
-  const latestFailure = [...events].reverse().find(event => event.failureClass);
-  const authenticationRequired = observation?.authentication === 'required' || preflight?.connection?.state === 'signed-out' || !authenticationRechecked && taskNeedsProviderSignIn(binding, latestFailure?.failureClass, agentOutput);
+  const authenticationRequired = observation?.authentication === 'required' || preflight?.connection?.state === 'signed-out' || !authenticationRechecked && taskNeedsProviderSignIn(binding, latestFailureClass, agentOutput);
   const presentation = getTaskExecutionPresentation({ binding, taskStatus: task.status, loading,
-    authenticationRequired, blocked: !binding && blockers.length > 0, conflict: binding?.state === 'failed' && latestFailure?.failureClass === 'conflict',
+    authenticationRequired, blocked: !binding && blockers.length > 0, conflict: binding?.state === 'failed' && latestFailureClass === 'conflict',
     mcpUnavailable: mcpReadOnly === true || preflight?.blockers?.some(blocker => blocker.code?.includes('MCP')) === true,
     waitingForPermission: !terminalBinding && pendingRequests.some(request => request.responseKind === 'codex-approval' || request.fields.length === 0),
   });
@@ -634,6 +660,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
             </SheetClose>
           </SheetHeader>
           <div ref={activityRef} onScroll={event => { const node = event.currentTarget; setAwayFromLatest(node.scrollHeight - node.scrollTop - node.clientHeight > 40); }} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-3 pb-3 pt-3 text-xs text-slate-600" aria-label="Agent activity">
+            {!agentOutput && binding?.latestSummary && <p className="rounded-xl bg-muted p-3 text-sm">{binding.latestSummary}</p>}
             {agentOutput && <div className="rounded-xl bg-white p-3 shadow-[0_1px_3px_rgba(0,0,0,0.1),0_0_0.5px_1px_rgba(113,113,113,0.15)]">
               <span className="inline-flex rounded-full bg-[#f9f9f9] px-2 py-1 text-xs shadow-[0_0_1px_1px_rgba(0,0,0,0.15)]">{responseLabel}</span>
               <p className="mt-5 whitespace-pre-wrap break-words leading-5">{agentOutput}</p>
@@ -641,7 +668,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
             {visibleActivity.length ? visibleActivity.map(item => <div key={item.id} className="flex items-start justify-between gap-4" title={item.detail}>
               <span className={`min-w-0 font-semibold ${item.tone === 'danger' ? 'text-red-600' : ''}`}>{item.label === 'Task instructions accepted' ? item.detail : item.label}{item.count > 1 ? ` × ${item.count}` : ''}</span>
               {'observedAt' in item && item.observedAt && <time className="shrink-0 text-slate-400" dateTime={item.observedAt}>{new Date(item.observedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</time>}
-            </div>) : !agentOutput && <p className="px-3">{loading ? 'Preparing your work session…' : 'The agent has not started work yet.'}</p>}
+            </div>) : !agentOutput && !binding?.latestSummary && <p className="px-3">{loading ? 'Preparing your work session…' : 'The agent has not started work yet.'}</p>}
             {mcpReadOnly && <ExecutionNotice tone="warning" title="Task access is read-only">The agent can inspect this task but cannot change its description or status. Select Task Write under Settings → MCP Access, then restart the listener.</ExecutionNotice>}
             {error && <div className="mb-3"><ExecutionNotice tone="danger" title={getAttentionState('failed').label} nextStep={getAttentionState('failed').nextStep}>{error}</ExecutionNotice></div>}
             {!error && !authenticationRequired && blockers.length > 0 && <div className="mb-3"><ExecutionHint tone={taskAlreadyComplete ? 'warning' : 'danger'} title={taskAlreadyComplete ? 'Task already complete' : 'Action needed before work starts'} body={`${blockers.join(' ')} ${taskAlreadyComplete ? 'Reopen or move the task to In progress, then start work.' : getAttentionState('blocked').nextStep}`} /></div>}

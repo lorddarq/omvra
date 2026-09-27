@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 
 import { cn } from "./utils";
 
@@ -10,6 +11,7 @@ type TooltipAlign = "start" | "center" | "end";
 interface TooltipContextValue {
   open: boolean;
   setOpen: (nextOpen: boolean) => void;
+  anchorRef: React.RefObject<HTMLSpanElement | null>;
 }
 
 const TooltipContext = React.createContext<TooltipContextValue | null>(null);
@@ -29,6 +31,7 @@ function TooltipProvider({ children }: React.PropsWithChildren) {
 function Tooltip({ children }: React.PropsWithChildren) {
   const [open, setOpen] = React.useState(false);
   const openTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const anchorRef = React.useRef<HTMLSpanElement | null>(null);
 
   const clearOpenTimer = React.useCallback(() => {
     if (openTimerRef.current) {
@@ -53,8 +56,8 @@ function Tooltip({ children }: React.PropsWithChildren) {
 
   return (
     <TooltipProvider>
-      <TooltipContext.Provider value={{ open, setOpen: setTooltipOpen }}>
-        <span data-slot="tooltip" className="relative inline-flex">
+      <TooltipContext.Provider value={{ open, setOpen: setTooltipOpen, anchorRef }}>
+        <span ref={anchorRef} data-slot="tooltip" className="relative inline-flex">
           {children}
         </span>
       </TooltipContext.Provider>
@@ -118,49 +121,101 @@ function TooltipContent({
   align?: TooltipAlign;
   sideOffset?: number;
 }) {
-  const { open } = useTooltipContext();
+  const { open, anchorRef } = useTooltipContext();
+  const [anchorRect, setAnchorRect] = React.useState<DOMRect | null>(null);
+  const [viewportShift, setViewportShift] = React.useState({ x: 0, y: 0 });
+  const contentRef = React.useRef<HTMLDivElement | null>(null);
 
-  if (!open || hidden) return null;
+  // Rendered in a portal with fixed positioning so scroll containers
+  // (overflow: auto/hidden) and sibling stacking contexts cannot clip it.
+  React.useLayoutEffect(() => {
+    if (!open || hidden) return;
+    const update = () => {
+      if (anchorRef.current) setAnchorRect(anchorRef.current.getBoundingClientRect());
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [open, hidden, anchorRef]);
 
-  const sideClassName = {
-    top: "bottom-full",
-    right: "left-full",
-    bottom: "top-full",
-    left: "right-full",
-  }[side];
+  // Keep the tooltip inside the viewport when the anchor sits near an edge.
+  React.useLayoutEffect(() => {
+    const node = contentRef.current;
+    if (!node) return;
+    const margin = 8;
+    const rect = node.getBoundingClientRect();
+    const baseLeft = rect.left - viewportShift.x;
+    const baseTop = rect.top - viewportShift.y;
+    const clamp = (start: number, size: number, limit: number) =>
+      Math.min(Math.max(margin - start, 0), Math.max(limit - margin - (start + size), margin - start));
+    const next = {
+      x: clamp(baseLeft, rect.width, window.innerWidth),
+      y: clamp(baseTop, rect.height, window.innerHeight),
+    };
+    if (next.x !== viewportShift.x || next.y !== viewportShift.y) setViewportShift(next);
+  }, [anchorRect, viewportShift]);
 
-  const alignClassName = side === "top" || side === "bottom"
-    ? {
-        start: "left-0",
-        center: "left-1/2 -translate-x-1/2",
-        end: "right-0",
-      }[align]
-    : {
-        start: "top-0",
-        center: "top-1/2 -translate-y-1/2",
-        end: "bottom-0",
-      }[align];
+  if (!open || hidden || !anchorRect || typeof document === "undefined") return null;
 
-  return (
+  const gap = 8 + sideOffset;
+  const style: React.CSSProperties = {};
+  const transforms: string[] = [];
+
+  if (side === "top" || side === "bottom") {
+    if (side === "bottom") {
+      style.top = anchorRect.bottom + gap;
+    } else {
+      style.top = anchorRect.top - gap;
+      transforms.push("translateY(-100%)");
+    }
+    if (align === "start") {
+      style.left = anchorRect.left;
+    } else if (align === "end") {
+      style.left = anchorRect.right;
+      transforms.push("translateX(-100%)");
+    } else {
+      style.left = anchorRect.left + anchorRect.width / 2;
+      transforms.push("translateX(-50%)");
+    }
+  } else {
+    if (side === "right") {
+      style.left = anchorRect.right + gap;
+    } else {
+      style.left = anchorRect.left - gap;
+      transforms.push("translateX(-100%)");
+    }
+    if (align === "start") {
+      style.top = anchorRect.top;
+    } else if (align === "end") {
+      style.top = anchorRect.bottom;
+      transforms.push("translateY(-100%)");
+    } else {
+      style.top = anchorRect.top + anchorRect.height / 2;
+      transforms.push("translateY(-50%)");
+    }
+  }
+  if (viewportShift.x || viewportShift.y) transforms.push(`translate(${viewportShift.x}px, ${viewportShift.y}px)`);
+  if (transforms.length) style.transform = transforms.join(" ");
+
+  return createPortal(
     <div
+      ref={contentRef}
       data-slot="tooltip-content"
       role="tooltip"
       className={cn(
-        "absolute z-50 flex w-fit max-w-[300px] items-center overflow-hidden text-ellipsis whitespace-nowrap rounded-xl bg-[#303038] px-3 py-2 text-xs leading-4 text-white shadow-lg",
-        sideClassName,
-        alignClassName,
+        "pointer-events-none fixed z-[1000] flex w-fit max-w-[300px] items-center overflow-hidden text-ellipsis whitespace-nowrap rounded-xl bg-[#303038] px-3 py-2 text-xs leading-4 text-white shadow-lg",
         className,
       )}
-      style={{
-        marginTop: side === "bottom" ? 8 + sideOffset : undefined,
-        marginBottom: side === "top" ? 8 + sideOffset : undefined,
-        marginLeft: side === "right" ? 8 + sideOffset : undefined,
-        marginRight: side === "left" ? 8 + sideOffset : undefined,
-      }}
+      style={style}
       {...props}
     >
       {children}
-    </div>
+    </div>,
+    document.body,
   );
 }
 

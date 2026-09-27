@@ -50,6 +50,7 @@ const WORKSPACE_FACADE_EXPORTS = [
   'getTaskContextEntry',
   'getWorkspaceSnapshot',
   'isMcpAccessTokenExpired',
+  'initializeAgentWorkStorage',
   'isMcpAgentAccessEnabled',
   'linkMilestoneTasks',
   'listAssignedWorkForAgent',
@@ -150,6 +151,10 @@ const RENDERER_WORKSPACE_KEYS = [
 ].sort();
 
 const IPC_INVOKE_CHANNELS = [
+  'agent-work/status',
+  'agent-work/preview',
+  'agent-work/execute',
+  'agent-work/cancel',
   'agent-configurations/export',
   'agent-runtime/delete-profile',
   'agent-runtime/get-state',
@@ -162,7 +167,14 @@ const IPC_INVOKE_CHANNELS = [
   'agent-runtime/save-profile',
   'agent-runtime/test-connection',
   'agent-runtime/sessions/list',
+  'agent-runtime/sessions/notification-visibility',
   'agent-runtime/sessions/create-binding',
+  'agent-runtime/sessions/delivery/ack',
+  'agent-runtime/sessions/delivery/diagnostics',
+  'agent-runtime/sessions/delivery/snapshot',
+  'agent-runtime/sessions/delivery/subscribe',
+  'agent-runtime/sessions/delivery/unsubscribe',
+  'agent-runtime/sessions/delivery/visibility',
   'agent-runtime/sessions/evaluate-governance',
   'agent-runtime/sessions/update-binding',
   'agent-runtime/sessions/append-event',
@@ -346,7 +358,7 @@ test('preload invoke channels exactly match registered IPC handlers', () => {
     ...collectFiles(path.join(REPO_ROOT, 'electron/services'), filePath => filePath.endsWith('-ipc.cjs')),
   ];
   const registeredChannels = [...new Set(registrarFiles.flatMap(filePath => (
-    collectMatches(fs.readFileSync(filePath, 'utf8'), /ipcMain\.handle\('([^']+)'/g)
+    collectMatches(fs.readFileSync(filePath, 'utf8'), /(?:ipcMain\.handle|handle)\('([^']+)'/g)
   )))].sort();
 
   assert.deepEqual(invokeChannels, IPC_INVOKE_CHANNELS);

@@ -830,6 +830,9 @@ export function repairWorkspaceBackupPayload(
   const electronStoreSnapshot = isRecord(payload.electronStore)
     ? getPortableElectronStoreSnapshotFromExport(payload.electronStore)
     : {};
+  const retiredHistoryKeys = ['omvra.acpSessionBindings.v1', 'omvra.acpSessionEvents.v1', 'omvra.agentWorkStorage.v1', 'omvra.agentWorkPolicy.v1'];
+  for (const key of retiredHistoryKeys) { delete electronStoreSnapshot[key]; delete storageSnapshot[key]; }
+  warnings.push('This workspace JSON backup does not restore agent session history. Existing local history and data policies remain separate; review policy changes in Settings.');
   const goalSnapshotError = Object.prototype.hasOwnProperty.call(electronStoreSnapshot, GOALS_STORE_KEY)
     ? validateGoalSnapshot(electronStoreSnapshot[GOALS_STORE_KEY])
     : undefined;

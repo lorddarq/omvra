@@ -1,3 +1,4 @@
+import { DataPoliciesSettings } from './settings/DataPoliciesSettings';
 import { normalizeAutoArchivePolicy } from '../../../electron/domain/auto-archive.mjs';
 import type { AutoArchivePolicy } from '../types';
 import { FeatheredScrollList } from './FeatheredScrollList';
@@ -62,12 +63,12 @@ const SETTINGS_PANEL_NAV_GROUPS = [
       },
       {
         id: 'agent-runtimes',
-        label: 'Runtime access',
+        label: 'ACP',
         icon: AgentIcon,
       },
       {
         id: 'mcp-access',
-        label: 'Connected agents',
+        label: 'MCP',
         icon: FiltersIcon,
       },
       {
@@ -158,7 +159,7 @@ export function AgentRuntimeSettingsSection({ children }: McpSettingsSectionProp
   return (
     <AnchoredPanelSection
       id="agent-runtimes"
-      title="Runtime access"
+      title="ACP"
       icon={AgentIcon}
       description="Control whether Omvra can connect to local or external agent runtimes."
     >
@@ -478,9 +479,9 @@ export function McpSettingsSection({ children }: McpSettingsSectionProps) {
   return (
     <AnchoredPanelSection
       id="mcp-access"
-      title="Connected agents"
+      title="MCP"
       icon={FiltersIcon}
-      description="Let connected agent tools work with this workspace. This is separate from Runtime access."
+      description="Let connected agent tools work with this workspace. This is separate from ACP."
     >
       {children}
     </AnchoredPanelSection>
@@ -635,6 +636,7 @@ export function DataSettingsSection({
   return (
     <AnchoredPanelSection id="storage" title="Local data & backup" icon={LayersIcon} description="Find local workspace data, storage usage, and backup controls.">
       <div className="min-w-0 space-y-8">
+        <DataPoliciesSettings />
         <div className="space-y-3">
           <div className="text-sm font-semibold leading-5 text-[#71717a]">Archiving</div>
           <p className="text-xs leading-4 text-[#6a7282]">Restore archived tasks and milestones without deleting their history or relationships.</p>

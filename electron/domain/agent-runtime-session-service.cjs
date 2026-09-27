@@ -52,6 +52,7 @@ function createAgentRuntimeSessionService({
   readBindings,
   writeBindings,
   readEvents,
+  readGovernance = null,
   writeEvents,
   attachBindingToAttempt,
   appendTaskContext,
@@ -389,7 +390,8 @@ function createAgentRuntimeSessionService({
     const events = (Array.isArray(readEvents(store)) ? readEvents(store) : []).filter(item => item.bindingId === bindingId);
     const evaluatedAt = input.evaluatedAt === undefined ? now() : validTimestamp(input.evaluatedAt);
     if (!evaluatedAt) return failure('INVALID_ACP_GOVERNANCE_POLICY', 'evaluatedAt must be a valid timestamp.');
-    const latestUsage = [...events].reverse().find(event => event.type === 'usage-reported');
+    const durable = readGovernance?.(store, bindingId);
+    const latestUsage = durable?.latestUsage ? {usage:durable.latestUsage,observedAt:durable.latestUsage.observedAt} : [...events].reverse().find(event => event.type === 'usage-reported');
     const usageEvents = events.filter(event => event.type === 'usage-reported');
     const usageAggregation = latestUsage?.usage?.aggregation || 'unknown';
     const tokenValue = usageAggregation === 'cumulative'
@@ -410,6 +412,7 @@ function createAgentRuntimeSessionService({
       attempts: bindings.filter(item => sameWorkScope(item.scope, binding.scope)).length,
       reportedTokens: tokenValue,
       reportedCost: costValue,
+      ...(durable?.metrics || {}),
     };
     if (input.thresholds !== undefined && (!input.thresholds || typeof input.thresholds !== 'object' || Array.isArray(input.thresholds))) {
       return failure('INVALID_ACP_GOVERNANCE_POLICY', 'thresholds must be an object.');

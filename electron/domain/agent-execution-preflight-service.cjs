@@ -42,7 +42,13 @@ function createAgentExecutionPreflightService({
     const dependencies = (Array.isArray(task.dependencyIds) ? task.dependencyIds : []).map((dependencyId) => {
       const dependency = taskById.get(dependencyId);
       const eligible = dependency?.status === 'done';
-      if (!eligible) blockers.push(issue('TASK_DEPENDENCY_INELIGIBLE', `Dependency "${dependencyId}" is not complete.`, { dependencyId }));
+      if (!eligible) {
+        const dependencyTitle = normalizeString(dependency?.title);
+        const message = !dependency
+          ? 'A dependency task no longer exists. Remove it from this task\'s dependencies.'
+          : `Dependency "${dependencyTitle || 'Untitled task'}" is not complete.`;
+        blockers.push(issue('TASK_DEPENDENCY_INELIGIBLE', message, { dependencyId, ...(dependencyTitle ? { dependencyTitle } : {}) }));
+      }
       return { taskId: dependencyId, status: dependency?.status || 'missing', eligible };
     });
 

@@ -7,9 +7,8 @@ import { getMcpStatusSummary, getRecentMcpActivitySignal, type AgentStatusTone }
 import type { Person, Task } from '../../types';
 import { FiltersIcon } from '../SettingsPanel';
 import { useAgentSessionSupervisor } from '../AgentSessionSupervisor';
-import { getAttentionState, getSessionAttentionState } from '../../utils/attention';
-import { ChevronUp, ChevronRight, CircleCheck, CircleAlert, Circle, Hourglass, LoaderCircle, TriangleAlert } from 'lucide-react';
-import { agentRuntimeTurnState, type AgentRuntimeTurnProjection } from '../../utils/agentRuntimeActivity';
+import type { AttentionState } from '../../utils/attention';
+import { ChevronUp, ChevronRight, CircleCheck, CircleAlert, CircleStop, Circle, Hourglass, LoaderCircle, ShieldAlert, TriangleAlert } from 'lucide-react';
 
 export interface AppStatusBarProps {
   tasks: Task[];
@@ -60,9 +59,8 @@ function SessionDockStatus({ sessionDock, onOpen }: { sessionDock: ReturnType<ty
     : (sessionDock.historyCount > 0 ? `${sessionDock.historyCount} session${sessionDock.historyCount === 1 ? '' : 's'} in history` : 'No session selected');
   const buttonLabel = sessionDock.binding && sessionDock.task ? `Open supervision: ${label} for ${sessionDock.task.title}` : undefined;
   const hasSessions = sessionDock.items.length > 0;
-  const attention = sessionDock.state === 'blocked'
-    ? getAttentionState('blocked')
-    : getRequestAwareAttention(sessionDock.binding, sessionDock.task, sessionDock.pendingRequest) || null;
+  // Attention is resolved once by the supervisor; this area only presents it.
+  const attention = sessionDock.attention || null;
   const accessibleLabel = `${buttonLabel || `Agent tasks status: ${label}`}. ${attention ? `${attention.description} Next action: ${attention.nextStep}` : 'No attention action is pending.'}`;
   const statusLabel = attention?.kind === 'active' ? 'Working' : attention?.label || label;
   const StatusIcon = getStatusIcon(attention);
@@ -76,7 +74,7 @@ function SessionDockStatus({ sessionDock, onOpen }: { sessionDock: ReturnType<ty
         title={`${detail}. ${label}`}
         className="group flex min-h-8 min-w-0 max-w-[calc(100vw-8rem)] items-center gap-2 rounded-lg bg-[#f0f2f5] px-2 py-1 text-left text-zinc-500 transition-colors hover:bg-gray-200/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1"
       >
-        <span className={`flex size-4 shrink-0 items-center justify-center rounded-full ${sessionDock.state === 'working' || sessionDock.state === 'hidden-active' || sessionDock.state === 'ready' ? 'bg-emerald-500/10 text-emerald-500' : sessionDock.state === 'needs-input' ? 'bg-amber-500/10 text-amber-500' : sessionDock.state === 'failed' ? 'bg-red-500/10 text-red-500' : 'bg-slate-400/10 text-slate-400'}`} aria-hidden="true">
+        <span className={`flex size-4 shrink-0 items-center justify-center rounded-full ${getStatusLedClass(attention)}`} aria-hidden="true">
           <span className="size-2 rounded-full bg-current" />
         </span>
         <span className="whitespace-nowrap text-sm font-medium tracking-[-0.14px]">Agent tasks:</span>
@@ -97,8 +95,7 @@ function SessionDockStatus({ sessionDock, onOpen }: { sessionDock: ReturnType<ty
         </div>
         <FeatheredScrollList scrollClassName="max-h-[min(372px,calc(var(--radix-popover-content-available-height)-65px))] pb-4">
           <div>
-            {sessionDock.items.map(({ binding, task, pendingRequest }) => {
-              const state = getRequestAwareAttention(binding, task, pendingRequest);
+            {sessionDock.items.map(({ binding, task, attention: state }) => {
               const Icon = getStatusIcon(state);
               const title = task?.title || 'Untitled task';
               return (
@@ -120,32 +117,34 @@ function SessionDockStatus({ sessionDock, onOpen }: { sessionDock: ReturnType<ty
   );
 }
 
-function getStatusIcon(attention: ReturnType<typeof getRequestAwareAttention> | null) {
+function getStatusIcon(attention: AttentionState | null | undefined) {
   return attention?.kind === 'active' || attention?.kind === 'starting' ? LoaderCircle
-    : attention?.kind === 'needs-input' ? Hourglass
-      : attention?.tone === 'danger' ? CircleAlert
-        : attention?.kind === 'complete' || attention?.kind === 'batch-finished' ? CircleCheck
-          : attention?.tone === 'warning' ? TriangleAlert : Circle;
+    : attention?.kind === 'permission-required' ? ShieldAlert
+      : attention?.kind === 'needs-input' ? Hourglass
+        : attention?.kind === 'cancelled' ? CircleStop
+          : attention?.tone === 'danger' ? CircleAlert
+            : attention?.kind === 'complete' || attention?.kind === 'batch-finished' ? CircleCheck
+              : attention?.tone === 'warning' ? TriangleAlert : Circle;
 }
 
-function getRequestAwareAttention(binding?: { state: string; turn?: AgentRuntimeTurnProjection; taskExecution?: { state?: string } }, task?: Task, pendingRequest?: { message: string }) {
-  const attention = getSessionAttentionState({ bindingState: binding?.state, turnState: agentRuntimeTurnState(binding), executionState: binding?.taskExecution?.state, taskStatus: task?.status });
-  if (attention?.kind !== 'needs-input') return attention;
-  if (pendingRequest) return { ...attention, description: pendingRequest.message };
-  return { ...getAttentionState('interrupted'), label: 'Input request unavailable', description: 'The session says it needs input, but Omvra has no answerable request.', nextStep: 'Open supervision to reconnect or replace the stale session.' };
+// Green while an agent is connected or working, amber when a person must act, red on failure or block.
+function getStatusLedClass(attention: AttentionState | null | undefined) {
+  if (attention?.tone === 'danger') return 'bg-red-500/10 text-red-500';
+  if (attention && ['needs-input', 'permission-required', 'interrupted'].includes(attention.kind)) return 'bg-amber-500/10 text-amber-500';
+  if (attention && ['active', 'starting', 'stopping', 'ready', 'batch-finished'].includes(attention.kind)) return 'bg-emerald-500/10 text-emerald-500';
+  return 'bg-slate-400/10 text-slate-400';
 }
 
 function getSessionDockLabel(sessionDock: ReturnType<typeof useAgentSessionSupervisor>['sessionDock']): string {
-  if (sessionDock.state === 'none') return 'No active work';
-  if (sessionDock.state === 'blocked') return `${getAttentionState('blocked').label} · Another session is active`;
-  const attention = getRequestAwareAttention(sessionDock.binding, sessionDock.task, sessionDock.pendingRequest);
-  if (!attention) return 'Session status unavailable';
+  const attention = sessionDock.attention;
+  if (!attention) return sessionDock.state === 'none' ? 'No active work' : 'Session status unavailable';
+  if (attention.kind === 'blocked') return `${attention.label} · ${sessionDock.state === 'blocked' ? 'Another session is active' : 'New work paused'}`;
   if (attention.kind === 'active') return `${attention.label} · Open to monitor`;
-  if (attention.kind === 'needs-input') return `${attention.label} · Review request`;
+  if (attention.kind === 'needs-input' || attention.kind === 'permission-required') return `${attention.label} · Review request`;
   if (attention.kind === 'failed') return `${attention.label} · Review needed`;
   if (['review', 'outcome-review'].includes(attention.kind)) return `${attention.label} · Review task`;
   if (attention.kind === 'interrupted') return `${attention.label} · Resume available`;
-  if (['batch-finished', 'ready', 'closed'].includes(attention.kind)) return `${attention.label} · Continue available`;
+  if (['batch-finished', 'ready', 'closed', 'cancelled'].includes(attention.kind)) return `${attention.label} · Continue available`;
   return attention.label;
 }
 

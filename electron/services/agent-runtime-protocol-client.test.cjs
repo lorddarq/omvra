@@ -420,3 +420,42 @@ test('bidirectional request IDs cannot resolve an unrelated client request', asy
   assert.deepEqual(outgoing[1], { jsonrpc: '2.0', id: 0, result: { outcome: 'cancelled' } });
   transport.close();
 });
+
+test('transport diagnostics exclude provider RPC errors, stderr and spawn error bodies', async () => {
+  const marker = 'PRIVATE_PROVIDER_ERROR_DO_NOT_LOG';
+  const logs = [];
+  const logger = Object.fromEntries(['debug','info','warn','error'].map(level => [level, (...args) => logs.push(args)]));
+  const child = createChild((message, current) => queueMicrotask(() => current.stdout.write(`${JSON.stringify({ id: message.id, error: { message: marker } })}\n`)));
+  const transport = new JsonLineTransport('/usr/bin/fixture', [], { workspacePath: '/tmp', spawnProcess: () => child, logger });
+  await assert.rejects(transport.request('initialize', {}));
+  child.stderr.write(marker);
+  child.emit('exit', 1);
+  const second = createChild(() => {});
+  const other = new JsonLineTransport('/usr/bin/fixture', [], { workspacePath: '/tmp', spawnProcess: () => second, logger });
+  second.emit('error', new Error(marker));
+  assert.equal(JSON.stringify(logs).includes(marker), false);
+  assert.ok(logs.some(([name]) => name.endsWith('request.failed')));
+  assert.ok(logs.some(([name]) => name.endsWith('process.exited')));
+  assert.ok(logs.some(([name]) => name.endsWith('process.error')));
+  transport.close(); other.close();
+});
+
+test('ACP progress is scoped to an active prompt and cancellation/unknown stop reasons never report success',async()=>{
+  for(const stopReason of ['cancelled','max_tokens','future_stop_reason']) {
+    let promptId;const observed=[];
+    const child=createChild((m,c)=>{
+      if(m.method==='initialize')respond(c,m.id,{protocolVersion:1,agentCapabilities:{}});
+      if(m.method==='session/new')respond(c,m.id,{sessionId:'session-1'});
+      if(m.method==='session/prompt')promptId=m.id;
+    });
+    const client=createNativeRuntimeClient({integrationMode:'acp-local-stdio',executablePath:'/usr/bin/fixture'},{workspacePath:'/tmp',spawnProcess:()=>child});
+    try {
+      client.onNotification(m=>observed.push(m));await client.initialize();await client.startSession();
+      const update=()=>child.stdout.write(JSON.stringify({method:'session/update',params:{sessionId:'session-1',update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'live'}}}})+'\n');
+      update();assert.equal(observed.length,0,'history outside a prompt is not live output');
+      const prompt=client.prompt('session-1','Work');update();respond(child,promptId,{stopReason});await prompt;update();
+      assert.deepEqual(observed.map(m=>m.method),['turn/started','item/agentMessage/delta','turn/completed']);
+      assert.equal(observed.at(-1).params.status,'interrupted');
+    } finally {client.close();}
+  }
+});

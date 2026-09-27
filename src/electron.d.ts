@@ -271,6 +271,7 @@ declare global {
         pickDirectory: () => Promise<string | null>;
       };
       openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
+      agentWork: import('../electron/services/agent-work-maintenance.cjs').AgentWorkApi;
       agentRuntime: {
         getState: () => Promise<{ ok: boolean; value?: AgentRuntimeState; error?: string }>;
         saveProfile: (profile: AgentRuntimeProfile) => Promise<{ ok: boolean; value?: AgentRuntimeProfile; error?: string }>;
@@ -288,9 +289,17 @@ declare global {
           prompt: string;
         }) => Promise<AgentRuntimeOperationResult>;
         sessions: {
-          list: (payload?: { bindingId?: string; limit?: number; includeEvents?: boolean }) => Promise<any>;
-          onEvent: (listener: (payload: { kind: 'event' | 'binding'; event?: any; binding?: any }) => void) => () => void;
-          requests: (bindingId: string) => Promise<Array<{ bindingId: string; turnId?: string; requestId: string | number; method: string; serverName: string; mode: string; message: string; fields: Array<{ name: string; type: string; title: string; description: string; required: boolean; defaultValue?: unknown; options?: unknown[] }> }>>;
+          setNotificationVisibility: (payload: {taskId?: string; visible: boolean}) => Promise<{ok: boolean; error?: string}>;
+          list: (payload?: { bindingId?: string; taskId?: string; limit?: number; includeEvents?: boolean; activeOnly?: boolean }) => Promise<any>;
+          onEvent: (listener: (payload: { kind: 'event' | 'binding' | 'storage-failure' | 'storage-recovered' | 'notification'; notification?: {notificationId: string; bindingId: string; taskId: string; turnId?: string; requiredVersion: number; category: string; safeSummary: string}; bindingId?: string; error?: string; event?: any; binding?: any }) => void) => () => void;
+          subscribeDelivery?: (payload: { bindingId: string; visible: boolean; requestId: number }) => Promise<import('./app/utils/agentRuntimeDelivery.ts').DeliveryResult<{ subscriptionId: string; snapshot: import('./app/utils/agentRuntimeDelivery.ts').DeliverySnapshotEnvelope | null }>>;
+          setDeliveryVisibility?: (payload: { subscriptionId: string; visible: boolean; requestId: number }) => Promise<import('./app/utils/agentRuntimeDelivery.ts').DeliveryResult<{ snapshot?: import('./app/utils/agentRuntimeDelivery.ts').DeliverySnapshotEnvelope | null }>>;
+          getDeliverySnapshot?: (payload: { subscriptionId: string; requestId: number }) => Promise<import('./app/utils/agentRuntimeDelivery.ts').DeliveryResult<{ snapshot: import('./app/utils/agentRuntimeDelivery.ts').DeliverySnapshotEnvelope | null }>>;
+          ackDelivery?: (payload: { subscriptionId: string; version: number }) => Promise<import('./app/utils/agentRuntimeDelivery.ts').DeliveryResult>;
+          unsubscribeDelivery?: (payload: { subscriptionId: string }) => Promise<import('./app/utils/agentRuntimeDelivery.ts').DeliveryResult>;
+          getDeliveryDiagnostics?: () => Promise<{ ok: boolean; value?: Record<string, unknown>; error?: string }>;
+          onDelivery?: (listener: (envelope: import('./app/utils/agentRuntimeDelivery.ts').DeliveryEnvelope) => void) => () => void;
+          requests: (bindingId: string) => Promise<Array<{ bindingId: string; turnId?: string; requestId: string | number; method: string; serverName: string; mode: string; message: string; responseKind?: 'elicitation' | 'codex-approval'; fields: Array<{ name: string; type: string; title: string; description: string; required: boolean; defaultValue?: unknown; options?: unknown[] }> }>>;
           createBinding: (payload: Record<string, unknown>) => Promise<any>;
           updateBinding: (payload: Record<string, unknown>) => Promise<any>;
           appendEvent: (payload: Record<string, unknown>) => Promise<any>;

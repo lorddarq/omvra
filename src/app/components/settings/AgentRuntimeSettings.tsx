@@ -117,7 +117,7 @@ export function AgentRuntimeSettings({ projects, tasks }: { projects: TimelineSw
     const result = await runtimeBridge.saveDefaults({ ...state.defaults, acpRuntimeAccessEnabled: enabled });
     setBusy(false);
     if (!result.ok) return setFeedback(result.error || 'Unable to change ACP runtime access.');
-    setFeedback(enabled ? 'Runtime access enabled.' : 'Runtime access disabled; connected agent access remains available.');
+    setFeedback(enabled ? 'ACP enabled.' : 'ACP disabled; MCP access remains available.');
     await load();
   };
 

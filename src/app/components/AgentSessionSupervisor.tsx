@@ -2,9 +2,11 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { toast } from 'sonner';
 import type { Task, TimelineSwimlane } from '../types';
 import { TaskExecutionAction } from './TaskExecutionAction';
-import { agentRuntimeTurnState, isAgentRuntimeTurnInFlight, projectAgentRuntimeSession, type AgentRuntimeDockState, type AgentRuntimeTurnProjection } from '../utils/agentRuntimeActivity';
+import { agentRuntimeTurnState, isAgentRuntimeTurnInFlight, projectAgentRuntimeSession, resolveAgentTaskAttention, type AgentRuntimeDockState, type AgentRuntimeTurnProjection, type AgentTaskPendingRequest } from '../utils/agentRuntimeActivity';
+import { primaryDeliveryAttention } from '../utils/agentRuntimeDelivery.ts';
+import type { AttentionState } from '../utils/attention';
+import { useAgentRuntimeDelivery } from '../hooks/useAgentRuntimeDelivery.ts';
 import { measurePerformanceOperation } from '../services/performanceLogging.ts';
-import { findNewCompletedTaskRuns, type RuntimeEvent } from '../utils/agentRuntimeNotifications.ts';
 import { areSerializedValuesEqual } from '../store/workspaceSelectors.ts';
 
 export const CONNECTED_SESSION_STATES = new Set(['starting', 'ready']);
@@ -23,7 +25,21 @@ export interface SessionBinding {
 export interface SessionDockItem {
   binding: SessionBinding;
   task?: Task;
-  pendingRequest?: { requestId: string | number; message: string };
+  pendingRequest?: AgentTaskPendingRequest;
+  attention?: AttentionState;
+}
+
+const STORAGE_BLOCKED_REASON = 'Agent history could not be saved. Cancel and pending input remain available; new work is paused.';
+const ACTIVE_SESSION_BLOCKED_REASON = 'Another task is using the agent right now. Open it from Agent tasks or wait for it to finish.';
+
+async function readPendingRequest(bindingId: string): Promise<AgentTaskPendingRequest | undefined> {
+  const requests = await measurePerformanceOperation('acp', 'supervisor.requests.list', async () => (
+    window.electron?.agentRuntime?.sessions?.requests?.(bindingId)
+  ));
+  const request = Array.isArray(requests) ? requests[0] : undefined;
+  if (!request || typeof request.message !== 'string') return undefined;
+  // Same classification as the main delivery projection: elicitation asks for input, everything else for permission.
+  return { requestId: request.requestId, message: request.message, kind: request.responseKind === 'elicitation' ? 'input' : 'permission' };
 }
 
 interface AgentSessionRequest {
@@ -50,6 +66,8 @@ export interface SessionDockProjection {
   historyCount: number;
   items: SessionDockItem[];
   pendingRequest?: SessionDockItem['pendingRequest'];
+  /** Resolved once here so the Agent tasks area and task details never disagree. */
+  attention?: AttentionState;
 }
 
 type AgentSessionSupervisorGlobal = typeof globalThis & {
@@ -82,36 +100,17 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
   const [bindings, setBindings] = useState<SessionBinding[]>([]);
   const [pendingRequestsByBinding, setPendingRequestsByBinding] = useState<Record<string, SessionDockItem['pendingRequest']>>({});
   const [supervisionVisible, setSupervisionVisible] = useState(false);
+  const [supervisedBindingId, setSupervisedBindingId] = useState<string | undefined>();
+  const [storageBlocked, setStorageBlocked] = useState(false);
+  // The one renderer subscription for supervision; the modal and dock consume its projection.
+  const delivery = useAgentRuntimeDelivery(supervisedBindingId, supervisionVisible && Boolean(request));
+  const deliveryAttention = primaryDeliveryAttention(delivery.control);
   const tasksRef = useRef(tasks);
   tasksRef.current = tasks;
 
   useEffect(() => {
     let disposed = false;
     let refreshRunning = false;
-    let notificationsInitialized = false;
-    const seenEventIds = new Set<string>();
-    const notifyCompletedRuns = (events: RuntimeEvent[], nextBindings: SessionBinding[], initialize = false) => {
-      if (!notificationsInitialized) {
-        events.forEach(event => {
-          const eventId = event && typeof event === 'object' && 'id' in event ? String(event.id || '') : '';
-          if (eventId) seenEventIds.add(eventId);
-        });
-        if (initialize) notificationsInitialized = true;
-        return;
-      }
-      const completedRuns = findNewCompletedTaskRuns(events, nextBindings, seenEventIds);
-      for (const run of completedRuns) {
-        const task = tasksRef.current.find(candidate => candidate.id === run.taskId);
-        toast.success('Agent run finished', { id: run.eventId, description: task?.title || run.taskId });
-      }
-    };
-    const readPendingRequest = async (binding: SessionBinding) => {
-      const requests = await measurePerformanceOperation('acp', 'supervisor.requests.list', async () => (
-        window.electron?.agentRuntime?.sessions?.requests?.(binding.id)
-      ));
-      const request = Array.isArray(requests) ? requests[0] : undefined;
-      return request && typeof request.message === 'string' ? { requestId: request.requestId, message: request.message } : undefined;
-    };
     const refreshPendingRequest = async (binding: SessionBinding) => {
       if (agentRuntimeTurnState(binding) !== 'waiting-input') {
         if (!disposed) setPendingRequestsByBinding(current => {
@@ -122,7 +121,7 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
         });
         return;
       }
-      const nextRequest = await readPendingRequest(binding);
+      const nextRequest = await readPendingRequest(binding.id);
       if (!disposed) setPendingRequestsByBinding(current => {
         if (areSerializedValuesEqual(current[binding.id], nextRequest)) return current;
         const next = { ...current };
@@ -138,15 +137,14 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
         const runtimeState = await window.electron?.agentRuntime?.getState?.();
         if (runtimeState?.ok && runtimeState.value?.defaults?.acpRuntimeAccessEnabled === false) return;
         const result = await measurePerformanceOperation('acp', 'supervisor.sessions.list', async () => (
-          window.electron?.agentRuntime?.sessions?.list?.({ limit: 100, includeEvents: !notificationsInitialized })
+          window.electron?.agentRuntime?.sessions?.list?.({ limit: 100, includeEvents: false })
         ));
         if (!result?.ok || !Array.isArray(result.bindings)) return;
         const nextBindings = result.bindings as SessionBinding[];
-        notifyCompletedRuns(Array.isArray(result.events) ? result.events as RuntimeEvent[] : [], nextBindings, true);
         const requestEntries = await Promise.all(nextBindings
           .filter(binding => agentRuntimeTurnState(binding) === 'waiting-input')
           .map(async binding => {
-            return [binding.id, await readPendingRequest(binding)] as const;
+            return [binding.id, await readPendingRequest(binding.id)] as const;
           }));
         if (!disposed) {
           setBindings(current => areSerializedValuesEqual(current, nextBindings) ? current : nextBindings);
@@ -161,9 +159,23 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
     // Keep a bounded recovery poll for missed runtime events; live events update only their binding/request below.
     const timer = window.setInterval(() => void refresh(), 10000);
     const unsubscribe = window.electron?.agentRuntime?.sessions?.onEvent?.((payload) => {
+      if (payload?.kind === 'notification' && payload.notification) {
+        const n = payload.notification;
+        const show = n.category === 'completed' ? toast.success : n.category === 'failure' ? toast.error : toast;
+        show(n.safeSummary, {id:'agent-runtime-notification', duration:4000, action:{label:'Open',onClick:()=>{
+          const task = tasksRef.current.find(candidate=>candidate.id===n.taskId);
+          if (task) setRequest(current=>({task,startOnRequest:false,requestId:(current?.requestId || 0)+1}));
+        }}});
+        return;
+      }
+      if(payload?.kind === 'storage-failure') {
+        setStorageBlocked(true);
+        toast.error(STORAGE_BLOCKED_REASON, {id:'agent-work-storage-failure'});
+        return;
+      }
+      if (payload?.kind === 'storage-recovered') { setStorageBlocked(false); toast.dismiss('agent-work-storage-failure'); return; }
       if (!payload?.binding) return;
       const nextBinding = payload.binding as SessionBinding;
-      if (payload.kind === 'event' && payload.event) notifyCompletedRuns([payload.event as RuntimeEvent], [nextBinding]);
       setBindings(current => {
         const index = current.findIndex(binding => binding.id === nextBinding.id);
         const next = index < 0 ? [...current, nextBinding] : current.map(binding => binding.id === nextBinding.id ? nextBinding : binding);
@@ -177,6 +189,31 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
       unsubscribe?.();
     };
   }, []);
+
+  // A request reference can reach the projection before the binding update; fetch its details once per request.
+  const deliveryRequestKey = deliveryAttention?.request ? `${delivery.bindingId}:${deliveryAttention.id}:${deliveryAttention.pendingCount ?? 1}` : null;
+  useEffect(() => {
+    const bindingId = delivery.bindingId;
+    if (!deliveryRequestKey || !bindingId) return;
+    let disposed = false;
+    void readPendingRequest(bindingId).then(nextRequest => {
+      if (disposed) return;
+      setPendingRequestsByBinding(current => {
+        if (areSerializedValuesEqual(current[bindingId], nextRequest)) return current;
+        const next = { ...current };
+        if (nextRequest) next[bindingId] = nextRequest;
+        else delete next[bindingId];
+        return next;
+      });
+    }).catch(() => {});
+    return () => { disposed = true; };
+  }, [delivery.bindingId, deliveryRequestKey]);
+
+  useEffect(() => {
+    // Visibility only tunes toast suppression; a main process without the handler must not surface errors.
+    window.electron?.agentRuntime?.sessions?.setNotificationVisibility?.({taskId:request?.task.id,visible:supervisionVisible && Boolean(request)})?.catch(() => {});
+    return () => { window.electron?.agentRuntime?.sessions?.setNotificationVisibility?.({visible:false})?.catch(() => {}); };
+  }, [request?.task.id, supervisionVisible]);
 
   const requestTask = useCallback((task: Task, options: { repositoryFolder?: string; startOnRequest?: boolean } = {}) => {
     setRequest(current => ({
@@ -205,12 +242,26 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
   const dockBinding = activeBinding || readyBinding || historyBinding;
   const dockTask = dockBinding?.scope?.taskId ? tasks.find(task => task.id === dockBinding.scope?.taskId) : undefined;
   // TODO: cap persisted historical runs in the runtime service; this eight-item UI limit only bounds rendering.
+  // Dates are deliberately not consulted: unscheduled tasks are supervised exactly like scheduled ones.
+  const attentionFor = (binding: SessionBinding, task?: Task) => resolveAgentTaskAttention({
+    binding,
+    taskStatus: task?.status,
+    pendingRequest: pendingRequestsByBinding[binding.id],
+    deliveryAttention: binding.id === delivery.bindingId ? deliveryAttention : undefined,
+  });
   const dockItems = [...bindings]
     .filter(binding => binding.scope?.kind === 'task' && tasks.some(task => task.id === binding.scope?.taskId))
     .sort((left, right) => Date.parse(right.updatedAt || '') - Date.parse(left.updatedAt || ''))
     .slice(0, 8)
-    .map(binding => ({ binding, task: tasks.find(task => task.id === binding.scope?.taskId), pendingRequest: pendingRequestsByBinding[binding.id] }));
+    .map(binding => {
+      const task = tasks.find(candidate => candidate.id === binding.scope?.taskId);
+      return { binding, task, pendingRequest: pendingRequestsByBinding[binding.id], attention: attentionFor(binding, task) };
+    });
   const blockedByActiveSession = Boolean(activeBinding && request && activeBinding.scope?.taskId !== request.task.id);
+  const blockedReason = blockedByActiveSession ? ACTIVE_SESSION_BLOCKED_REASON : storageBlocked ? STORAGE_BLOCKED_REASON : undefined;
+  const dockAttention = blockedReason
+    ? resolveAgentTaskAttention({ blockedReason })
+    : dockBinding ? attentionFor(dockBinding, dockTask) : undefined;
   const activeSessionProjection = projectAgentRuntimeSession(activeBinding, [], {
     blocked: blockedByActiveSession,
     supervisionVisible,
@@ -222,7 +273,8 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
     historyCount: bindings.filter(binding => HISTORY_SESSION_STATES.has(binding.state)).length,
     items: dockItems,
     pendingRequest: dockBinding ? pendingRequestsByBinding[dockBinding.id] : undefined,
-  }), [activeBinding, activeSessionProjection.dockState, bindings, dockBinding, dockItems, dockTask, historyBinding, pendingRequestsByBinding, readyBinding]);
+    attention: dockAttention,
+  }), [activeBinding, activeSessionProjection.dockState, bindings, dockAttention, dockBinding, dockItems, dockTask, historyBinding, pendingRequestsByBinding, readyBinding]);
   const value = useMemo(() => ({ requestTask, sessionDock, openSession: openBinding }), [openBinding, requestTask, sessionDock]);
   const launcherValue = useMemo(() => ({ requestTask }), [requestTask]);
   return (
@@ -237,6 +289,8 @@ export function AgentSessionSupervisorProvider({ children, tasks, projects }: { 
             openRequest={request.requestId}
             startOnOpenRequest={request.startOnRequest}
             onVisibilityChange={setSupervisionVisible}
+            onBindingChange={setSupervisedBindingId}
+            delivery={delivery}
             onBlockedByBinding={openBinding}
             trigger={null}
           />

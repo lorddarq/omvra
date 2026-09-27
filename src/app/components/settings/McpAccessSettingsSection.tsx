@@ -85,14 +85,14 @@ export function McpAccessSettingsSection({
   return (
     <div className="space-y-8">
       <p className="max-w-[440px] text-xs leading-5 text-[#8a8a92] text-pretty">
-        Agent access lets connected tools work with this workspace. It is independent from Runtime access: turning Runtime access off does not turn off this connection.
+        Agent access lets connected tools work with this workspace. It is independent from ACP: turning ACP off does not turn off this connection.
       </p>
 
       <section className="space-y-5" aria-labelledby="mcp-server-title">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 space-y-1">
             <div className={LABEL_CLASS}>Allow connected agents</div>
-            <p className={DESCRIPTION_CLASS}>When off, external agent tools cannot access this workspace. Runtime access remains controlled separately.</p>
+            <p className={DESCRIPTION_CLASS}>When off, external agent tools cannot access this workspace. ACP remains controlled separately.</p>
           </div>
           <Switch
             checked={agentAccessEnabled}

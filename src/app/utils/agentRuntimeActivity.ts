@@ -1,3 +1,6 @@
+import { getAttentionState, getSessionAttentionState, type AttentionState } from './attention.ts';
+import type { DeliveryActivity, DeliveryAttention } from './agentRuntimeDelivery.ts';
+
 export interface AgentRuntimeActivityEvent {
   id: string;
   type: string;
@@ -167,12 +170,13 @@ export function describeAgentRuntimeSession(bindingState: string, events: AgentR
 export function projectAgentRuntimeSession(
   binding?: { state?: string; turn?: AgentRuntimeTurnProjection; taskExecution?: { state?: string } },
   events: AgentRuntimeActivityEvent[] = [],
-  options: { blocked?: boolean; supervisionVisible?: boolean } = {},
+  options: { blocked?: boolean; supervisionVisible?: boolean; turnCompleted?: boolean } = {},
 ): AgentRuntimeSessionProjection {
   const turnState = agentRuntimeTurnState(binding);
   const isTurnInFlight = IN_FLIGHT_AGENT_RUNTIME_TURN_STATES.has(turnState || '');
   const executionState = binding?.taskExecution?.state;
-  const lastBatchCompleted = executionState === 'batch-finished' || events.some(event =>
+  // `turnCompleted` comes from the bounded projection or binding; `events` remains for legacy callers.
+  const lastBatchCompleted = executionState === 'batch-finished' || (options.turnCompleted === true && !isTurnInFlight) || events.some(event =>
     event.nativeEventType === 'turn/completed' && !['failed', 'interrupted'].includes(event.state || '')
   );
   const summary = binding?.state
@@ -189,4 +193,55 @@ export function projectAgentRuntimeSession(
             : binding ? 'history' : 'none';
 
   return { turnState, isTurnInFlight, lastBatchCompleted, summary, dockState };
+}
+
+// Bounded main-process activity summaries, rendered as-is; the renderer never re-derives them from native events.
+export function projectDeliveryActivity(activity: DeliveryActivity | null | undefined): AgentRuntimeActivityItem[] {
+  return (activity?.entries || []).map(entry => ({ id: entry.id, label: entry.label, observedAt: entry.at, count: entry.count, tone: 'neutral' as const }));
+}
+
+export interface AgentTaskPendingRequest {
+  requestId: string | number;
+  message: string;
+  kind: 'permission' | 'input';
+}
+
+const OUTCOME_KINDS = new Set(['complete', 'review', 'outcome-review']);
+const CANCEL_REASONS = new Set(['cancelled']);
+
+/**
+ * One attention answer for an agent task, shared by the Agent tasks area and task details.
+ * Governed task state wins over runtime state; runtime completion never implies task completion.
+ */
+export function resolveAgentTaskAttention({ binding, taskStatus, pendingRequest, deliveryAttention, blockedReason }: {
+  binding?: { state?: string; turn?: AgentRuntimeTurnProjection; taskExecution?: { state?: string } };
+  taskStatus?: string;
+  pendingRequest?: AgentTaskPendingRequest;
+  deliveryAttention?: Pick<DeliveryAttention, 'category'>;
+  blockedReason?: string;
+}): AttentionState | undefined {
+  if (blockedReason) return { ...getAttentionState('blocked'), description: blockedReason };
+  const base = getSessionAttentionState({ bindingState: binding?.state, turnState: agentRuntimeTurnState(binding), executionState: binding?.taskExecution?.state, taskStatus });
+  if (base && OUTCOME_KINDS.has(base.kind)) return base;
+  const category = deliveryAttention?.category;
+  if (category === 'blocked') return getAttentionState('blocked');
+  const waiting = base?.kind === 'needs-input' || category === 'permission' || category === 'input';
+  if (waiting) {
+    const permission = pendingRequest ? pendingRequest.kind === 'permission' : category !== 'input';
+    const attention = getAttentionState(permission ? 'permission-required' : 'needs-input');
+    if (pendingRequest) return { ...attention, description: pendingRequest.message };
+    // Main reported a request reference but details are not loaded yet; keep the request state, not a stale warning.
+    if (category === 'permission' || category === 'input') return attention;
+    return { ...getAttentionState('interrupted'), label: 'Input request unavailable', description: 'The session says it needs input, but Omvra has no answerable request.', nextStep: 'Open supervision to reconnect or replace the stale session.' };
+  }
+  // Live work and explicit session end are current facts; they outrank the previous turn's outcome.
+  if (base && ['active', 'starting', 'stopping', 'failed', 'closed'].includes(base.kind)) return base;
+  if (category === 'failure') return getAttentionState('failed');
+  const turn = binding?.turn;
+  const cancelled = category === 'cancelled' || binding?.taskExecution?.state === 'stopped'
+    || (turn?.state === 'interrupted' && CANCEL_REASONS.has(turn.terminalReason || ''));
+  if (cancelled) return getAttentionState('cancelled');
+  if (category === 'recovery') return getAttentionState('interrupted');
+  if (category === 'completed' || (turn?.state === 'completed' && (!base || base.kind === 'ready'))) return getAttentionState('batch-finished');
+  return base;
 }

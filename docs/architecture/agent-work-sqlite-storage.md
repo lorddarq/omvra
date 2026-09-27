@@ -1,6 +1,9 @@
 # SQLite storage for agent sessions and task work metadata
 
-**Status:** Proposed architecture specification  
+**Status:** Contract specified; awaiting human review (2026-09-25)
+
+**Task:** `task-6e1c768c-84d9-4533-8f0d-6e011fa2117d`
+
 **Scope:** Main-process SQLite store for agent runtime history, delivery state, and bounded task-work projections  
 **Related contract:** [Storage architecture review](storage-architecture-review.md)
 
@@ -10,7 +13,7 @@ Agent session bindings and events currently use bounded arrays in electron-store
 
 ## Decision boundary
 
-SQLite owns agent-work data. The existing workspace/task store remains authoritative for normal task metadata:
+After verified cutover, SQLite owns agent-work data. This document specifies future behavior; it does not claim SQLite or the Settings controls are implemented. The existing workspace/task store remains authoritative for normal task metadata:
 
 | Existing task authority | SQLite agent-work authority |
 | --- | --- |
@@ -18,90 +21,176 @@ SQLite owns agent-work data. The existing workspace/task store remains authorita
 
 SQLite may hold a bounded, derived task-work projection keyed by `task_id` for fast supervision and reporting. It must not become a second writer for task title, description, status, acceptance, Goal state, or contribution acceptance. A task record can reference work IDs; it does not need to embed session history.
 
+Task dates remain workspace task metadata and are optional. A task with no start and end date is an intentional **unscheduled** task, not an archived, completed, cancelled, or invalid task. SQLite may expose a derived `unscheduled` value in reporting or work projections, but must never write or infer dates as part of agent-session persistence. Unscheduled tasks remain eligible for assignment, execution, supervision, dependencies, search, reporting, and later scheduling; they are omitted from Timeline placement until a valid range is assigned.
+
 The correlation chain is explicit:
 
 ```text
 task -> contribution/attempt -> session -> turn -> event
 ```
 
-Missing links are allowed for general agent sessions, but task-bound sessions should record every available identifier.
+Task sessions require `task_id` and `attempt_id`; `contribution_id` is optional for existing direct-task execution. Goal-node sessions carry Goal, element, execution, and attempt correlation instead. General unbound sessions are not introduced by this contract. External identifiers are references, never copies of authoritative records.
 
-## Proposed schema
+## Verified baseline and quality goals
 
-All tables are main-process-owned and use integer SQLite primary keys or stable UUIDs as appropriate. Timestamps are UTC ISO strings or SQLite integers consistently within the implementation.
+- `electron/domain/agent-runtime-session-service.cjs` owns binding revisions, lifecycle transitions, scope validation, idempotent events, governance, archive preparation, and crash reconciliation. Its event store retains the latest 2,000 entries; lists cap reads at 100.
+- `electron/services/workspace-service.cjs` wires `omvra.acpSessionBindings.v1` and `omvra.acpSessionEvents.v1` to electron-store arrays. `agent-runtime-session-runner.cjs` consumes protocol events; `electron/ipc/agent-runtime.cjs` exposes commands. Reuse these domain rules and IPC boundaries.
+- Existing normalization permits `messagePreview` up to 20,000 characters. This is a gap relative to the no-raw-response privacy contract, not authorization to migrate previews. Existing preview tests demonstrate behavior, not privacy compliance.
+- Governance currently reads retained events for usage/tool/turn metrics. Pruning cannot safely ship until those metrics have durable bounded aggregates independent of event retention.
+- `package.json` pins Electron 43.3.0 and electron-builder 26.16.1; no SQLite package is declared. Packaged driver availability and performance remain unverified.
 
-### `agent_sessions`
+Constraints: one active execution workspace-wide; provider runtime and MCP remain separate; task/contribution/Goal acceptance only through existing governed commands. Goals: bounded storage and memory, responsive session delivery, deterministic recovery, no second authority. All numeric defaults below are initial policy decisions to benchmark, not measured performance claims.
 
-Stable session identity and lifecycle projection: `id`, `binding_id`, `task_id`, `attempt_id`, `provider`, `runtime_profile_id`, `scope_kind`, `scope_id`, `provider_session_ref` (opaque and non-secret), `state`, `attention_state`, `created_at`, `updated_at`, `finished_at`, `last_event_seq`, and bounded `latest_snapshot_version`.
+## Schema contract v1
 
-### `agent_turns`
+One database per existing workspace-store identity, under its Electron user-data directory (`agent-work-v1.sqlite`; development and production must use distinct paths). Do not place it in a repository, temporary directory, or provider profile. Schema version uses `PRAGMA user_version`; a breaking migration creates a verified replacement rather than silently reinterpreting old columns. Use UTC epoch milliseconds (`INTEGER`) internally and convert at existing ISO timestamp API boundaries. IDs are bounded `TEXT`, preserving existing IDs; sequences and revisions are non-negative safe integers.
 
-Turn-level boundaries: `id`, `session_id`, `turn_index`, `state`, `started_at`, `finished_at`, `outcome`, bounded `final_summary`, `final_summary_version`, and `error_code`. This is a summary record, not a raw transcript.
+The following is the logical schema for implementation, not shipped DDL. Unmarked fields are required; `?` means nullable. JSON fields are bounded, versioned allowlists, never arbitrary protocol objects. Enable foreign keys on every connection. Internal child references use foreign keys with restricted deletion; prune children explicitly before parents so a cascade cannot bypass batch limits. External task, contribution, attempt, Goal, and runtime-profile references have no cross-store foreign key; validate through existing services at creation and report missing references on later reads.
 
-### `agent_events`
+| Table | Columns and keys | Constraints and indexes |
+| --- | --- | --- |
+| `agent_sessions` | `id` PK (existing binding ID), `revision`, `idempotency_key`, `runtime_profile_id`, `provider?`, `source_protocol`, `scope_kind`, `task_id?`, `contribution_id?`, `attempt_id?`, `goal_id?`, `goal_element_id?`, `goal_execution_id?`, `goal_execution_attempt?`, `source_revision`, `provider_session_ref?`, `state`, `attention_state`, `capabilities_json`, `created_at`, `updated_at`, `last_observed_at`, `finished_at?`, `terminal_reason?`, `last_event_seq`, `pruned_through_seq`, `snapshot_version`, `recovery_required`, `governance_json` | Unique creation idempotency key. Reuse session/scope enums and transition rules from session service. Index `(task_id, attempt_id, updated_at, id)`, `(goal_execution_id, id)`, `(finished_at, id)`. No duplicate `binding_id`: public binding ID maps to `id`. |
+| `agent_turns` | `id` PK (existing turn ID), `session_id` FK, `turn_index`, `state`, `request_id?`, `created_at`, `updated_at`, `started_at?`, `finished_at?`, `outcome?`, `final_summary?`, `final_summary_version`, `error_code?`, `governance_json` | Unique `(session_id, turn_index)` and `(session_id, id)`; existing turn enums. Index `(finished_at, id)`. A completed turn may leave a reusable session `ready`; never infer session closure from turn completion. |
+| `agent_events` | `id` PK, `session_id` FK, `turn_id?`, `seq`, `idempotency_key`, `kind`, `native_type`, `priority`, `summary`, `facts_json`, `observed_at`, `created_at` | Unique `(session_id, seq)` and `(session_id, idempotency_key)`; composite FK `(session_id, turn_id)` to turns prevents cross-session correlation. Index `(created_at, id)`. `facts_json` allows only normalized usage, permission state, capability ID, request ID, tool category, failure class and counts. No message segments. |
+| `agent_work_projections` | `task_id`, `attempt_id`, `session_id` FK, `latest_state`, `latest_attention_state`, `latest_summary?`, `started_at?`, `finished_at?`, `updated_at`, `projection_version` | PK `(task_id, attempt_id)`, both non-null. Index `(updated_at, task_id, attempt_id)`. Derived, replaceable; no task status, dates, acceptance, dependencies, Goal or archive state. Provider metadata is joined from sessions, not copied. |
+| `agent_delivery_state` | `session_id` FK, `surface`, `last_snapshot_version`, `last_sent_seq`, `quiet_until?`, `updated_at` | PK `(session_id, surface)`; surfaces are supervisor, status area, toast. Visibility and pending output/characters stay in bounded memory, not durable storage. Reset presentation on renderer reconnect. |
+| `agent_notifications` | `id` PK, `session_id` FK, `turn_id?`, `priority`, `dedupe_key`, `summary`, `created_at`, `expires_at`, `delivered_at?`, `dismissed_at?` | Unique `(session_id, dedupe_key)`; same-session turn FK; indexes `(expires_at, id)` and `(delivered_at, created_at, id)`. Derive task ID through session. Dedupe key includes transition identity/version, not summary text. |
 
-Append-only normalized events: `id`, `session_id`, `turn_id`, `seq`, `kind`, `native_type`, `priority`, `summary`, bounded `message_segment` where allowed, `observed_at`, and `created_at`. Enforce uniqueness on `(session_id, seq)`, index session/time and task/session lookups, and retain only the configured bounded history.
+`unscheduled` is a read/reporting projection of the authoritative task record and must not be used to mutate task dates or Timeline membership. Compute it at read time rather than persist a second task-date authority; missing/partial/invalid ranges remain the task date validator's responsibility. A missing task is explicitly unavailable, not implicitly unscheduled. A task-work projection can be rebuilt from retained session/turn summaries, but pruned history cannot be reconstructed or invented.
 
-### `agent_work_projections`
+Limits enforced before persistence and rechecked at SQL constraints where practical: identifiers 160 UTF-8 bytes (opaque provider reference 512), native type 160, event/notification summary 1 KiB, turn/work summary 4 KiB, facts 2 KiB, capabilities 16 KiB (at most 50 existing normalized items), governance 4 KiB. Require valid timestamps, positive event sequence, valid enums, and bounded list inputs. Use prepared parameters; expose no renderer-supplied SQL or database paths. Preserve supported legacy binding extension fields only through an explicit bounded allowlist; unknown extensions block cutover for review rather than being silently discarded or copied unchecked.
 
-One current derived row per task/attempt: `task_id`, `attempt_id`, `session_id`, `latest_state`, `latest_attention_state`, `latest_summary`, `latest_model_message`, `provider`, `provider_session_ref`, `started_at`, `finished_at`, `updated_at`, and `projection_version`. Updates are idempotent and replace the current projection; they do not mutate the task authority.
+### Correlation, revisions and ordering
 
-### `agent_delivery_state`
+- Task correlation is `task_id -> contribution_id? / attempt_id -> session.id -> turn.id -> event.id / seq`. Preserve the current attempt identifier and source revision; neither proves the current task revision. Goal correlation uses the separate existing Goal scope. A runtime session never creates a new contribution implicitly.
+- `revision` continues binding optimistic concurrency; workspace `__mcpRevision` remains separate and unchanged. Reuse existing errors for revision/idempotency mismatch.
+- The repository serializes sequence allocation, append, session/turn updates, governance aggregates and projection version in one short transaction. A retry with the same retained idempotency key and identical normalized content returns the original result; conflicting content fails. Runner retries carry the original allocated sequence. Never derive the next sequence from `MAX(events.seq)` after pruning.
+- Prune events only as contiguous prefixes per session; advance `pruned_through_seq` in the deletion transaction. A retry at/below that watermark returns an explicit already-pruned result without applying counters again. Retried writes must preserve sequence identity across worker retries. Provider replay without stable identity must reconcile the snapshot and report an unknown gap, not fabricate exactly-once delivery.
+- Permission/input payloads remain provider-owned and transient. Persist only request ID, kind, state, and a safe generic summary. After restart, revalidate with the runtime; never replay a previous approval or persist entered secrets. Protect unresolved-request metadata until resolution or explicit session closure.
+- `governance_json` stores versioned counts and latest provider usage with provenance, aggregation mode, unknown values and covered sequence. Preserve existing unknown-versus-zero and delta-versus-cumulative semantics. A same-work-scope query aggregates retained counters across applicable sessions; attempts still come from task/Goal authority. A resumable or unfinished governed attempt protects required counters even when ordinary event detail expires.
 
-Ephemeral/recoverable delivery bookkeeping: `session_id`, `surface`, `visibility`, `last_snapshot_version`, `last_sent_seq`, `pending_output`, `pending_chars`, `quiet_until`, and `updated_at`. It exists to recover a supervision view and to prevent duplicate notifications; it is not a transcript.
+## Privacy, provider references and deletion
 
-### `agent_notifications`
+Raw prompts, raw responses, transcripts, hidden reasoning, credentials, input answers, raw tool payloads and unredacted provider payloads remain forbidden in the database, WAL, logs, exports and backups. Truncation or renaming content to `summary` does not make it safe. Persist application-authored summaries from allowlisted structured facts (for example, “Turn completed; 3 tool operations”), never verbatim model output or provider error strings. Redact identifiers/text before enqueueing writes; unknown event kinds produce a generic unsupported-event summary. Full model messages and final response text may be displayed transiently under the delivery contract but are not persisted. Reopening after restart therefore shows a safe summary, not a saved conversation. Changing this needs a separate accepted privacy contract; there is no bypass preference here.
 
-Bounded notification records for dedupe and reporting: `id`, `session_id`, `task_id`, `priority`, `dedupe_key`, `summary`, `created_at`, `delivered_at`, and `dismissed_at`. Expiration/retention is mandatory.
+`provider_session_ref` is optional opaque non-secret local resume metadata, not a URL, credential, instruction, or canonical history. Keep it main-process-only; clear it on explicit close/archive as the existing contract requires. Do not require provider thread history for supervision. A missing or inaccessible reference produces an explicit resume failure and a user-controlled new session. Deleting Omvra history does not delete provider-owned history; do not claim otherwise.
 
-## Privacy and retention
+Archiving a task uses existing governed archive preparation and does not transfer archive authority to SQLite. History ages normally after closure. Deleting task-work history deletes eligible local events, notifications, delivery state, turns, projections and sessions in that order, preserving task/contribution/Goal/context/evidence records. Active/recovery-critical sessions require explicit resolution/closure before deletion; history deletion must not cancel a session implicitly. On permanent task deletion, enqueue a resumable main-process cleanup keyed by the committed deletion; recheck for active sessions and missing task references after restart. No cross-store atomic transaction is claimed. Archive/restore must continue to work when related history has already expired.
 
-The current runtime contract forbids persisting raw prompts, raw responses, transcripts, hidden reasoning, credentials, and unredacted provider payloads. This spec therefore persists normalized event summaries and bounded final/last-message projections only. Storing full model conversations would require an explicit privacy-contract revision, migration, export, and deletion policy; it is not implied by adding SQLite.
+Logical deletion is not a promise of forensic erasure: free pages, WAL, exported files, old backups and provider stores can retain copies. App-managed history backups follow the retention policy below; user-exported files require separate user deletion. Encryption-at-rest is limited to OS account/file protections in v1; no application encryption or secure-erasure claim is made. A stronger guarantee requires a separate design decision.
 
-Every table has a retention class. Runtime events and notifications are capped by count and age; finished sessions have a separate retention policy; delivery state is deleted on session close after the final projection is committed. The store must expose pruning metrics and run pruning without blocking the UI.
+## Retention contract
 
-## Main-process repository boundary
+Retention and maintenance are user-visible under **Settings → Storage → Data policies**. Values below are workspace defaults, stored as validated settings under the existing preferences authority, not agent/MCP-editable SQL configuration. Retain data only while BOTH age and count limits allow it; prune oldest eligible entries first with a stable time/ID order. Ages use repository `created_at` for events/notifications and `finished_at` for closed sessions/turns, never untrusted provider time. Reading a record does not renew its lifetime.
 
-Create one main-process SQLite repository/connection owner. Renderer code accesses it only through typed IPC commands. Writes use short transactions and a serialized write queue. The repository must handle `SQLITE_BUSY` with bounded retry/backoff, report failures, and never silently fall back to a second persistence authority.
+| Category | Default age and count ceiling | Protection / expiry behavior |
+| --- | --- | --- |
+| Runtime events | 7 days; 2,000 per session; 20,000 workspace-wide | Ordinary detail may expire during active work after its facts/counters are committed. Preserve current attention/recovery facts in the session/turn snapshot, not an unlimited protected log. |
+| Notifications | 7 days; 500 workspace-wide; explicit `expires_at` | Expired toasts are not replayed. Unresolved attention lives in the protected snapshot even if its toast record expires. |
+| Closed sessions and their turns | 30 days; 1,000 closed sessions and 10,000 finished turns workspace-wide | Delete children first. Ready/reusable sessions are not closed sessions. Finished turns in reusable sessions can expire once needed recovery/budget facts are in protected aggregates. |
+| Finished turn/work summaries | 30 days; 1,000 completed work projections workspace-wide | Latest final summary protected for 24 hours after commit; summary lifetime cannot exceed its session. Unfinished-attempt recovery projections are protected until resolved. |
+| Delivery state | Delete at explicit session close after final commit; reconnect resets transient state | Keep only bounded cursors for reusable/protected sessions. |
+| App-managed migration/recovery backups | 7 days; at most 2 successful generations | Failed migration source remains protected until verified recovery or explicit user removal. Exported copies are outside automatic deletion. |
 
-Do not dual-write the same agent event to an old JSON array and SQLite indefinitely. Migration must be an explicit, resumable step with a backup/export, row counts, checksums or equivalent verification, and a cutover marker. Keep JSON/electron-store for settings, flexible configuration, compatibility import/export, and backups.
+A session is protected if its execution is queued/starting/active/waiting-input/cancelling, its provider is still live (including idle `ready`), a permission/input request or completion barrier is unresolved, or it is interrupted/resumable or needed for unfinished-attempt governance/reconciliation. Protect the minimal snapshot, latest required turn, counters and reference, not every historical event. Stale protection is surfaced for user resolution; it never auto-completes work or expires an approval.
 
-## Provider-neutral history
+Count caps are soft only for protected records. Diagnostics report protected counts/bytes, oldest protection, reason, eligible excess and unmet policy. Set a 256 MiB logical database high-water mark and 64 MiB WAL high-water mark. Under pressure prune eligible detail, coalesce ordinary activity and stop admitting optional event history; preserve bounded latest snapshots, lifecycle and safety facts. If protected data prevents recovery or disk writes fail, refuse new starts and surface a storage failure while retaining cancel/input controls for existing work. Never promise a hard byte cap while protection or external readers prevent reclamation.
 
-`provider_session_ref` is optional opaque metadata. Codex thread IDs can be retained as an external reference; Claude can still have a complete Omvra-owned bounded history even when the provider offers no durable thread. The application must not assume that an external provider thread is available, complete, or authoritative.
+### Settings controls and action semantics
 
-## Transaction and projection rules
+| Group | Controls / information |
+| --- | --- |
+| Retention | Separate session/turn history, runtime events, notifications and finished summaries controls. Age choices: 1, 7, 30, 90 days (summaries minimum 1 day). Positive integer count caps, maximum 10× defaults; per-session events cannot exceed workspace cap; summaries cannot outlive session history. No “forever” or zero/unlimited sentinel. Reset restores defaults. Show effective policy and protected exceptions before saving. |
+| Maintenance | Automatic maintenance on/off (default on), read-only idle/busy/deferred/failed state and next reason. **Prune now** and **Compact database** remain available to request when maintenance is off. Turning maintenance off does not disable ingestion caps or pressure protection. |
+| Diagnostics | Database/WAL/free-page bytes, schema/driver/runtime versions, category counts and protected estimates, last prune/checkpoint/compaction time, duration, removed rows, last redacted error, queue pressure and coalescing counts. No content or provider references. |
 
-For each normalized runtime event, the main process may update the session cursor, append the bounded event, update the turn/session projection, and update delivery state in one short transaction where practical. High-volume message segments may be coalesced before persistence according to the delivery policy. The final completion transaction must persist the final summary and projection before publishing completion to the renderer.
+Each manual action first previews affected categories, estimated eligible/protected row counts, approximate bytes and the current policy version. **Prune now** confirms logical deletions; **Compact database** confirms page reclamation only and explicitly shows zero history rows deleted. Byte estimates are approximate, not a promise of released space. A stale policy requires a refreshed preview; protection is rechecked inside every transaction. Lowering a retention setting previews the resulting deletions before applying. Requests return an operation ID/status immediately; duplicate clicks reuse the pending operation. Progress and failures remain visible and keyboard/screen-reader accessible. Cancellation stops between batches, never halfway through a commit; already completed deletions are not undone.
 
-Task acceptance, contribution acceptance, Goal completion, dependency changes, archive state, and backup records continue through their existing governed services and optimistic revision rules. SQLite work projections can inform those services but cannot perform those transitions implicitly.
+### Pruning, checkpointing and compaction
 
-## Migration and rollout
+One main-process-owned repository runs database I/O on one dedicated Node worker. This is execution isolation inside the Electron application, not another deployed service. Renderer IPC and provider-consumption paths never run blocking SQL. Use one serialized, bounded command queue, prioritizing lifecycle/permission/final commits above history and maintenance. Initial queue cap: 256 commands or 1 MiB; reserve 32 commands for lifecycle/control, coalesce optional detail first, report saturation rather than silently dropping critical state.
 
-1. Instrument the current array/IPC path and capture representative rates, sizes, memory, and latency.
-2. Introduce the repository behind a feature flag and write/read only a bounded development sample.
-3. Add session/turn/event/projection recovery and compare it with the existing supervisor snapshot.
-4. Migrate runtime/session/context history with an export and verification report.
-5. Cut over reads, then writes, and remove the old event-array writer after a verified release.
-6. Evaluate whether stable task rows should ever move to SQLite separately; do not expand scope merely because the agent-work store exists.
+- Logical pruning: on startup after reconciliation, every 15 minutes, after category thresholds, or on request. Select at most **200 child/leaf rows per transaction**, aim for **10 ms** work, then yield at least **50 ms** and recheck foreground demand/protection. A transaction cannot be preempted; the time budget is a tuning target, not a hard latency guarantee. Delete children in separate bounded commits before their parent; no unbounded cascading session delete. Do not hold a read transaction across IPC or await.
+- Configure WAL and `synchronous=FULL`; disable automatic checkpoints on commit (`wal_autocheckpoint=0`) so the owner schedules them. At **16 MiB WAL** or **60 seconds** since the last checkpoint with pending pages, enqueue `wal_checkpoint(PASSIVE)`. Record busy/readers and retry later; never loop waiting for a reader. At 64 MiB apply pressure handling and flag prolonged checkpoint blockage. WAL size cannot be forcibly bounded against an external long-lived reader.
+- Initialize `auto_vacuum=INCREMENTAL` before creating tables. Once free pages exceed **20% and 16 MiB**, run `incremental_vacuum(128)` in idle slices after **30 seconds** with no pending foreground writes, no active execution and no unresolved recovery commit. An idle live session also defers compaction. Between slices yield and prioritize incoming session work. Run checkpoint TRUNCATE only during the same idle window with no reader; busy means defer. Manual Compact uses this same scheduling, never bypasses protection.
+- Full `VACUUM` is excluded from normal/manual online maintenance. If ever needed for an older schema, run only in an explicit offline migration/repair window, with verified backup, free-space preflight and starts suspended. Off-thread execution alone does not remove SQLite write-lock contention.
 
-## Verification requirements
+These choices follow SQLite's [WAL](https://www.sqlite.org/wal.html), [checkpoint and incremental-vacuum pragmas](https://www.sqlite.org/pragma.html), and [VACUUM](https://www.sqlite.org/lang_vacuum.html) semantics; thresholds are Omvra policy, not SQLite guarantees.
 
-- schema creation and migration are idempotent;
-- unique sequence constraints prevent duplicate events;
-- crash/restart recovery returns the latest bounded snapshot;
-- pruning enforces count and age limits;
-- concurrent event bursts remain serialized without unbounded memory;
-- final-summary-before-completion ordering survives failure injection;
-- provider references contain no credentials or raw protocol payloads;
-- task authority remains unchanged when a session starts, ends, crashes, or is cancelled;
-- backup/export and deletion behavior are documented and tested.
+## Transactions, failure handling and recovery
 
-## Open decisions
+Completion ordering is mandatory: consume provider terminal event; atomically commit safe final summary, session/turn state, counters, projection and deduped completion notification; then publish final snapshot; then completion attention. Renderer cursors reject stale versions and reopen from one bounded snapshot. Renderer failure after commit cannot lose completion; crash between notification send and delivered marker may repeat a toast, so dedupe by stable ID/version on reconnect. Do not claim exactly-once external notification delivery.
 
-- SQLite driver and Electron ABI/rebuild/packaging strategy (`better-sqlite3` is a candidate, not a decision).
-- Exact retention classes, caps, and deletion UX.
-- Whether bounded final model messages may be retained by default or require a workspace preference.
-- Whether the first migration includes only runtime/session/context events or also a task-work projection.
-- Database location, encryption-at-rest expectations, and backup inclusion.
+A failed final commit must show “runtime ended; history could not be saved,” not durable completion. Keep the bounded pending final snapshot and retry visibly. On restart, an uncommitted active binding reconciles as interrupted with an explicit history gap; do not manufacture the missing final output. No memory-only fallback is represented as durable success.
 
+Use a short busy timeout (50 ms) and bounded asynchronous retries (50, 100, 200 ms) for critical writes; maintenance defers on busy. Roll back failed transactions. Disk-full/read-only/corruption errors stop history writes and new launches, report a redacted actionable error, and preserve live cancel/input transport independently. Do not silently switch back to JSON or auto-delete/recreate a corrupt database. Quarantine/restore requires an explicit repair action. Validate schema version/integrity before use; a newer unknown schema opens no write path. Worker crash rejects pending commands and invokes recovery; critical state is never acknowledged before commit.
+
+Cross-store correlation follows existing idempotent `attachBindingToAttempt` reconciliation. SQLite commit and workspace attempt attachment cannot be atomic: use the stable binding/attempt ID to retry association on startup; surface reconciliation-required and block a conflicting start until resolved. This does not change task acceptance or optimistic revisions. Public domain APIs retain behavior; existing synchronous array-wired callers must be adapted to awaited repository operations as part of implementation, not wrapped in fire-and-forget writes.
+
+## Backup, migration and rollout
+
+1. Capture current event rates, IPC volume, latency and disk/memory use. Inventory all binding/event callers, governance, archive preparation, diagnostics, backup and runner recovery. Add durable aggregate semantics before allowing their source events to expire.
+2. Probe `node:sqlite` in the exact packaged Electron runtime; exercise worker loading, WAL, constraints, reopen, checkpoint, incremental vacuum and online backup on macOS, Windows and Linux targets. Development samples are isolated and cannot become a second live authority.
+3. With starts suspended and sessions explicitly closed/resolved, freeze the legacy runtime writer; capture a protected source backup and fingerprint. Import only `omvra.acpSessionBindings.v1` and `omvra.acpSessionEvents.v1` into a temporary v1 database. Leave runtime profiles, task context ledger, collaboration attempts/events, Goals and workspace records in electron-store. Create turns from known IDs/current binding state; mark unavailable historical turn boundaries rather than inventing them. Preserve source IDs/revisions/idempotency keys and assign sequence by stored source order.
+4. Apply the stricter privacy allowlist during import: omit message previews/provider detail/raw payloads, count exclusions by category, never log their content. Legacy source backup is an explicitly protected repair artifact, not a new compliant history export; delete on the backup retention schedule after cutover verification. Build work projections only from retained safe facts. Unknown required fields or ambiguous metrics require a reported reconciliation, not silent acceptance.
+5. Verify source/accepted/excluded counts, canonical hashes of allowed fields, scope relationships, foreign keys, integrity and bounded snapshots. Save the source fingerprint, destination schema/hash and migration phase in a durable main-process migration manifest. Restart resumes the same import or discards an unverified temporary destination; the old source remains unchanged before cutover.
+6. Flush/close the verified destination, atomically install it and advance the cutover manifest while writers remain suspended. Switch **both reads and writes together** to SQLite, then enable starts. A crash at any stage chooses the authority solely from the verified manifest/fingerprint; disagreement blocks writes. No read-first or indefinite dual-write interval. Remove the legacy live writer; retain the source only for the bounded rollback window.
+7. Before any new SQLite write, rollback may restore the verified pre-cutover source. After cutover writes, never re-enable stale JSON: use a separately verified reverse export or fix forward. Old binaries must refuse writes when a newer cutover marker exists; upgrade/rollback packaging must enforce this gate.
+
+Backup integration must be implemented before release. Existing workspace-only JSON backups remain readable and explicitly report that agent history is absent. New backups use a versioned manifest plus privacy-filtered logical history snapshot; omit provider resume references and delivery cursors. Take a coordinated workspace/history cut with mutation barriers, without an unbounded freeze during live work; manual full backups wait for an idle window. Use SQLite's [online backup API](https://www.sqlite.org/backup.html) for consistent internal snapshots, never copy only the live `.sqlite` file while WAL contains committed writes. A raw internal snapshot remains local/restricted and is not automatically export-safe.
+
+Restore validates version, size caps, hashes, privacy allowlists and relationships in staging; take a rollback backup before replacing anything. Restore workspace and history as one manifest-governed operation; missing task IDs become unavailable references and are eligible for cleanup, never recreated tasks. Restored sessions are interrupted/history-only with resume references cleared, pending input invalidated and notifications suppressed. Rebuild projections and require explicit preflight before any new execution. Startup recovery must not automatically replay prompts or permissions.
+
+## Driver decision and alternatives
+
+| Option | Benefits | Costs / release implications | Decision |
+| --- | --- | --- | --- |
+| Keep bounded electron-store arrays | No new dependency or migration | Whole-array rewrite; cannot independently page/prune indexed history | Keep as current behavior until cutover gates pass; not the target history store. |
+| Built-in `node:sqlite` in a repository worker | Standard library, no extra native addon, direct SQLite transactions | Synchronous API needs worker isolation; actual Electron-embedded Node API/version must be probed; API stability and backup support vary by Node version | Preferred candidate, subject to packaged capability gates. |
+| `better-sqlite3` in the same worker | Established synchronous transaction API | New native dependency; Electron ABI/prebuild/rebuild and packaged binary/signing checks for every supported OS/architecture | Fallback only if built-in capability checks fail; no dependency added by this task. |
+| `sqlite3` asynchronous addon | Async API avoids synchronous query calls on main loop | Still a native dependency and single-writer database; callback ordering adds transaction complexity | No demonstrated benefit over one worker/owner. |
+
+Recommendation: try the standard library first; one repository owner and SQLite file, no ORM or configurable driver framework. Native addons require Electron-specific compatibility validation; Node-API/prebuilt availability does not prove packaging works. Verify unpacked native binaries, clean-install load, upgrade/reopen, signed macOS app/notarization, Windows installer and Linux AppImage separately. No packaged release claim follows from a renderer build.
+
+Sources: [Node SQLite API](https://nodejs.org/api/sqlite.html), [better-sqlite3 upstream](https://github.com/WiseLibs/better-sqlite3), [sqlite3 upstream](https://github.com/TryGhost/node-sqlite3), [Electron native modules](https://www.electronjs.org/docs/latest/tutorial/using-native-node-modules). These describe options, not proof of support in Omvra's packaged runtime.
+
+## Verification and handoff
+
+This specification changes documentation only. The implementation owner must leave focused runnable checks at the existing domain/service test boundary; no simulated passing SQLite tests are claimed here.
+
+| Contract / acceptance criterion | Required verification |
+| --- | --- |
+| Workspace authority and optional dates | Start/end/crash/cancel/prune preserve task/contribution/Goal revisions and fields. Scheduled and unscheduled tasks execute identically; dates are derived only during reads. |
+| Six-table schema and correlation | Schema migration rerun is idempotent; duplicate keys, invalid timestamps, wrong-session turn IDs and invalid scope are rejected; stale revisions fail; direct task and Goal-node scopes round-trip. |
+| Privacy | Seed raw previews, prompt/response/secret-shaped fields, malicious errors and references; none reach SQLite/WAL/export/logs; safe generic summaries survive. Permission answers never replay. |
+| Retention and budgets | Age and count limits independently prune; prefix retries cannot double-count; protected snapshots/counters survive active/interrupted/unfinished attempts; governance decisions remain identical before/after pruning. |
+| Settings and manual actions | Reach Settings → Storage → Data policies; validate controls; previews show categories/protection/estimates; stale previews refresh; repeated clicks dedupe; prune cancellation stops between batches; Compact deletes zero rows. |
+| Nonblocking maintenance | Stress a high-rate session while requesting prune/compact; bound queue/row batches, verify no online full VACUUM, worker isolation and priority delivery; exercise busy reader, WAL threshold and pressure modes. Record latency rather than assume it. |
+| Migration and failure handling | Inject crash before/after every manifest/install step, final commit and notification publish; test disk-full, read-only, busy, worker death, corruption, newer schema and rollback after new writes. Exactly one authority; no false completion. |
+| Backup and deletion | Round-trip old workspace-only and new manifest backups; omit resume refs; restore interrupted history without approvals; task deletion cleanup resumes; archive/restore tolerates expired history; deletion never changes durable acceptance. |
+
+Risks: stricter persistence removes replay of old model text (mitigation: explicit safe-summary UX); protected histories can exceed soft caps (diagnostics and blocked new starts); migration loses unavailable historical turn detail (mark gaps); worker adaptation changes asynchronous call paths (await commits and failure-injection tests); driver/ABI compatibility and latency are not yet measured (packaged spike before production).
+
+Remaining release gates, not unspecified product rules: validate/tune the numerical defaults under representative load; pass packaged built-in-driver capability checks or document the fallback decision; implement and verify Settings, migration and coordinated backup/restore. Human acceptance of this proposed contract remains separate from task execution or runtime completion.
+
+## Supervision integration evidence (2026-09-25)
+
+The desktop owner initializes `agent-work-session-service.cjs` before runtime operations can proceed. The workspace facade routes all session reads and writes through that owner; a cutover marker without an owner fails closed. The runner awaits repository writes and serializes a bounded native-notification ingress (256 pending callbacks, 1 MiB). Completion commits its application-authored summary, work projection and attention notification before the binding and completion event are published. Ingress/storage failure surfaces a supervision error and blocks new starts/continuation while preserving live cancel/input transport. Failed terminal/control state is retained as one bounded in-memory reconciliation record per live session; successful reconciliation does not replay provider input responses. Process loss still requires durable recovery. This is the persistence barrier; the separate delivery/burst-policy task still owns cadence, lane subscriptions and acknowledgement delivery.
+
+Migration runs against the existing binding/event arrays while runtime operations are suspended. Its SQLite file is staged at its final workspace-private pathname but remains inaccessible to runtime readers until verification and the atomic JSON authority switch. `migration-source-v1.json` is a mode-0600 repair copy, with a SHA-256 source fingerprint; `migration-v1.json` records import/verification phases, counts, exclusions and canonical event hashes. Session IDs, source revisions, idempotency keys, scopes and opaque references survive. Known transient fields are excluded with counts; unknown fields, bad correlations, over-capacity history, source changes and hash/count disagreements block cutover. Imported orphaned live turns become interrupted, historical turn-boundary gaps are labelled, and incomplete legacy governance totals remain unknown. Imports are idempotent after interruption, including a crash between verified-manifest persistence and the atomic marker/legacy-array update. The protected source is removed on a subsequent startup after seven days following successful verification; failed imports retain their source. Missing post-cutover databases and revived legacy writers fail closed.
+
+Reopen reads bounded committed snapshots, invalidates old permission requests and does not restart prompts. The renderer receives safe summaries and attention without provider resume references. Task availability, unscheduled state and accepted/review status are derived from the current workspace task record. The integration does not copy task dates/status/dependencies/Goals/archive state into SQLite or use turn completion as acceptance. Terminal closed/failed sessions release recovery retention protection; interrupted recoverable sessions retain it until explicitly closed/archived.
+
+Workspace JSON export/restore remains workspace-only: it omits retired runtime arrays and the local authority marker, warns that agent history remains separate, and refuses attempts to recreate the retired arrays through generic store IPC. Coordinated portable SQLite history backup/restore, old-binary downgrade packaging enforcement, Settings retention controls, the delivery-policy dependency, and packaged cross-platform/manual UI validation remain release gates. They are not claimed by these integration checks. The migration was exercised on isolated fixtures; the currently running user's database was not externally migrated or restarted.
+
+Runnable checks: `npm run test:agent-work` (repository, migration/service integration and runner), `npm run test:workspace-contracts`, and `npm run build`. The local Electron binary can exercise the integration using `ELECTRON_RUN_AS_NODE=1 ./node_modules/.bin/electron --test electron/services/agent-work-integration.test.cjs electron/services/agent-runtime-session-runner.test.cjs`. These checks include partial-import retry, source preservation and privacy exclusion counts, restored attention and task-derived unscheduled state, completion-commit gating/rollback, legacy-write rejection and missing-database rejection.
+
+## Data policies delivery (2026-09-25)
+
+Settings → Local data & backup now includes Data policies. The main process owns the validated `omvra.agentWorkPolicy.v1` JSON preference; the SQLite connection receives that policy at startup and keeps only its effective in-memory version. Generic store writes/restores cannot bypass the confirmation boundary. Workspace-only exports omit this policy along with local history; restored workspace JSON leaves both unchanged and directs users to review policy changes in Settings.
+
+`agent-work-maintenance.cjs` coordinates privacy-safe status, bounded five-minute previews (at most eight), confirmation receipts, and one manual operation at a time. Duplicate confirmations reuse the same operation. A changed policy invalidates a preview; the UI refreshes it and requires confirmation again. The worker shares eligibility SQL between preview and pruning, then rechecks protection inside each transaction. Byte estimates use average occupied bytes per row and are approximate, not physical-reclamation promises.
+
+Prune operations yield for 50 ms between batches of at most 200 deletions/summary clearings and stop on cancellation between commits. One request stops after 1,000 batches with a visible deferred reason; users can preview another request. Compaction retains the existing 30-second idle/protection/fragmentation checks, deletes zero history rows, and reports deferral rather than blocking live work. The coordinator remains main-owned when Settings closes; application shutdown drains its current batch before closing SQLite. Disabling automatic maintenance gates startup, policy, resumed and command-count scheduling; ingestion count caps remain enforced independently.
+
+Verification: `electron/services/agent-work-maintenance.test.cjs` covers persisted policy, duplicate/stale confirmation, protected previews, cancellation, progress, IPC rejection and shutdown. `npm run test:data-policies-ui` runs the actual component/preload/IPC/SQLite in an isolated Electron fixture with active and interrupted sessions, including keyboard focus/Escape, stale-preview refresh, explicit prune confirmation and cancellation. This is desktop fixture evidence, not signed-package or full-workspace performance acceptance. Remaining coordinated history backup/restore, runtime notification recovery, privacy logging, date projection and delivery-policy work keep their own acceptance gates.

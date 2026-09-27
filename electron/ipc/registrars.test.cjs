@@ -134,7 +134,7 @@ test('performance registrar delegates timing records and local log controls', as
   assert.deepEqual(calls, [['record', { operation: 'render' }], ['record-batch', [{ operation: 'render' }]], ['open'], ['clear']]);
 });
 
-test('agent runtime session listing is read-only and never reconciles bindings', () => {
+test('agent runtime session listing is read-only and never reconciles bindings', async () => {
   const { handlers, ipcMain } = createIpcHarness();
   let reconcileCalls = 0;
   registerAgentRuntimeIpcHandlers({
@@ -143,7 +143,7 @@ test('agent runtime session listing is read-only and never reconciles bindings',
     reconcileAgentRuntimeSessions: () => { reconcileCalls += 1; },
   });
 
-  assert.deepEqual(handlers.get('agent-runtime/sessions/list')(null, { limit: 25 }), {
+  assert.deepEqual(await handlers.get('agent-runtime/sessions/list')(null, { limit: 25 }), {
     ok: true,
     payload: { limit: 25 },
   });
@@ -218,19 +218,19 @@ test('agent runtime registrar validates writes and keeps custom schemes behind i
     resolveManagedWorkspace: taskId => ({ workspacePath: `/tmp/agent-workspaces/${taskId}`, source: 'scratch-workspace' }),
   });
 
-  const saved = handlers.get('agent-runtime/save-profile')(null, {
+  const saved = await handlers.get('agent-runtime/save-profile')(null, {
     id: 'external', name: 'Codex', integrationMode: 'external-handoff', externalUrlScheme: 'codex', enabled: true,
   });
   assert.equal(saved.ok, true);
-  assert.deepEqual(handlers.get('agent-runtime/save-defaults')(null, { globalProfileId: 'external', projectProfileIds: {} }).value.globalProfileId, 'external');
+  assert.deepEqual((await handlers.get('agent-runtime/save-defaults')(null, { globalProfileId: 'external', projectProfileIds: {} })).value.globalProfileId, 'external');
   const handoff = await handlers.get('agent-runtime/open-external')(null, {
     workspacePath: '/tmp/workspace', taskId: 'task-1', contextReference: 'omvra://task/task-1', prompt: 'Continue task',
   });
   assert.equal(handoff.ok, true);
   assert.equal(new URL(opened).protocol, 'codex:');
   assert.equal(handlers.has('agent-runtime/test-connection'), true);
-  assert.deepEqual(handlers.get('agent-runtime/resolve-managed-workspace')(null, 'task-1').value, { workspacePath: '/tmp/agent-workspaces/task-1', source: 'scratch-workspace' });
-  assert.deepEqual(handlers.get('agent-runtime/sessions/evaluate-governance')(null, { bindingId: 'binding-1' }), { ok: true, bindingId: 'binding-1', action: 'warn' });
+  assert.deepEqual((await handlers.get('agent-runtime/resolve-managed-workspace')(null, 'task-1')).value, { workspacePath: '/tmp/agent-workspaces/task-1', source: 'scratch-workspace' });
+  assert.deepEqual(await handlers.get('agent-runtime/sessions/evaluate-governance')(null, { bindingId: 'binding-1' }), { ok: true, bindingId: 'binding-1', action: 'warn' });
   assert.deepEqual(await handlers.get('agent-runtime/sessions/continue-task')(null, 'binding-1'), { ok: true, bindingId: 'binding-1' });
 });
 
@@ -255,4 +255,28 @@ test('task context registrar keeps reads targeted and checkpoints human-authored
   assert.equal(appendOptions.provenance, 'human-authored');
   assert.deepEqual(appendOptions.sourceRefs, [{ type: 'task-change', id: 'task-1@4' }]);
   assert.equal(handlers.get('task-context/append-checkpoint')(null, { taskId: '', summary: '' }).error, 'TASK_ID_REQUIRED');
+});
+
+test('notification visibility validates input and takes ownership from the IPC sender',async()=>{
+ const {handlers,ipcMain}=createIpcHarness(),calls=[];
+ registerAgentRuntimeIpcHandlers({ipcMain,store:{},setNotificationVisibility:(sender,taskId)=>{calls.push([sender.id,taskId]);return {ok:true};}});
+ const invoke=payload=>handlers.get('agent-runtime/sessions/notification-visibility')({sender:{id:7}},payload);
+ assert.equal((await invoke({visible:'true',taskId:'task'})).ok,false);
+ assert.equal((await invoke({visible:true,taskId:'bad/id'})).ok,false);
+ assert.equal((await invoke({visible:true,taskId:'task',senderId:999})).ok,true);
+ assert.equal((await invoke({visible:false})).ok,true);
+ assert.deepEqual(calls,[[7,'task'],[7,null]]);
+});
+
+test('delivery commands are sender-scoped and fail closed without a delivery owner',async()=>{
+ const unavailable=createIpcHarness();
+ registerAgentRuntimeIpcHandlers({ipcMain:unavailable.ipcMain,store:{}});
+ assert.equal((await unavailable.handlers.get('agent-runtime/sessions/delivery/subscribe')({sender:{id:7}},{bindingId:'b'})).error,'DELIVERY_UNAVAILABLE');
+ const {handlers,ipcMain}=createIpcHarness(),calls=[];
+ const delivery=Object.fromEntries(['subscribe','setVisibility','snapshot','acknowledge','unsubscribe','diagnostics'].map(method=>[method,(sender,payload)=>{calls.push([method,sender.id,payload]);return {ok:true};}]));
+ registerAgentRuntimeIpcHandlers({ipcMain,store:{},delivery});
+ assert.equal((await handlers.get('agent-runtime/sessions/delivery/ack')({sender:{id:7}},null)).error,'INVALID_DELIVERY_REQUEST');
+ await handlers.get('agent-runtime/sessions/delivery/subscribe')({sender:{id:7}},{bindingId:'b',visible:true,requestId:1});
+ await handlers.get('agent-runtime/sessions/delivery/diagnostics')({sender:{id:7}});
+ assert.deepEqual(calls.map(([method,sender])=>[method,sender]),[['subscribe',7],['diagnostics',7]]);
 });

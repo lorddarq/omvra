@@ -14,6 +14,7 @@ try {
   console.warn('[updates] electron-updater is unavailable:', error?.message || error);
 }
 const { registerMcpIpcHandlers } = require('./ipc/mcp.cjs');
+const {registerAgentWorkIpcHandlers}=require('./ipc/agent-work.cjs');
 const { registerStoreIpcHandlers } = require('./ipc/store.cjs');
 const { registerGoalIpcHandlers } = require('./ipc/goals.cjs');
 const { registerDocumentIpcHandlers } = require('./ipc/documents.cjs');
@@ -55,7 +56,7 @@ const {
   prepareAgentExecution,
   recoverOrphanedTaskExecution,
   prepareAgentRuntimeSessionArchive,
-  reconcileInterruptedAgentRuntimeSessions,
+  initializeAgentWorkStorage,
   updateAgentRuntimeSessionBinding,
   transitionTaskContribution,
   moveTaskToStatus,
@@ -80,12 +81,69 @@ const appDataPath = app.getPath('appData');
 const userDataPath = resolveWorkspaceUserDataPath({ appDataPath, appName: APP_NAME, isDev }) || app.getPath('userData');
 app.setName(APP_NAME);
 app.setPath('userData', userDataPath);
+if(!app.requestSingleInstanceLock()) app.exit(0);
+app.on('second-instance',()=>{ const window=BrowserWindow.getAllWindows()[0]; if(window){if(window.isMinimized())window.restore();window.focus();} });
 const store = new Store({ name: storeName });
 const performanceLog = createPerformanceLogService({
   logsDirectory: path.join(app.getPath('userData'), 'performance-logs'),
   shell,
 });
-reconcileInterruptedAgentRuntimeSessions(store);
+const agentWorkReady = initializeAgentWorkStorage(store);
+agentWorkReady.catch(error => console.error('[agent-work] Storage unavailable:', error.code || 'AGENT_WORK_STORAGE_FAILED'));
+const { publicResult } = require('./services/agent-work-session-service.cjs');
+const { createRuntimeNotificationScheduler } = require('./services/agent-runtime-notifications.cjs');
+const runtimeModalBySender = new Map();
+const runtimeNotifications = createRuntimeNotificationScheduler({
+  isTaskVisible: taskId => BrowserWindow.getAllWindows().some(window => !window.isDestroyed() && window.isVisible() && !window.isMinimized() && runtimeModalBySender.get(window.webContents.id) === taskId),
+  send: notification => {
+    const window = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows().find(candidate => !candidate.isDestroyed());
+    if (!window || window.isDestroyed()) return false;
+    window.webContents.send(AGENT_RUNTIME_EVENT_CHANNEL, {kind:'notification',notification});
+    return true;
+  },
+});
+const { createAgentRuntimeDelivery } = require('./services/agent-runtime-delivery.cjs');
+const runtimeDelivery = createAgentRuntimeDelivery({
+  listRequests: bindingId => agentRuntimeSessionRunner.listRequests(bindingId),
+  loadBinding: async bindingId => publicResult(await listAgentRuntimeSessions(store, { bindingId, limit: 1, includeEvents: false }))?.bindings?.[0] || null,
+  logger: console,
+});
+const runtimeDeliveryOwners = new Set();
+function runtimeDeliveryOwner(sender) {
+  const ownerId = sender.id;
+  if (!runtimeDeliveryOwners.has(ownerId)) {
+    runtimeDeliveryOwners.add(ownerId);
+    sender.once('destroyed', () => { runtimeDeliveryOwners.delete(ownerId); runtimeDelivery.releaseOwner(ownerId); });
+    // A reload keeps the same sender; its previous page's subscriptions must not leak.
+    sender.on('did-navigate', () => runtimeDelivery.releaseOwner(ownerId));
+  }
+  return {
+    ownerId,
+    send: envelope => {
+      if (sender.isDestroyed()) return false;
+      sender.send(AGENT_RUNTIME_DELIVERY_CHANNEL, envelope);
+      return true;
+    },
+    isWindowVisible: () => {
+      const window = BrowserWindow.fromWebContents(sender);
+      return Boolean(window && !window.isDestroyed() && window.isVisible() && !window.isMinimized());
+    },
+  };
+}
+// Only explicitly named fields cross from the renderer; ownership always comes from the sender.
+const runtimeDeliveryIpc = {
+  subscribe: (sender, { bindingId, visible, requestId }) => runtimeDelivery.subscribe({ bindingId, visible, requestId, ...runtimeDeliveryOwner(sender) }),
+  setVisibility: (sender, { subscriptionId, visible, requestId }) => runtimeDelivery.setVisibility({ subscriptionId, visible, requestId, ownerId: sender.id }),
+  snapshot: (sender, { subscriptionId, requestId }) => runtimeDelivery.snapshot({ subscriptionId, requestId, ownerId: sender.id }),
+  acknowledge: (sender, { subscriptionId, version }) => runtimeDelivery.acknowledge({ subscriptionId, version, ownerId: sender.id }),
+  unsubscribe: (sender, { subscriptionId }) => runtimeDelivery.unsubscribe({ subscriptionId, ownerId: sender.id }),
+  diagnostics: () => ({ ok: true, value: runtimeDelivery.diagnostics() }),
+};
+app.on('browser-window-created', (_event, window) => {
+  const ownerId = window.webContents.id;
+  for (const name of ['minimize', 'hide']) window.on(name, () => runtimeDelivery.windowVisibilityChanged(ownerId, false));
+  for (const name of ['restore', 'show']) window.on(name, () => runtimeDelivery.windowVisibilityChanged(ownerId, !window.isMinimized() && window.isVisible()));
+});
 const agentRuntimeSessionRunner = createAgentRuntimeSessionRunner({
   store,
   resolveProfile: resolveAgentRuntimeProfile,
@@ -96,7 +154,7 @@ const agentRuntimeSessionRunner = createAgentRuntimeSessionRunner({
   createBinding: (runtimeStore, payload) => createAgentRuntimeSessionBinding(runtimeStore, payload),
   updateBinding: (runtimeStore, payload) => updateAgentRuntimeSessionBinding(runtimeStore, payload),
   appendEvent: (runtimeStore, payload) => appendAgentRuntimeEvent(runtimeStore, payload),
-  emitRuntimeEvent: (payload) => broadcastAgentRuntimeEvent(payload),
+  emitRuntimeEvent: (payload) => broadcastAgentRuntimeEvent(publicResult(payload)),
   updateTaskExecutionState: (runtimeStore, payload) => updateAgentRuntimeTaskExecution(runtimeStore, payload),
   listSessions: (runtimeStore, payload) => listAgentRuntimeSessions(runtimeStore, payload),
   getTaskById: (runtimeStore, taskId) => getTaskById(runtimeStore, taskId),
@@ -115,6 +173,7 @@ const agentRuntimeSessionRunner = createAgentRuntimeSessionRunner({
 });
 const STORE_DID_CHANGE_CHANNEL = 'store/did-change';
 const AGENT_RUNTIME_EVENT_CHANNEL = 'agent-runtime/event';
+const AGENT_RUNTIME_DELIVERY_CHANNEL = 'agent-runtime/delivery';
 const RENDERER_DIAGNOSTIC_CHANNEL = 'renderer/diagnostic';
 const RENDERER_FAILURES_KEY = 'omvra.rendererFailures.v1';
 const AGENT_RUNTIME_STORE_KEYS = new Set([
@@ -229,13 +288,16 @@ function startGoalScheduleRuntime() {
 
 function startAgentRuntimeReconciliation() {
   if (agentRuntimeReconciliationTimer) clearInterval(agentRuntimeReconciliationTimer);
-  const tick = () => {
+  let reconciling = false;
+  const tick = async () => {
+    if(reconciling) return;
+    reconciling = true;
     try {
       if (!readAgentRuntimeDefaults(store).acpRuntimeAccessEnabled && !agentRuntimeSessionRunner.hasLiveSessions()) return;
-      agentRuntimeSessionRunner.reconcile();
+      await agentRuntimeSessionRunner.reconcile();
     } catch (error) {
-      console.error('[agent-runtime] reconciliation failed:', error?.message || error);
-    }
+      console.error('[agent-runtime] reconciliation failed:', error?.code || 'AGENT_WORK_STORAGE_FAILED');
+    } finally { reconciling = false; }
   };
   tick();
   agentRuntimeReconciliationTimer = setInterval(tick, AGENT_RUNTIME_RECONCILIATION_INTERVAL_MS);
@@ -255,14 +317,25 @@ function broadcastStoreDidChange(keys = []) {
 }
 
 function broadcastAgentRuntimeEvent(payload) {
+  // Delivery publishes the committed projection first, so completion notifications can
+  // never overtake the final state/output they announce.
+  const delivered = runtimeDelivery.accept(payload);
+  if (!delivered.stale) {
+    runtimeNotifications.accept(delivered.accepted && payload.binding ? { ...payload, binding: { ...payload.binding, snapshotVersion: delivered.version } } : payload);
+  }
+  // Model output crosses IPC only as bounded delivery projections, never per token.
+  if (delivered.ordinaryOutput) return;
   for (const window of BrowserWindow.getAllWindows()) {
-    if (!window.isDestroyed()) window.webContents.send(AGENT_RUNTIME_EVENT_CHANNEL, payload);
+    if (window.isDestroyed()) continue;
+    // Hidden or minimized windows receive lifecycle and attention changes, not per-event detail.
+    if (payload.kind === 'event' && (!window.isVisible() || window.isMinimized())) continue;
+    window.webContents.send(AGENT_RUNTIME_EVENT_CHANNEL, payload);
   }
 }
 
-function recordRendererFailure(details = {}) {
+async function recordRendererFailure(details = {}) {
   const current = Array.isArray(store.get(RENDERER_FAILURES_KEY)) ? store.get(RENDERER_FAILURES_KEY) : [];
-  const sessions = listAgentRuntimeSessions(store, { limit: 20 });
+  const sessions = await listAgentRuntimeSessions(store, { limit: 20, activeOnly:true }).catch(()=>({bindings:[]}));
   const report = {
     id: randomUUID(),
     occurredAt: new Date().toISOString(),
@@ -515,8 +588,8 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   const { startAutoArchiveService } = await import('./services/auto-archive-service.mjs');
-  const stopAutoArchive = startAutoArchiveService(store, () => new Set(
-    (listAgentRuntimeSessions(store, { limit: 200 })?.bindings || [])
+  const stopAutoArchive = startAutoArchiveService(store, async () => new Set(
+    ((await listAgentRuntimeSessions(store, { limit: 100, activeOnly:true, includeEvents:false }))?.bindings || [])
       .filter(binding => ['queued', 'starting', 'active', 'waiting-input', 'cancelling'].includes(binding.turn?.state))
       .map(binding => binding.scope?.taskId).filter(Boolean)
   ));
@@ -583,7 +656,9 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
 
-app.on('before-quit', () => {
+let runtimeShutdown = null;
+let runtimeShutdownComplete = false;
+app.on('before-quit', event => {
   if (goalScheduleTimer) {
     clearInterval(goalScheduleTimer);
     goalScheduleTimer = null;
@@ -592,7 +667,18 @@ app.on('before-quit', () => {
     clearInterval(agentRuntimeReconciliationTimer);
     agentRuntimeReconciliationTimer = null;
   }
-  agentRuntimeSessionRunner.dispose();
+  if(!runtimeShutdownComplete) {
+    event.preventDefault();
+    if(!runtimeShutdown) runtimeShutdown = (async()=>{
+      runtimeNotifications.dispose();
+      runtimeDelivery.dispose();
+      runtimeModalBySender.clear();
+      try { await agentRuntimeSessionRunner.dispose(); } catch(error) { console.error('[agent-work] Shutdown recovery required:', error.code || 'AGENT_WORK_STORAGE_FAILED'); }
+      try { const owner = await agentWorkReady; await owner.close(); } catch(error) { console.error('[agent-work] Close failed:', error.code || 'AGENT_WORK_STORAGE_FAILED'); }
+      runtimeShutdownComplete = true; app.quit();
+    })();
+    return;
+  }
   if (mcpHttpServer) {
     mcpHttpServer.close();
     mcpHttpServer = null;
@@ -603,9 +689,11 @@ app.on('before-quit', () => {
   }
 });
 
+registerAgentWorkIpcHandlers({ipcMain,ready:agentWorkReady});
 registerStoreIpcHandlers({
   ipcMain,
   store,
+  agentWorkManaged: true,
   preferencesKey: PREFERENCES_KEY,
   onStoreMutation: (keys) => keys.forEach(key => pendingRendererStoreMutationKeys.add(key)),
   onPreferencesSet: (value) => {
@@ -694,6 +782,13 @@ registerAgentRuntimeIpcHandlers({
   startGoalAgentRuntimeSession: (payload) => agentRuntimeSessionRunner.startGoalNode(payload),
   invokeAgentRuntimeSession: (bindingId, method, text) => agentRuntimeSessionRunner.invoke(bindingId, method, text),
   respondAgentRuntimeSession: (bindingId, requestId, result, error) => agentRuntimeSessionRunner.respond(bindingId, requestId, result, error),
+  setNotificationVisibility: (sender, taskId) => {
+    if (!runtimeModalBySender.has(sender.id)) sender.once('destroyed', () => { runtimeModalBySender.delete(sender.id); runtimeNotifications.visibilityChanged(); });
+    runtimeModalBySender.set(sender.id, taskId);
+    runtimeNotifications.visibilityChanged();
+    return {ok:true};
+  },
+  delivery: runtimeDeliveryIpc,
   listAgentRuntimeSessionRequests: (bindingId) => agentRuntimeSessionRunner.listRequests(bindingId),
   closeAgentRuntimeSession: (bindingId) => agentRuntimeSessionRunner.close(bindingId),
   continueAgentRuntimeTaskSession: (bindingId) => agentRuntimeSessionRunner.continueTask(bindingId),

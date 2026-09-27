@@ -56,7 +56,7 @@ test('composed preflight resolves task, contribution, dependencies, runtime, mod
 test('preflight fails closed for unfinished dependencies, active attempts, auth, and capability gaps', () => {
   const { service } = harness({
     tasks: [
-      { id: 'dependency', status: 'in-progress', __mcpRevision: 2 },
+      { id: 'dependency', title: 'Design review', status: 'in-progress', __mcpRevision: 2 },
       { id: 'task-1', status: 'open', assigneeId: 'arc', dependencyIds: ['dependency'], __mcpRevision: 4, collaboration: { orchestratorId: 'arc', contributions: [{ id: 'contribution-1', personId: 'edgar', role: 'subagent', scope: 'Work', state: 'pending' }] } },
     ],
     attempts: [{ id: 'attempt-active', taskId: 'task-1', contributionId: 'contribution-1', state: 'working' }],
@@ -71,6 +71,9 @@ test('preflight fails closed for unfinished dependencies, active attempts, auth,
     'TASK_DEPENDENCY_INELIGIBLE', 'ACP_EXECUTION_ALREADY_ACTIVE', 'ACP_AUTHENTICATION_REQUIRED', 'ACP_CAPABILITY_UNSUPPORTED',
     'ACP_BUDGET_EXCEEDED', 'ACP_PERMISSION_DENIED',
   ]));
+  const dependencyBlocker = result.blockers.find(item => item.code === 'TASK_DEPENDENCY_INELIGIBLE');
+  assert.equal(dependencyBlocker.message, 'Dependency "Design review" is not complete.');
+  assert.equal(dependencyBlocker.dependencyId, 'dependency');
 });
 
 test('deferred connection preflight refreshes stale unavailable observations before blocking execution', () => {

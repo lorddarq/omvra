@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { agentRuntimeTurnState, describeAgentRuntimeSession, hasAgentRuntimeTaskStarted, isAgentRuntimeTurnInFlight, joinAgentMessageDeltas, projectAgentRuntimeSession, selectCurrentAgentRuntimeTurnEvents, summarizeAgentRuntimeActivity } from './agentRuntimeActivity.ts';
+import { agentRuntimeTurnState, describeAgentRuntimeSession, hasAgentRuntimeTaskStarted, isAgentRuntimeTurnInFlight, joinAgentMessageDeltas, projectAgentRuntimeSession, projectDeliveryActivity, resolveAgentTaskAttention, selectCurrentAgentRuntimeTurnEvents, summarizeAgentRuntimeActivity } from './agentRuntimeActivity.ts';
 
 test('agent message delta joining preserves normal boundaries and repairs compact legacy chunks', () => {
   assert.equal(joinAgentMessageDeltas(['Current ', 'implementation ', 'passes.']), 'Current implementation passes.');
@@ -123,4 +123,53 @@ test('one session projection drives both supervision summaries and dock states',
   assert.equal(waiting.summary?.label, 'Agent is waiting for you');
   assert.equal(waiting.dockState, 'needs-input');
   assert.equal(projectAgentRuntimeSession(undefined, [], { blocked: true }).dockState, 'blocked');
+});
+
+test('Agent tasks attention covers working, blocked, permission, input, failed, cancelled and completed', () => {
+  const kind = (input: Parameters<typeof resolveAgentTaskAttention>[0]) => resolveAgentTaskAttention(input)?.kind;
+  const ready = { state: 'ready' };
+  assert.equal(kind({ binding: { state: 'ready', turn: { id: 't', state: 'active' } }, taskStatus: 'in-progress' }), 'active');
+  assert.equal(kind({ blockedReason: 'Another task is using the agent.' }), 'blocked');
+  assert.equal(resolveAgentTaskAttention({ blockedReason: 'History not saved.' })?.description, 'History not saved.');
+  assert.equal(kind({ binding: ready, deliveryAttention: { category: 'blocked' } }), 'blocked');
+
+  const waiting = { state: 'ready', turn: { id: 't', state: 'waiting-input' } };
+  const permission = resolveAgentTaskAttention({ binding: waiting, pendingRequest: { requestId: 1, message: 'Allow npm test?', kind: 'permission' } });
+  assert.equal(permission?.kind, 'permission-required');
+  assert.equal(permission?.description, 'Allow npm test?');
+  assert.equal(kind({ binding: waiting, pendingRequest: { requestId: 1, message: 'Which file?', kind: 'input' } }), 'needs-input');
+  assert.equal(kind({ binding: ready, deliveryAttention: { category: 'permission' } }), 'permission-required', 'projection attention is immediate, before the binding update lands');
+  assert.equal(kind({ binding: ready, deliveryAttention: { category: 'input' } }), 'needs-input');
+  assert.equal(resolveAgentTaskAttention({ binding: waiting })?.label, 'Input request unavailable');
+
+  assert.equal(kind({ binding: { state: 'failed' } }), 'failed');
+  assert.equal(kind({ binding: ready, deliveryAttention: { category: 'failure' } }), 'failed');
+  assert.equal(kind({ binding: { state: 'ready', turn: { id: 't', state: 'interrupted', terminalReason: 'cancelled' } } }), 'cancelled');
+  assert.equal(kind({ binding: ready, deliveryAttention: { category: 'cancelled' } }), 'cancelled');
+  assert.equal(kind({ binding: { state: 'ready', turn: { id: 't', state: 'interrupted', terminalReason: 'process-exit' } } }), 'interrupted', 'a crash is not a user stop');
+  assert.equal(kind({ binding: ready, deliveryAttention: { category: 'recovery' } }), 'interrupted');
+  assert.equal(kind({ binding: { state: 'ready', turn: { id: 't', state: 'completed' } } }), 'batch-finished');
+  assert.equal(kind({ binding: ready, deliveryAttention: { category: 'completed' } }), 'batch-finished');
+  assert.equal(kind({ binding: { state: 'closed', turn: { id: 't', state: 'interrupted', terminalReason: 'cancelled' } } }), 'closed', 'an ended session outranks the previous turn');
+});
+
+test('run completion never overrides governed task state', () => {
+  assert.equal(resolveAgentTaskAttention({ binding: { state: 'ready' }, taskStatus: 'done', deliveryAttention: { category: 'failure' } })?.kind, 'complete');
+  assert.equal(resolveAgentTaskAttention({ binding: { state: 'ready' }, taskStatus: 'under-review', deliveryAttention: { category: 'completed' } })?.kind, 'review');
+  assert.equal(resolveAgentTaskAttention({ binding: { state: 'ready' }, taskStatus: 'in-progress', deliveryAttention: { category: 'completed' } })?.kind, 'batch-finished', 'finished run, task still in progress');
+});
+
+test('bounded delivery activity renders without native event interpretation', () => {
+  assert.deepEqual(projectDeliveryActivity(null), []);
+  const items = projectDeliveryActivity({ tools: { count: 3, exact: true }, files: null, checks: null, lastActivityAt: '2026-09-25T10:00:00.000Z', entries: [{ id: '1:0', label: 'Tool: Bash', count: 3, at: '2026-09-25T10:00:00.000Z' }] });
+  assert.deepEqual(items, [{ id: '1:0', label: 'Tool: Bash', observedAt: '2026-09-25T10:00:00.000Z', count: 3, tone: 'neutral' }]);
+});
+
+test('a completed turn from the projection marks the last batch without an event log', () => {
+  const binding = { state: 'ready', turn: { id: 't', state: 'completed' } };
+  assert.equal(projectAgentRuntimeSession(binding).lastBatchCompleted, false);
+  const projection = projectAgentRuntimeSession(binding, [], { turnCompleted: true });
+  assert.equal(projection.lastBatchCompleted, true);
+  assert.equal(projection.summary?.label, 'Last batch completed');
+  assert.equal(projectAgentRuntimeSession({ state: 'ready', turn: { id: 't2', state: 'active' } }, [], { turnCompleted: true }).lastBatchCompleted, false, 'a new in-flight turn is not a finished batch');
 });

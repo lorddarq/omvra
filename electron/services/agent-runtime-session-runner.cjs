@@ -36,6 +36,7 @@ function createAgentRuntimeSessionRunner({
   const clients = new Map();
   const clientSubscriptions = new Map();
   const pendingRequests = new Map();
+  const responsesInFlight = new Set();
   const automaticBatchCounts = new Map();
   const automaticContinuationInFlight = new Set();
   const timersByBinding = new Map();
@@ -50,19 +51,24 @@ function createAgentRuntimeSessionRunner({
     'This runtime session is not active in the current Omvra app process. It may belong to an earlier app process or provider history state. Start a new session; Omvra will keep the current task context.',
   );
   const shuttingDown = () => failure('ACP_APP_SHUTDOWN', 'The Omvra app is shutting down and cannot start or continue runtime work.');
-  const log = (level, event, details = {}) => logger?.[level]?.(`[agent-runtime] ${event}`, details);
+  const log = (level, event, details = {}) => {
+    // Error bodies and stacks may contain provider output, credentials or paths.
+    const { message, stack, error, ...facts } = details;
+    logger?.[level]?.(`[agent-runtime] ${event}`, { ...facts, ...(error ? { hasError: true } : {}) });
+  };
   const emit = (payload) => {
     try { emitRuntimeEvent?.(payload); } catch (error) { log('warn', 'live-event.emit-failed', { message: error?.message || String(error) }); }
   };
-  const appendRuntimeEvent = (payload) => {
-    const turnId = bindingFor(payload.bindingId)?.turn?.id;
-    const result = appendEvent(store, { ...payload, ...(turnId ? { turnId } : {}) });
+  const appendRuntimeEvent = async (payload) => {
+    const turnId = (await bindingFor(payload.bindingId))?.turn?.id;
+    const result = await appendEvent(store, { ...payload, ...(turnId ? { turnId } : {}) });
+    if (result?.ok === false) throw Object.assign(new Error('Agent history write failed'), {code:result.error || 'AGENT_WORK_STORAGE_FAILED'});
     if (result?.ok && !result.idempotent && result.event) {
-      emit({ kind: 'event', event: result.event, binding: bindingFor(result.event.bindingId) });
+      emit({ kind: 'event', event: result.event, binding: (await bindingFor(result.event.bindingId)) });
     }
     return result;
   };
-  const syncTaskExecution = (binding, state, details = {}) => {
+  const syncTaskExecution = async (binding, state, details = {}) => {
     if (typeof updateTaskExecutionState !== 'function' || binding?.scope?.kind !== 'task') return null;
     const result = updateTaskExecutionState(store, {
       taskId: binding.scope.taskId,
@@ -72,7 +78,7 @@ function createAgentRuntimeSessionRunner({
       ...details,
     });
     if (!result?.ok) log('warn', 'task-execution.state-sync-failed', { bindingId: binding.id, state, error: result?.error });
-    else emit({ kind: 'binding', binding: bindingFor(binding.id) || binding });
+    else emit({ kind: 'binding', binding: (await bindingFor(binding.id)) || binding });
     return result;
   };
   const requestKey = (bindingId, requestId) => `${bindingId}:${typeof requestId}:${String(requestId)}`;
@@ -81,7 +87,7 @@ function createAgentRuntimeSessionRunner({
     return safe;
   };
   const turnStateFor = binding => binding?.turn?.state || ({ active: 'active', 'needs-input': 'waiting-input', cancelling: 'cancelling' }[binding?.state]);
-  const activeTurn = () => (listSessions(store, { limit: 100 })?.bindings || []).find(binding => ACTIVE_TURN_STATES.has(turnStateFor(binding)));
+  const activeTurn = async () => ((await listSessions(store, { limit: 100, activeOnly: true }))?.bindings || []).find(binding => ACTIVE_TURN_STATES.has(turnStateFor(binding)));
   const activeTurnFailure = binding => failure(
     'ACP_EXECUTION_ALREADY_ACTIVE',
     'Another task turn is already active. Open its supervision before starting new work.',
@@ -101,7 +107,7 @@ function createAgentRuntimeSessionRunner({
     const timer = setTimer(async () => {
       timersByBinding.get(bindingId)?.delete(timer);
       if (timersByBinding.get(bindingId)?.size === 0) timersByBinding.delete(bindingId);
-      if (!disposed) await callback();
+      if (!disposed) { try { await callback(); } catch(error) { emit({kind:'storage-failure',bindingId,error:error.code || 'AGENT_WORK_STORAGE_FAILED'}); } }
     }, delay);
     const timers = timersByBinding.get(bindingId) || new Set();
     timers.add(timer);
@@ -155,7 +161,7 @@ function createAgentRuntimeSessionRunner({
     return options;
   }
 
-  function sanitizedElicitation(bindingId, message) {
+  async function sanitizedElicitation(bindingId, message, turnId) {
     if (message?.id === undefined || message?.id === null) return null;
     const approvalMethod = typeof message.method === 'string' && [
       'item/commandExecution/requestApproval',
@@ -171,7 +177,7 @@ function createAgentRuntimeSessionRunner({
           : 'call an MCP tool';
       return {
         bindingId,
-        turnId: bindingFor(bindingId)?.turn?.id,
+        turnId,
         requestId: message.id,
         method: message.method,
         responseKind: 'codex-approval',
@@ -200,7 +206,7 @@ function createAgentRuntimeSessionRunner({
     });
     return {
       bindingId,
-      turnId: bindingFor(bindingId)?.turn?.id,
+      turnId,
       requestId: message.id,
       method: message.method,
       responseKind: 'elicitation',
@@ -252,33 +258,36 @@ function createAgentRuntimeSessionRunner({
     });
   }
 
-  function bindingFor(id) {
-    const result = listSessions(store, { bindingId: id, limit: 1 });
-    return result?.bindings?.[0] || null;
+  async function bindingFor(id) {
+    const result = await listSessions(store, { bindingId: id, limit: 1 });
+    const binding = result?.bindings?.[0] || null;
+    const session = clients.get(id);
+    if (binding && session) session.binding = binding;
+    return binding;
   }
 
-  function syncSessionState(bindingId, state, terminalReason) {
-    const current = bindingFor(bindingId);
+  async function syncSessionState(bindingId, state, terminalReason) {
+    const current = (await bindingFor(bindingId));
     if (!current || current.state === state) return current;
-    const result = updateBinding(store, { bindingId, expectedRevision: current.revision, state, ...(terminalReason ? { terminalReason } : {}) });
+    const result = await updateBinding(store, { bindingId, expectedRevision: current.revision, state, ...(terminalReason ? { terminalReason } : {}) });
     if (!result.ok) log('warn', 'binding.state-sync-failed', { bindingId, from: current.state, to: state, error: result.error });
     else {
       const taskState = { starting: 'starting', ready: 'ready', interrupted: 'interrupted', failed: 'failed', closed: 'stopped' }[state];
-      if (taskState) syncTaskExecution(result.binding || current, taskState, { reason: state });
+      if (taskState) (await syncTaskExecution(result.binding || current, taskState, { reason: state }));
       emit({ kind: 'binding', binding: result.binding || current });
       log('info', 'binding.state-changed', { bindingId, from: current.state, to: state });
     }
     return result.binding || current;
   }
 
-  function syncTurnState(bindingId, state, details = {}) {
-    const current = bindingFor(bindingId);
+  async function syncTurnState(bindingId, state, details = {}) {
+    const current = (await bindingFor(bindingId));
     if (!current) return null;
     const previous = current.turn;
     if (!previous && !details.turnId) return current;
     if (previous?.state === state && !details.requestId) return current;
     if (previous && TERMINAL_TURN_STATES.has(previous.state) && previous.id === (details.turnId || previous.id)) return current;
-    const result = updateBinding(store, {
+    const result = await updateBinding(store, {
       bindingId,
       expectedRevision: current.revision,
       state: current.state,
@@ -291,39 +300,40 @@ function createAgentRuntimeSessionRunner({
     });
     if (!result.ok) {
       log('warn', 'turn.state-sync-failed', { bindingId, turnId: details.turnId || previous?.id, from: previous?.state, to: state, error: result.error });
-      return bindingFor(bindingId) || current;
+      throw Object.assign(new Error(result.error || 'AGENT_WORK_STORAGE_FAILED'), {code:result.error || 'AGENT_WORK_STORAGE_FAILED'});
     }
-    const next = result.binding || bindingFor(bindingId) || current;
+    const next = result.binding || (await bindingFor(bindingId)) || current;
+    if (clients.has(bindingId)) clients.get(bindingId).binding = next;
     const taskState = { queued: 'starting', starting: 'starting', active: 'working', 'waiting-input': 'waiting', cancelling: 'stopping', completed: 'batch-finished', failed: 'failed', interrupted: 'interrupted' }[state];
-    if (taskState) syncTaskExecution(next, taskState, { reason: details.reason || state, ...(details.batchNumber !== undefined ? { batchNumber: details.batchNumber } : {}) });
+    if (taskState) (await syncTaskExecution(next, taskState, { reason: details.reason || state, ...(details.batchNumber !== undefined ? { batchNumber: details.batchNumber } : {}) }));
     emit({ kind: 'binding', binding: next });
     log('info', 'turn.state-changed', { bindingId, turnId: next.turn?.id || details.turnId || previous?.id, from: previous?.state || null, to: state });
     return next;
   }
 
-  function beginTurn(bindingId, details = {}) {
-    const current = bindingFor(bindingId);
+  async function beginTurn(bindingId, details = {}) {
+    const current = (await bindingFor(bindingId));
     if (!current) return null;
     if (ACTIVE_TURN_STATES.has(current.turn?.state)) return current;
-    return syncTurnState(bindingId, details.state || 'starting', { ...details, turnId: details.turnId || `turn-${randomUUID()}` });
+    return (await syncTurnState(bindingId, details.state || 'starting', { ...details, turnId: details.turnId || `turn-${randomUUID()}` }));
   }
 
-  function reconcileBindingLoss(bindingId, lifecycle = {}) {
+  async function reconcileBindingLoss(bindingId, lifecycle = {}) {
     releaseClient(bindingId);
-    const current = bindingFor(bindingId);
+    const current = (await bindingFor(bindingId));
     if (!current || ['interrupted', 'closed', 'failed'].includes(current.state)) return current;
-    const reason = lifecycle.kind === 'shutdown' ? 'app-shutdown' : lifecycle.code === 'ACP_RUNTIME_MISSING' ? 'runtime-missing' : lifecycle.kind === 'exit' ? 'process-exit' : 'protocol-error';
-    if (ACTIVE_TURN_STATES.has(current.turn?.state)) syncTurnState(bindingId, 'interrupted', { reason });
-    const afterTurn = bindingFor(bindingId) || current;
-    let updated = updateBinding(store, { bindingId, expectedRevision: afterTurn.revision, state: 'interrupted', terminalReason: reason });
+    const reason = lifecycle.kind === 'shutdown' ? 'process-exit' : lifecycle.code === 'ACP_RUNTIME_MISSING' ? 'runtime-missing' : lifecycle.kind === 'exit' ? 'process-exit' : 'protocol-error';
+    if (ACTIVE_TURN_STATES.has(current.turn?.state)) (await syncTurnState(bindingId, 'interrupted', { reason }));
+    const afterTurn = (await bindingFor(bindingId)) || current;
+    let updated = await updateBinding(store, { bindingId, expectedRevision: afterTurn.revision, state: 'interrupted', terminalReason: reason });
     if (!updated.ok && updated.error === 'REVISION_MISMATCH') {
-      const latest = bindingFor(bindingId);
+      const latest = (await bindingFor(bindingId));
       if (latest && !['interrupted', 'closed', 'failed'].includes(latest.state)) {
-        updated = updateBinding(store, { bindingId, expectedRevision: latest.revision, state: 'interrupted', terminalReason: reason });
+        updated = await updateBinding(store, { bindingId, expectedRevision: latest.revision, state: 'interrupted', terminalReason: reason });
       }
     }
-    const binding = updated.ok && updated.binding ? updated.binding : bindingFor(bindingId) || current;
-    appendRuntimeEvent({
+    const binding = updated.ok && updated.binding ? updated.binding : (await bindingFor(bindingId)) || current;
+    (await appendRuntimeEvent({
       bindingId,
       runtimeProfileId: binding.runtimeProfileId,
       kind: 'session',
@@ -331,15 +341,61 @@ function createAgentRuntimeSessionRunner({
       state: 'interrupted',
       outcome: lifecycle.kind === 'exit' ? 'process-exit' : lifecycle.code || 'transport-error',
       idempotencyKey: `runtime:${bindingId}:connection-lost:${binding.revision}`,
-    });
+    }));
     log('warn', 'session.connection-lost', { bindingId, runtimeProfileId: binding.runtimeProfileId, reason, lastObservedAt: binding.lastObservedAt || null });
     return binding;
   }
 
+  let notificationTail = Promise.resolve();
+  let pendingNotificationCount = 0;
+  let pendingNotificationBytes = 0;
+  const notificationFailures = new Map();
+  function enqueueNotification(bindingId, client, action, message) {
+    if (clients.get(bindingId)?.client !== client) return Promise.resolve({ok:false,error:'ACP_SESSION_NOT_FOUND'});
+    const bytes = message ? Buffer.byteLength(JSON.stringify(message)) : 0;
+    if (pendingNotificationCount >= 256 || pendingNotificationBytes + bytes > 1048576) {
+      const notificationFailure = Object.assign(new Error('AGENT_WORK_QUEUE_FULL'), {code:'AGENT_WORK_QUEUE_FULL'});
+      storageFailed(bindingId, notificationFailure);
+      return Promise.resolve({ok:false,error:notificationFailure.code});
+    }
+    pendingNotificationCount++; pendingNotificationBytes += bytes;
+    const result = notificationTail.then(() => clients.get(bindingId)?.client !== client ? {ok:false,error:'ACP_SESSION_NOT_FOUND'} : action()).catch(error => {
+      storageFailed(bindingId, error);
+      return {ok:false,error:error.code || 'AGENT_WORK_STORAGE_FAILED'};
+    }).finally(() => { pendingNotificationCount--; pendingNotificationBytes -= bytes; });
+    notificationTail = result;
+    return result;
+  }
+  async function flush() { await notificationTail; if(notificationFailures.size) throw notificationFailures.values().next().value; }
+
+  function storageFailed(bindingId, error) {
+    notificationFailures.set(bindingId, error);
+    clearBindingTimers(bindingId);
+    emit({kind:'storage-failure',bindingId,error:error.code || 'AGENT_WORK_STORAGE_FAILED'});
+  }
+  const storageBlocked = () => notificationFailures.size
+    ? failure('AGENT_WORK_STORAGE_FAILED', 'Agent history needs reconciliation before starting more work.') : null;
+  async function controlBinding(bindingId) {
+    try { return await bindingFor(bindingId); }
+    catch (error) { storageFailed(bindingId, error); return clients.get(bindingId)?.binding || null; }
+  }
+  async function persistControl(bindingId, state, details = {}) {
+    const session = clients.get(bindingId);
+    if (session) session.pendingControl = {state, details};
+    try {
+      const binding = await syncTurnState(bindingId, state, details);
+      if (binding) emit({kind:'binding',binding});
+      if (session) delete session.pendingControl;
+      return true;
+    } catch (error) { storageFailed(bindingId, error); return false; }
+  }
+
+
   function attachClient(binding, client) {
+    clients.get(binding.id).binding = binding;
     const subscriptions = [
-      client.onLifecycle?.(lifecycle => reconcileBindingLoss(binding.id, lifecycle)),
-      client.onNotification?.(message => recordNotification(binding, message)),
+      client.onLifecycle?.(lifecycle => enqueueNotification(binding.id, client, () => reconcileBindingLoss(binding.id, lifecycle))),
+      client.onNotification?.(message => enqueueNotification(binding.id, client, () => recordNotification(binding, message), message)),
     ].filter(unsubscribe => typeof unsubscribe === 'function');
     clientSubscriptions.set(binding.id, subscriptions);
   }
@@ -363,7 +419,7 @@ function createAgentRuntimeSessionRunner({
         ? moveTaskToStatus(store, { taskId: binding.scope.taskId, statusId: 'under-review', statusTitle: 'Under Review', expectedRevision: latestTask?.__mcpRevision, actor: 'agent-runtime-reconciliation' })
         : { ok: false, error: 'TASK_STATUS_FINALIZER_UNAVAILABLE' };
     const executionState = moved.ok ? (moved.task?.status === 'done' ? 'complete' : 'ready-for-review') : 'outcome-unreconciled';
-    appendRuntimeEvent({
+    (await appendRuntimeEvent({
       bindingId: binding.id,
       runtimeProfileId: binding.runtimeProfileId,
       kind: 'session',
@@ -371,26 +427,26 @@ function createAgentRuntimeSessionRunner({
       state: executionState,
       outcome: moved.ok ? 'automatic-batch-limit-finalized' : `automatic-batch-limit:${moved.error || attemptResult.error || 'reconciliation-failed'}`,
       idempotencyKey: `runtime:${binding.id}:automatic-outcome:${executionState}`,
-    });
-    const current = bindingFor(binding.id) || binding;
+    }));
+    const current = (await bindingFor(binding.id)) || binding;
     if (['starting', 'ready'].includes(current.state)) {
-      const closed = updateBinding(store, { bindingId: current.id, expectedRevision: current.revision, state: 'closed', terminalReason: 'closed' });
+      const closed = await updateBinding(store, { bindingId: current.id, expectedRevision: current.revision, state: 'closed', terminalReason: 'closed' });
       const session = clients.get(binding.id);
       try { await session?.client?.closeSession?.(current.opaqueSessionRef); } catch (error) { log('debug', 'automatic-outcome.remote-close-failed', { bindingId: binding.id, message: error?.message || String(error) }); }
       releaseClient(binding.id);
-      const closedBinding = closed?.ok ? closed.binding : bindingFor(binding.id) || current;
-      syncTaskExecution(closedBinding, executionState, { reason: moved.ok ? 'automatic-outcome-finalized' : 'automatic-outcome-unreconciled' });
+      const closedBinding = closed?.ok ? closed.binding : (await bindingFor(binding.id)) || current;
+      (await syncTaskExecution(closedBinding, executionState, { reason: moved.ok ? 'automatic-outcome-finalized' : 'automatic-outcome-unreconciled' }));
     }
   }
 
-  function scheduleAutomaticContinuation(bindingId) {
+  async function scheduleAutomaticContinuation(bindingId) {
     if (!Number.isInteger(maxAutomaticBatches) || maxAutomaticBatches <= 0 || automaticContinuationInFlight.has(bindingId)) return;
-    const current = bindingFor(bindingId);
+    const current = (await bindingFor(bindingId));
     if (!current || current.state !== 'ready' || ACTIVE_TURN_STATES.has(current.turn?.state) || !taskMayContinue(current)) return;
     const completedBatches = (automaticBatchCounts.get(bindingId) || 0) + 1;
     automaticBatchCounts.set(bindingId, completedBatches);
     if (completedBatches > maxAutomaticBatches) {
-      appendRuntimeEvent({
+      (await appendRuntimeEvent({
         bindingId,
         runtimeProfileId: current.runtimeProfileId,
         kind: 'session',
@@ -398,16 +454,16 @@ function createAgentRuntimeSessionRunner({
         state: 'ready',
         outcome: `Automatic continuation stopped after ${maxAutomaticBatches} batches.`,
         idempotencyKey: `runtime:${bindingId}:automatic-limit:${completedBatches}`,
-      });
-      void finalizeAutomaticOutcome(current);
+      }));
+      await finalizeAutomaticOutcome(current);
       return;
     }
     automaticContinuationInFlight.add(bindingId);
     scheduleBindingTimer(bindingId, async () => {
       try {
-        const latest = bindingFor(bindingId);
+        const latest = (await bindingFor(bindingId));
         if (!latest || latest.state !== 'ready' || ACTIVE_TURN_STATES.has(latest.turn?.state) || !taskMayContinue(latest)) return;
-      appendRuntimeEvent({
+      (await appendRuntimeEvent({
           bindingId,
           runtimeProfileId: latest.runtimeProfileId,
           kind: 'session',
@@ -415,7 +471,7 @@ function createAgentRuntimeSessionRunner({
           state: 'continuing',
           outcome: `Starting automatic work batch ${completedBatches} of ${maxAutomaticBatches}.`,
           idempotencyKey: `runtime:${bindingId}:automatic-continuing:${completedBatches}`,
-        });
+        }));
         await continueTask(bindingId, { automatic: true });
       } finally {
         automaticContinuationInFlight.delete(bindingId);
@@ -423,12 +479,16 @@ function createAgentRuntimeSessionRunner({
     }, 0);
   }
 
-  function recordNotification(binding, message) {
+  async function recordNotification(binding, message) {
+    if (TERMINAL_TURN_STATES.has(clients.get(binding.id)?.pendingControl?.state)) return {ok:true,ignored:true};
     const method = typeof message?.method === 'string' ? message.method : 'runtime/notification';
+    const current = await controlBinding(binding.id);
+    if(!current || TERMINAL_TURN_STATES.has(current.turn?.state)) return {ok:true,ignored:true};
     const lower = method.toLowerCase();
     const kind = lower.includes('permission') || lower.includes('approval') ? 'permission'
-      : lower.includes('input') || lower.includes('elicitation') ? 'input'
-        : lower.includes('usage') || lower.includes('cost') ? 'usage'
+      : lower.includes('elicitation') ? 'input'
+        : lower.includes('usage') || lower.includes('cost') || lower.includes('tokens') ? 'usage'
+          : lower.includes('agentmessage') ? 'message'
           : lower.includes('tool') ? 'tool'
             : lower.includes('plan') ? 'plan'
               : lower.includes('turn') || lower.includes('prompt') ? 'turn'
@@ -439,15 +499,8 @@ function createAgentRuntimeSessionRunner({
         : typeof params.turn?.error?.message === 'string' ? params.turn.error.message
           : null;
     const subject = params.toolName || params.tool?.name || params.serverName || params.server?.name || params.name || params.item?.type || null;
-    const summary = {
-      bindingId: binding.id,
-      method,
-      state: params.state || params.status || params.turn?.status || params.thread?.status || null,
-      subject,
-      failureReason: params.failureReason || null,
-      error: errorMessage ? errorMessage.slice(0, 500) : null,
-    };
-    log(summary.state === 'failed' ? 'warn' : 'debug', 'notification', summary);
+    const reportedState = params.state || params.status || params.turn?.status || params.thread?.status;
+    log(reportedState === 'failed' ? 'warn' : 'debug', 'notification', { bindingId: binding.id, kind, hasError: Boolean(errorMessage) });
     const activeClient = clients.get(binding.id)?.client;
     const policyApprovedOmvraCall = message?.method === 'mcpServer/elicitation/request'
       && message.params?.serverName === 'omvra'
@@ -455,7 +508,7 @@ function createAgentRuntimeSessionRunner({
       && activeClient?.profile?.approvalPolicy === 'never';
     if (policyApprovedOmvraCall) {
       activeClient.respond(message.id, { action: 'accept', content: advertisedApprovalContent(message.params) });
-      return appendRuntimeEvent({
+      return (await appendRuntimeEvent({
         bindingId: binding.id,
         runtimeProfileId: binding.runtimeProfileId,
         kind: 'permission',
@@ -466,11 +519,15 @@ function createAgentRuntimeSessionRunner({
         toolName: 'omvra',
         permissionState: 'allowed',
         idempotencyKey: `runtime:${binding.id}:mcp-policy-approval:${String(message.id)}`,
-      });
+      }));
     }
-    const elicitation = sanitizedElicitation(binding.id, message);
-    if (elicitation) pendingRequests.set(requestKey(binding.id, elicitation.requestId), elicitation);
-    const appended = appendRuntimeEvent({
+    const elicitation = (await sanitizedElicitation(binding.id, message, current.turn?.id));
+    if (elicitation) {
+      if (listRequests(binding.id).length >= 32 && !pendingRequests.has(requestKey(binding.id, elicitation.requestId))) throw Object.assign(new Error('Too many input requests'), {code:'AGENT_WORK_QUEUE_FULL'});
+      pendingRequests.set(requestKey(binding.id, elicitation.requestId), elicitation);
+      emit({kind:'binding',requestId:elicitation.requestId,binding:{...safeBinding(current),turn:{...current.turn,state:'waiting-input'}}});
+    }
+    const appended = method === 'turn/completed' ? null : (await appendRuntimeEvent({
       bindingId: binding.id,
       runtimeProfileId: binding.runtimeProfileId,
       kind,
@@ -493,7 +550,7 @@ function createAgentRuntimeSessionRunner({
         ? (typeof params.delta === 'string' ? params.delta : typeof params.text === 'string' ? params.text : undefined)
         : undefined,
       idempotencyKey: `runtime:${binding.id}:${randomUUID()}`,
-    });
+    }));
     if (method === 'turn/started') {
       if (Array.isArray(params.mcpServers)) {
         const mcpServers = params.mcpServers.slice(0, 32).map(server => ({
@@ -502,30 +559,35 @@ function createAgentRuntimeSessionRunner({
           error: typeof server?.error === 'string' ? server.error.slice(0, 500) : null,
         }));
         const failedServers = mcpServers.filter(server => server.status === 'failed' || server.error);
-        log(failedServers.length ? 'warn' : 'info', 'provider.mcp-status', { bindingId: binding.id, servers: mcpServers });
+        log(failedServers.length ? 'warn' : 'info', 'provider.mcp-status', { bindingId: binding.id, serverCount: mcpServers.length, failedCount: failedServers.length });
       }
-      syncTurnState(binding.id, 'active');
+      (await syncTurnState(binding.id, 'active'));
     }
     else if (method === 'turn/completed') {
       const waitingForInput = [...pendingRequests.values()].some(request => request.bindingId === binding.id);
-      const cancellationRequested = bindingFor(binding.id)?.turn?.state === 'cancelling';
+      const cancellationRequested = clients.get(binding.id)?.cancelRequested || current.turn?.state === 'cancelling';
       if (!waitingForInput) for (const key of pendingRequests.keys()) if (key.startsWith(`${binding.id}:`)) pendingRequests.delete(key);
       const turnState = params.turn?.status || params.status || params.state;
       const nextState = waitingForInput ? 'waiting-input' : turnState === 'failed' ? 'failed' : turnState === 'interrupted' || cancellationRequested ? 'interrupted' : 'completed';
-      const nextBinding = syncTurnState(binding.id, nextState, { reason: nextState });
+      const session = clients.get(binding.id);
+      if (session && TERMINAL_TURN_STATES.has(nextState)) session.pendingControl = {state:nextState,details:{reason:nextState}};
+      const nextBinding = (await syncTurnState(binding.id, nextState, { reason: nextState }));
+      if (session) delete session.pendingControl;
+      if(TERMINAL_TURN_STATES.has(nextState) && nextBinding?.turn?.state===nextState) await appendRuntimeEvent({bindingId:binding.id,runtimeProfileId:binding.runtimeProfileId,kind:'turn',nativeEventType:'turn/completed',state:nextState,idempotencyKey:`terminal-event:${nextBinding.turn.id}:${nextState}`});
       if (!waitingForInput && turnState !== 'failed' && turnState !== 'interrupted' && nextBinding?.turn?.state === 'completed') {
         const task = typeof getTaskById === 'function' && binding.scope?.kind === 'task' ? getTaskById(store, binding.scope.taskId) : null;
         const taskState = task?.status === 'done' ? 'complete' : task?.status === 'under-review' ? 'ready-for-review' : 'batch-finished';
-        syncTaskExecution(nextBinding, taskState, { reason: taskState === 'complete' ? 'task-complete' : taskState === 'ready-for-review' ? 'task-under-review' : 'turn-completed' });
+        (await syncTaskExecution(nextBinding, taskState, { reason: taskState === 'complete' ? 'task-complete' : taskState === 'ready-for-review' ? 'task-under-review' : 'turn-completed' }));
       }
-      if (!waitingForInput && turnState !== 'failed' && turnState !== 'interrupted' && nextBinding?.turn?.state === 'completed') scheduleAutomaticContinuation(binding.id);
+      if (!waitingForInput && turnState !== 'failed' && turnState !== 'interrupted' && nextBinding?.turn?.state === 'completed') (await scheduleAutomaticContinuation(binding.id));
     }
-    else if (elicitation) syncTurnState(binding.id, 'waiting-input', { requestId: elicitation.requestId });
+    else if (elicitation) (await syncTurnState(binding.id, 'waiting-input', { requestId: elicitation.requestId }));
     return appended;
   }
 
   async function start(payload = {}) {
     if (disposed) return shuttingDown();
+    if (storageBlocked()) return storageBlocked();
     log('info', 'start.requested', { taskId: payload.taskId || null, hasWorkspace: Boolean(payload.workspacePath), executionProfileId: payload.executionProfileId || null });
     if (payload.confirmed !== true) {
       log('warn', 'start.rejected', { taskId: payload.taskId || null, error: 'ACP_START_CONFIRMATION_REQUIRED' });
@@ -536,8 +598,8 @@ function createAgentRuntimeSessionRunner({
       return failure('ACP_REPOSITORY_FOLDER_REQUIRED', 'A repository folder is required before starting work.');
     }
 
-    reconcile();
-    const activeExisting = activeTurn();
+    (await reconcile());
+    const activeExisting = (await activeTurn());
     if (activeExisting) {
       log('warn', 'start.rejected', { taskId: payload.taskId, bindingId: activeExisting.id, error: 'ACP_EXECUTION_ALREADY_ACTIVE' });
       return activeTurnFailure(activeExisting);
@@ -615,24 +677,36 @@ function createAgentRuntimeSessionRunner({
       store.set('omvra.taskContributionAttempts.v1', attempts.concat(attempt));
     }
 
-    const bindingResult = createBinding(store, {
-      runtimeProfileId: profile.id,
-      idempotencyKey: `${payload.idempotencyKey}:binding`,
-      scope: {
-        kind: 'task',
-        taskId: confirmed.contractSnapshot.taskId,
-        contributionId: confirmed.contractSnapshot.contributionId,
-        executionAttemptId: attempt.id,
-        taskRevision: Number(started.task?.__mcpRevision || latestRevision),
-      },
-      capabilities: [],
-      turn: { id: `turn-${randomUUID()}`, state: 'queued' },
-      extensions: { workspacePath: payload.workspacePath.trim() },
-    });
-    if (!bindingResult.ok) return failure(bindingResult.error, bindingResult.message || 'The runtime session binding could not be created.', { preflight: confirmed });
+    let bindingResult;
+    try {
+      bindingResult = await createBinding(store, {
+        runtimeProfileId: profile.id,
+        idempotencyKey: `${payload.idempotencyKey}:binding`,
+        scope: {
+          kind: 'task',
+          taskId: confirmed.contractSnapshot.taskId,
+          contributionId: confirmed.contractSnapshot.contributionId,
+          executionAttemptId: attempt.id,
+          taskRevision: Number(started.task?.__mcpRevision || latestRevision),
+        },
+        capabilities: [],
+        turn: { id: `turn-${randomUUID()}`, state: 'queued' },
+        extensions: { workspacePath: payload.workspacePath.trim() },
+      });
+      if (!bindingResult.ok) throw Object.assign(new Error('The runtime session binding could not be created.'), {code:bindingResult.error});
+    } catch (error) {
+      // Direct attempts have no collaboration transition to recover them. Preserve
+      // the failed attempt for diagnosis, but never leave it reporting live work.
+      if (!confirmed.contractSnapshot.contributionId) {
+        const attempts = store.get('omvra.taskContributionAttempts.v1');
+        store.set('omvra.taskContributionAttempts.v1', (Array.isArray(attempts) ? attempts : []).map(item =>
+          item.id === attempt.id && item.state === 'working' ? {...item,state:'failed',failureReason:'runtime-binding-failed',updatedAt:now()} : item));
+      }
+      return failure(error.code || 'AGENT_WORK_STORAGE_FAILED', 'The runtime session binding could not be created.', {preflight:confirmed,reconciliationRequired:true});
+    }
 
     const binding = bindingResult.binding;
-    syncTaskExecution(binding, 'starting', { reason: 'session-created' });
+    (await syncTaskExecution(binding, 'starting', { reason: 'session-created' }));
     log('info', 'binding.created', { taskId: payload.taskId, bindingId: binding.id, runtimeProfileId: profile.id });
     let client;
     try {
@@ -646,32 +720,32 @@ function createAgentRuntimeSessionRunner({
       const session = await client.startSession();
       if (disposed) throw Object.assign(new Error('The app is shutting down.'), { code: 'ACP_APP_SHUTDOWN' });
       log('info', 'session.created', { bindingId: binding.id });
-      const ready = updateBinding(store, {
+      const ready = await updateBinding(store, {
         bindingId: binding.id,
-        expectedRevision: binding.revision,
+        expectedRevision: (await bindingFor(binding.id)).revision,
         state: 'ready',
         opaqueSessionRef: session.sessionId,
         capabilities: Object.entries(negotiated.capabilities || {}).filter(([, supported]) => supported === true).map(([id]) => ({ id, support: 'supported' })),
       });
       if (!ready.ok) throw Object.assign(new Error(ready.message || 'The runtime session could not be marked ready.'), { code: ready.error });
-      syncTaskExecution(ready.binding, 'ready', { reason: 'session-ready' });
+      (await syncTaskExecution(ready.binding, 'ready', { reason: 'session-ready' }));
       {
         const promptText = contextPack.text || 'Begin working on the assigned task. Re-read its current state before making changes.';
         log('info', 'context.prompting', { bindingId: binding.id, contextEntryCount: confirmed.contractSnapshot.contextEntryIds?.length || 0 });
-        appendRuntimeEvent({ bindingId: binding.id, runtimeProfileId: profile.id, kind: 'session', nativeEventType: 'omvra/taskInstructions/sent', state: 'sent', idempotencyKey: `runtime:${binding.id}:task-instructions` });
-        syncTurnState(binding.id, 'starting', { batchNumber: 1 });
+        (await appendRuntimeEvent({ bindingId: binding.id, runtimeProfileId: profile.id, kind: 'session', nativeEventType: 'omvra/taskInstructions/sent', state: 'sent', idempotencyKey: `runtime:${binding.id}:task-instructions` }));
+        (await syncTurnState(binding.id, 'starting', { batchNumber: 1 }));
         await client.prompt(session.sessionId, promptText);
         log('info', 'context.accepted', { bindingId: binding.id });
       }
       log('info', 'session.ready', { taskId: payload.taskId, bindingId: binding.id, runtimeProfileId: profile.id });
-      const current = bindingFor(binding.id) || ready.binding;
+      const current = (await bindingFor(binding.id)) || ready.binding;
       return { ok: true, state: current.state, binding: current, attempt, task: started.task, preflight: confirmed };
     } catch (error) {
       releaseClient(binding.id);
-      syncTurnState(binding.id, 'failed', { reason: error.code || 'protocol-error' });
-      const current = bindingFor(binding.id) || binding;
-      updateBinding(store, { bindingId: binding.id, expectedRevision: current.revision, state: 'failed', terminalReason: 'protocol-error' });
-      syncTaskExecution(bindingFor(binding.id) || binding, 'failed', { reason: error.code || 'protocol-error' });
+      (await syncTurnState(binding.id, 'failed', { reason: error.code || 'protocol-error' }));
+      const current = (await bindingFor(binding.id)) || binding;
+      await updateBinding(store, { bindingId: binding.id, expectedRevision: current.revision, state: 'failed', terminalReason: 'protocol-error' });
+      (await syncTaskExecution((await bindingFor(binding.id)) || binding, 'failed', { reason: error.code || 'protocol-error' }));
       log('error', 'start.failed', { taskId: payload.taskId, bindingId: binding.id, code: error.code || 'ACP_RUNTIME_UNAVAILABLE', message: error.message || String(error), stack: error.stack || null });
       return failure(error.code || 'ACP_RUNTIME_UNAVAILABLE', error.message || 'The runtime session could not be started.', { preflight: confirmed, binding });
     }
@@ -679,14 +753,15 @@ function createAgentRuntimeSessionRunner({
 
   async function startGoalNode(payload = {}) {
     if (disposed) return shuttingDown();
+    if (storageBlocked()) return storageBlocked();
     if (payload.confirmed !== true) return failure('ACP_START_CONFIRMATION_REQUIRED', 'Explicit confirmation is required before starting Goal-node work.');
     const required = ['goalId', 'goalElementId', 'goalExecutionId', 'workspacePath'];
     if (required.some(field => typeof payload[field] !== 'string' || !payload[field].trim())) return failure('ACP_GOAL_SCOPE_REQUIRED', 'A Goal, agent-node, execution, and repository folder are required.');
     const goalRevision = Number(payload.goalRevision);
     const executionAttempt = Number(payload.executionAttempt);
     if (!Number.isInteger(goalRevision) || goalRevision < 0 || !Number.isInteger(executionAttempt) || executionAttempt < 0) return failure('ACP_GOAL_SCOPE_REQUIRED', 'Goal revision and execution attempt are required.');
-    reconcile();
-    const activeExisting = activeTurn();
+    (await reconcile());
+    const activeExisting = (await activeTurn());
     if (activeExisting) return activeTurnFailure(activeExisting);
     const profileResolution = resolveProfile(store, payload);
     if (!profileResolution.ok || !profileResolution.profile) {
@@ -695,7 +770,7 @@ function createAgentRuntimeSessionRunner({
     }
     const mcpReadiness = await ensureOmvraMcpListener();
     if (!mcpReadiness.ok) return mcpReadiness;
-    const bindingResult = createBinding(store, {
+    const bindingResult = await createBinding(store, {
       runtimeProfileId: profileResolution.profile.id,
       idempotencyKey: `${payload.idempotencyKey || `goal-${payload.goalExecutionId}-${payload.goalElementId}`}:binding`,
       scope: { kind: 'goal-node', goalId: payload.goalId, goalElementId: payload.goalElementId, goalExecutionId: payload.goalExecutionId, executionAttempt, goalRevision },
@@ -712,9 +787,9 @@ function createAgentRuntimeSessionRunner({
       if (disposed) throw Object.assign(new Error('The app is shutting down.'), { code: 'ACP_APP_SHUTDOWN' });
       const session = await client.startSession();
       if (disposed) throw Object.assign(new Error('The app is shutting down.'), { code: 'ACP_APP_SHUTDOWN' });
-      const ready = updateBinding(store, {
+      const ready = await updateBinding(store, {
         bindingId: binding.id,
-        expectedRevision: binding.revision,
+        expectedRevision: (await bindingFor(binding.id)).revision,
         state: 'ready',
         opaqueSessionRef: session.sessionId,
         capabilities: Object.entries(negotiated.capabilities || {}).filter(([, supported]) => supported === true).map(([id]) => ({ id, support: 'supported' })),
@@ -723,69 +798,65 @@ function createAgentRuntimeSessionRunner({
       return { ok: true, state: 'ready', binding: ready.binding };
     } catch (error) {
       releaseClient(binding.id);
-      updateBinding(store, { bindingId: binding.id, expectedRevision: binding.revision, state: 'failed', terminalReason: 'protocol-error' });
+      await updateBinding(store, { bindingId: binding.id, expectedRevision: binding.revision, state: 'failed', terminalReason: 'protocol-error' });
       return failure(error.code || 'ACP_RUNTIME_UNAVAILABLE', error.message || 'The Goal runtime session could not be started.', { binding });
     }
   }
 
   async function invoke(bindingId, method, text) {
     if (disposed) return shuttingDown();
-    let current = bindingFor(bindingId);
+    if (method !== 'cancel' && storageBlocked()) return storageBlocked();
+    let current = method === 'cancel' ? clients.get(bindingId)?.binding || await controlBinding(bindingId) : await bindingFor(bindingId);
     const session = clients.get(bindingId);
     if (!current || !session) return inactiveSession();
+    if (method === 'cancel') {
+      if (!ACTIVE_TURN_STATES.has(current.turn?.state) && !session.pendingControl) return failure('ACP_SESSION_BUSY', 'There is no active task turn to cancel.');
+      try {
+        // Transport control must never wait for a database write or queue drain.
+        session.cancelRequested = true;
+        const result = await session.client.cancel(current.opaqueSessionRef);
+        if (result?.acknowledged === true) clearPendingRequests(bindingId);
+        const state = result?.acknowledged === true ? 'interrupted' : 'cancelling';
+        const persisted = await persistControl(bindingId, state, {reason:'cancelled'});
+        if (result?.acknowledged !== true) scheduleBindingTimer(bindingId, () => persistControl(bindingId, 'interrupted', {reason:'cancelled'}), CANCEL_SETTLE_TIMEOUT_MS);
+        return {ok:true,result,...(!persisted ? {storageFailure:true,reconciliationRequired:true} : {})};
+      } catch (error) {
+        session.cancelRequested = false;
+        return failure(error.code || 'ACP_RUNTIME_UNAVAILABLE', 'The runtime cancellation failed.');
+      }
+    }
     if (method === 'prompt') {
-      const blocking = activeTurn();
+      const blocking = (await activeTurn());
       if (blocking && blocking.id !== bindingId) return activeTurnFailure(blocking);
-      current = beginTurn(bindingId, { state: 'starting' }) || current;
+      current = (await beginTurn(bindingId, { state: 'starting' })) || current;
     }
     if (method === 'steer' && !ACTIVE_TURN_STATES.has(current.turn?.state)) return failure('ACP_SESSION_BUSY', 'There is no active task turn to steer.');
-    if (method === 'cancel' && !ACTIVE_TURN_STATES.has(current.turn?.state)) return failure('ACP_SESSION_BUSY', 'There is no active task turn to cancel.');
-    const ref = current.opaqueSessionRef;
     try {
-      if (method === 'cancel') {
-        current = syncTurnState(bindingId, 'cancelling') || current;
-      }
-      const result = method === 'prompt' ? await session.client.prompt(ref, text) : method === 'steer' ? await session.client.steer(ref, text) : await session.client.cancel(ref);
-      if (method === 'cancel') {
-        const latest = bindingFor(bindingId);
-        if (result?.acknowledged === true && latest?.turn?.state === 'cancelling') {
-          syncTurnState(bindingId, 'interrupted', { reason: 'cancelled' });
-        } else if (latest?.turn?.state === 'cancelling') {
-          scheduleBindingTimer(bindingId, () => {
-            const pending = bindingFor(bindingId);
-            if (pending?.turn?.state === 'cancelling') syncTurnState(bindingId, 'interrupted', { reason: 'cancelled' });
-          }, CANCEL_SETTLE_TIMEOUT_MS);
-        }
-      }
-      return { ok: true, result };
-    } catch (error) {
-      if (method === 'cancel') {
-        const latest = bindingFor(bindingId);
-        if (latest?.turn?.state === 'cancelling') syncTurnState(bindingId, 'active', { reason: 'cancel-failed' });
-      }
-      return failure(error.code || 'ACP_RUNTIME_UNAVAILABLE', error.message || 'The runtime operation failed.');
-    }
+      const result = method === 'prompt' ? await session.client.prompt(current.opaqueSessionRef, text) : await session.client.steer(current.opaqueSessionRef, text);
+      return {ok:true,result};
+    } catch (error) { return failure(error.code || 'ACP_RUNTIME_UNAVAILABLE', 'The runtime operation failed.'); }
   }
 
   async function continueTask(bindingId, { automatic = false } = {}) {
     if (disposed) return shuttingDown();
-    const current = bindingFor(bindingId);
+    if (storageBlocked()) return storageBlocked();
+    const current = (await bindingFor(bindingId));
     const session = clients.get(bindingId);
     if (!current || !session) return inactiveSession();
     if (current.scope?.kind !== 'task') return failure('ACP_CAPABILITY_UNSUPPORTED', 'Only task sessions can be continued from Start work.');
     if (current.state !== 'ready') return failure('ACP_SESSION_BUSY', `Session is ${current.state}.`);
-    const blocking = activeTurn();
+    const blocking = (await activeTurn());
     if (blocking && blocking.id !== bindingId) return activeTurnFailure(blocking);
     if (ACTIVE_TURN_STATES.has(current.turn?.state)) return failure('ACP_SESSION_BUSY', `Turn is ${current.turn.state}.`);
     const contextPack = buildCurrentTaskContext(current);
     if (!contextPack.ok) return contextPack;
     const text = contextPack.text || 'Continue working on the assigned task. Re-read its current state before making changes.';
     try {
-      beginTurn(bindingId, { state: 'starting', batchNumber: Number(current.taskExecution?.batchNumber || 0) + 1 });
-      syncTaskExecution(bindingFor(bindingId) || current, automatic ? 'continuing' : 'working', { reason: automatic ? 'automatic-batch' : 'manual-batch', batchNumber: Number(current.taskExecution?.batchNumber || 0) + 1 });
-      appendRuntimeEvent({ bindingId, runtimeProfileId: current.runtimeProfileId, kind: 'session', nativeEventType: 'omvra/taskInstructions/sent', state: 'sent', idempotencyKey: `runtime:${bindingId}:task-instructions:${randomUUID()}` });
+      (await beginTurn(bindingId, { state: 'starting', batchNumber: Number(current.taskExecution?.batchNumber || 0) + 1 }));
+      (await syncTaskExecution((await bindingFor(bindingId)) || current, automatic ? 'continuing' : 'working', { reason: automatic ? 'automatic-batch' : 'manual-batch', batchNumber: Number(current.taskExecution?.batchNumber || 0) + 1 }));
+      (await appendRuntimeEvent({ bindingId, runtimeProfileId: current.runtimeProfileId, kind: 'session', nativeEventType: 'omvra/taskInstructions/sent', state: 'sent', idempotencyKey: `runtime:${bindingId}:task-instructions:${randomUUID()}` }));
       await session.client.prompt(current.opaqueSessionRef, text);
-      return { ok: true, binding: bindingFor(bindingId) || current };
+      return { ok: true, binding: (await bindingFor(bindingId)) || current };
     } catch (error) {
       return failure(error.code || 'ACP_RUNTIME_UNAVAILABLE', error.message || 'The runtime session could not be continued.');
     }
@@ -793,23 +864,27 @@ function createAgentRuntimeSessionRunner({
 
   async function respond(bindingId, requestId, result, error) {
     if (disposed) return shuttingDown();
-    const current = bindingFor(bindingId);
     const session = clients.get(bindingId);
+    const current = session?.binding || await controlBinding(bindingId);
     if (!current || !session) return inactiveSession();
-    if (requestId === undefined || requestId === null) return failure('ACP_PROTOCOL_INCOMPATIBLE', 'A runtime request ID is required.');
+    const key = requestKey(bindingId, requestId);
+    const request = pendingRequests.get(key);
+    if (!request || responsesInFlight.has(key) || request.turnId !== current.turn?.id) return failure('ACP_REQUEST_NOT_FOUND', 'This runtime request is no longer pending.');
+    responsesInFlight.add(key);
     try {
-      session.client.respond(requestId, result, error);
-      pendingRequests.delete(requestKey(bindingId, requestId));
-      if (current.turn?.state === 'waiting-input') syncTurnState(bindingId, 'active');
-      return { ok: true };
+      await session.client.respond(requestId, result, error);
+      pendingRequests.delete(key);
+      const persisted = await persistControl(bindingId, listRequests(bindingId).length ? 'waiting-input' : 'active');
+      return {ok:true,...(!persisted ? {storageFailure:true,reconciliationRequired:true} : {})};
     } catch (caught) {
-      return failure(caught.code || 'ACP_PROTOCOL_INCOMPATIBLE', caught.message || 'The runtime request could not be answered.');
-    }
+      return failure(caught.code || 'ACP_PROTOCOL_INCOMPATIBLE', 'The runtime request could not be answered.');
+    } finally { responsesInFlight.delete(key); }
   }
 
   async function resume(bindingId, payload = {}) {
     if (disposed) return shuttingDown();
-    const current = bindingFor(bindingId);
+    if (storageBlocked()) return storageBlocked();
+    const current = (await bindingFor(bindingId));
     if (!current || !current.opaqueSessionRef) return failure('ACP_SESSION_RESUME_UNSUPPORTED', 'This session has no resumable runtime reference.');
     if (!['interrupted', 'starting'].includes(current.state)) return failure('ACP_SESSION_NOT_RESUMABLE', `Session is ${current.state}.`);
     const profileResolution = resolveProfile(store, { executionProfileId: current.runtimeProfileId });
@@ -822,7 +897,7 @@ function createAgentRuntimeSessionRunner({
     const mcpReadiness = await ensureOmvraMcpListener();
     if (!mcpReadiness.ok) return mcpReadiness;
     const starting = current.state === 'interrupted'
-      ? updateBinding(store, { bindingId, expectedRevision: current.revision, state: 'starting' })
+      ? await updateBinding(store, { bindingId, expectedRevision: current.revision, state: 'starting' })
       : { ok: true, binding: current };
     if (!starting.ok) return starting;
     let client;
@@ -834,36 +909,36 @@ function createAgentRuntimeSessionRunner({
       if (disposed) throw Object.assign(new Error('The app is shutting down.'), { code: 'ACP_APP_SHUTDOWN' });
       const session = await client.resumeSession(current.opaqueSessionRef);
       if (disposed) throw Object.assign(new Error('The app is shutting down.'), { code: 'ACP_APP_SHUTDOWN' });
-      const ready = updateBinding(store, {
+      const ready = await updateBinding(store, {
         bindingId,
-        expectedRevision: starting.binding.revision,
+        expectedRevision: (await bindingFor(bindingId)).revision,
         state: 'ready',
         opaqueSessionRef: session.sessionId,
         capabilities: Object.entries(negotiated.capabilities || {}).filter(([, supported]) => supported === true).map(([id]) => ({ id, support: 'supported' })),
       });
       if (!ready.ok) throw Object.assign(new Error(ready.message || 'The session could not be resumed.'), { code: ready.error });
-      syncTaskExecution(ready.binding, 'ready', { reason: 'session-resumed' });
+      (await syncTaskExecution(ready.binding, 'ready', { reason: 'session-resumed' }));
       const contextPack = buildCurrentTaskContext(ready.binding);
       if (!contextPack.ok) throw Object.assign(new Error(contextPack.message), { code: contextPack.error });
       {
         const promptText = contextPack.text || 'Resume working on the assigned task. Re-read its current state before making changes.';
-        appendRuntimeEvent({ bindingId, runtimeProfileId: current.runtimeProfileId, kind: 'session', nativeEventType: 'omvra/taskInstructions/sent', state: 'sent', idempotencyKey: `runtime:${bindingId}:task-instructions:${ready.binding.revision}` });
-        beginTurn(bindingId, { state: 'starting' });
+        (await appendRuntimeEvent({ bindingId, runtimeProfileId: current.runtimeProfileId, kind: 'session', nativeEventType: 'omvra/taskInstructions/sent', state: 'sent', idempotencyKey: `runtime:${bindingId}:task-instructions:${ready.binding.revision}` }));
+        (await beginTurn(bindingId, { state: 'starting' }));
         await client.prompt(session.sessionId, promptText);
       }
-      return { ...ready, binding: bindingFor(bindingId) || ready.binding };
+      return { ...ready, binding: (await bindingFor(bindingId)) || ready.binding };
     } catch (error) {
       releaseClient(bindingId);
-      if (ACTIVE_TURN_STATES.has(bindingFor(bindingId)?.turn?.state)) syncTurnState(bindingId, 'failed', { reason: error.code || 'protocol-error' });
-      const latest = bindingFor(bindingId) || starting.binding;
-      updateBinding(store, { bindingId, expectedRevision: latest.revision, state: 'failed', terminalReason: 'protocol-error' });
-      syncTaskExecution(bindingFor(bindingId) || latest, 'failed', { reason: error.code || 'protocol-error' });
+      if (ACTIVE_TURN_STATES.has((await bindingFor(bindingId))?.turn?.state)) (await syncTurnState(bindingId, 'failed', { reason: error.code || 'protocol-error' }));
+      const latest = (await bindingFor(bindingId)) || starting.binding;
+      await updateBinding(store, { bindingId, expectedRevision: latest.revision, state: 'failed', terminalReason: 'protocol-error' });
+      (await syncTaskExecution((await bindingFor(bindingId)) || latest, 'failed', { reason: error.code || 'protocol-error' }));
       return failure(error.code || 'ACP_SESSION_RESUME_UNSUPPORTED', error.message || 'The runtime session could not be resumed.');
     }
   }
 
   async function close(bindingId) {
-    const current = bindingFor(bindingId);
+    const current = (await bindingFor(bindingId));
     const session = clients.get(bindingId);
     if (!current) return failure('ACP_SESSION_NOT_FOUND', 'The runtime session binding was not found.');
     if (session) {
@@ -876,11 +951,13 @@ function createAgentRuntimeSessionRunner({
       }
     }
     try {
-      if (ACTIVE_TURN_STATES.has((bindingFor(bindingId) || current).turn?.state)) syncTurnState(bindingId, 'interrupted', { reason: 'closed' });
-      const latest = bindingFor(bindingId) || current;
-      const result = updateBinding(store, { bindingId, expectedRevision: latest.revision, state: 'closed', terminalReason: 'closed' });
+      if (ACTIVE_TURN_STATES.has(((await bindingFor(bindingId)) || current).turn?.state)) (await syncTurnState(bindingId, 'interrupted', { reason: 'closed' }));
+      const latest = (await bindingFor(bindingId)) || current;
+      const result = await updateBinding(store, { bindingId, expectedRevision: latest.revision, state: 'closed', terminalReason: 'closed' });
       if (!result.ok) return result;
-      syncTaskExecution(result.binding, 'stopped', { reason: 'closed' });
+      (await syncTaskExecution(result.binding, 'stopped', { reason: 'closed' }));
+      // Delivery releases transient output only after observing the committed closed state.
+      emit({ kind: 'binding', binding: result.binding });
       releaseClient(bindingId);
       return result;
     } catch (error) {
@@ -888,30 +965,42 @@ function createAgentRuntimeSessionRunner({
     }
   }
 
-  function reconcile() {
-    const projection = listSessions(store, { limit: 100, includeEvents: false });
+  async function reconcile() {
+    const projection = await listSessions(store, { limit: 100, includeEvents: false });
     const persistedSessions = projection?.bindings || [];
+    for (const bindingId of [...notificationFailures.keys()]) {
+      const session = clients.get(bindingId);
+      if (session?.pendingControl) {
+        const {state,details} = session.pendingControl;
+        if (!await persistControl(bindingId, state, details)) continue;
+      }
+      await appendRuntimeEvent({bindingId,runtimeProfileId:session?.binding?.runtimeProfileId || persistedSessions.find(b=>b.id===bindingId)?.runtimeProfileId,kind:'session',nativeEventType:'omvra/storage/reconciled',state:'interrupted',idempotencyKey:`storage-reconciled:${bindingId}:${randomUUID()}`});
+      notificationFailures.delete(bindingId);
+      emit({kind:'storage-recovered',bindingId});
+    }
+
     let changed = false;
     for (const binding of persistedSessions) {
       if (['ready', 'active', 'needs-input', 'cancelling'].includes(binding.state) && !clients.has(binding.id)) {
-        changed = Boolean(reconcileBindingLoss(binding.id, { code: 'ACP_RUNTIME_MISSING', kind: 'error' })?.ok) || changed;
+        changed = Boolean((await reconcileBindingLoss(binding.id, { code: 'ACP_RUNTIME_MISSING', kind: 'error' }))?.ok) || changed;
       }
     }
     for (const [bindingId, session] of clients.entries()) {
       if (typeof session.client.isAlive === 'function' && !session.client.isAlive()) {
-        changed = Boolean(reconcileBindingLoss(bindingId, { code: 'ACP_SESSION_INTERRUPTED', kind: 'error' })?.ok) || changed;
+        changed = Boolean((await reconcileBindingLoss(bindingId, { code: 'ACP_SESSION_INTERRUPTED', kind: 'error' }))?.ok) || changed;
       }
     }
-    return changed ? listSessions(store, { limit: 100, includeEvents: false }) : projection;
+    return changed ? await listSessions(store, { limit: 100, includeEvents: false }) : projection;
   }
 
-  function dispose() {
+  async function dispose() {
     if (disposed) return { ok: true, idempotent: true, closedClientCount: 0 };
     disposed = true;
+    await notificationTail;
     const bindingIds = [...clients.keys()];
     for (const bindingId of bindingIds) {
       releaseClient(bindingId);
-      reconcileBindingLoss(bindingId, { code: 'ACP_APP_SHUTDOWN', kind: 'shutdown' });
+      try { await reconcileBindingLoss(bindingId, { code: 'ACP_APP_SHUTDOWN', kind: 'shutdown' }); } catch (error) { storageFailed(bindingId, error); }
     }
     for (const bindingId of [...timersByBinding.keys()]) clearBindingTimers(bindingId);
     pendingRequests.clear();
@@ -919,7 +1008,7 @@ function createAgentRuntimeSessionRunner({
     return { ok: true, idempotent: false, closedClientCount: bindingIds.length };
   }
 
-  return { close, continueTask, dispose, hasLiveSessions: () => clients.size > 0, invoke, listRequests, reconcile, respond, resume, start, startGoalNode };
+  return { close, continueTask, dispose, flush, hasLiveSessions: () => clients.size > 0, invoke, listRequests, reconcile, respond, resume, start, startGoalNode };
 }
 
 module.exports = { createAgentRuntimeSessionRunner };

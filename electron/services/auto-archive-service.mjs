@@ -7,12 +7,14 @@ export function startAutoArchiveService(store, getBusyTaskIds = () => new Set())
   let applying = false;
   let scheduled = false;
   let stopped = false;
-  function check() {
+  async function check() {
     if (applying || stopped) return;
     applying = true;
     try {
+      const busyTaskIds = await getBusyTaskIds();
+      if(stopped) return;
       const tasks = store.get(tasksKey) || [];
-      const next = reconcileAutoArchive(tasks, previous, store.get('omvra.statusColumns.v1') || [], store.get('omvra.preferences.v1')?.autoArchivePolicy, Date.now(), getBusyTaskIds());
+      const next = reconcileAutoArchive(tasks, previous, store.get('omvra.statusColumns.v1') || [], store.get('omvra.preferences.v1')?.autoArchivePolicy, Date.now(), busyTaskIds);
       if (next !== tasks) store.set(tasksKey, next);
       previous = next;
     } catch (error) {

@@ -102,6 +102,7 @@ test('desktop service handles external writes, timed checks, startup and shutdow
   assert.ok([...listeners.values()].every(list => !list.length));
   store.set('omvra.tasks.v1', [task('due')]);
   const stopAgain = startAutoArchiveService(store);
+  await new Promise(queueMicrotask);
   assert.equal(store.get('omvra.tasks.v1')[0].archived, true);
   stopAgain();
 });

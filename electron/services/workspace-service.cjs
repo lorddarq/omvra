@@ -1701,26 +1701,41 @@ const taskExecutionContextPack = createAgentRuntimeContextPack({
   getEntry: (store, payload) => taskContextLedgerService.get(store, payload),
 });
 
+function attachAgentBindingToAttempt(store, binding) {
+  if (binding.scope?.kind !== 'task') return { ok: true };
+  const attempts = readArray(store, TASK_CONTRIBUTION_ATTEMPTS_KEY);
+  const attempt = attempts.find(item => item.id === binding.scope.executionAttemptId);
+  if (!attempt || attempt.taskId !== binding.scope.taskId || (binding.scope.contributionId && attempt.contributionId !== binding.scope.contributionId)) {
+    return { ok: false, error: 'ACP_EXECUTION_ATTEMPT_NOT_FOUND', message: 'The session binding does not match a persisted task execution attempt.' };
+  }
+  if (attempt.sessionBindingId && attempt.sessionBindingId !== binding.id) {
+    return { ok: false, error: 'ACP_EXECUTION_ALREADY_ACTIVE', message: 'The execution attempt is already bound to another session.' };
+  }
+  if (!attempt.sessionBindingId) {
+    store.set(TASK_CONTRIBUTION_ATTEMPTS_KEY, attempts.map(item => item.id === attempt.id ? { ...item, sessionBindingId: binding.id } : item));
+  }
+  return { ok: true };
+}
+const agentWorkServices = new WeakMap();
+const { STORAGE_KEY: AGENT_WORK_STORAGE_KEY } = require('./agent-work-migration.cjs');
+const { openAgentWorkSessionService } = require('./agent-work-session-service.cjs');
+function initializeAgentWorkStorage(store) {
+  if (!agentWorkServices.has(store)) agentWorkServices.set(store, openAgentWorkSessionService({store,attachBindingToAttempt:attachAgentBindingToAttempt,appendTaskContext:(...args)=>taskContextLedgerService.append(...args),getTaskById:(...args)=>taskService.getTaskById(...args)}));
+  return agentWorkServices.get(store);
+}
+function runtimeServiceCall(method, store, ...args) {
+  const service = agentWorkServices.get(store);
+  if (service) return service.then(owner=>owner[method](store,...args));
+  if (store.get(AGENT_WORK_STORAGE_KEY)) throw Object.assign(new Error('AGENT_WORK_OWNER_UNAVAILABLE'),{code:'AGENT_WORK_OWNER_UNAVAILABLE'});
+  return agentRuntimeSessionService[method](store,...args);
+}
+
 const agentRuntimeSessionService = createAgentRuntimeSessionService({
   readBindings: store => store.get(SESSION_BINDINGS_KEY),
   writeBindings: (store, bindings) => store.set(SESSION_BINDINGS_KEY, bindings),
   readEvents: store => store.get(SESSION_EVENTS_KEY),
   writeEvents: (store, events) => store.set(SESSION_EVENTS_KEY, events),
-  attachBindingToAttempt: (store, binding) => {
-    if (binding.scope?.kind !== 'task') return { ok: true };
-    const attempts = readArray(store, TASK_CONTRIBUTION_ATTEMPTS_KEY);
-    const attempt = attempts.find(item => item.id === binding.scope.executionAttemptId);
-    if (!attempt || attempt.taskId !== binding.scope.taskId || (binding.scope.contributionId && attempt.contributionId !== binding.scope.contributionId)) {
-      return { ok: false, error: 'ACP_EXECUTION_ATTEMPT_NOT_FOUND', message: 'The session binding does not match a persisted task execution attempt.' };
-    }
-    if (attempt.sessionBindingId && attempt.sessionBindingId !== binding.id) {
-      return { ok: false, error: 'ACP_EXECUTION_ALREADY_ACTIVE', message: 'The execution attempt is already bound to another session.' };
-    }
-    if (!attempt.sessionBindingId) {
-      store.set(TASK_CONTRIBUTION_ATTEMPTS_KEY, attempts.map(item => item.id === attempt.id ? { ...item, sessionBindingId: binding.id } : item));
-    }
-    return { ok: true };
-  },
+  attachBindingToAttempt: attachAgentBindingToAttempt,
   appendTaskContext: (...args) => taskContextLedgerService.append(...args),
   normalizeString,
 });
@@ -1877,24 +1892,37 @@ const {
 } = taskCollaborationLifecycleService;
 
 function recoverOrphanedTaskExecution(store, { taskId } = {}) {
-  const task = taskService.getTaskById(store, normalizeString(taskId));
-  const contribution = task?.collaboration?.contributions?.find(item => item.state === 'working');
-  if (!task || !contribution?.latestAttemptId) return { ok: true, changed: false, task };
-  const activeBinding = readArray(store, SESSION_BINDINGS_KEY).find(binding => (
-    binding.scope?.kind === 'task'
-    && binding.scope.taskId === task.id
-    && binding.scope.executionAttemptId === contribution.latestAttemptId
-    && (OWNED_RUNTIME_SESSION_STATES.has(binding.state) || ACTIVE_RUNTIME_TURN_STATES.has(binding.turn?.state))
-  ));
-  if (activeBinding) return { ok: true, changed: false, task, binding: activeBinding };
-  return recoverOrphanedAttempt(store, {
-    taskId: task.id,
-    contributionId: contribution.id,
-    attemptId: contribution.latestAttemptId,
-    actorPersonId: task.collaboration.orchestratorId,
-    expectedRevision: task.__mcpRevision || 0,
-    idempotencyKey: `runtime-recovery:${task.id}:${contribution.latestAttemptId}`,
-  });
+  if(agentWorkServices.has(store)) {
+    const task = taskService.getTaskById(store, normalizeString(taskId));
+    const attemptId = task?.collaboration?.contributions?.find(item=>item.state==='working')?.latestAttemptId;
+    const bindingId = readArray(store,TASK_CONTRIBUTION_ATTEMPTS_KEY).find(item=>item.id===attemptId)?.sessionBindingId;
+    return listAgentRuntimeSessions(store,{taskId,...(bindingId?{bindingId}:{}),limit:100,includeEvents:false}).then(result=>{
+      if(taskService.getTaskById(store,normalizeString(taskId))?.__mcpRevision!==task?.__mcpRevision) return {ok:true,changed:false};
+      return recoverWithBindings(result.bindings);
+    });
+  }
+  if(store.get(AGENT_WORK_STORAGE_KEY)) throw Object.assign(new Error('AGENT_WORK_OWNER_UNAVAILABLE'),{code:'AGENT_WORK_OWNER_UNAVAILABLE'});
+  return recoverWithBindings(readArray(store,SESSION_BINDINGS_KEY));
+  function recoverWithBindings(bindings) {
+    const task = taskService.getTaskById(store, normalizeString(taskId));
+    const contribution = task?.collaboration?.contributions?.find(item => item.state === 'working');
+    if (!task || !contribution?.latestAttemptId) return { ok: true, changed: false, task };
+    const activeBinding = bindings.find(binding => (
+      binding.scope?.kind === 'task'
+      && binding.scope.taskId === task.id
+      && binding.scope.executionAttemptId === contribution.latestAttemptId
+      && (OWNED_RUNTIME_SESSION_STATES.has(binding.state) || ACTIVE_RUNTIME_TURN_STATES.has(binding.turn?.state))
+    ));
+    if (activeBinding) return { ok: true, changed: false, task, binding: activeBinding };
+    return recoverOrphanedAttempt(store, {
+      taskId: task.id,
+      contributionId: contribution.id,
+      attemptId: contribution.latestAttemptId,
+      actorPersonId: task.collaboration.orchestratorId,
+      expectedRevision: task.__mcpRevision || 0,
+      idempotencyKey: `runtime-recovery:${task.id}:${contribution.latestAttemptId}`,
+    });
+  }
 }
 
 const {
@@ -1908,16 +1936,14 @@ const {
   confirmStart: confirmAgentExecutionStart,
 } = agentExecutionPreflightService;
 
-const {
-  appendDurableOutcome: appendAgentRuntimeOutcome,
-  appendEvent: appendAgentRuntimeEvent,
-  createBinding: createAgentRuntimeSessionBinding,
-  evaluateGovernance: evaluateAgentRuntimeGovernance,
-  list: listAgentRuntimeSessions,
-  prepareArchive: prepareAgentRuntimeSessionArchive,
-  reconcileInterrupted: reconcileInterruptedAgentRuntimeSessions,
-  updateBinding: updateAgentRuntimeSessionBinding,
-} = agentRuntimeSessionService;
+const appendAgentRuntimeOutcome = (store, ...args) => runtimeServiceCall('appendDurableOutcome',store,...args);
+const appendAgentRuntimeEvent = (store, ...args) => runtimeServiceCall('appendEvent',store,...args);
+const createAgentRuntimeSessionBinding = (store, ...args) => runtimeServiceCall('createBinding',store,...args);
+const evaluateAgentRuntimeGovernance = (store, ...args) => runtimeServiceCall('evaluateGovernance',store,...args);
+const listAgentRuntimeSessions = (store, ...args) => runtimeServiceCall('list',store,...args);
+const prepareAgentRuntimeSessionArchive = (store, ...args) => runtimeServiceCall('prepareArchive',store,...args);
+const reconcileInterruptedAgentRuntimeSessions = (store, ...args) => runtimeServiceCall('reconcileInterrupted',store,...args);
+const updateAgentRuntimeSessionBinding = (store, ...args) => runtimeServiceCall('updateBinding',store,...args);
 
 const TASK_EXECUTION_STATES = new Set(['starting', 'ready', 'working', 'continuing', 'waiting', 'stopping', 'batch-finished', 'interrupted', 'stopped', 'failed', 'ready-for-review', 'outcome-unreconciled', 'complete']);
 
@@ -1937,6 +1963,8 @@ function finalizeAgentRuntimeAttempt(store, { taskId, attemptId, state = 'comple
 }
 
 function updateAgentRuntimeTaskExecution(store, { taskId, attemptId, state, reason, batchNumber, lastEventAt, turnId, turnState } = {}) {
+  if(agentWorkServices.has(store)) return {ok:true};
+  if(store.get(AGENT_WORK_STORAGE_KEY)) throw Object.assign(new Error('AGENT_WORK_OWNER_UNAVAILABLE'),{code:'AGENT_WORK_OWNER_UNAVAILABLE'});
   const normalizedTaskId = normalizeString(taskId);
   const normalizedAttemptId = normalizeString(attemptId);
   if (!normalizedTaskId || !normalizedAttemptId) return { ok: false, error: 'ACP_EXECUTION_ATTEMPT_REQUIRED', message: 'A task and execution attempt are required.' };
@@ -1968,6 +1996,7 @@ function attachTaskExecutionProjection(attemptsById, binding) {
 
 function listAgentRuntimeSessionsWithTaskExecution(store, input) {
   const result = listAgentRuntimeSessions(store, input);
+  if (agentWorkServices.has(store)) return result;
   if (!result?.ok) return result;
   const hasTaskBindings = result.bindings.some(binding => binding?.scope?.kind === 'task' && binding.scope.executionAttemptId);
   const attemptsById = hasTaskBindings
@@ -1986,6 +2015,7 @@ const {
 } = milestoneService;
 
 module.exports = {
+  initializeAgentWorkStorage,
   TASK_CONTRIBUTION_ATTEMPTS_KEY,
   SESSION_BINDINGS_KEY,
   SESSION_EVENTS_KEY,

@@ -22,18 +22,17 @@ description: Enforce strict UX/UI implementation guardrails for web and app inte
 
 ## UX Heuristics To Apply
 
-Apply these principles during every design or implementation pass:
+Take heed of these principles during every design or implementation pass. Understand how they influence user perception and behavior, and how this relates to the task given.:
 
 - **Aesthetic Usability Effect**: Users are more tolerant of minor usability issues when they find an interface visually appealing, and this effect can mask UI problems during usability testing.
-- Avoid Choice Overload
-- Chunk Information
+- **Chunk Information**: A memory technique that breaks large amounts of data into smaller, meaningful groups to help your brain remember more information
 - Avoid Cognitive Bias
 - Avoid Cognitive Load
-- Doherty Threshold (target <400ms system response pacing)
-- Fitt's Law
+- **Doherty Threshold**: A system must respond to user input within 400 milliseconds to maintain attention and prevent frustration
+- **Fitt's Law**: The time required to rapidly move to a target area is a function of the distance to the target and the size of the target
 - Flow
-- Goal-Gradient Effect
-- Hick's Law
+- **Goal-Gradient Effect**: A psychological phenomenon where people and animals increase their effort and speed up their behavior as they get closer to a goal
+- **Hick's Law**: The time it takes for a person to make a decision increases logarithmically as the number of choices increases. However there are also times where this law or principle has to be broken due to the inherent number of existing choices a system exposes, that cannot be reduced. Relates to avoiding choice overload as much as possible, by limiting the amount of given choices a user should make.
 - Jakob's Law
 - Law of Common Region
 - Law of Proximity
@@ -42,7 +41,7 @@ Apply these principles during every design or implementation pass:
 - Law of Uniform Connectedness
 - Mental Models
 - Miller's Law
-- Occam's Razor
+- **Occam's Razor**: A problem-solving rule that says the simplest explanation is usually the best one. May be used when problemsolving or debugging a cause-effect situation, or a hypothesis.
 - Paradox of the Active User
 - Pareto Principle
 - Parkinson's Law
@@ -71,7 +70,7 @@ Apply these principles during every design or implementation pass:
 - Pause looping animations when off-screen.
 - Keep interaction feedback animation duration at or below `200ms`.
 
-Never:
+**Never**:
 
 - Animate layout properties: `width`, `height`, `top`, `left`, `margin`, `padding`.
 - Add animation unless explicitly requested.
@@ -95,7 +94,7 @@ Never use `useEffect` for logic expressible as render logic or derived state.
 - Use color intentionally to direct attention toward key actions.
 - Compute nested radii with: `RadiusInner = RadiusOuter - padding`.
 
-Never:
+**Never**:
 
 - Mix more than one font family in a view.
 - Use text transparency unless explicitly requested.

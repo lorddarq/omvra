@@ -11,8 +11,8 @@ metadata:
   author: patterns.dev
   version: "1.1"
 related_skills:
-  - "hooks-pattern"
-  - "hoc-pattern"
+  - hooks-pattern
+  - hoc-pattern
 ---
 
 # AI UI Patterns

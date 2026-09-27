@@ -4,7 +4,9 @@ import * as React from 'react';
 import TestRenderer from 'react-test-renderer';
 import { useAppUpdateState } from './useAppUpdateState.ts';
 
-const { act, create } = TestRenderer as any;
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+const { act } = React;
+const { create } = TestRenderer as any;
 
 type AppUpdateStateHarness = Awaited<ReturnType<typeof renderUpdateHook>>;
 

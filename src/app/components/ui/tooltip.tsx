@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
+import { Slot } from "@radix-ui/react-slot";
 
 import { cn } from "./utils";
 
@@ -24,12 +25,15 @@ function useTooltipContext() {
   return context;
 }
 
-function TooltipProvider({ children }: React.PropsWithChildren) {
-  return <>{children}</>;
+const TooltipDelayContext = React.createContext(800);
+
+function TooltipProvider({ children, delayDuration = 800 }: React.PropsWithChildren<{ delayDuration?: number }>) {
+  return <TooltipDelayContext.Provider value={delayDuration}>{children}</TooltipDelayContext.Provider>;
 }
 
 function Tooltip({ children }: React.PropsWithChildren) {
   const [open, setOpen] = React.useState(false);
+  const delayDuration = React.useContext(TooltipDelayContext);
   const openTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const anchorRef = React.useRef<HTMLSpanElement | null>(null);
 
@@ -46,66 +50,47 @@ function Tooltip({ children }: React.PropsWithChildren) {
       openTimerRef.current = setTimeout(() => {
         setOpen(true);
         openTimerRef.current = null;
-      }, 800);
+      }, delayDuration);
     } else {
       setOpen(false);
     }
-  }, [clearOpenTimer]);
+  }, [clearOpenTimer, delayDuration]);
 
   React.useEffect(() => clearOpenTimer, [clearOpenTimer]);
 
   return (
-    <TooltipProvider>
-      <TooltipContext.Provider value={{ open, setOpen: setTooltipOpen, anchorRef }}>
-        <span ref={anchorRef} data-slot="tooltip" className="relative inline-flex">
-          {children}
-        </span>
-      </TooltipContext.Provider>
-    </TooltipProvider>
+    <TooltipContext.Provider value={{ open, setOpen: setTooltipOpen, anchorRef }}>
+      <span ref={anchorRef} data-slot="tooltip" className="relative inline-flex">
+        {children}
+      </span>
+    </TooltipContext.Provider>
   );
 }
 
 function TooltipTrigger({
   children,
   asChild,
+  onMouseEnter,
+  onMouseLeave,
+  onFocus,
+  onBlur,
   ...props
 }: React.ComponentProps<"button"> & { asChild?: boolean }) {
   const { setOpen } = useTooltipContext();
-  const child = children as React.ReactElement<any> | undefined;
-
-  const triggerProps = {
-    "data-slot": "tooltip-trigger",
-    onMouseEnter: () => setOpen(true),
-    onMouseLeave: () => setOpen(false),
-    onFocus: () => setOpen(true),
-    onBlur: () => setOpen(false),
-    ...props,
-  };
-
-  if (asChild && React.isValidElement(child)) {
-    return React.cloneElement(child, {
-      ...triggerProps,
-      ...child.props,
-      onMouseEnter: (event: React.MouseEvent<HTMLElement>) => {
-        triggerProps.onMouseEnter?.(event as never);
-        child.props.onMouseEnter?.(event);
-      },
-      onMouseLeave: (event: React.MouseEvent<HTMLElement>) => {
-        triggerProps.onMouseLeave?.(event as never);
-        child.props.onMouseLeave?.(event);
-      },
-      onFocus: (event: React.FocusEvent<HTMLElement>) => {
-        triggerProps.onFocus?.(event as never);
-        child.props.onFocus?.(event);
-      },
-      onBlur: (event: React.FocusEvent<HTMLElement>) => {
-        triggerProps.onBlur?.(event as never);
-        child.props.onBlur?.(event);
-      },
-    });
-  }
-
-  return <button type="button" {...triggerProps}>{children}</button>;
+  const Component = asChild ? Slot : "button";
+  return (
+    <Component
+      type="button"
+      data-slot="tooltip-trigger"
+      {...props}
+      onMouseEnter={event => { onMouseEnter?.(event); if (!event.defaultPrevented) setOpen(true); }}
+      onMouseLeave={event => { onMouseLeave?.(event); setOpen(false); }}
+      onFocus={event => { onFocus?.(event); if (!event.defaultPrevented) setOpen(true); }}
+      onBlur={event => { onBlur?.(event); setOpen(false); }}
+    >
+      {children}
+    </Component>
+  );
 }
 
 function TooltipContent({

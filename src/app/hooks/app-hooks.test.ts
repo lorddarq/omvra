@@ -47,7 +47,9 @@ test('AppMainViews ignores shell-only updates but renders changed view inputs', 
   assert.equal(areAppMainViewsPropsEqual(shared, changedViewInput), false);
 });
 
-const { act, create } = TestRenderer as any;
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+const { act } = React;
+const { create } = TestRenderer as any;
 
 type RenderHookHarness<TProps, TResult> = {
   result: () => TResult;

@@ -12,7 +12,7 @@ type GoalsSidebarProps = {
   statusChipClass: (status: GoalElement['status']) => string;
   compactChipClass: (colorClass: string) => string;
   statusLabel: (status: GoalElement['status']) => string;
-  StatusIcon: (props: { status: GoalElement['status']; className?: string }) => JSX.Element;
+  StatusIcon: (props: { status: GoalElement['status']; className?: string }) => React.JSX.Element;
 };
 
 export function GoalsSidebar({ goals, selectedGoalId, collapsed, onSelectGoal, onToggleCollapsed, onNewGoal, statusChipClass, compactChipClass, statusLabel, StatusIcon }: GoalsSidebarProps) {

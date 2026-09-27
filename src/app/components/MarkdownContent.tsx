@@ -20,7 +20,7 @@ type CodeComponentProps = ComponentPropsWithoutRef<'code'> & {
 };
 
 function isNestedListNode(node: ReactNode) {
-  if (!isValidElement(node)) return false;
+  if (!isValidElement<{ node?: { tagName?: string } }>(node)) return false;
   if (node.type === 'ul' || node.type === 'ol') return true;
 
   const tagName = typeof node.props === 'object' && node.props !== null
@@ -33,7 +33,7 @@ function flattenMarkdownText(node: ReactNode): string {
   if (node === null || node === undefined || typeof node === 'boolean') return '';
   if (typeof node === 'string' || typeof node === 'number') return String(node);
   if (Array.isArray(node)) return node.map(flattenMarkdownText).join('');
-  if (!isValidElement(node)) return '';
+  if (!isValidElement<{ children?: ReactNode }>(node)) return '';
   return flattenMarkdownText(node.props?.children);
 }
 

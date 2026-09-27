@@ -43,7 +43,8 @@
     "predist": "npm run generate:icons",
     "dist": "npm run predist && npm run build:electron",
     "start": "electron .",
-    "generate:icons": "node electron/scripts/generate-icons.cjs"
+    "generate:icons": "node electron/scripts/generate-icons.cjs",
+    "test:react19-ui": "electron scripts/react19/verify-ui.cjs"
   },
   "dependencies": {
     "@radix-ui/react-context-menu": "^2.2.16",
@@ -60,25 +61,26 @@
     "electron-store": "^8.1.0",
     "electron-updater": "^6.8.9",
     "lucide-react": "0.487.0",
-    "react": "18.3.1",
+    "react": "19.3.0",
     "react-dnd": "16.0.1",
     "react-dnd-html5-backend": "16.0.1",
-    "react-dom": "18.3.1",
+    "react-dom": "19.3.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "sonner": "^2.0.7",
-    "tailwind-merge": "3.2.0"
+    "tailwind-merge": "3.2.0",
+    "loading-dev": "0.3.4"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.0",
-    "@types/react": "^18.3.0",
-    "@types/react-dom": "^18.3.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.0.2",
     "concurrently": "^9.2.1",
     "electron": "43.3.0",
     "electron-builder": "26.16.1",
     "icon-gen": "^5.0.0",
-    "react-test-renderer": "^18.3.1",
+    "react-test-renderer": "19.3.0",
     "sharp": "0.35.4",
     "tailwindcss": "4.3.0",
     "typescript": "^5.9.3",

@@ -4,7 +4,7 @@
 [![Pages deployment](https://github.com/lorddarq/omvra/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/lorddarq/omvra/actions/workflows/deploy-pages.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Electron](https://img.shields.io/badge/Electron-desktop-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
-[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=20232A)](https://react.dev/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=20232A)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![MCP](https://img.shields.io/badge/MCP-enabled-6f42c1)](#mcp-integration-desktop)
 
@@ -140,7 +140,7 @@ Open **Settings → About & updates** to choose stable releases or release candi
 
 ## Development
 
-The app uses Electron, React, TypeScript, Vite, Tailwind CSS, react-dnd, and electron-store. CI uses Node 24.
+The app uses Electron, React 19, TypeScript, Vite, Tailwind CSS, react-dnd, and electron-store. CI uses Node 24. Working indicators use the `Atom` component from `loading-dev`, with a shared four-second duration and built-in reduced-motion support.
 
 ```bash
 npm install
@@ -154,6 +154,8 @@ npm run dev:vite      # Renderer only
 npm run dev:electron  # Electron; waits for the renderer
 npm run dev:pages     # Marketing site
 ```
+
+`npm run test:react19-ui` runs isolated Electron checks for tooltip event composition, callback-ref cleanup, dialog portals, select interactions, and HTML5 drag-and-drop.
 
 Updater fixtures exercise UI states without contacting a release server or installing an update:
 

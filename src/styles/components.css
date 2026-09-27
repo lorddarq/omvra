@@ -29,46 +29,6 @@
   animation: agent-loading-shimmer 1.4s linear infinite;
 }
 
-.atom-spinner {
-  position: relative;
-  display: inline-block;
-  width: var(--atom-size, 16px);
-  height: var(--atom-size, 16px);
-  flex: none;
-  color: currentColor;
-  perspective: 200px;
-}
-
-.atom-spinner-shell,
-.atom-spinner-ring {
-  position: absolute;
-  inset: 0;
-  box-sizing: border-box;
-  border: calc(var(--atom-size, 16px) * .055) solid currentColor;
-  border-radius: 9999px;
-}
-
-.atom-spinner-spin {
-  position: absolute;
-  inset: 0;
-  transform-style: preserve-3d;
-  animation: atom-spinner-rotate 4s linear infinite;
-  animation-delay: calc(-4s * var(--atom-step) / 3);
-}
-
-.atom-spinner-ring {
-  border-width: calc(var(--atom-size, 16px) * .045);
-  transform: rotateX(65deg);
-}
-
-@keyframes atom-spinner-rotate {
-  to { transform: rotate(360deg); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .atom-spinner-spin { animation: none; transform: rotate(calc(60deg * var(--atom-step))); }
-}
-
 @keyframes agent-loading-pixel {
   0%, 100% { opacity: 0.15; transform: scale(0.75); }
   50% { opacity: 1; transform: scale(1); }

@@ -27,6 +27,29 @@ function legacy(f) {
   domain.appendEvent(null,{bindingId:b.id,runtimeProfileId:b.runtimeProfileId,turnId:'turn-1',kind:'tool',idempotencyKey:'tool-event'});
   return b;
 }
+test('session list reads the workspace once and refreshes task authority on the next request',async t=>{
+  const f=await fixture(t),Conf=require('conf');
+  let reads=0;
+  const store=new Conf({cwd:f.directory,configName:'projection-workspace',deserialize:text=>{reads++;return JSON.parse(text);}});
+  store.set('omvra.tasks.v1',Array.from({length:100},(_,i)=>({id:`task-${i}`,status:'in-progress',notes:'x'.repeat(37000)})));
+  for(let i=0;i<100;i++) await f.repo.createSession({runtimeProfileId:'runtime-1',scope:{kind:'task',taskId:`task-${i}`,executionAttemptId:`attempt-${i}`,taskRevision:0},idempotencyKey:`session-${i}`});
+  const service=createAgentWorkSessionService({repository:f.repo,store,readTasks:s=>s.get('omvra.tasks.v1')});
+  reads=0;
+  const started=performance.now();
+  const first=await service.list(store,{limit:100,includeEvents:false});
+  t.diagnostic(JSON.stringify({sessions:first.bindings.length,workspaceReads:reads,listMs:performance.now()-started}));
+  assert.equal(first.bindings.length,100);
+  assert.equal(reads,1);
+  assert.ok(first.bindings.every(b=>b.taskAvailable && b.unscheduled));
+  store.set('omvra.tasks.v1',[{id:'task-0',status:'done',startDate:'2026-09-27',endDate:'2026-09-28'}]);
+  reads=0;
+  const second=await service.list(store,{limit:100,includeEvents:false});
+  assert.equal(reads,1);
+  const current=second.bindings.find(b=>b.scope.taskId==='task-0');
+  assert.equal(current.taskExecution.state,'complete');
+  assert.equal(current.unscheduled,false);
+  assert.equal(second.bindings.filter(b=>!b.taskAvailable).length,99);
+});
 test('migration retries after partial import, verifies history, recovers attention and never writes task authority',async t=>{
   const f=await fixture(t),b=legacy(f);
   const task={id:'task-1',status:'open',__mcpRevision:4,dependencies:['task-other'],archivedAt:null};
@@ -52,7 +75,7 @@ test('migration retries after partial import, verifies history, recovers attenti
   assert.equal(JSON.stringify(snapshot).includes('PRIVATE_'),false);
   assert.equal(snapshot.binding.turn.id,'turn-1');
   assert.match(snapshot.turn.final_summary,/historical output was not imported/);
-  const service=createAgentWorkSessionService({repository:f.repo,store:f.store,getTaskById:()=>f.store.get('omvra.tasks.v1')[0],attachBindingToAttempt:()=>({ok:true}),appendTaskContext:()=>({ok:true})});
+  const service=createAgentWorkSessionService({repository:f.repo,store:f.store,readTasks:()=>f.store.get('omvra.tasks.v1'),attachBindingToAttempt:()=>({ok:true}),appendTaskContext:()=>({ok:true})});
   let result=await service.list(f.store,{bindingId:b.id});
   assert.equal(result.bindings[0].unscheduled,true);
   assert.equal(publicResult(result).bindings[0].opaqueSessionRef,undefined);
@@ -73,7 +96,7 @@ test('migration rejects unknown fields and changed legacy writers without cuttin
 test('runner completion waits for the committed projection; failure publishes no finished state',async t=>{
   const f=await fixture(t);
   const task={id:'task-1',status:'in-progress'};
-  const service=createAgentWorkSessionService({repository:f.repo,store:f.store,getTaskById:()=>task,attachBindingToAttempt:()=>({ok:true}),appendTaskContext:()=>({ok:true})});
+  const service=createAgentWorkSessionService({repository:f.repo,store:f.store,readTasks:()=>[task],attachBindingToAttempt:()=>({ok:true}),appendTaskContext:()=>({ok:true})});
   let b=(await service.createBinding(f.store,{runtimeProfileId:'runtime-1',scope:{kind:'task',taskId:task.id,executionAttemptId:'attempt-1',taskRevision:0},idempotencyKey:'session-1'})).binding;
   b=(await service.updateBinding(f.store,{bindingId:b.id,expectedRevision:b.revision,state:'interrupted',opaqueSessionRef:'provider-thread-1'})).binding;
   let notify,releaseCommit;const emitted=[];
@@ -159,7 +182,7 @@ test('migration verifies destination fields, not merely source digest labels',as
 test('real SQLite starts accept absent or present contribution IDs and failed binding writes retire direct attempts',async t=>{
   for(const contributionId of [null,undefined,'contribution-1']) {
     const f=await fixture(t),task={id:'task-1',status:'in-progress',__mcpRevision:4};
-    const service=createAgentWorkSessionService({repository:f.repo,store:f.store,getTaskById:()=>task,attachBindingToAttempt:()=>({ok:true}),appendTaskContext:()=>({ok:true})});
+    const service=createAgentWorkSessionService({repository:f.repo,store:f.store,readTasks:()=>[task],attachBindingToAttempt:()=>({ok:true}),appendTaskContext:()=>({ok:true})});
     let initialized=0,notify;
     const runner=createAgentRuntimeSessionRunner({store:f.store,resolveProfile:()=>({ok:true,profile:{id:'runtime-1'}}),
       confirmStart:()=>({ok:true,canStart:true,task,attempt:contributionId?{id:'attempt-1'}:null,contractSnapshot:{taskId:task.id,taskRevision:4,contributionId},contractDigest:'digest'}),
@@ -175,7 +198,7 @@ test('real SQLite starts accept absent or present contribution IDs and failed bi
     } finally {await runner.dispose();}
   }
   const f=await fixture(t);
-  const service=createAgentWorkSessionService({repository:f.repo,store:f.store,getTaskById:()=>({id:'task-1'}),attachBindingToAttempt:()=>({ok:true}),appendTaskContext:()=>({ok:true})});
+  const service=createAgentWorkSessionService({repository:f.repo,store:f.store,readTasks:()=>[{id:'task-1'}],attachBindingToAttempt:()=>({ok:true}),appendTaskContext:()=>({ok:true})});
   for(const returnedFailure of [false,true]) {
     const runner=createAgentRuntimeSessionRunner({store:f.store,resolveProfile:()=>({ok:true,profile:{id:'runtime-1'}}),
       confirmStart:()=>({canStart:true,task:{__mcpRevision:4},contractSnapshot:{taskId:'task-1',taskRevision:4,contributionId:null}}),
@@ -194,7 +217,7 @@ test('real SQLite starts accept absent or present contribution IDs and failed bi
 
 test('SQLite date projection shares Timeline semantics without rewriting task metadata',async t=>{
   const f=await fixture(t),task={id:'task-1',status:'open',__mcpRevision:7,archived:false};
-  const service=createAgentWorkSessionService({repository:f.repo,store:f.store,getTaskById:()=>task,attachBindingToAttempt:()=>({ok:true}),appendTaskContext:()=>({ok:true})});
+  const service=createAgentWorkSessionService({repository:f.repo,store:f.store,readTasks:()=>[task],attachBindingToAttempt:()=>({ok:true}),appendTaskContext:()=>({ok:true})});
   const b=(await service.createBinding(f.store,{runtimeProfileId:'runtime',scope:{kind:'task',taskId:'task-1',executionAttemptId:'attempt',taskRevision:7},idempotencyKey:'date-test'})).binding;
   const cases=[ [{},true], [{startDate:'2026-09-25'},false], [{endDate:'2026-09-25'},true], [{startDate:'invalid',endDate:'invalid'},true], [{startDate:'2026-02-30',endDate:'2026-03-02'},true], [{startDate:'2026-09-26',endDate:'2026-09-25'},true], [{startDate:'2026-09-25',endDate:'2026-09-25'},false], [{startDate:'2026-09-25',endDate:'2026-09-26'},false] ];
   for(const [dates,expected] of cases) {
@@ -208,7 +231,7 @@ test('SQLite date projection shares Timeline semantics without rewriting task me
 test('storage outage preserves typed input and cancel transport, blocks launches and retries terminal commit without replay', async t => {
   const f=await fixture(t);
   const task={id:'task-1',status:'in-progress',__mcpRevision:4};
-  const service=createAgentWorkSessionService({repository:f.repo,store:f.store,getTaskById:()=>task,attachBindingToAttempt:()=>({ok:true}),appendTaskContext:()=>({ok:true})});
+  const service=createAgentWorkSessionService({repository:f.repo,store:f.store,readTasks:()=>[task],attachBindingToAttempt:()=>({ok:true}),appendTaskContext:()=>({ok:true})});
   let binding=(await service.createBinding(f.store,{runtimeProfileId:'runtime-1',scope:{kind:'task',taskId:task.id,executionAttemptId:'attempt-1',taskRevision:4},idempotencyKey:'controls'})).binding;
   binding=(await service.updateBinding(f.store,{bindingId:binding.id,expectedRevision:binding.revision,state:'interrupted',opaqueSessionRef:'provider-ref'})).binding;
   let outage=false,notify,closed=0,cancelled=0;
@@ -245,7 +268,7 @@ test('storage outage preserves typed input and cancel transport, blocks launches
 
 test('failed completion stays unresolved until the safe terminal commit succeeds',async t=>{
   const f=await fixture(t),emitted=[];let notify,rejectTerminal=true;
-  const service=createAgentWorkSessionService({repository:f.repo,store:f.store,getTaskById:()=>({id:'task-1'}),attachBindingToAttempt:()=>({ok:true}),appendTaskContext:()=>({ok:true})});
+  const service=createAgentWorkSessionService({repository:f.repo,store:f.store,readTasks:()=>[{id:'task-1'}],attachBindingToAttempt:()=>({ok:true}),appendTaskContext:()=>({ok:true})});
   let b=(await service.createBinding(f.store,{runtimeProfileId:'runtime-1',scope:{kind:'task',taskId:'task-1',executionAttemptId:'attempt-1',taskRevision:0},idempotencyKey:'terminal-retry'})).binding;
   await service.updateBinding(f.store,{bindingId:b.id,expectedRevision:b.revision,state:'interrupted',opaqueSessionRef:'ref'});
   const runner=createAgentRuntimeSessionRunner({store:f.store,resolveProfile:()=>({ok:true,profile:{id:'runtime-1'}}),listSessions:service.list,appendEvent:service.appendEvent,
@@ -267,7 +290,7 @@ test('pruning under runtime ingress preserves ordered completion and responsive 
  const {performance}=require('node:perf_hooks');
  const {createRuntimeNotificationScheduler}=require('./agent-runtime-notifications.cjs');
  const f=await fixture(t);let notify,cancelReached=false;const deliveries=[],latencies=[];
- const service=createAgentWorkSessionService({repository:f.repo,store:f.store,getTaskById:()=>({id:'task-1'}),attachBindingToAttempt:()=>({ok:true}),appendTaskContext:()=>({ok:true})});
+ const service=createAgentWorkSessionService({repository:f.repo,store:f.store,readTasks:()=>[{id:'task-1'}],attachBindingToAttempt:()=>({ok:true}),appendTaskContext:()=>({ok:true})});
  const scheduler=createRuntimeNotificationScheduler({send:n=>deliveries.push(n)});t.after(()=>scheduler.dispose());
  let b=(await service.createBinding(f.store,{runtimeProfileId:'runtime-1',scope:{kind:'task',taskId:'task-1',executionAttemptId:'attempt-1',taskRevision:0},idempotencyKey:'maintenance-stream'})).binding;
  await service.updateBinding(f.store,{bindingId:b.id,expectedRevision:b.revision,state:'interrupted',opaqueSessionRef:'ref'});
@@ -291,7 +314,7 @@ test('native ACP progress traverses the real runner and SQLite into visible boun
   const {createNativeRuntimeClient}=require('./agent-runtime-protocol-client.cjs');
   const {createAgentRuntimeDelivery}=require('./agent-runtime-delivery.cjs');
   const f=await fixture(t),task={id:'task-1',status:'in-progress',__mcpRevision:4};
-  const service=createAgentWorkSessionService({repository:f.repo,store:f.store,getTaskById:()=>task,attachBindingToAttempt:()=>({ok:true}),appendTaskContext:()=>({ok:true})});
+  const service=createAgentWorkSessionService({repository:f.repo,store:f.store,readTasks:()=>[task],attachBindingToAttempt:()=>({ok:true}),appendTaskContext:()=>({ok:true})});
   let b=(await service.createBinding(f.store,{runtimeProfileId:'runtime-1',scope:{kind:'task',taskId:task.id,executionAttemptId:'attempt-1',taskRevision:4},idempotencyKey:'native-progress'})).binding;
   b=(await service.updateBinding(f.store,{bindingId:b.id,expectedRevision:b.revision,state:'interrupted',opaqueSessionRef:'native-session'})).binding;
   const delivery=createAgentRuntimeDelivery({loadBinding:async()=> (await service.list(f.store,{bindingId:b.id})).bindings[0]});

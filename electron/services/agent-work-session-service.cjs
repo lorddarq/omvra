@@ -34,10 +34,10 @@ function eventInput(input) {
 function eventProjection(row,binding) {
   return {schemaVersion:1,id:row.id,bindingId:row.session_id,runtimeProfileId:binding.runtimeProfileId,turnId:row.turn_id||undefined,type:row.kind,nativeEventType:row.native_type,observedAt:new Date(row.observed_at).toISOString(),...JSON.parse(row.facts_json),summary:row.summary,seq:row.seq,origin:'native-runtime',dispatchEligible:false};
 }
-function createAgentWorkSessionService({repository,store,attachBindingToAttempt,appendTaskContext,getTaskById}) {
-  const project = snapshot => {
+function createAgentWorkSessionService({repository,store,attachBindingToAttempt,appendTaskContext,readTasks}) {
+  const project = (snapshot,tasks) => {
     const b=snapshot.binding;
-    const task=b.scope.kind==='task'?getTaskById(store,b.scope.taskId):null;
+    const task=b.scope.kind==='task'?(tasks ?? readTasks(store)).find(task=>task?.id===b.scope.taskId):null;
     const turnState=b.turn?.state;
     const state=task?.status==='done'?'complete':task?.status==='under-review'?'ready-for-review':b.state==='interrupted'?'interrupted':({queued:'starting',starting:'starting',active:'working','waiting-input':'waiting',cancelling:'stopping',completed:'batch-finished',failed:'failed',interrupted:'interrupted'}[turnState]||({closed:'stopped',failed:'failed',interrupted:'interrupted',ready:'ready',starting:'starting'}[b.state]));
     return {...b,attentionState:snapshot.session.attention_state,latestSummary:snapshot.turn?.final_summary||snapshot.projection?.latest_summary||null,snapshotVersion:snapshot.session.snapshot_version,historyIncomplete:Boolean(JSON.parse(snapshot.session.governance_json).historyIncomplete),recoveryRequired:Boolean(snapshot.session.recovery_required),...(b.scope.kind==='task'?{taskAvailable:Boolean(task),unscheduled:task? !hasScheduledDateRange(task) : null,taskExecution:{schemaVersion:1,state,updatedAt:b.updatedAt,...(b.turn?{turnId:b.turn.id,turnState}: {})}}:{})};
@@ -52,8 +52,11 @@ function createAgentWorkSessionService({repository,store,attachBindingToAttempt,
       return {ok:true,bindings:[project(s)],events:input.includeEvents===false?[]:s.events.map(e=>eventProjection(e,s.binding)),hasMore:input.includeEvents===false?false:s.hasMore,notifications:s.notifications};
     }
     const result=await repository.listSessions(defined({limit,taskId:input.taskId,activeOnly:input.activeOnly===true,recent:true}));
-    const bindings=[];
-    for(const b of result.sessions) bindings.push(await load(b.id));
+    const snapshots=[];
+    for(const b of result.sessions) snapshots.push(await repository.snapshot({bindingId:b.id,limit:1}));
+    // Read current task authority once, after asynchronous history reads. Never cache across requests.
+    const tasks=snapshots.some(s=>s.binding.scope.kind==='task')?readTasks(store):[];
+    const bindings=snapshots.map(s=>project(s,tasks));
     return {ok:true,bindings,events:[],hasMore:result.hasMore};
   }
   async function createBinding(_store,input) {

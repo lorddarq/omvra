@@ -1720,7 +1720,7 @@ const agentWorkServices = new WeakMap();
 const { STORAGE_KEY: AGENT_WORK_STORAGE_KEY } = require('./agent-work-migration.cjs');
 const { openAgentWorkSessionService } = require('./agent-work-session-service.cjs');
 function initializeAgentWorkStorage(store) {
-  if (!agentWorkServices.has(store)) agentWorkServices.set(store, openAgentWorkSessionService({store,attachBindingToAttempt:attachAgentBindingToAttempt,appendTaskContext:(...args)=>taskContextLedgerService.append(...args),getTaskById:(...args)=>taskService.getTaskById(...args)}));
+  if (!agentWorkServices.has(store)) agentWorkServices.set(store, openAgentWorkSessionService({store,attachBindingToAttempt:attachAgentBindingToAttempt,appendTaskContext:(...args)=>taskContextLedgerService.append(...args),readTasks:store=>readArray(store,TASKS_KEY)}));
   return agentWorkServices.get(store);
 }
 function runtimeServiceCall(method, store, ...args) {

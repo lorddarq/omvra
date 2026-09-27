@@ -6,7 +6,7 @@ const os = require('node:os');
 const { DatabaseSync } = require('node:sqlite');
 const { spawn } = require('node:child_process');
 const { createAgentWorkRepository } = require('./agent-work-repository.cjs');
-const { DAY } = require('./agent-work-contract.cjs');
+const { DAY, LIMITS } = require('./agent-work-contract.cjs');
 
 async function fixture(t, policy) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'omvra-sqlite-test-'));
@@ -212,6 +212,34 @@ async function finish(repo,b) { return repo.completeTurn({bindingId:b.id,expecte
   assert.equal(m.counts.delivery_state,1);
   await assert.rejects(f.repo.setPolicy({events:0}),{code:'INVALID_AGENT_WORK_NUMBER'});
   await assert.rejects(f.repo.setPolicy({summaryDays:90,sessionDays:7}),{code:'INVALID_RETENTION_POLICY'});
+ });
+ test('WAL pressure recovers without pruning, but respects a reader pinning the log',async t=>{
+  for(const operation of ['checkpoint','createSession','appendEvent']) {
+    const f=await fixture(t,{automatic:false});
+    const b=await makeSession(f.repo);
+    if(operation!=='appendEvent') await finish(f.repo,b);
+    const reader=new DatabaseSync(f.databasePath),writer=new DatabaseSync(f.databasePath);
+    try {
+      reader.exec('BEGIN; SELECT count(*) FROM agent_sessions;');
+      writer.exec(`PRAGMA wal_autocheckpoint=0; CREATE TABLE scratch(value BLOB); INSERT INTO scratch VALUES(zeroblob(${LIMITS.walBytes})); DROP TABLE scratch;`);
+      assert.ok((await f.repo.metrics()).walBytes>=LIMITS.walBytes);
+      await f.repo.checkpoint();
+      await assert.rejects(f.repo.createSession(create('2')),{code:'AGENT_WORK_STORAGE_PRESSURE'});
+      const message=event(b.id,1,{kind:'message'});
+      assert.equal((await f.repo.appendEvent(message)).persisted,false);
+      // A reader at the newest snapshot permits copying every frame, but can
+      // still prevent TRUNCATE. This must defer without discarding protection.
+      reader.exec('ROLLBACK; BEGIN; SELECT count(*) FROM agent_sessions;');
+      assert.equal((await f.repo.checkpoint()).busy,1);
+      await assert.rejects(f.repo.createSession(create('2')),{code:'AGENT_WORK_STORAGE_PRESSURE'});
+      reader.exec('ROLLBACK');
+      if(operation==='checkpoint') await f.repo.checkpoint();
+      if(operation==='createSession') assert.equal((await f.repo.createSession(create('2'))).ok,true);
+      if(operation==='appendEvent') assert.notEqual((await f.repo.appendEvent(message)).persisted,false);
+      assert.ok((await f.repo.metrics()).walBytes<LIMITS.walBytes,operation);
+      assert.equal((await f.repo.snapshot({bindingId:b.id})).turn.state,operation==='appendEvent'?'active':'completed');
+    } finally {reader.close();writer.close();}
+  }
  });
  test('newer schema and corruption fail closed without creating a JSON fallback',async t=>{
   const f=await fixture(t);

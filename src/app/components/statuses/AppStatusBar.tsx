@@ -3,12 +3,13 @@ import { useState } from 'react';
 import { Popover, PopoverTrigger, PopoverContent } from '../ui/popover';
 import { FeatheredScrollList } from '../FeatheredScrollList';
 import { cn } from '../ui/utils';
+import { AtomSpinner } from '../ui/AtomSpinner';
 import { getMcpStatusSummary, getRecentMcpActivitySignal, type AgentStatusTone } from '../../utils/statusBar';
 import type { Person, Task } from '../../types';
 import { FiltersIcon } from '../SettingsPanel';
 import { useAgentSessionSupervisor } from '../AgentSessionSupervisor';
 import type { AttentionState } from '../../utils/attention';
-import { ChevronUp, ChevronRight, CircleCheck, CircleAlert, CircleStop, Circle, Hourglass, LoaderCircle, ShieldAlert, TriangleAlert } from 'lucide-react';
+import { ChevronUp, ChevronRight, CircleCheck, CircleAlert, CircleStop, Circle, Hourglass, ShieldAlert, TriangleAlert } from 'lucide-react';
 
 export interface AppStatusBarProps {
   tasks: Task[];
@@ -63,7 +64,6 @@ function SessionDockStatus({ sessionDock, onOpen }: { sessionDock: ReturnType<ty
   const attention = sessionDock.attention || null;
   const accessibleLabel = `${buttonLabel || `Agent tasks status: ${label}`}. ${attention ? `${attention.description} Next action: ${attention.nextStep}` : 'No attention action is pending.'}`;
   const statusLabel = attention?.kind === 'active' ? 'Working' : attention?.label || label;
-  const StatusIcon = getStatusIcon(attention);
   return (
     <Popover open={expanded && hasSessions} onOpenChange={setExpanded}>
       <PopoverTrigger asChild>
@@ -79,7 +79,7 @@ function SessionDockStatus({ sessionDock, onOpen }: { sessionDock: ReturnType<ty
         </span>
         <span className="whitespace-nowrap text-sm font-medium tracking-[-0.14px]">Agent tasks:</span>
         <span className="flex min-w-0 items-center gap-1.5 text-xs font-medium">
-          <StatusIcon className="size-4 shrink-0" strokeWidth={1.5} aria-hidden="true" />
+          <SessionStatusIcon attention={attention} className="size-4 shrink-0" strokeWidth={1.5} />
           <span className="truncate">{statusLabel}</span>
         </span>
         {hasSessions && <ChevronUp className={`size-4 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} strokeWidth={1.5} aria-hidden="true" />}
@@ -96,14 +96,13 @@ function SessionDockStatus({ sessionDock, onOpen }: { sessionDock: ReturnType<ty
         <FeatheredScrollList scrollClassName="max-h-[min(372px,calc(var(--radix-popover-content-available-height)-65px))] pb-4">
           <div>
             {sessionDock.items.map(({ binding, task, attention: state }) => {
-              const Icon = getStatusIcon(state);
               const title = task?.title || 'Untitled task';
               return (
                 <button key={binding.id} type="button" onClick={() => { setExpanded(false); onOpen(binding); }}
                   aria-label={`${title}. ${state?.label || 'Session status unavailable'}. Open supervision`}
                   title={`${title}. ${state?.description || 'Session status unavailable'}`}
                   className="relative flex min-h-[46px] w-full items-center gap-3 py-3.5 pl-5 pr-3.5 text-left hover:bg-black/5 focus-visible:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500">
-                  <Icon className={`size-4 shrink-0 ${state?.tone === 'danger' ? 'text-red-500' : state?.tone === 'warning' && state.kind !== 'batch-finished' ? 'text-amber-500' : 'text-slate-500'}`} strokeWidth={1.25} aria-hidden="true" />
+                  <SessionStatusIcon attention={state} className={`size-4 shrink-0 ${state?.tone === 'danger' ? 'text-red-500' : state?.tone === 'warning' && state.kind !== 'batch-finished' ? 'text-amber-500' : 'text-slate-500'}`} strokeWidth={1.25} />
                   <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-600">{title}</span>
                   <ChevronRight className="size-[18px] shrink-0 text-neutral-400" strokeWidth={1.25} aria-hidden="true" />
                 </button>
@@ -117,14 +116,15 @@ function SessionDockStatus({ sessionDock, onOpen }: { sessionDock: ReturnType<ty
   );
 }
 
-function getStatusIcon(attention: AttentionState | null | undefined) {
-  return attention?.kind === 'active' || attention?.kind === 'starting' ? LoaderCircle
-    : attention?.kind === 'permission-required' ? ShieldAlert
+function SessionStatusIcon({ attention, className, strokeWidth }: { attention: AttentionState | null | undefined; className: string; strokeWidth: number }) {
+  if (attention?.kind === 'active' || attention?.kind === 'starting') return <AtomSpinner className={className} aria-hidden="true" />;
+  const Icon = attention?.kind === 'permission-required' ? ShieldAlert
       : attention?.kind === 'needs-input' ? Hourglass
         : attention?.kind === 'cancelled' ? CircleStop
           : attention?.tone === 'danger' ? CircleAlert
             : attention?.kind === 'complete' || attention?.kind === 'batch-finished' ? CircleCheck
               : attention?.tone === 'warning' ? TriangleAlert : Circle;
+  return <Icon className={className} strokeWidth={strokeWidth} aria-hidden="true" />;
 }
 
 // Green while an agent is connected or working, amber when a person must act, red on failure or block.

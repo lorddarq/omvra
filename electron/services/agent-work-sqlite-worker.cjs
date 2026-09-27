@@ -380,10 +380,22 @@ function pruneBatch() {
   return { deletedRows: deleted, summariesCleared, more: deleted + summariesCleared === budget, durationMs: maintenance.pruneDurationMs };
 }
 function checkpoint() {
-  const result = get('PRAGMA wal_checkpoint(PASSIVE)');
+  let result = get('PRAGMA wal_checkpoint(PASSIVE)');
+  // PASSIVE copies frames but retains the file allocation. Reclaim it under
+  // pressure without waiting for readers or deleting any recovery records.
+  if (result.log === result.checkpointed && sizes().walBytes >= LIMITS.walBytes) {
+    db.exec('PRAGMA busy_timeout=0');
+    try { result = get('PRAGMA wal_checkpoint(TRUNCATE)'); }
+    finally { db.exec('PRAGMA busy_timeout=50'); }
+  }
   lastCheckpoint = Date.now();
   maintenance.lastCheckpoint = { at: lastCheckpoint, ...result };
   return result;
+}
+function storagePressure() {
+  let size = sizes();
+  if (size.walBytes >= LIMITS.walBytes) { checkpoint(); size = sizes(); }
+  return size.logicalBytes >= LIMITS.databaseBytes || size.walBytes >= LIMITS.walBytes;
 }
 function compact() {
   const s = sizes();
@@ -461,18 +473,20 @@ const methods = {
     }
     return {sessions:get('SELECT count(*) AS n FROM agent_sessions').n,events:get('SELECT count(*) AS n FROM agent_events').n,eventDigest:migrationEventDigest(),sessionDigest:hash.digest('hex')};
   },
-  createSession: input => transaction(() => { const size=sizes(); if(size.logicalBytes>=LIMITS.databaseBytes || size.walBytes>=LIMITS.walBytes) fail('AGENT_WORK_STORAGE_PRESSURE'); return applyDomain('createBinding',input); }),
+  createSession: input => {
+    if(storagePressure()) fail('AGENT_WORK_STORAGE_PRESSURE');
+    return transaction(() => applyDomain('createBinding',input));
+  },
   updateSession: input => transaction(()=>{
     const current = latestTurn(input.bindingId);
     if (input.turn && ['completed','failed','interrupted'].includes(input.turn.state)) fail('AGENT_WORK_COMPLETION_REQUIRED');
     if (['closed','failed'].includes(input.state) && current && ['queued','starting','active','waiting-input','cancelling'].includes(current.state)) fail('AGENT_WORK_COMPLETION_REQUIRED');
     return applyDomain('updateBinding',input);
   }),
-  appendBatch: inputs => transaction(()=>{
-    const size=sizes();
-    const pressure=size.logicalBytes>=LIMITS.databaseBytes || size.walBytes>=LIMITS.walBytes;
-    return inputs.map(e=>pressure && e.type==='message-observed' ? { persisted:false, reason:'storage-pressure' } : append(e));
-  }),
+  appendBatch: inputs => {
+    const pressure=storagePressure();
+    return transaction(()=>inputs.map(e=>pressure && e.type==='message-observed' ? { persisted:false, reason:'storage-pressure' } : append(e)));
+  },
   completeTurn: input => transaction(()=>complete(input)), snapshot,
   listSessions: input => ({ sessions: all(`SELECT * FROM agent_sessions s WHERE id>? AND (? IS NULL OR task_id=?) ${input.activeOnly ? `AND EXISTS(SELECT 1 FROM agent_turns t WHERE t.session_id=s.id AND t.state IN (${activeTurns}))` : ''} ORDER BY ${input.recent?'updated_at DESC,id DESC':'id'} LIMIT ?`,input.afterId,input.taskId,input.taskId,input.limit+1).map(binding) }),
   governance: ({bindingId}) => {

@@ -1,6 +1,6 @@
 # SQLite storage for agent sessions and task work metadata
 
-**Status:** Contract specified; awaiting human review (2026-09-25)
+**Status:** Implementation present; contract and implementation notes (updated 2026-09-29)
 
 **Task:** `task-6e1c768c-84d9-4533-8f0d-6e011fa2117d`
 
@@ -9,11 +9,11 @@
 
 ## Problem
 
-Agent session bindings and events currently use bounded arrays in electron-store. Each append reads and rewrites the whole array, while the renderer also keeps a task-local event array. Provider differences make external history inconsistent: Codex can expose a saved thread, while Claude does not provide the same durable history. We need provider-neutral history for supervision and reporting without making JSON or a provider thread the source of truth.
+Before the SQLite cutover, agent session bindings and events used bounded arrays in electron-store. Each append reads and rewrites the whole array, while the renderer also keeps a task-local event array. Provider differences make external history inconsistent: Codex can expose a saved thread, while Claude does not provide the same durable history. We need provider-neutral history for supervision and reporting without making JSON or a provider thread the source of truth.
 
 ## Decision boundary
 
-After verified cutover, SQLite owns agent-work data. This document specifies future behavior; it does not claim SQLite or the Settings controls are implemented. The existing workspace/task store remains authoritative for normal task metadata:
+SQLite owns agent-work data after the verified migration. The desktop initializes `agent-work-session-service.cjs`, which uses `agent-work-repository.cjs` and a dedicated `agent-work-sqlite-worker.cjs` worker with built-in `node:sqlite`. The database lives at `<electron-store directory>/<store basename>/agent-work-v1.sqlite`. Migration records its authority marker in electron-store and clears the legacy session/event arrays after verification. Workspace JSON exports do not include this database. The schema and retention sections below describe the contract; packaged-driver availability and full contract acceptance still require release verification. The existing workspace/task store remains authoritative for normal task metadata:
 
 | Existing task authority | SQLite agent-work authority |
 | --- | --- |
@@ -31,7 +31,7 @@ task -> contribution/attempt -> session -> turn -> event
 
 Task sessions require `task_id` and `attempt_id`; `contribution_id` is optional for existing direct-task execution. Goal-node sessions carry Goal, element, execution, and attempt correlation instead. General unbound sessions are not introduced by this contract. External identifiers are references, never copies of authoritative records.
 
-## Verified baseline and quality goals
+## Pre-migration baseline and quality goals
 
 - `electron/domain/agent-runtime-session-service.cjs` owns binding revisions, lifecycle transitions, scope validation, idempotent events, governance, archive preparation, and crash reconciliation. Its event store retains the latest 2,000 entries; lists cap reads at 100.
 - `electron/services/workspace-service.cjs` wires `omvra.acpSessionBindings.v1` and `omvra.acpSessionEvents.v1` to electron-store arrays. `agent-runtime-session-runner.cjs` consumes protocol events; `electron/ipc/agent-runtime.cjs` exposes commands. Reuse these domain rules and IPC boundaries.

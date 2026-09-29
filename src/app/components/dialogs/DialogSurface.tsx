@@ -20,7 +20,7 @@ export function DialogSurface({
   );
 }
 
-interface DialogSurfaceHeaderProps extends ComponentPropsWithoutRef<'div'> {
+interface DialogSurfaceHeaderProps extends Omit<ComponentPropsWithoutRef<'div'>, 'title'> {
   title: ReactNode;
   description?: ReactNode;
 }

@@ -107,8 +107,8 @@ test('plans only tasks left by completed-task filtering', () => {
     { id: 'done', title: 'Done', status: 'done' as const, swimlaneId: 'one', startDate: '2026-01-01', endDate: '2026-01-01' },
   ];
   const columns = [
-    { id: 'open', name: 'Open', stage: 'open' as const, color: 'bg-blue-500', order: 0 },
-    { id: 'done', name: 'Done', stage: 'complete' as const, color: 'bg-green-500', order: 1 },
+    { id: 'open', title: 'Open', stage: 'open' as const, color: 'bg-blue-500', order: 0 },
+    { id: 'done', title: 'Done', stage: 'complete' as const, color: 'bg-green-500', order: 1 },
   ];
   const filtered = filterTimelineTasks(tasks, columns, false);
   const plan = buildTimelineTrackPlan(filtered, ['one'], 'projects', 40, 48);

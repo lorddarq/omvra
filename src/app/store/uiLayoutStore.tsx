@@ -12,7 +12,7 @@ import {
   useState,
 } from 'react';
 import type { Person, ProjectMilestone, Task, TaskStatus, TimelineSwimlane } from '../types.ts';
-import { useViewState, type ViewType } from '../hooks/useViewState.ts';
+import { DEFAULT_STATES, useViewState, type ViewType } from '../hooks/useViewState.ts';
 import { useWorkspaceDialogs } from '../hooks/useWorkspaceDialogs.ts';
 import {
   DEFAULT_TIMELINE_LAYOUT_STATE,
@@ -263,10 +263,10 @@ export function UiLayoutStoreProvider({
   const buildBackupUiState = useCallback(() => ({
     currentView: viewState.currentView,
     viewState: {
-      timeline: getViewStateSnapshot('timeline'),
-      kanban: getViewStateSnapshot('kanban'),
-      roadmap: getViewStateSnapshot('roadmap'),
-      loops: getViewStateSnapshot('loops'),
+      timeline: { ...DEFAULT_STATES.timeline, ...getViewStateSnapshot('timeline') },
+      kanban: { ...DEFAULT_STATES.kanban, ...getViewStateSnapshot('kanban') },
+      roadmap: { ...DEFAULT_STATES.roadmap, ...getViewStateSnapshot('roadmap') },
+      loops: { ...DEFAULT_STATES.loops, ...getViewStateSnapshot('loops') },
     },
     timeline: timelineLayoutState,
   }), [getViewStateSnapshot, timelineLayoutState, viewState.currentView]);

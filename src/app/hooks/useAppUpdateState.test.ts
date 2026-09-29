@@ -21,6 +21,8 @@ async function renderUpdateHook() {
       updates: {
         getState: async () => ({
           supported: true,
+          unsupportedReason: null,
+          unsupportedDetails: null,
           packaged: true,
           channel: 'stable',
           status: 'available',
@@ -43,6 +45,8 @@ async function renderUpdateHook() {
           dismissCalls += 1;
           return {
             supported: true,
+            unsupportedReason: null,
+            unsupportedDetails: null,
             packaged: true,
             channel: 'stable',
             status: 'idle',
@@ -128,6 +132,8 @@ test('useAppUpdateState keeps available-update reminder as a session-only dismis
 
     await harness.emitState({
       supported: true,
+      unsupportedReason: null,
+      unsupportedDetails: null,
       packaged: true,
       channel: 'stable',
       status: 'downloaded',
@@ -163,6 +169,8 @@ test('useAppUpdateState opens the backup gate only after the update action is re
   try {
     await harness.emitState({
       supported: true,
+      unsupportedReason: null,
+      unsupportedDetails: null,
       packaged: true,
       channel: 'rc',
       status: 'available',
@@ -197,6 +205,8 @@ test('useAppUpdateState closes the backup gate when dismissing an available prer
   try {
     await harness.emitState({
       supported: true,
+      unsupportedReason: null,
+      unsupportedDetails: null,
       packaged: true,
       channel: 'rc',
       status: 'available',

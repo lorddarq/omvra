@@ -1,3 +1,4 @@
+import { LockKeyhole } from 'lucide-react';
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import type { GoalAgentConfiguration, GoalArtifactReference, GoalConditionBranch, GoalConnectorSide, GoalElement, GoalElementType, GoalPolicy, GoalPolicyDimension, GoalPolicyDimensionOverride, GoalRecord, GoalRuntimeProjection, GoalSchedule, Person, ProjectMilestone, SupportingArtifactType, Task, TimelineSwimlane } from '../../types.ts';
 import type { GoalPolicyV1 } from '../../utils/goalPolicy.ts';

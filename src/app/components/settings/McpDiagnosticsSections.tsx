@@ -189,7 +189,7 @@ function ActivityLogEntry({ entry }: { entry: McpAuditEntry }) {
         {entry.outcome && <p>{entry.outcome}</p>}
         {(entry.agent || entry.clientName) && (
           <p>
-            Agent/client: {entry.agent || 'unknown'}{entry.clientName ? ` · ${entry.clientName}` : ''}
+            Agent/client: {String(entry.agent || 'unknown')}{entry.clientName ? ` · ${entry.clientName}` : ''}
             {entry.clientVersion ? ` ${entry.clientVersion}` : ''}
           </p>
         )}

@@ -42,8 +42,8 @@ test('sanitizePeople drops agent instructions for human people', () => {
 
 test('sanitizePreferences preserves rc update channel and falls back to stable', () => {
   const fallback = {
-    executionLoadStatusIds: ['in-progress'] as const,
-    pipelineLoadStatusIds: ['open'] as const,
+    executionLoadStatusIds: ['in-progress' as const],
+    pipelineLoadStatusIds: ['open' as const],
     updateChannel: 'stable' as const,
     markdownAppearance: DEFAULT_MARKDOWN_APPEARANCE,
     mcpAgentAccessEnabled: false,
@@ -55,6 +55,9 @@ test('sanitizePreferences preserves rc update channel and falls back to stable',
     mcpAccessTokenIssuedAt: undefined,
     mcpAccessTokenTtlMinutes: 60,
     performanceLoggingEnabled: false,
+    cleanupGoalArtifacts: false,
+    goalAuditArchiveDirectory: '',
+    customScrollbarsEnabled: true,
   };
   const statusColumns = [
     { id: 'open', title: 'Open' },

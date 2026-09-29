@@ -170,3 +170,9 @@ test('supervision surfaces never gate on task dates', () => {
     assert.doesNotMatch(launchPath, /startDate|endDate|getScheduledDateRange|hasScheduledDateRange/, `${name} must not require dates to supervise`);
   }
 });
+
+test('milestone preflight passes folder paths in the shared resolver order', () => {
+  const source = readComponent('MilestoneExecutionAction.tsx');
+  assert.match(source, /resolveAgentRuntimeWorkspace\(\s*task\.repositoryFolder,\s*project\?\.repositoryFolder,\s*runtime\.value\.defaults\.globalWorkspacePath,?\s*\)/);
+  assert.doesNotMatch(source, /resolveManagedWorkspace/);
+});

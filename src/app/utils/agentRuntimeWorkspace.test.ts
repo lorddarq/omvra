@@ -21,3 +21,14 @@ test('task execution blocks instead of creating an empty scratch workspace', () 
     /Configure a repository folder on the task or project/,
   );
 });
+
+test('execution uses configured folder precedence and ignores blank overrides', () => {
+  for (const [task, project, global, workspacePath, source] of [
+    [' /task ', '/project', '/global', '/task', 'task-override'],
+    ['  ', ' /project ', '/global', '/project', 'project-default'],
+    [undefined, '  ', ' /global ', '/global', 'global-default'],
+  ]) {
+    assert.deepEqual(resolveAgentRuntimeWorkspace(task, project, global), { workspacePath, source });
+  }
+  assert.throws(() => resolveAgentRuntimeWorkspace(' ', ' ', ' '), /Configure a repository folder/);
+});

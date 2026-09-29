@@ -14,7 +14,7 @@ import {
   type HelpContent,
   type HelpFaq,
   type HelpResource,
-} from '../utils/helpContent.ts';
+} from '../../utils/helpContent.ts';
 import { parseUpdateReleaseNotes } from '../../utils/updateReleaseNotes.ts';
 import { AnchoredPanelSection } from '../AnchoredPanel';
 import { AboutIcon, HelpIcon } from '../SettingsPanel';

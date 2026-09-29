@@ -2,7 +2,14 @@
 
 All notable changes for Omvra release candidates should be documented in this file.
 
-This entry reflects the current supported feature set in the repository and is intended as the baseline for the next stable release candidate.
+## Unreleased
+
+- Fixed milestone preflight passing task IDs as working directories; task, project, and global folder precedence now matches direct task launches. Missing folders block execution.
+- Repaired TypeScript errors in product code and stale fixtures, including status derivation left over from removed agent watchers.
+- Added type checking and tests to pull-request, branch, and packaging CI.
+- Clarified storage ownership: electron-store remains canonical for planning records; SQLite in a dedicated worker owns agent-work history and projections. Workspace JSON backups do not include SQLite history.
+
+The entries below describe their respective historical releases.
 
 ## 0.1.30-rc.1 - 2026-04-01
 

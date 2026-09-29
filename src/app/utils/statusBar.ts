@@ -166,27 +166,12 @@ export function deriveAgentStatuses({
         };
       }
 
-      if (hasFreshRuntimeSignal) {
-        return {
-          personId: person.id,
-          name: person.name,
-          state: 'idle' as const,
-          tone: 'muted' as const,
-          title: `${person.name} is idle`,
-          lastSignalAt: runtime?.lastCheckedAt,
-          provenance: fallbackProvenance,
-        };
-      }
-
       return {
         personId: person.id,
         name: person.name,
         state: 'unavailable' as const,
-        tone: hasRuntimeError ? 'danger' as const : 'unknown' as const,
-        title: hasRuntimeError
-          ? `${person.name} is unavailable`
-          : `${person.name} has no trustworthy status signal`,
-        lastSignalAt: runtime?.lastCheckedAt,
+        tone: 'unknown' as const,
+        title: `${person.name} has no trustworthy status signal`,
         provenance: fallbackProvenance,
       };
     });

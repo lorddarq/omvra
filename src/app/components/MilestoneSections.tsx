@@ -7,7 +7,7 @@ import {
 } from '../utils/roadmap';
 import { DateRangeLabel } from './DateRangeLabel';
 import { ProjectBadge } from './ProjectBadge';
-import type { StatusColumn, Task, TimelineSwimlane } from '../types';
+import type { StatusColumn, Task, TaskStatus, TimelineSwimlane } from '../types';
 import { EmptyStateCard } from './EmptyStateCard';
 import { DependencyStatusPill } from './TaskSummarySection';
 import { DialogSurfaceSection } from './dialogs/DialogSurface';

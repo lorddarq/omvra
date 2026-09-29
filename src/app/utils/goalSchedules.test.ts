@@ -18,7 +18,7 @@ test('goal schedules normalize one-time and recurring rules without losing the c
 });
 
 test('schedule status respects disabled and expired boundaries', () => {
-  const base = { id: 'schedule-1', goalId: 'goal-1', rule: { mode: 'one-time' as const, date: '2026-07-20', time: '09:00' }, timezone: 'UTC', updatedAt: new Date(0).toISOString() };
+  const base = { temporalMode: 'latest' as const, id: 'schedule-1', goalId: 'goal-1', rule: { mode: 'one-time' as const, date: '2026-07-20', time: '09:00' }, timezone: 'UTC', updatedAt: new Date(0).toISOString() };
   assert.equal(scheduleStatus({ ...base, enabled: false }), 'disabled');
   assert.equal(scheduleStatus({ ...base, enabled: true, endsAt: '2026-07-19T00:00:00.000Z' }, new Date('2026-07-20T00:00:00.000Z')), 'expired');
   assert.equal(scheduleStatus({ ...base, enabled: true }, new Date('2026-07-20T00:00:00.000Z')), 'scheduled');

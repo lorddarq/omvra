@@ -122,9 +122,16 @@ jobs:
 
           emit_outputs "${next_tag}" "true"
 
+  verify:
+    name: Verify Release
+    needs: prepare_release
+    uses: ./.github/workflows/verification.yml
+    with:
+      ref: ${{ needs.prepare_release.outputs.release_tag }}
+
   build:
     name: Build and Package
-    needs: prepare_release
+    needs: [prepare_release, verify]
     runs-on: ${{ matrix.os }}
     environment: release
     permissions:

@@ -9,99 +9,26 @@ import {
   rollupAgentStatuses,
 } from './statusBar.ts';
 
-type AgentWatchRuntimeState = Record<string, unknown>;
-const agentWatchConfigs: never[] = [];
-
 const people: Person[] = [
   { id: 'agent-1', name: 'Codex', role: 'Agent', kind: 'agentic' },
   { id: 'agent-2', name: 'Edgar', role: 'Agent', kind: 'agentic' },
   { id: 'person-1', name: 'Ada', role: 'Engineer', kind: 'human' },
 ];
 
-test.skip('removed agent watcher activity signals', () => {
+test('agent status uses fresh MCP writes and reports missing signals without a watcher', () => {
   const now = Date.parse('2026-07-01T18:45:00.000Z');
-  const runtime: Record<string, AgentWatchRuntimeState> = {
-    'agent-1': {
-      personId: 'agent-1',
-      lastCheckedAt: '2026-07-01T18:44:30.000Z',
-      newTaskCount: 1,
-      updatedTaskCount: 0,
-      removedTaskCount: 0,
-      latestTaskTitles: ['Tighten status copy'],
-    },
-  };
-
-  const statuses = deriveAgentStatuses({
-    people,
-    tasks: [],
-    agentWatchConfigs,
-    agentWatchRuntime: runtime,
-    mcpAuditLog: [
-      {
-        auditId: 'audit-1',
-        timestamp: '2026-07-01T18:44:40.000Z',
-        outcome: 'allowed',
-        toolName: 'tasks.update',
-        assigneeId: 'agent-1',
-        userAgent: 'GitHub-Copilot/1.0',
-      },
-    ],
-    now,
-  });
-
-  assert.equal(statuses.find(status => status.personId === 'agent-1')?.state, 'writing');
-  assert.equal(statuses.find(status => status.personId === 'agent-1')?.provenance.id, 'copilot');
-});
-
-test.skip('removed agent watcher freshness signals', () => {
-  const now = Date.parse('2026-07-01T18:45:00.000Z');
-  const runtime: Record<string, AgentWatchRuntimeState> = {
-    'agent-1': {
-      personId: 'agent-1',
-      lastCheckedAt: '2026-07-01T18:44:30.000Z',
-      newTaskCount: 1,
-      updatedTaskCount: 0,
-      removedTaskCount: 0,
-      latestTaskTitles: ['Draft task summary'],
-    },
-    'agent-2': {
-      personId: 'agent-2',
-      lastCheckedAt: '2026-07-01T18:40:30.000Z',
-      newTaskCount: 0,
-      updatedTaskCount: 0,
-      removedTaskCount: 0,
-      latestTaskTitles: [],
-    },
-  };
-
-  const statuses = deriveAgentStatuses({
-    people,
-    tasks: [],
-    agentWatchConfigs,
-    agentWatchRuntime: runtime,
-    mcpAuditLog: [],
-    now,
-  });
-
-  assert.equal(statuses.find(status => status.personId === 'agent-1')?.state, 'working');
-  assert.equal(statuses.find(status => status.personId === 'agent-2')?.state, 'idle');
-
-  const staleStatuses = deriveAgentStatuses({
-    people,
-    tasks: [],
-    agentWatchConfigs,
-    agentWatchRuntime: {
-      'agent-1': {
-        ...runtime['agent-1'],
-        lastCheckedAt: '2026-07-01T18:20:00.000Z',
-      },
-    },
-    mcpAuditLog: [],
-    now,
-  });
-
-  assert.equal(staleStatuses.find(status => status.personId === 'agent-1')?.state, 'unavailable');
-  assert.equal(staleStatuses.find(status => status.personId === 'agent-2')?.state, 'unavailable');
+  const mcpAuditLog: McpAuditEntry[] = [{
+    auditId: 'audit-1', timestamp: '2026-07-01T18:44:40.000Z',
+    outcome: 'allowed', toolName: 'tasks.update', assigneeId: 'agent-1',
+    userAgent: 'GitHub-Copilot/1.0',
+  }];
+  const statuses = deriveAgentStatuses({ people, tasks: [], mcpAuditLog, now });
+  assert.equal(statuses.length, 2);
+  assert.equal(statuses[0].state, 'writing');
+  assert.equal(statuses[0].provenance.id, 'copilot');
+  assert.equal(statuses[1].state, 'unavailable');
+  const stale = deriveAgentStatuses({ people, tasks: [], mcpAuditLog, now: now + 120_000 });
+  assert.ok(stale.every(status => status.state === 'unavailable' && status.tone === 'unknown'));
 });
 
 test('deriveAgentStatuses falls back to recent generic MCP task activity when one agent exists', () => {

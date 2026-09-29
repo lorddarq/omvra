@@ -71,15 +71,13 @@ export function MilestoneExecutionAction({ milestone, tasks, projects, trigger, 
           const blockers = task.status === 'done' ? ['Task is already complete.'] : [];
           let workspace;
           try {
-            workspace = await resolveAgentRuntimeWorkspace(
-              task.id,
+            workspace = resolveAgentRuntimeWorkspace(
               task.repositoryFolder,
               project?.repositoryFolder,
               runtime.value.defaults.globalWorkspacePath,
-              taskId => window.electron.agentRuntime.resolveManagedWorkspace(taskId),
             );
           } catch (caught) {
-            blockers.push(caught instanceof Error ? caught.message : 'A scratch workspace could not be prepared.');
+            blockers.push(caught instanceof Error ? caught.message : 'A working folder could not be resolved.');
           }
           const folder = workspace?.workspacePath || '';
           for (const dependencyId of task.dependencyIds || []) {

@@ -118,7 +118,6 @@ export const AppMainViews = React.memo(function AppMainViews({
               people={people}
               statusColumns={statusColumns}
               customScrollbarsEnabled={customScrollbarsEnabled}
-              condensedUI={condensedUI}
               initialScrollLeft={timeline.timelineInitialScrollLeft}
               initialLayoutState={timeline.timelineInitialLayoutState}
               onLayoutStateChange={timeline.onTimelineLayoutStateChange}

@@ -44,7 +44,8 @@ export function usePerformanceLogging(enabled: boolean): void {
           });
         });
       });
-      inputObserver.observe({ type: 'event', buffered: true, durationThreshold: 16 });
+      const options: PerformanceObserverInit & { durationThreshold: number } = { type: 'event', buffered: true, durationThreshold: 16 };
+      inputObserver.observe(options);
       observers.push(inputObserver);
     }
 

@@ -84,9 +84,9 @@ export type WorkspaceStatusColumn = StatusColumn;
 export interface WorkspaceBackupUiState {
   currentView?: WorkspaceViewType;
   viewState?: {
-    timeline?: TimelineViewState;
-    kanban?: KanbanViewState;
-    roadmap?: RoadmapViewState;
+    timeline?: Partial<TimelineViewState>;
+    kanban?: Partial<KanbanViewState>;
+    roadmap?: Partial<RoadmapViewState>;
   };
   timeline?: Partial<TimelineLayoutState>;
 }

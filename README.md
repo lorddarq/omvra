@@ -125,20 +125,22 @@ The authoritative tool catalog is [mcp-registry.cjs](electron/services/mcp-regis
 
 ## Local data, backup, and updates
 
-Desktop workspace data is stored through Electron’s main process using `electron-store`. The renderer uses a structured store with hydration, selectors, mutations, and persistence adapters; browser storage is not the canonical desktop database.
+Desktop planning data (tasks, projects, milestones, Goals, acceptance, preferences, and revisions) is stored through Electron’s main process using `electron-store`. Agent sessions, turns, normalized events, delivery state, notifications, and derived work projections live separately in SQLite, accessed through a dedicated worker using Node’s built-in `node:sqlite`. The database is stored at `<electron-store directory>/<store basename>/agent-work-v1.sqlite`, keeping development and production stores separate. SQLite does not own task status or acceptance. See the [agent-work storage contract](docs/architecture/agent-work-sqlite-storage.md). The renderer uses a structured store with hydration, selectors, mutations, and persistence adapters; browser storage is not the canonical desktop database.
 
 Open **Settings → Local data & backup**:
 
 - **Backup Data** exports a JSON recovery copy.
 - **Restore Data** imports a backup. Create a backup of your current workspace first.
 
-Exports include tasks, people, projects, status columns, milestones, preferences, UI state, Goal policy, and storage snapshots. Treat backup files as private workspace data. Local attachment references and machine-specific paths may need repair after moving computers; a backup does not install runtimes or authenticate provider accounts.
+Exports include tasks, people, projects, status columns, milestones, preferences, UI state, Goal policy, and storage snapshots. Workspace JSON exports do not include the SQLite agent-work database or its session history. Treat backup files as private workspace data. Local attachment references and machine-specific paths may need repair after moving computers; a backup does not install runtimes or authenticate provider accounts.
 
 Attachments can reference local files. Moving or deleting those originals can break the references, so preserve the linked files as well as the backup.
 
 Open **Settings → About & updates** to choose stable releases or release candidates and check for updates. Release-candidate installation requires a fresh backup. Update availability and installation depend on the packaged build and platform.
 
 ## Development
+
+GitHub Actions runs the type check, main-process tests, and launch/status regression checks on pull requests and branch pushes. Packaging also requires the type check and main-process tests to pass.
 
 The app uses Electron, React 19, TypeScript, Vite, Tailwind CSS, react-dnd, and electron-store. CI uses Node 24. Working indicators use the `Atom` component from `loading-dev`, with a shared four-second duration and built-in reduced-motion support.
 

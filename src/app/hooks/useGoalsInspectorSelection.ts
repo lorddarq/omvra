@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
-import type { GoalAgentMode, GoalPolicyV1, GoalRecord, GoalRuntimeProjection, GoalSchedule, Person, ProjectMilestone, SupportingArtifactType, Task } from '../types.ts';
+import type { GoalAgentMode, GoalRecord, GoalRuntimeProjection, GoalSchedule, Person, ProjectMilestone, SupportingArtifactType, Task } from '../types.ts';
 import { buildArtifactOptions, buildSupportingSourceOptions } from '../utils/goalArtifacts.ts';
-import { resolveInspectorPolicy } from '../utils/goalPolicy.ts';
+import { type GoalPolicyV1, resolveInspectorPolicy } from '../utils/goalPolicy.ts';
 
 export function useGoalsInspectorSelection({ goals, selectedGoalId, selectedElementId, schedules, people, tasks, milestones, workspacePolicy, runtimeProjection, policyImpacts, supportingArtifactType, supportingSourceSearch }: {
   goals: GoalRecord[];

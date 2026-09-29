@@ -32,7 +32,7 @@ test('policy-only backup round-trips the Goal policy and reports repaired fields
     goalPolicy: { ...policy, dimensions: { tokens: { constrained: true, value: -1 } } },
   }, createDefaultGoalPolicy());
   assert.equal(malformed.ok, true);
-  assert.equal(malformed.policy.dimensions.tokens.value, 100000);
+  assert.equal(malformed.policy.dimensions.tokens.constrained && malformed.policy.dimensions.tokens.value, 100000);
   assert.ok(malformed.warnings.length > 0);
 });
 
@@ -352,8 +352,8 @@ test('workspace backup preserves shared MCP and UI task relationships and agent 
   assert.equal(repaired.tasks[0].timeSpentMinutes, 45);
   assert.equal(repaired.tasks[0].timeEntries?.[0].minutes, 45);
   assert.equal(repaired.tasks[0].comments?.[0].content, 'Ready');
-  assert.equal(repaired.tasks[0].activityLog?.[0].message, 'Verified');
-  assert.equal(repaired.tasks[0].agentSummary, 'Shared contract verified.');
+  assert.equal(Reflect.get(repaired.tasks[0], 'activityLog')?.[0].message, 'Verified');
+  assert.equal(Reflect.get(repaired.tasks[0], 'agentSummary'), 'Shared contract verified.');
   assert.deepEqual(repaired.milestones[0].linkedTaskIds, ['task-1']);
   assert.equal(repaired.people[0].agentInstructions, 'Protect the shared contract.');
   assert.equal(repaired.people[0].agentOperationalInstructions, 'Run the smallest complete verification.');

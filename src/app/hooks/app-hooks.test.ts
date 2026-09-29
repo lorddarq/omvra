@@ -438,6 +438,7 @@ test('useViewState exposes hydrated timeline state on first render and preserves
 
   try {
     const hydratedStates: AllViewStates = {
+      loops: { zoom: 1, panX: 0, panY: 0 },
       timeline: {
         scrollLeft: 320,
         collapsedSwimlanes: ['project-1'],

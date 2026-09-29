@@ -512,6 +512,10 @@ export function useAppShell(): AppShellState {
         statusColumns: repaired.statusColumns,
         preferences: {
           ...repaired.preferences,
+          customScrollbarsEnabled: preferences.customScrollbarsEnabled,
+          skillRoots: repaired.preferences.skillRoots ?? preferences.skillRoots,
+          condensedUI: repaired.preferences.condensedUI ?? preferences.condensedUI,
+          performanceLoggingEnabled: repaired.preferences.performanceLoggingEnabled ?? preferences.performanceLoggingEnabled,
           cleanupGoalArtifacts: preferences.cleanupGoalArtifacts,
           goalAuditArchiveDirectory: preferences.goalAuditArchiveDirectory,
         },

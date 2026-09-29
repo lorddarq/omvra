@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { LinkIcon as Link2 } from '../icons/LinkIcon';

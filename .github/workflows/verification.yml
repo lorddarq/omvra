@@ -1,0 +1,33 @@
+name: Verification
+
+on:
+  pull_request:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run test:mcp
+      - name: Renderer regression checks
+        run: node --experimental-strip-types --test src/app/utils/agentRuntimeWorkspace.test.ts src/app/utils/statusBar.test.ts src/app/components/agentSessionSupervisor.test.ts

@@ -90,6 +90,7 @@ test('summarizeMilestone derives progress from column roadmap stages and exclude
 test('isMilestoneComplete follows the shared milestone health semantics', () => {
   const milestone: ProjectMilestone = {
     id: 'milestone-complete',
+    projectIds: [],
     title: 'Completed milestone',
     endDate: '2026-07-10',
     linkedTaskIds: ['task-done'],

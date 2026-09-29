@@ -65,8 +65,8 @@ test('goal policy preserves unknown fields while warning about unsafe known fiel
   });
 
   assert.deepEqual(result.policy.futurePolicyField, { enabled: true });
-  assert.equal(result.policy.acceptance.futureAcceptanceField, 'keep');
-  assert.equal(result.policy.dimensions.financial.futureDimensionField, 'keep');
+  assert.equal(Reflect.get(result.policy.acceptance, 'futureAcceptanceField'), 'keep');
+  assert.equal(Reflect.get(result.policy.dimensions.financial, 'futureDimensionField'), 'keep');
   assert.equal(result.policy.dimensions.financial.constrained && result.policy.dimensions.financial.value, 0.25);
   assert.ok(result.warnings.length >= 2);
 });

@@ -9,8 +9,6 @@ import { canDropTimelineTaskInRow } from '../utils/timelineTaskDrop';
 import { isPointerReleased } from '../utils/pointerInteraction';
 import { findTimelineDateIndex, type TimelineViewportMonth } from '../utils/timelineWindow';
 
-const ITEM_TYPE = 'SWIMLANE_ROW';
-
 interface DraggableSwimlaneRowProps {
   swimlane: TimelineSwimlane;
   index: number;
@@ -317,9 +315,11 @@ export function DraggableSwimlaneRow({
   }, [isSelecting, handleSelectionEnd]);
 
   const liveTimelineDrag = useDragLayer((monitor) => {
-    const item = monitor.getItem<TaskDragItem | null>();
     const clientOffset = monitor.getClientOffset();
     const isDraggingTimelineTask = monitor.isDragging() && monitor.getItemType() === TIMELINE_TASK_TYPE;
+    // The drag layer sees every drag (including SWIMLANE_ROW reorders), so only
+    // expose the item when it is actually a timeline task.
+    const item = isDraggingTimelineTask ? monitor.getItem<TaskDragItem>() : null;
 
     return {
       item,

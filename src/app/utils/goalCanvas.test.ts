@@ -52,4 +52,5 @@ test('retry return edges are allowed only to an earlier node', () => {
 test('goal canvas centers newly created elements using their rendered size', () => {
   assert.deepEqual(goalCanvasPanToCenterElement({ id: 'goal', type: 'goal', title: 'Goal', x: 420, y: 180, width: 250, height: 104 }), { x: -545, y: -232 });
   assert.deepEqual(goalCanvasPanToCenterElement({ id: 'subgoal', type: 'subgoal', title: 'Subgoal', x: 260, y: 560 }), { x: -370, y: -605 });
+  assert.deepEqual(goalCanvasPanToCenterElement({ id: 'goal', type: 'goal', title: 'Goal', x: 420, y: 180, width: 250, height: 104 }, 0.6), { x: -327, y: -139.2 });
 });

@@ -21,7 +21,7 @@ export function GoalsAgentSection({ element, people, selectedAgent, selectedAgen
   return <section className="mt-5 border-t border-slate-100 pt-4">
     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Task instructions</p>
     <label className="mt-3 block text-sm font-medium text-slate-700">What this agent must do
-      <textarea value={selectedAgentConfiguration?.instructions ?? ''} onChange={event => onUpdateConfiguration({ instructions: event.target.value })} rows={8} autoFocus={false} placeholder="Describe the concrete work, scope, and expected result for this agent node." className="mt-1 w-full resize-y rounded-md border border-blue-200 bg-blue-50/30 px-3 py-2.5 text-sm leading-5 text-slate-700 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+      <textarea value={selectedAgentConfiguration?.instructions ?? ''} onChange={event => onUpdateConfiguration({ instructions: event.target.value })} rows={8} autoFocus={false} placeholder="Describe the concrete work, scope, and expected result for this agent node." className="mt-1 w-full resize-y rounded-md border border-slate-200 bg-zinc-50 px-3 py-2.5 text-sm leading-5 text-slate-700 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
     </label>
     <p className="mt-2 text-[11px] text-slate-400">These instructions are sent with the delegation contract. They are separate from the node label and canonical agent profile.</p>
     <label className="mt-3 flex items-start gap-2 text-xs font-medium text-slate-600"><input type="checkbox" checked={selectedAgentConfiguration?.workAsSubagent === true} onChange={event => onUpdateConfiguration({ workAsSubagent: event.target.checked })} className="mt-0.5" /> <span>Instruct the working agent to run this as a subagent<span className="mt-1 block text-[11px] font-normal text-slate-400">Omvra does not spawn it. The working agent must create and manage the subagent through its own runtime.</span></span></label>
@@ -40,7 +40,7 @@ export function GoalsAgentSection({ element, people, selectedAgent, selectedAgen
             <SelectContent><SelectItem value="__none__">Select an agent</SelectItem>{people.filter(person => person.kind === 'agentic').map(person => <SelectItem key={person.id} value={person.id}>{person.name} · {person.role}</SelectItem>)}</SelectContent>
           </Select>
         </label>
-        {selectedAgent && <p className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-500">Canonical profile is applied at dispatch: {selectedAgent.agentInstructions ? 'persona' : 'no persona'} + {selectedAgent.agentOperationalInstructions ? 'operational guidance' : 'no operational guidance'}.</p>}
+        {selectedAgent && <p className="mt-2 rounded-md bg-slate-50 px-2.5 py-2 text-[11px] text-slate-500">Canonical profile is applied at dispatch: {selectedAgent.agentInstructions ? 'persona' : 'no persona'} + {selectedAgent.agentOperationalInstructions ? 'operational guidance' : 'no operational guidance'}.</p>}
         {selectedAgentMissing && <p role="alert" className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800">Assign a canonical agent before this node can be started or dispatched.</p>}
         <label className="mt-3 flex items-center gap-2 text-xs font-medium text-slate-600"><input type="checkbox" checked={selectedAgentConfiguration?.spawnIfUnavailable === true} onChange={event => onUpdateConfiguration({ spawnIfUnavailable: event.target.checked })} /> Recruit temporarily if unavailable</label>
       </> : <>
@@ -77,7 +77,7 @@ export function GoalsControlFlowSection({ element, retryTargetTitle, onUpdateEle
         <SelectContent><SelectItem value="human-review">Require human review</SelectItem><SelectItem value="fail-goal">Fail the Goal</SelectItem></SelectContent>
       </Select>
     </label>
-    <div className="mt-3 rounded-md border border-cyan-100 bg-cyan-50/60 px-2.5 py-2 text-[11px] text-cyan-800"><span className="font-semibold">Retry target:</span> {retryTargetTitle ?? 'Connect this node to an earlier step.'}</div>
+    <div className="mt-3 rounded-md bg-zinc-50 px-2.5 py-2 text-[11px] text-slate-600"><span className="font-semibold">Retry target:</span> {retryTargetTitle ?? 'Connect this node to an earlier step.'}</div>
   </section>;
 }
 
@@ -89,8 +89,8 @@ export function GoalsRequirementsSection({ goal, element }: { goal?: GoalRecord;
     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Contract requirements</p>
     <p className="mt-1 text-[11px] text-slate-400">Typed references are resolved before setup. Contents and secrets are never copied into this inspector.</p>
     <div className="mt-3 space-y-2">
-      {inputs.map(input => <div key={`input-${input.id}`} className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2"><p className="text-xs font-medium text-slate-700">Input · {input.label ?? input.id}</p><p className="mt-0.5 text-[11px] capitalize text-slate-400">{input.kind.replace('-', ' ')} · {input.scope}{input.required === false ? ' · optional' : ''}</p></div>)}
-      {capabilities.map(capability => <div key={`capability-${capability.id}`} className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2"><p className="text-xs font-medium text-slate-700">Capability · {capability.label ?? capability.capabilityId}</p><p className="mt-0.5 text-[11px] text-slate-400">{capability.source ?? 'any source'}{capability.version ? ` · ${capability.version}` : ''} · {capability.permission ?? 'permission unknown'}</p></div>)}
+      {inputs.map(input => <div key={`input-${input.id}`} className="rounded-md bg-slate-50 px-2.5 py-2"><p className="text-xs font-medium text-slate-700">Input · {input.label ?? input.id}</p><p className="mt-0.5 text-[11px] capitalize text-slate-400">{input.kind.replace('-', ' ')} · {input.scope}{input.required === false ? ' · optional' : ''}</p></div>)}
+      {capabilities.map(capability => <div key={`capability-${capability.id}`} className="rounded-md bg-slate-50 px-2.5 py-2"><p className="text-xs font-medium text-slate-700">Capability · {capability.label ?? capability.capabilityId}</p><p className="mt-0.5 text-[11px] text-slate-400">{capability.source ?? 'any source'}{capability.version ? ` · ${capability.version}` : ''} · {capability.permission ?? 'permission unknown'}</p></div>)}
     </div>
   </section>;
 }
@@ -103,7 +103,7 @@ export function GoalsProjectBindingsSection({ goal, projects }: { goal?: GoalRec
     {bindings.length === 0 ? <p className="mt-2 rounded-md border border-dashed border-slate-200 px-2.5 py-2 text-[11px] text-slate-400">Projectless Goal · no synthetic project assigned.</p> : <div className="mt-3 space-y-2">{bindings.map(binding => {
       const project = projectById.get(binding.projectId);
       const state = binding.projection?.state ?? (project ? 'active' : 'stale-project');
-      return <div key={binding.id} className={`rounded-md border px-2.5 py-2 ${state === 'active' ? 'border-slate-200 bg-slate-50' : 'border-amber-200 bg-amber-50'}`}>
+      return <div key={binding.id} className={`rounded-md px-2.5 py-2 ${state === 'active' ? 'bg-slate-50' : 'bg-amber-50'}`}>
         <p className="text-xs font-medium text-slate-700">{project?.name ?? binding.projection?.name ?? binding.projectId}</p>
         <p className="mt-0.5 text-[11px] capitalize text-slate-400">{binding.role} · {state.replace('-', ' ')}{project?.description ? ` · ${project.description}` : ''}</p>
       </div>;
@@ -142,13 +142,13 @@ export function GoalsConditionSection({ element, positiveLabel, negativeLabel, o
   if (!element || element.type !== 'condition') return null;
   return <section className="mt-5 border-t border-slate-100 pt-4">
     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Branches</p>
-    <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
-      <p className="text-[11px] font-semibold text-emerald-800">Positive branch</p>
+    <div className="mt-3 rounded-lg bg-zinc-50 p-3">
+      <p className="text-[11px] font-semibold text-slate-700">Positive branch</p>
       <label className="mt-2 block text-xs font-medium text-slate-600">Branch name<Input value={positiveLabel} onChange={event => onUpdateElement({ conditionPositiveLabel: event.target.value })} className="mt-1" /></label>
       <label className="mt-2 block text-xs font-medium text-slate-600">Outcome<textarea value={element.conditionPositiveOutcome ?? ''} onChange={event => onUpdateElement({ conditionPositiveOutcome: event.target.value })} rows={2} placeholder="What happens when the condition is positive?" className="mt-1 w-full resize-y rounded-md border border-slate-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
     </div>
-    <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50/60 p-3">
-      <p className="text-[11px] font-semibold text-rose-800">Negative branch</p>
+    <div className="mt-3 rounded-lg bg-zinc-50 p-3">
+      <p className="text-[11px] font-semibold text-slate-700">Negative branch</p>
       <label className="mt-2 block text-xs font-medium text-slate-600">Branch name<Input value={negativeLabel} onChange={event => onUpdateElement({ conditionNegativeLabel: event.target.value })} className="mt-1" /></label>
       <label className="mt-2 block text-xs font-medium text-slate-600">Outcome<textarea value={element.conditionNegativeOutcome ?? ''} onChange={event => onUpdateElement({ conditionNegativeOutcome: event.target.value })} rows={2} placeholder="What happens when the condition is negative?" className="mt-1 w-full resize-y rounded-md border border-slate-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
     </div>
@@ -176,7 +176,7 @@ export function GoalsScheduleSection({ schedule, latestOccurrence, onCreate, onU
       {schedule.rule.mode === 'one-time' && <label className="block text-xs font-medium text-slate-600">Date<Input type="date" value={schedule.rule.date ?? ''} onChange={event => onUpdate({ rule: { date: event.target.value } })} className="mt-1" /></label>}
       <label className="block text-xs font-medium text-slate-600">Time<Input type="time" value={schedule.rule.time} onChange={event => onUpdate({ rule: { time: event.target.value } })} className="mt-1" /></label>
       <label className="block text-xs font-medium text-slate-600">Temporal mode<select value={schedule.temporalMode} onChange={event => onUpdate({ temporalMode: event.target.value as GoalSchedule['temporalMode'] })} className="mt-1 h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs"><option value="anchored">Anchored data window</option><option value="latest">Latest data on retry</option></select></label>
-      <div className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-500"><span className="font-semibold text-slate-700">Timezone:</span> {schedule.timezone}<br /><span className="font-semibold text-slate-700">Status:</span> {scheduleStatus(schedule)}</div>
+      <div className="rounded-md bg-slate-50 px-2.5 py-2 text-[11px] text-slate-500"><span className="font-semibold text-slate-700">Timezone:</span> {schedule.timezone}<br /><span className="font-semibold text-slate-700">Status:</span> {scheduleStatus(schedule)}</div>
       {latestOccurrence && <div className="rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[11px] text-slate-500"><span className="font-semibold text-slate-700">Latest occurrence:</span> {latestOccurrence.state.replace(/-/g, ' ')} · {latestOccurrence.attempts} attempt{latestOccurrence.attempts === 1 ? '' : 's'}<br /><span className="font-semibold text-slate-700">Scheduled for:</span> {latestOccurrence.scheduledFor}{latestOccurrence.error && <><br /><span className="font-semibold text-red-700">Outcome:</span> {latestOccurrence.error}</>}</div>}
       <div className="grid grid-cols-2 gap-2"><label className="block text-xs font-medium text-slate-600">Starts<input type="date" value={schedule.startsAt?.slice(0, 10) ?? ''} onChange={event => onUpdate({ startsAt: event.target.value || undefined })} className="mt-1 h-8 w-full rounded-md border border-slate-200 px-2 text-xs" /></label><label className="block text-xs font-medium text-slate-600">Ends<input type="date" value={schedule.endsAt?.slice(0, 10) ?? ''} onChange={event => onUpdate({ endsAt: event.target.value || undefined })} className="mt-1 h-8 w-full rounded-md border border-slate-200 px-2 text-xs" /></label></div>
       <button type="button" onClick={onDelete} className="text-xs font-medium text-red-600 hover:text-red-700">Remove schedule</button>

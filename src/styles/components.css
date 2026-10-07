@@ -131,7 +131,7 @@
 .goals-canvas-grid {
   --goals-grid-size: 24px;
   --goals-grid-dot-size: 1px;
-  --goals-grid-dot-color: rgba(148, 163, 184, 0.32);
+  --goals-grid-dot-color: rgba(113, 113, 122, 0.16);
   background-image: radial-gradient(circle, var(--goals-grid-dot-color) var(--goals-grid-dot-size), transparent var(--goals-grid-dot-size));
   background-position: 1px 1px;
   background-size: var(--goals-grid-size) var(--goals-grid-size);

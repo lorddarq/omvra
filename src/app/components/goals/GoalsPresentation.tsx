@@ -16,22 +16,16 @@ export function isExecutionLocked(element: GoalElement | undefined): boolean {
 }
 
 export function nodeClass(type: GoalElementType, connected = true): string {
-  if (!connected && type === 'instructions') return 'border-slate-200 bg-slate-100 text-slate-500';
-  if (type === 'goal') return 'border-slate-900 bg-slate-900 text-white';
-  if (type === 'subgoal') return 'border-blue-200 bg-white text-slate-900';
-  if (type === 'agent') return 'border-amber-200 bg-amber-50 text-slate-900';
-  if (type === 'condition') return 'border-violet-200 bg-violet-50 text-slate-900';
-  if (type === 'approval-gate') return 'border-orange-200 bg-orange-50 text-slate-900';
-  if (type === 'human-input') return 'border-sky-200 bg-sky-50 text-slate-900';
-  if (type === 'retry') return 'border-cyan-200 bg-cyan-50 text-slate-900';
-  if (type === 'deliverable') return 'border-emerald-200 bg-emerald-50 text-slate-900';
-  if (type === 'artifact') return 'border-sky-200 bg-sky-50 text-slate-900';
-  return 'border-slate-200 bg-white text-slate-700';
+  if (!connected && type === 'instructions') return 'border-zinc-200 bg-zinc-50 text-zinc-500';
+  if (type === 'goal') return 'border-zinc-700 bg-zinc-800 text-white';
+  return 'border-[var(--omvra-color-border-default)] bg-[var(--omvra-color-surface-default)] text-[var(--omvra-color-text-primary)]';
 }
 
 export function elementIcon(type: GoalElementType) {
   if (type === 'agent') return <Bot className="size-3.5" />;
   if (type === 'goal') return <Sparkles className="size-3.5" />;
+  if (type === 'condition') return <CircleDot className="size-3.5" />;
+  if (type === 'approval-gate') return <ShieldCheck className="size-3.5" />;
   if (type === 'human-input') return <MessageSquareText className="size-3.5" />;
   if (type === 'retry') return <RotateCcw className="size-3.5" />;
   if (type === 'deliverable') return <PuzzlePieceIcon className="size-3.5" />;
@@ -56,9 +50,9 @@ export function statusChipClass(status: GoalElement['status']): string {
   if (status === 'working') return 'border-blue-200 bg-blue-50 text-blue-700';
   if (status === 'blocked') return 'border-red-200 bg-red-50 text-red-700';
   if (status === 'evidence-required') return 'border-amber-200 bg-amber-50 text-amber-800';
-  if (status === 'approval-required') return 'border-violet-200 bg-violet-50 text-violet-700';
+  if (status === 'approval-required') return 'border-amber-200 bg-amber-50 text-amber-800';
   if (status === 'permission-denied') return 'border-red-200 bg-red-50 text-red-700';
-  if (status === 'human-review') return 'border-sky-200 bg-sky-50 text-sky-700';
+  if (status === 'human-review') return 'border-amber-200 bg-amber-50 text-amber-800';
   return 'border-slate-200 bg-slate-100 text-slate-600';
 }
 

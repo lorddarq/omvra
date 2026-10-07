@@ -44,6 +44,7 @@
     "dist": "npm run predist && npm run build:electron",
     "start": "electron .",
     "generate:icons": "node electron/scripts/generate-icons.cjs",
+    "test:goals-ui": "electron scripts/goals/verify-viewport.cjs",
     "test:react19-ui": "electron scripts/react19/verify-ui.cjs"
   },
   "dependencies": {

@@ -55,10 +55,10 @@ export function goalCanvasElementHeight(element: GoalElement, measuredHeights: R
     ?? (element.type === 'condition' ? Math.max(element.height ?? 90, 150) : element.type === 'human-input' ? Math.max(element.height ?? 90, 120) : element.height ?? 90);
 }
 
-export function goalCanvasPanToCenterElement(element: GoalElement): { x: number; y: number } {
+export function goalCanvasPanToCenterElement(element: GoalElement, zoom = 1): { x: number; y: number } {
   return {
-    x: -(element.x + (element.width ?? 220) / 2),
-    y: -(element.y + (element.height ?? 90) / 2),
+    x: -(element.x + (element.width ?? 220) / 2) * zoom,
+    y: -(element.y + (element.height ?? 90) / 2) * zoom,
   };
 }
 

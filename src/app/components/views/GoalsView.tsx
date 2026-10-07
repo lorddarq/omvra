@@ -533,7 +533,7 @@ export function GoalsView({ people = [], tasks = [], milestones = [], projects =
     const element = createGoalElement(type, activeGoal.elements.length);
     setGoals(current => current.map(goal => goal.id === selectedGoalId ? { ...goal, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString(), elements: [...goal.elements, element] } : goal));
     setSelectedElementId(element.id);
-    setPan(goalCanvasPanToCenterElement(element));
+    setPan(goalCanvasPanToCenterElement(element, zoom));
   };
   const deleteElement = () => {
     if (!selectedElement) return;
@@ -580,14 +580,16 @@ export function GoalsView({ people = [], tasks = [], milestones = [], projects =
     const title = newGoalTitle.trim() || 'Untitled goal';
     const element: GoalElement = { id: createStableId('element'), type: 'goal', title, body: newGoalBody.trim() || 'Define the outcome', x: 420, y: 180, width: 250, height: 104, status: 'draft' };
     const goal: GoalRecord = { id: createStableId('goal'), title, color: '#2563eb', updatedAt: new Date().toISOString(), elements: [element] };
-    setGoals(current => [...current, goal]); setSelectedGoalId(goal.id); setSelectedElementId(element.id); setPan(goalCanvasPanToCenterElement(element)); setNewGoalDialogOpen(false);
+    setGoals(current => [...current, goal]); setSelectedGoalId(goal.id); setSelectedElementId(element.id); setPan(goalCanvasPanToCenterElement(element, zoom)); setNewGoalDialogOpen(false);
   };
 
   const addTemplate = (template: GoalTemplate) => {
     const goal = instantiateGoalTemplate(template, createStableId);
     setGoals(current => [...current, goal]);
     setSelectedGoalId(goal.id);
-    setSelectedElementId(goal.elements.find(element => element.type === 'goal')?.id ?? goal.elements[0]?.id ?? '');
+    const firstElement = goal.elements.find(element => element.type === 'goal') ?? goal.elements[0];
+    setSelectedElementId(firstElement?.id ?? '');
+    if (firstElement) setPan(goalCanvasPanToCenterElement(firstElement, zoom));
   };
 
   const moveCanvasSelection = (elementId: string, forward: boolean) => {
@@ -597,7 +599,10 @@ export function GoalsView({ people = [], tasks = [], milestones = [], projects =
     const nextIndex = forward ? Math.min(items.length - 1, index + 1) : Math.max(0, index - 1);
     const nextId = items[nextIndex]?.id ?? elementId;
     setSelectedElementId(nextId);
-    requestAnimationFrame(() => document.getElementById(`goal-canvas-item-${nextId}`)?.focus());
+    const nextElement = items[nextIndex];
+    const focusElement = nextElement?.type === 'connector' ? items.find(element => element.id === nextElement.sourceId) : nextElement;
+    if (focusElement) setPan(goalCanvasPanToCenterElement(focusElement, zoom));
+    requestAnimationFrame(() => document.getElementById(`goal-canvas-item-${nextId}`)?.focus({ preventScroll: true }));
   };
 
 
@@ -606,7 +611,7 @@ export function GoalsView({ people = [], tasks = [], milestones = [], projects =
     const element = createAgentElement(person, activeGoal.elements.length);
     setGoals(current => current.map(goal => goal.id === selectedGoalId ? { ...goal, revision: goalRevision(goal) + 1, updatedAt: new Date().toISOString(), elements: [...goal.elements, element] } : goal));
     setSelectedElementId(element.id);
-    setPan(goalCanvasPanToCenterElement(element));
+    setPan(goalCanvasPanToCenterElement(element, zoom));
     setAgentMenuOpen(false);
     setArtifactMenuOpen(false);
   };
@@ -708,7 +713,7 @@ export function GoalsView({ people = [], tasks = [], milestones = [], projects =
   };
 
   return (
-  <section className="goals-view relative h-full min-h-0 overflow-hidden bg-slate-50 text-slate-700">
+  <section className="goals-view relative h-full min-h-0 overflow-clip bg-[var(--omvra-color-surface-canvas)] text-slate-700">
     <GoalsSidebar
       goals={goals}
       selectedGoalId={selectedGoalId}
@@ -770,13 +775,13 @@ export function GoalsView({ people = [], tasks = [], milestones = [], projects =
                 <SelectContent><SelectItem value="file">File</SelectItem><SelectItem value="summary">Summary</SelectItem><SelectItem value="conclusion">Conclusion</SelectItem><SelectItem value="resolution">Resolution</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent>
               </Select>
             </label>
-            <label className="mt-3 block text-xs font-medium text-slate-600">Delivery instructions<textarea value={selectedElement.deliverySpec?.instructions ?? ''} onChange={event => updateElement({ deliverySpec: { ...(selectedElement.deliverySpec ?? { outcomeKind: 'other' }), instructions: event.target.value } })} rows={5} placeholder="Describe how this outcome should be delivered, where, and in what form." className="mt-1 w-full resize-y rounded-md border border-emerald-200 bg-emerald-50/30 px-2.5 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" /></label>
+            <label className="mt-3 block text-xs font-medium text-slate-600">Delivery instructions<textarea value={selectedElement.deliverySpec?.instructions ?? ''} onChange={event => updateElement({ deliverySpec: { ...(selectedElement.deliverySpec ?? { outcomeKind: 'other' }), instructions: event.target.value } })} rows={5} placeholder="Describe how this outcome should be delivered, where, and in what form." className="mt-1 w-full resize-y rounded-md border border-slate-200 bg-zinc-50 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
             <div className="mt-3 grid grid-cols-2 gap-2">
               <label className="block text-xs font-medium text-slate-600">Format<Input value={selectedElement.deliverySpec?.format ?? ''} onChange={event => updateElement({ deliverySpec: { ...(selectedElement.deliverySpec ?? { outcomeKind: 'other', instructions: '' }), format: event.target.value || undefined } })} placeholder="e.g. PDF" className="mt-1" /></label>
               <label className="block text-xs font-medium text-slate-600">Recipient<Input value={selectedElement.deliverySpec?.recipient ?? ''} onChange={event => updateElement({ deliverySpec: { ...(selectedElement.deliverySpec ?? { outcomeKind: 'other', instructions: '' }), recipient: event.target.value || undefined } })} placeholder="Person or team" className="mt-1" /></label>
             </div>
             <label className="mt-3 block text-xs font-medium text-slate-600">Destination<Input value={selectedElement.deliverySpec?.destination ?? ''} onChange={event => updateElement({ deliverySpec: { ...(selectedElement.deliverySpec ?? { outcomeKind: 'other', instructions: '' }), destination: event.target.value || undefined } })} placeholder="Workspace, folder, URL, or channel" className="mt-1" /></label>
-            <label className="mt-3 block text-xs font-medium text-slate-600">Acceptance criteria<textarea value={(selectedElement.deliverySpec?.acceptanceCriteria ?? []).join('\n')} onChange={event => updateElement({ deliverySpec: { ...(selectedElement.deliverySpec ?? { outcomeKind: 'other', instructions: '' }), acceptanceCriteria: event.target.value.split(/\r?\n/).map(value => value.trim()).filter(Boolean) } })} rows={4} placeholder="One criterion per line" className="mt-1 w-full resize-y rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" /></label>
+            <label className="mt-3 block text-xs font-medium text-slate-600">Acceptance criteria<textarea value={(selectedElement.deliverySpec?.acceptanceCriteria ?? []).join('\n')} onChange={event => updateElement({ deliverySpec: { ...(selectedElement.deliverySpec ?? { outcomeKind: 'other', instructions: '' }), acceptanceCriteria: event.target.value.split(/\r?\n/).map(value => value.trim()).filter(Boolean) } })} rows={4} placeholder="One criterion per line" className="mt-1 w-full resize-y rounded-md border border-slate-200 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
             <label className="mt-3 block text-xs font-medium text-slate-600">Expected artifact count <span className="font-normal text-slate-400">(optional)</span><Input type="number" min={0} step={1} value={selectedElement.deliverySpec?.expectedArtifactCount ?? ''} onChange={event => updateElement({ deliverySpec: { ...(selectedElement.deliverySpec ?? { outcomeKind: 'other', instructions: '' }), expectedArtifactCount: event.target.value === '' ? undefined : Math.max(0, Math.floor(Number(event.target.value))) } })} className="mt-1" /></label>
             <label className="mt-3 block text-xs font-medium text-slate-600">Acceptance state
               <Select value={selectedElement.deliverableStatus ?? 'planned'} onValueChange={value => updateElement({ deliverableStatus: value as GoalElement['deliverableStatus'] })}>
@@ -784,12 +789,12 @@ export function GoalsView({ people = [], tasks = [], milestones = [], projects =
                 <SelectContent><SelectItem value="planned">Planned</SelectItem><SelectItem value="in-progress">In progress</SelectItem><SelectItem value="ready-for-review">Ready for review</SelectItem><SelectItem value="accepted">Accepted</SelectItem><SelectItem value="rejected">Rejected</SelectItem></SelectContent>
               </Select>
             </label>
-            <div className="mt-4 rounded-md border border-emerald-100 bg-emerald-50/40 p-2.5">
-              <p className="text-[11px] font-semibold text-emerald-800">Delivered outputs</p>
-              <p className="mt-1 text-[11px] text-emerald-700/70">Runtime handoff records appear here after execution. Supporting artifacts are kept on separate nodes.</p>
+            <div className="mt-4 rounded-md border border-slate-200 bg-zinc-50 p-2.5">
+              <p className="text-[11px] font-semibold text-slate-700">Delivered outputs</p>
+              <p className="mt-1 text-[11px] text-slate-500">Runtime handoff records appear here after execution. Supporting artifacts are kept on separate nodes.</p>
               {(runtimeProjection?.handoffs ?? []).filter(handoff => !handoff.deliverableId || handoff.deliverableId === selectedElement.id).length === 0
                 ? <p className="mt-2 text-[11px] text-slate-400">No terminal handoff recorded yet.</p>
-                : <div className="mt-2 space-y-2">{(runtimeProjection?.handoffs ?? []).filter(handoff => !handoff.deliverableId || handoff.deliverableId === selectedElement.id).map(handoff => <div key={handoff.id} className="rounded-md border border-emerald-100 bg-white px-2.5 py-2"><p className="text-[10px] text-slate-400">{handoff.deliveredAt ? new Date(handoff.deliveredAt).toLocaleString() : 'Recorded handoff'}</p>{(handoff.producedArtifactReferences ?? []).map((reference, index) => <p key={`${handoff.id}-${index}`} className="mt-1 truncate text-xs font-medium text-slate-700">{reference.label ?? reference.locator ?? 'Produced output'}{reference.format ? ` · ${reference.format}` : ''}</p>)}</div>)}</div>}
+                : <div className="mt-2 space-y-2">{(runtimeProjection?.handoffs ?? []).filter(handoff => !handoff.deliverableId || handoff.deliverableId === selectedElement.id).map(handoff => <div key={handoff.id} className="rounded-md border border-slate-200 bg-white px-2.5 py-2"><p className="text-[10px] text-slate-400">{handoff.deliveredAt ? new Date(handoff.deliveredAt).toLocaleString() : 'Recorded handoff'}</p>{(handoff.producedArtifactReferences ?? []).map((reference, index) => <p key={`${handoff.id}-${index}`} className="mt-1 truncate text-xs font-medium text-slate-700">{reference.label ?? reference.locator ?? 'Produced output'}{reference.format ? ` · ${reference.format}` : ''}</p>)}</div>)}</div>}
             </div>
           </GoalsDeliverableSection>
         )}

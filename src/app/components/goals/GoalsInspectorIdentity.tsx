@@ -33,7 +33,7 @@ export function GoalsInspectorIdentity({ element, activeGoal, people, selectedAg
     {element.type === 'goal' && <>
       <label className="mt-4 block text-xs font-medium text-slate-600">
         Color
-        <input type="color" value={activeGoal?.color ?? '#2563eb'} onChange={event => onUpdateGoal({ color: event.target.value })} aria-label="Goal color" className="mt-1 h-9 w-full cursor-pointer rounded-md border border-slate-200 bg-white p-1" />
+        <input type="color" value={activeGoal?.color ?? '#2563eb'} onChange={event => onUpdateGoal({ color: event.target.value })} aria-label="Goal color" className="mt-1 block h-9 w-12 cursor-pointer rounded-md border border-slate-200 bg-white p-1" />
       </label>
       <label className="mt-4 block text-xs font-medium text-slate-600">
         Overseer agent

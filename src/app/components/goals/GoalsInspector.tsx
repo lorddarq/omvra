@@ -12,11 +12,11 @@ interface GoalsInspectorProps {
 }
 
 export function GoalsInspector({ selectedElement, selectedElementLocked, children, onDelete, goalCopyState = 'idle', onCopyGoalDetails }: GoalsInspectorProps) {
-  return <aside className="absolute bottom-16 right-4 top-16 z-20 w-72 overflow-auto rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+  return <aside className="absolute bottom-16 right-4 top-16 z-20 w-72 overflow-auto rounded-2xl border border-[var(--omvra-color-border-subtle)] bg-[var(--omvra-color-surface-default)] p-4 shadow-[var(--omvra-button-shadow)]">
     <div className="flex items-center justify-between">
       <div>
-        <p className="text-[11px] uppercase text-slate-400">Details</p>
-        <h2 className="mt-1 text-sm font-semibold text-slate-900">{selectedElement.type}</h2>
+        <p className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Details</p>
+        <h2 className="mt-1 text-sm font-semibold capitalize text-slate-900">{selectedElement.type.replaceAll('-', ' ')}</h2>
         {selectedElement.type === 'goal' && <button type="button" onClick={onCopyGoalDetails} className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50" aria-label="Copy goal details">
           {goalCopyState === 'copied' ? <Check className="size-3.5 text-emerald-600" /> : goalCopyState === 'failed' ? <TriangleAlert className="size-3.5 text-red-600" /> : <Copy className="size-3.5" />}
           {goalCopyState === 'copied' ? 'Copied' : goalCopyState === 'failed' ? 'Copy failed' : 'Copy goal details'}

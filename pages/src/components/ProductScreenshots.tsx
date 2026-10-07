@@ -25,6 +25,12 @@ const screenshots = [
     description: 'Define outcomes, add agents and approval gates, then track the workflow from one canvas.',
     src: `${import.meta.env.BASE_URL}screens/workflows.jpg`,
   },
+  {
+    label: 'Agent supervision',
+    title: 'Stay in control while agents work.',
+    description: 'Follow live progress, review activity, and guide an active task without leaving the workspace.',
+    src: `${import.meta.env.BASE_URL}screens/supervision.jpg`,
+  },
 ] as const
 
 function Arrow({ direction }: { direction: 'previous' | 'next' }) {

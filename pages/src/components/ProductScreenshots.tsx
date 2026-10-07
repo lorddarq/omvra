@@ -5,19 +5,25 @@ const screenshots = [
     label: 'Timeline planning',
     title: 'See when work happens.',
     description: 'Lay out projects across time, spot collisions, and keep the next move visible.',
-    src: `${import.meta.env.BASE_URL}screens/timeline.png`,
+    src: `${import.meta.env.BASE_URL}screens/timeline.jpg`,
   },
   {
     label: 'Kanban execution',
     title: 'Keep work moving.',
     description: 'Make ownership and status visible while tasks move toward review and completion.',
-    src: `${import.meta.env.BASE_URL}screens/kanban.png`,
+    src: `${import.meta.env.BASE_URL}screens/kanban.jpg`,
   },
   {
-    label: 'Roadmap coordination',
+    label: 'Milestone coordination',
     title: 'Connect milestones to delivery.',
     description: 'See the work behind each milestone and the dependencies that can slow it down.',
-    src: `${import.meta.env.BASE_URL}screens/roadmap.png`,
+    src: `${import.meta.env.BASE_URL}screens/milestones.jpg`,
+  },
+  {
+    label: 'Workflow design',
+    title: 'Shape governed agent work.',
+    description: 'Define outcomes, add agents and approval gates, then track the workflow from one canvas.',
+    src: `${import.meta.env.BASE_URL}screens/workflows.jpg`,
   },
 ] as const
 

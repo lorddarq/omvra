@@ -10,12 +10,14 @@ import ACPSection from './components/ACPSection'
 import Download from './components/Download'
 import Faq from './components/Faq'
 import Footer from './components/Footer'
+import Anatomy from './components/Anatomy'
 
 function App() {
   return (
     <div className="landing-shell">
       <Hero />
       <WhyOmvra />
+      <Anatomy />
       <ProductScreenshots />
       <Features />
       <HowItWorks />

@@ -1,0 +1,54 @@
+.anatomy-section { padding: 108px 0 88px; background: #fbfaf8; color: #5b5966; }
+.anatomy-heading { max-width: 780px; margin: 0 auto 36px; text-align: center; }
+.anatomy-kicker { margin: 0 0 18px; color: #8174c8; font: 600 11px/1.2 var(--anatomy-mono); letter-spacing: .16em; }
+.anatomy-heading h2 { margin: 0; color: #5b5966; font-size: clamp(2.55rem, 5vw, 4rem); font-weight: 500; letter-spacing: -.055em; line-height: 1.02; }
+.anatomy-heading h2 span { color: #8174c8; }
+.anatomy-heading > p:last-child { max-width: 620px; margin: 20px auto 0; color: #6d6a73; font-size: 17px; line-height: 1.7; }
+.anatomy-section .iso { --anatomy-card: #fbfaf8; --anatomy-paper: #fbfaf8; --anatomy-lit: #6c4fe0; --anatomy-lit-top: #f0ebff; --anatomy-lit-shade: #e6ddff; }
+.anatomy-section .iso-figure { margin: 0; }
+.anatomy-section .iso-plate { overflow: hidden; padding: 58px 24px 52px; border-radius: 20px; background: linear-gradient(180deg,rgba(255,255,255,.98),rgba(248,246,243,.98)); box-shadow: 0 2px 8px rgba(17,24,39,.04),0 20px 48px rgba(17,24,39,.07); }
+.anatomy-section .iso-plate-corners { inset: 20px 22px; }
+.anatomy-section .iso-plate-corner { font-size: 10px; }
+.hr-live-wrap { max-width: 900px; margin: auto; }
+.hr-stage { position: relative; outline: none; touch-action: pan-y; -webkit-tap-highlight-color: transparent; }
+.hr-stage:focus-visible { border-radius: 6px; outline: 1px solid #8174c8; outline-offset: 3px; }
+.hr-svg { overflow: visible; }
+.co-order { transition: transform 700ms cubic-bezier(.2,.8,.2,1); }
+.co-evidence { animation: co-evidence-in 520ms cubic-bezier(.2,.8,.2,1) both; }
+@keyframes co-evidence-in { from { opacity: 0; transform: translate(-22px,-8px); } to { opacity: 1; transform: translate(0,0); } }
+.co-stamp { cursor: pointer; transform-box: fill-box; transform-origin: 50% 0%; transition: transform 360ms cubic-bezier(.2,.8,.2,1); }
+.co-stamp[aria-disabled="true"] { cursor: not-allowed; opacity: .76; }
+.co-stamp.is-accepted { transform: translateY(6px); }
+.co-stamp:focus-visible { outline: 1px solid #6c4fe0; }
+.co-beacon.is-on .iso-top { fill: #e6ddff; }
+.co-beacon.is-on .iso-edge { stroke: #6c4fe0; stroke-width: 1px; }
+.co-beacon.is-on { filter: drop-shadow(0 0 3px rgba(108,79,224,.44)); }
+.hr-control-label { color: #8174c8; font: 600 9px var(--anatomy-mono); letter-spacing: .15em; }
+.hr-controls { display: grid; grid-template-columns: 1fr auto; gap: 8px 20px; align-items: center; margin: 15px 2px 0; }
+.hr-control-label { grid-column: 1; grid-row: 1; }
+.hr-controls p { grid-column: 1; grid-row: 2; margin: 0; color: #77737c; font-size: 13px; }
+.hr-control-buttons { display: flex; gap: 8px; grid-column: 2; grid-row: 1 / span 2; }
+.hr-control-buttons button { min-height: 38px; padding: 0 13px; border: 1px solid rgba(0,0,0,.1); border-radius: 9px; background: rgba(255,255,255,.8); color: #5b5966; font-size: 12px; cursor: pointer; }
+.hr-control-buttons button.primary { border-color: #3b3b43; background: #3b3b43; color: white; }
+.hr-control-buttons button:hover { filter: brightness(1.08); }
+.hr-control-buttons button:focus-visible { outline: 2px solid #8174c8; outline-offset: 2px; }
+.anatomy-section .iso-legend { margin: 14px 2px 0; color: #77737c; font-size: 12px; }
+.anatomy-section .iso-caption { max-width: 920px; }
+.anatomy-footnote { max-width: 850px; margin: 24px auto 0; color: #77737c; font-size: 12px; line-height: 1.7; text-align: center; }
+@media(max-width:700px) {
+  .anatomy-section { padding: 78px 0 66px; }
+  .anatomy-heading { margin-bottom: 26px; }
+  .anatomy-heading > p:last-child { font-size: 15px; }
+  .anatomy-section .iso-plate { padding: 52px 8px 52px; }
+  .hr-live-wrap { width: 112%; margin-left: -6%; }
+  .hr-controls { grid-template-columns: 1fr; gap: 8px; }
+  .hr-control-label, .hr-controls p, .hr-control-buttons { grid-column: 1; grid-row: auto; }
+  .hr-control-buttons { justify-content: space-between; }
+  .anatomy-section .iso-plate-corners { inset: 17px 14px; }
+  .anatomy-section .iso-plate-corner { font-size: 8px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .co-evidence { animation: none; }
+  .co-order,.co-stamp { transition: none; }
+  .co-beacon.is-on { filter: none; }
+}

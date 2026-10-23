@@ -2,14 +2,21 @@
   "resources": [
     { "id": "getting-started", "title": "Getting started with Omvra", "url": "https://github.com/lorddarq/omvra#readme" },
     { "id": "first-task", "title": "Creating and assigning your first task", "url": "https://github.com/lorddarq/omvra#readme" },
+    { "id": "organizing-work", "title": "Organizing work with Kanban, projects, and milestones", "url": "https://github.com/lorddarq/omvra#readme" },
+    { "id": "task-details", "title": "Adding task details, dependencies, and context", "url": "https://github.com/lorddarq/omvra#readme" },
     { "id": "backup-onboarding", "title": "Backing up your workspace and replaying onboarding", "url": "https://github.com/lorddarq/omvra#readme" },
+    { "id": "restore-updates", "title": "Restoring your workspace and managing updates", "url": "https://github.com/lorddarq/omvra#readme" },
     { "id": "timeline-planning", "title": "Planning work on the timeline", "url": "https://github.com/lorddarq/omvra#readme" },
     { "id": "timeline-resize", "title": "Moving and resizing timeline tasks", "url": "https://github.com/lorddarq/omvra#readme" },
     { "id": "timeline-projects", "title": "Understanding timeline projects and visibility", "url": "https://github.com/lorddarq/omvra#readme" },
     { "id": "timeline-missing-task", "title": "Fixing a task that is missing from the timeline", "url": "https://github.com/lorddarq/omvra#readme" },
     { "id": "mcp-agents", "title": "Using MCP with coding agents", "url": "https://github.com/lorddarq/omvra#readme" },
+    { "id": "agent-profiles", "title": "Creating agent profiles and configuring instructions and skills", "url": "https://github.com/lorddarq/omvra#readme" },
+    { "id": "acp-runtimes", "title": "Connecting agent runtimes through ACP", "url": "https://github.com/lorddarq/omvra#readme" },
     { "id": "agent-assignment", "title": "Assigning work to an agent", "url": "https://github.com/lorddarq/omvra#readme" },
-    { "id": "agent-review", "title": "Completing agent work and requesting human review", "url": "https://github.com/lorddarq/omvra#readme" },
+    { "id": "agent-supervision", "title": "Starting, supervising, and continuing agent work", "url": "https://github.com/lorddarq/omvra#readme" },
+    { "id": "agent-review", "title": "Submitting agent work, reviewing results, requesting revisions, and accepting work", "url": "https://github.com/lorddarq/omvra#readme" },
+    { "id": "workflows", "title": "Building and running Workflows", "url": "https://github.com/lorddarq/omvra#readme" },
     { "id": "mcp-security", "title": "Securing and troubleshooting MCP access", "url": "https://github.com/lorddarq/omvra#readme" }
   ],
   "faqs": [

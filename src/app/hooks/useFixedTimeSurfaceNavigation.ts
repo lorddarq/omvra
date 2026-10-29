@@ -6,6 +6,8 @@ import {
   type TimeSurfaceMarker,
 } from '../utils/timeSurface.ts';
 
+import { useLocalToday } from './useLocalToday.ts';
+
 interface UseFixedTimeSurfaceNavigationOptions {
   scrollRef: RefObject<HTMLDivElement | null>;
   rangeStart: Date;
@@ -35,11 +37,13 @@ export function useFixedTimeSurfaceNavigation({
   rangeStart,
   dayCount,
   dayWidth,
-  today = new Date(),
+  today: referenceToday,
   autoScrollKey,
   scrollStepPx = 200,
   onScrollFrame,
 }: UseFixedTimeSurfaceNavigationOptions): UseFixedTimeSurfaceNavigationResult {
+  const localToday = useLocalToday();
+  const today = referenceToday ?? localToday;
   // Roadmap uses a fixed-width day surface, so it can share this navigation hook directly.
   // Timeline keeps its own navigation because visible days can be filtered and widths vary per cell.
   const isHeaderScrubbingRef = useRef(false);

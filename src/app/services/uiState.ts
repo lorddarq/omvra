@@ -151,7 +151,8 @@ export async function loadUiStateSnapshot(
 
   return {
     viewStates: sanitizeViewStates({
-      timeline: timelineState,
+      // Pixel offsets belong to the current session; fresh launches start at Today.
+      timeline: { ...timelineState, scrollLeft: 0 },
       kanban: kanbanState,
       roadmap: roadmapState,
       loops: loopsState,

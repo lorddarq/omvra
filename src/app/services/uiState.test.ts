@@ -33,3 +33,21 @@ test('sanitizeViewStates falls back to defaults for invalid payloads', () => {
   assert.equal(result.kanban.scrollTop, 48);
   assert.equal(result.roadmap.scrollLeft, 0);
 });
+
+test('fresh UI hydration discards the old timeline offset but preserves other view state', async () => {
+  const previousWindow = globalThis.window;
+  Object.assign(globalThis, { window: { electron: { storeGetMany: async () => ({
+    omvra_viewstate_timeline: { scrollLeft: 9000, mode: 'people', collapsedSwimlanes: ['lane-1'] },
+    omvra_viewstate_kanban: { scrollLeft: 123, scrollTop: 48 },
+  }) } } });
+  try {
+    const { loadUiStateSnapshot } = await import('./uiState.ts');
+    const { viewStates } = await loadUiStateSnapshot([], []);
+    assert.equal(viewStates.timeline.scrollLeft, 0);
+    assert.equal(viewStates.timeline.mode, 'people');
+    assert.deepEqual(viewStates.timeline.collapsedSwimlanes, ['lane-1']);
+    assert.equal(viewStates.kanban.scrollLeft, 123);
+  } finally {
+    Object.assign(globalThis, { window: previousWindow });
+  }
+});

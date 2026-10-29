@@ -23,6 +23,7 @@ interface TimelineHeaderProps {
   rowHeight: number;
   swimlaneCount: number;
   highlightToday?: boolean;
+  today: Date;
   headerRef: React.RefObject<HTMLDivElement>;
   onMonthResizeStart?: (monthKey: string, e: React.MouseEvent<HTMLDivElement>) => void;
   onMonthReset?: (monthKey: string) => void;
@@ -55,6 +56,7 @@ export function TimelineHeader({
   rowHeight,
   swimlaneCount,
   highlightToday = true,
+  today,
   headerRef,
   onMonthResizeStart,
   onMonthReset,
@@ -116,13 +118,7 @@ export function TimelineHeader({
                   {month.dates.map((d, i) => {
                     const globalIdx = month.startDayIndex + i;
                     const w = dayWidths[globalIdx] ?? defaultDayWidth;
-                    const today = new Date();
-                    const todayNoTime = new Date(
-                      today.getFullYear(),
-                      today.getMonth(),
-                      today.getDate()
-                    );
-                    const isToday = isSameDate(d, todayNoTime);
+                    const isToday = isSameDate(d, today);
                     
                     // Check if this is a weekend or week start
                     const dayOfWeek = d.getDay();

@@ -60,6 +60,7 @@ import type { TimelineLayoutState } from '../../services/uiState';
 import { persistTimelineLayoutState } from '../../services/uiState';
 import { isPointerReleased } from '../../utils/pointerInteraction';
 import { HorizontalScrollbar } from '../HorizontalScrollbar';
+import { useLocalToday } from '../../hooks/useLocalToday';
 
 const DEFAULT_ROW_HEIGHT = 48;
 const TIMELINE_TRACK_HEIGHT = 40;
@@ -419,10 +420,7 @@ export function TimelineView({
   }, [displaySwimlanes, tasks]);
 
   // Today marker
-  const today = useMemo(() => {
-    const t = new Date();
-    return new Date(t.getFullYear(), t.getMonth(), t.getDate());
-  }, []);
+  const today = useLocalToday();
 
   const todayIndex = useMemo(() => {
     // In 5-day mode, weekend "today" may be filtered out; use nearest visible day.
@@ -1310,6 +1308,7 @@ export function TimelineView({
                 rowHeight={DEFAULT_ROW_HEIGHT}
                 swimlaneCount={displaySwimlanes.length}
                 highlightToday={true}
+                today={today}
                 headerRef={headerRef}
                 onMonthResizeStart={(monthKey, e) => {
                   e.preventDefault();

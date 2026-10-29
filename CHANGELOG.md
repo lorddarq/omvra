@@ -9,6 +9,11 @@ All notable changes for Omvra release candidates should be documented in this fi
 - Added type checking and tests to pull-request, branch, and packaging CI.
 - Clarified storage ownership: electron-store remains canonical for planning records; SQLite in a dedicated worker owns agent-work history and projections. Workspace JSON backups do not include SQLite history.
 
+## 0.3.259 - 2026-10-29
+
+- Keep Timeline and Roadmap today markers current at local midnight and after waking from sleep.
+- Open fresh app sessions at today while preserving Timeline scroll position when switching views.
+
 The entries below describe their respective historical releases.
 
 ## 0.1.30-rc.1 - 2026-04-01

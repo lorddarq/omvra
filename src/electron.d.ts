@@ -299,7 +299,7 @@ declare global {
           unsubscribeDelivery?: (payload: { subscriptionId: string }) => Promise<import('./app/utils/agentRuntimeDelivery.ts').DeliveryResult>;
           getDeliveryDiagnostics?: () => Promise<{ ok: boolean; value?: Record<string, unknown>; error?: string }>;
           onDelivery?: (listener: (envelope: import('./app/utils/agentRuntimeDelivery.ts').DeliveryEnvelope) => void) => () => void;
-          requests: (bindingId: string) => Promise<Array<{ bindingId: string; turnId?: string; requestId: string | number; method: string; serverName: string; mode: string; message: string; responseKind?: 'elicitation' | 'codex-approval'; fields: Array<{ name: string; type: string; title: string; description: string; required: boolean; defaultValue?: unknown; options?: unknown[] }> }>>;
+          requests: (bindingId: string) => Promise<Array<{ bindingId: string; turnId?: string; requestId: string | number; method: string; serverName: string; mode: string; message: string; responseKind?: 'elicitation' | 'codex-approval' | 'acp-permission'; fields: Array<{ name: string; type: string; title: string; description: string; required: boolean; defaultValue?: unknown; options?: unknown[] }>; options?: Array<{ optionId: string; name: string; kind: string }> }>>;
           createBinding: (payload: Record<string, unknown>) => Promise<any>;
           updateBinding: (payload: Record<string, unknown>) => Promise<any>;
           appendEvent: (payload: Record<string, unknown>) => Promise<any>;

@@ -290,6 +290,11 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout release source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare_release.outputs.release_tag }}
+
       - name: Download macOS artifacts
         uses: actions/download-artifact@v7
         with:
@@ -317,15 +322,20 @@ jobs:
           IS_PRERELEASE: ${{ needs.prepare_release.outputs.is_prerelease }}
         run: |
           set -euo pipefail
+          notes_file="docs/releases/${RELEASE_TAG}.md"
+          if [[ ! -f "${notes_file}" ]]; then
+            echo "Release notes are missing: ${notes_file}" >&2
+            exit 1
+          fi
 
           if gh release view "${RELEASE_TAG}" --repo "${GH_REPO}" >/dev/null 2>&1; then
             if [[ "${IS_PRERELEASE}" == "true" ]]; then
-              gh release edit "${RELEASE_TAG}" --repo "${GH_REPO}" --title "${RELEASE_TAG}" --prerelease --latest=false
+              gh release edit "${RELEASE_TAG}" --repo "${GH_REPO}" --title "${RELEASE_TAG}" --notes-file "${notes_file}" --prerelease --latest=false
             else
-              gh release edit "${RELEASE_TAG}" --repo "${GH_REPO}" --title "${RELEASE_TAG}" --prerelease=false --latest
+              gh release edit "${RELEASE_TAG}" --repo "${GH_REPO}" --title "${RELEASE_TAG}" --notes-file "${notes_file}" --prerelease=false --latest
             fi
           else
-            create_args=(release create "${RELEASE_TAG}" --title "${RELEASE_TAG}" --verify-tag)
+            create_args=(release create "${RELEASE_TAG}" --title "${RELEASE_TAG}" --verify-tag --notes-file "${notes_file}")
             if [[ "${IS_PRERELEASE}" == "true" ]]; then
               create_args+=(--prerelease --latest=false)
             else

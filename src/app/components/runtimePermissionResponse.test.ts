@@ -13,3 +13,13 @@ test('elicitation permissions preserve selected field values on Allow and clear 
   assert.deepEqual(buildPermissionResponse(request, 'accept', { approval: 'allow' }), { action: 'accept', content: { approval: 'allow' }, _meta: null });
   assert.deepEqual(buildPermissionResponse(request, 'decline', { approval: 'allow' }), { action: 'decline', content: null, _meta: null });
 });
+
+test('ACP permission responses return the exact user-selected option', () => {
+  const request = { responseKind: 'acp-permission' as const, fields: [], options: [
+    { optionId: 'allow-once', kind: 'allow_once' },
+    { optionId: 'always', kind: 'allow_always' },
+    { optionId: 'reject-once', kind: 'reject_once' },
+  ] };
+  assert.deepEqual(buildPermissionResponse(request, 'accept', {}, 'always'), { outcome: { outcome: 'selected', optionId: 'always' } });
+  assert.deepEqual(buildPermissionResponse(request, 'decline', {}, 'reject-once'), { outcome: { outcome: 'selected', optionId: 'reject-once' } });
+});

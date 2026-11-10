@@ -501,12 +501,12 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     }
   };
 
-  const respondToRequest = async (request: RuntimePermissionRequest, action: 'accept' | 'decline') => {
+  const respondToRequest = async (request: RuntimePermissionRequest, action: 'accept' | 'decline', optionId?: string) => {
     if (!binding || requestBusy) return;
     setRequestBusy(true);
     setError(null);
     try {
-      const response = buildPermissionResponse(request, action, Object.fromEntries(request.fields.map(field => [field.name, requestFieldValue(request, field, requestValues)])));
+      const response = buildPermissionResponse(request, action, Object.fromEntries(request.fields.map(field => [field.name, requestFieldValue(request, field, requestValues)])), optionId);
       const result = await window.electron?.agentRuntime?.sessions?.respond?.({
         bindingId: binding.id,
         requestId: request.requestId,
@@ -736,7 +736,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
               getValue={(request, field) => requestFieldValue(request, field, requestValues)}
               isMissing={(request, field) => requestFieldIsMissing(request, field, requestValues)}
               onValueChange={(request, field, value) => setRequestValues(current => ({ ...current, [requestValueKey(request, field.name)]: value }))}
-              onRespond={(request, action) => void respondToRequest(request, action)}
+              onRespond={(request, action, optionId) => void respondToRequest(request, action, optionId)}
             /></div>}
             <div>
               <div className="mx-0.5 -mb-2 flex min-h-[39px] flex-wrap items-center justify-between gap-x-2 rounded-t-xl bg-[#eaebec] px-2.5 pb-3 pt-1 text-xs font-medium text-zinc-500">

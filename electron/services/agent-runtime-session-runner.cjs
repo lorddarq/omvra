@@ -163,6 +163,32 @@ function createAgentRuntimeSessionRunner({
 
   async function sanitizedElicitation(bindingId, message, turnId) {
     if (message?.id === undefined || message?.id === null) return null;
+    if (message.method === 'session/request_permission') {
+      const params = message.params || {};
+      const toolCall = params.toolCall && typeof params.toolCall === 'object' ? params.toolCall : {};
+      const options = Array.isArray(params.options) ? params.options.slice(0, 12).flatMap(option => {
+        if (!option || typeof option.optionId !== 'string' || !option.optionId || typeof option.name !== 'string') return [];
+        return [{ optionId: option.optionId.slice(0, 160), name: option.name.slice(0, 200), kind: typeof option.kind === 'string' ? option.kind.slice(0, 80) : 'other' }];
+      }) : [];
+      if (!options.length) return null;
+      const operation = typeof toolCall.title === 'string' && toolCall.title.trim()
+        ? toolCall.title.trim()
+        : typeof toolCall.name === 'string' && toolCall.name.trim()
+          ? toolCall.name.trim()
+          : typeof toolCall.kind === 'string' && toolCall.kind.trim() ? toolCall.kind.trim() : 'tool call';
+      return {
+        bindingId,
+        turnId,
+        requestId: message.id,
+        method: message.method,
+        responseKind: 'acp-permission',
+        serverName: '',
+        mode: 'permission',
+        message: `Permission requested for ${operation.slice(0, 500)}.`,
+        fields: [],
+        options,
+      };
+    }
     const approvalMethod = typeof message.method === 'string' && [
       'item/commandExecution/requestApproval',
       'item/fileChange/requestApproval',
@@ -219,19 +245,6 @@ function createAgentRuntimeSessionRunner({
 
   function listRequests(bindingId) {
     return [...pendingRequests.values()].filter(request => request.bindingId === bindingId).map(request => JSON.parse(JSON.stringify(request)));
-  }
-
-  function advertisedApprovalContent(params = {}) {
-    const properties = params.requestedSchema?.properties;
-    if (!properties || typeof properties !== 'object' || Array.isArray(properties)) return {};
-    for (const [name, definition] of Object.entries(properties)) {
-      if (!definition || typeof definition !== 'object' || !Array.isArray(definition.enum) || definition.enum.length === 0) continue;
-      const preferred = definition.default !== undefined && definition.enum.includes(definition.default)
-        ? definition.default
-        : definition.enum.find(option => /^(?:allow|approve|approved|accept|yes)$/i.test(String(option))) ?? definition.enum[0];
-      return { [String(name).slice(0, 128)]: preferred };
-    }
-    return {};
   }
 
   function buildCurrentTaskContext(binding) {
@@ -498,29 +511,9 @@ function createAgentRuntimeSessionRunner({
       : typeof params.error?.message === 'string' ? params.error.message
         : typeof params.turn?.error?.message === 'string' ? params.turn.error.message
           : null;
-    const subject = params.toolName || params.tool?.name || params.serverName || params.server?.name || params.name || params.item?.type || null;
+    const subject = params.toolName || params.tool?.name || params.toolCall?.name || params.toolCall?.title || params.serverName || params.server?.name || params.name || params.item?.type || null;
     const reportedState = params.state || params.status || params.turn?.status || params.thread?.status;
     log(reportedState === 'failed' ? 'warn' : 'debug', 'notification', { bindingId: binding.id, kind, hasError: Boolean(errorMessage) });
-    const activeClient = clients.get(binding.id)?.client;
-    const policyApprovedOmvraCall = message?.method === 'mcpServer/elicitation/request'
-      && message.params?.serverName === 'omvra'
-      && message.params?._meta?.codex_approval_kind === 'mcp_tool_call'
-      && activeClient?.profile?.approvalPolicy === 'never';
-    if (policyApprovedOmvraCall) {
-      activeClient.respond(message.id, { action: 'accept', content: advertisedApprovalContent(message.params) });
-      return (await appendRuntimeEvent({
-        bindingId: binding.id,
-        runtimeProfileId: binding.runtimeProfileId,
-        kind: 'permission',
-        nativeEventType: 'omvra/mcpToolApproval/policy-accepted',
-        state: 'allowed',
-        outcome: 'runtime-profile-policy',
-        requestId: message.id,
-        toolName: 'omvra',
-        permissionState: 'allowed',
-        idempotencyKey: `runtime:${binding.id}:mcp-policy-approval:${String(message.id)}`,
-      }));
-    }
     const elicitation = (await sanitizedElicitation(binding.id, message, current.turn?.id));
     if (elicitation) {
       if (listRequests(binding.id).length >= 32 && !pendingRequests.has(requestKey(binding.id, elicitation.requestId))) throw Object.assign(new Error('Too many input requests'), {code:'AGENT_WORK_QUEUE_FULL'});

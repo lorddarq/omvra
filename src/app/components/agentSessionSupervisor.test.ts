@@ -100,7 +100,7 @@ test('the supervisor owns a live session registry and a reopenable active-sessio
   assert.match(statusBar, /ShieldAlert/);
   assert.match(statusBar, /CircleStop/);
   const activityIndex = execution.indexOf('Agent activity');
-  const pendingActionsIndex = execution.indexOf("onRespond={(request, action) => void respondToRequest(request, action)}");
+  const pendingActionsIndex = execution.indexOf("onRespond={(request, action, optionId) => void respondToRequest(request, action, optionId)}");
   assert.ok(pendingActionsIndex > activityIndex, 'Pending request actions must remain beside the anchored composer area');
   const permissionCard = readComponent('RuntimePermissionCard.tsx');
   assert.match(permissionCard, />Deny<\/button>/);

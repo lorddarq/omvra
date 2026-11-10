@@ -106,7 +106,7 @@ test('the supervisor owns a live session registry and a reopenable active-sessio
   assert.match(permissionCard, />Deny<\/button>/);
   assert.match(permissionCard, /onRespond\(request, 'decline'\)/);
   assert.match(execution, /requestFieldIsMissing/);
-  assert.match(execution, /Reconnect session/);
+  assert.match(execution, /Restart task/);
   assert.match(execution, /onBlockedByBinding\(result\.binding/);
   assert.match(source, /onBlockedByBinding=\{openBinding\}/);
 });

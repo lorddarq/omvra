@@ -53,6 +53,7 @@ function normalizeCommand(method, input = {}) {
     return { digest:identifier(input.digest), binding:{ ...created,id:identifier(b.id),revision:integer(b.revision),state:identifier(b.state),schemaVersion:1,createdAt:timestamp(b.createdAt),updatedAt:timestamp(b.updatedAt),lastObservedAt:timestamp(b.lastObservedAt),...(b.opaqueSessionRef ? {opaqueSessionRef:identifier(b.opaqueSessionRef,false,512)} : {}),...(b.terminalReason ? {terminalReason:identifier(b.terminalReason)} : {}),...(b.turn ? {turn:turn(b.turn)} : {}) } };
   }
   if (method === 'migrationFinalize') { object(input, ['bindingId']); return {bindingId:identifier(input.bindingId)}; }
+  if (method === 'resetTaskCache') { object(input, ['taskId']); return {taskId:identifier(input.taskId)}; }
   if (method === 'migrationEvent') {
     object(input, ['event']);
     return normalizeCommand('appendEvent', input.event);

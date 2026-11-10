@@ -55,6 +55,7 @@ const {
   listAgentRuntimeSessions,
   prepareAgentExecution,
   recoverOrphanedTaskExecution,
+  resetAgentRuntimeTaskCache,
   prepareAgentRuntimeSessionArchive,
   initializeAgentWorkStorage,
   updateAgentRuntimeSessionBinding,
@@ -776,6 +777,16 @@ registerAgentRuntimeIpcHandlers({
   listAgentRuntimeSessions: (payload) => listAgentRuntimeSessions(store, payload),
   prepareAgentExecution: (payload) => prepareAgentExecution(store, payload),
   recoverOrphanedTaskExecution: (payload) => recoverOrphanedTaskExecution(store, payload),
+  resetAgentRuntimeTaskCache: async (taskId) => {
+    const { bindings = [] } = await listAgentRuntimeSessions(store, { taskId, limit: 100, includeEvents: false });
+    for (const binding of bindings) {
+      if (!['closed', 'failed'].includes(binding.state)) {
+        const closed = await agentRuntimeSessionRunner.close(binding.id);
+        if (!closed?.ok) return closed;
+      }
+    }
+    return resetAgentRuntimeTaskCache(store, taskId);
+  },
   prepareAgentRuntimeSessionArchive: (bindingId) => prepareAgentRuntimeSessionArchive(store, bindingId),
   updateAgentRuntimeSessionBinding: (payload) => updateAgentRuntimeSessionBinding(store, payload),
   startAgentRuntimeSession: (payload) => agentRuntimeSessionRunner.start(payload),

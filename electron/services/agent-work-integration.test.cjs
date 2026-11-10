@@ -167,6 +167,26 @@ test('workspace facade cuts over together and keeps a ready session attached to 
     assert.equal(closed.binding.opaqueSessionRef,undefined);
   } finally {await owner.close();}
 });
+test('task cache reset clears all runtime history for that task and protects live work',async t=>{
+  const f=await fixture(t);
+  const service=createAgentWorkSessionService({repository:f.repo,store:f.store,readTasks:()=>[],attachBindingToAttempt:()=>({ok:true}),appendTaskContext:()=>({ok:true})});
+  const create=async(taskId,id)=>{
+    let binding=(await service.createBinding(f.store,{runtimeProfileId:'runtime-1',scope:{kind:'task',taskId,executionAttemptId:`attempt-${taskId}`,taskRevision:0},idempotencyKey:id})).binding;
+    binding=(await service.updateBinding(f.store,{bindingId:binding.id,expectedRevision:binding.revision,state:'closed',terminalReason:'closed'})).binding;
+    await service.appendEvent(f.store,{bindingId:binding.id,runtimeProfileId:'runtime-1',kind:'session',nativeEventType:'omvra/session/closed',state:'closed',idempotencyKey:`event-${id}`});
+    return binding;
+  };
+  const target=await create('task-1','target');
+  const other=await create('task-2','other');
+  assert.equal((await service.resetTaskCache(f.store,'task-1')).clearedSessions,1);
+  assert.deepEqual((await service.list(f.store,{taskId:'task-1'})).bindings,[]);
+  const otherHistory=await service.list(f.store,{bindingId:other.id});
+  assert.equal(otherHistory.bindings.length,1);
+  assert.equal(otherHistory.events.length,1);
+  const live=(await service.createBinding(f.store,{runtimeProfileId:'runtime-1',scope:{kind:'task',taskId:'task-1',executionAttemptId:'live-attempt',taskRevision:0},idempotencyKey:'live-session'})).binding;
+  assert.equal((await service.resetTaskCache(f.store,'task-1')).error,'ACP_SESSION_ACTIVE');
+  assert.ok(live.id);
+});
 test('migration verifies destination fields, not merely source digest labels',async t=>{
   const f=await fixture(t);legacy(f);
   const wrapped={...f.repo,migrationVerify:async()=>{

@@ -406,18 +406,15 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     return resolvedBinding;
   };
 
-  const recoverOrphanedSession = async (bindingId: string) => {
-    const closed = await window.electron?.agentRuntime?.sessions?.close?.(bindingId);
-    if (!closed?.ok) throw new Error(closed?.message || closed?.error || 'The unavailable runtime session could not be replaced.');
+  const resetTaskSessionCache = async () => {
+    const reset = await window.electron?.agentRuntime?.sessions?.resetTaskCache?.(task.id);
+    if (!reset?.ok) throw new Error(reset?.message || reset?.error || 'The task session cache could not be reset.');
     setBinding(null);
     setLatestFailureClass(undefined);
     setPendingRequests([]);
-    const replacement = await refreshSession();
-    // Re-enter the normal launch effect: it continues a recovered `ready`
-    // session, leaves active/input sessions alone, and starts a new session
-    // only when no usable replacement exists.
-    setStartRequested(!replacement || replacement.state === 'ready' || replacement.state === 'starting' || isAgentRuntimeTurnInFlight(replacement));
-    toast.info('Runtime session recovered', { description: 'The previous provider session was replaced while preserving your task context.' });
+    setRequestValues({});
+    await refreshSession();
+    return reset;
   };
 
   const startWork = async (replaceBinding = false) => {
@@ -426,10 +423,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
     setError(null);
     console.info('[agent-runtime:ui] session-start.requested', { taskId: task.id, executionProfileId: resolution.profile.id });
     try {
-      if (replaceBinding && binding) {
-        const closed = await window.electron?.agentRuntime?.sessions?.close?.(binding.id);
-        if (!closed?.ok) throw new Error(closed?.message || closed?.error || 'The previous work session could not be replaced.');
-      }
+      if (replaceBinding) await resetTaskSessionCache();
       const result = await window.electron?.agentRuntime?.sessions?.start?.({
         confirmed: true,
         taskId: task.id,
@@ -486,7 +480,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
           : await sessions?.[operation]?.({ bindingId: binding.id, text });
         if (!result?.ok) {
           if (result.error === 'ACP_SESSION_NOT_FOUND') {
-            await recoverOrphanedSession(binding.id);
+            await resetTaskSessionCache();
             return;
           }
           throw new Error(result?.message || result?.error || 'The requested action failed.');
@@ -515,7 +509,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
       if (!result?.ok) {
         if (result.error === 'ACP_SESSION_NOT_FOUND') {
           setRequestValues({});
-          await recoverOrphanedSession(binding.id);
+          await resetTaskSessionCache();
           return;
         }
         throw new Error(result.message || result.error || 'Your response could not be submitted.');
@@ -539,7 +533,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
       const result = await window.electron?.agentRuntime?.sessions?.resume?.({ bindingId: binding.id, workspacePath: resolvedRepositoryFolder });
       if (!result?.ok) {
         if (result.error === 'ACP_SESSION_NOT_FOUND') {
-          await recoverOrphanedSession(binding.id);
+          await resetTaskSessionCache();
           return;
         }
         throw new Error(result?.message || result?.error || 'Work could not be resumed.');
@@ -561,7 +555,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
       const result = await window.electron?.agentRuntime?.sessions?.continueTask?.(binding.id);
       if (!result?.ok) {
         if (result.error === 'ACP_SESSION_NOT_FOUND') {
-          await recoverOrphanedSession(binding.id);
+          await resetTaskSessionCache();
           return;
         }
         throw new Error(result.message || result.error || 'Work could not be continued.');
@@ -672,9 +666,9 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
             {mcpReadOnly && <ExecutionNotice tone="warning" title="Task access is read-only">The agent can inspect this task but cannot change its description or status. Select Task Write under Settings → MCP Access, then restart the listener.</ExecutionNotice>}
             {error && <div className="mb-3"><ExecutionNotice tone="danger" title={getAttentionState('failed').label} nextStep={getAttentionState('failed').nextStep}>{error}</ExecutionNotice></div>}
             {!error && !authenticationRequired && blockers.length > 0 && <div className="mb-3"><ExecutionHint tone={taskAlreadyComplete ? 'warning' : 'danger'} title={taskAlreadyComplete ? 'Task already complete' : 'Action needed before work starts'} body={`${blockers.join(' ')} ${taskAlreadyComplete ? 'Reopen or move the task to In progress, then start work.' : getAttentionState('blocked').nextStep}`} /></div>}
-            {!terminalBinding && turnState === 'waiting-input' && sessionLoaded && pendingRequests.length === 0 && binding && <ExecutionNotice tone="warning" title="Input request unavailable" nextStep="Reconnect the session to continue." assertive>
-              <div>Omvra no longer has an answerable request for this session.</div>
-              <button type="button" onClick={() => void recoverOrphanedSession(binding.id)} disabled={operationBusy} className="mt-3 rounded bg-black/5 px-2.5 py-1.5 font-semibold disabled:opacity-40">Reconnect session</button>
+            {!terminalBinding && turnState === 'waiting-input' && sessionLoaded && pendingRequests.length === 0 && binding && <ExecutionNotice tone="warning" title="Input request unavailable" nextStep="Restart this task to clear its session cache and start fresh." assertive>
+              <div>Omvra no longer has an answerable request for this session. The unanswered turn cannot continue.</div>
+              <button type="button" onClick={() => void startWork(true)} disabled={operationBusy || loading || blockers.length > 0 || !resolvedRepositoryFolder} className="mt-3 rounded bg-black/5 px-2.5 py-1.5 font-semibold disabled:opacity-40">Restart task</button>
             </ExecutionNotice>}
             {/* Retained diagnostics for a future detail view; no underlying task/session data is removed. */}
             <div hidden>
@@ -751,7 +745,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                 <div className="ml-auto flex items-center gap-1">
                   {awayFromLatest && <button type="button" onClick={() => activityRef.current?.scrollTo({ top: activityRef.current.scrollHeight, behavior: 'instant' })} className="rounded px-1.5 py-1 hover:bg-black/5">Jump to latest</button>}
               {resolution?.profile?.integrationMode === 'external-handoff' && <button type="button" onClick={() => void openExternal()} disabled={operationBusy || !resolvedRepositoryFolder} className="rounded-md px-1.5 py-1 text-xs font-medium text-zinc-500 outline-none hover:bg-black/5 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-blue-500">Open externally</button>}
-              {!awayFromLatest && task.status !== 'done' && binding?.state === 'ready' && <button type="button" onClick={() => void startWork(true)} disabled={operationBusy || loading || blockers.length > 0 || !resolvedRepositoryFolder || isAgentRuntimeTurnInFlight(binding)} className="rounded-md px-1.5 py-1 text-xs font-medium text-zinc-500 outline-none hover:bg-black/5 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-blue-500" title="Start a new work attempt with the current runtime configuration">Restart</button>}
+              {!awayFromLatest && task.status !== 'done' && binding && <button type="button" onClick={() => void startWork(true)} disabled={operationBusy || loading || blockers.length > 0 || !resolvedRepositoryFolder || isAgentRuntimeTurnInFlight(binding)} className="rounded-md px-1.5 py-1 text-xs font-medium text-zinc-500 outline-none hover:bg-black/5 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-blue-500" title="Clear this task’s session cache and start a fresh work attempt">Restart</button>}
               {!awayFromLatest && task.status !== 'done' && binding?.state === 'ready' && <button type="button" onClick={() => void continueTaskSession()} disabled={operationBusy || isAgentRuntimeTurnInFlight(binding)} className="rounded-md px-1.5 py-1 text-xs font-medium text-zinc-500 outline-none hover:bg-black/5 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-blue-500">{operationBusy ? 'Continuing…' : 'Continue'}</button>}
               {task.status !== 'done' && !authenticationRequired && (binding?.state === 'interrupted' || binding?.state === 'failed' || binding?.state === 'closed' || !binding) && <button type="button" onClick={() => void (binding?.state === 'interrupted' && hasCapability('resume') ? resumeSession() : startWork(Boolean(binding && !terminalBinding)))} disabled={operationBusy || (binding?.state === 'interrupted' ? !resolvedRepositoryFolder : loading || blockers.length > 0 || activeAttempt)} className="rounded-md px-1.5 py-1 text-xs font-medium text-zinc-500 outline-none hover:bg-black/5 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-blue-500">{binding?.state === 'interrupted' && hasCapability('resume') ? 'Resume' : binding?.state === 'closed' ? 'Restart' : binding?.state === 'failed' ? 'Restart' : activeAttempt ? 'Work in progress' : operationBusy ? 'Starting…' : 'Start'}</button>}
 

@@ -28,6 +28,7 @@ function registerAgentRuntimeIpcHandlers({
   listAgentRuntimeSessions,
   prepareAgentExecution,
   recoverOrphanedTaskExecution = null,
+  resetAgentRuntimeTaskCache = null,
   prepareAgentRuntimeSessionArchive,
   updateAgentRuntimeSessionBinding,
   startAgentRuntimeSession,
@@ -123,6 +124,7 @@ function registerAgentRuntimeIpcHandlers({
   handle('agent-runtime/sessions/cancel', async (_, payload) => invokeAgentRuntimeSession(payload.bindingId, 'cancel'));
   handle('agent-runtime/sessions/respond', async (_, payload) => respondAgentRuntimeSession(payload.bindingId, payload.requestId, payload.result, payload.error));
   handle('agent-runtime/sessions/close', async (_, bindingId) => closeAgentRuntimeSession(bindingId));
+  handle('agent-runtime/sessions/reset-task-cache', async (_, taskId) => resetAgentRuntimeTaskCache?.(taskId) || {ok:false,error:'TASK_SESSION_RESET_UNAVAILABLE'});
   handle('agent-runtime/sessions/continue-task', async (_, bindingId) => logged('session-continue-task', { bindingId: bindingId || null }, () => continueAgentRuntimeTaskSession(bindingId)));
   handle('agent-runtime/sessions/resume', async (_, payload = {}) => logged('session-resume', { bindingId: payload.bindingId || null }, () => resumeAgentRuntimeSession(payload.bindingId, payload)));
   handle('agent-runtime/test-connection', async (_, payload) => {

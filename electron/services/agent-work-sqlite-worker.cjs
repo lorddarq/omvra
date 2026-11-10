@@ -489,6 +489,19 @@ const methods = {
   },
   completeTurn: input => transaction(()=>complete(input)), snapshot,
   listSessions: input => ({ sessions: all(`SELECT * FROM agent_sessions s WHERE id>? AND (? IS NULL OR task_id=?) ${input.activeOnly ? `AND EXISTS(SELECT 1 FROM agent_turns t WHERE t.session_id=s.id AND t.state IN (${activeTurns}))` : ''} ORDER BY ${input.recent?'updated_at DESC,id DESC':'id'} LIMIT ?`,input.afterId,input.taskId,input.taskId,input.limit+1).map(binding) }),
+  resetTaskCache: ({taskId}) => transaction(()=>{
+    const rows=all('SELECT id FROM agent_sessions WHERE task_id=?',taskId);
+    if(rows.some(({id})=>get(`SELECT 1 FROM agent_sessions s WHERE s.id=? AND (s.state IN ('starting','ready','active','needs-input','cancelling') OR EXISTS(SELECT 1 FROM agent_turns t WHERE t.session_id=s.id AND t.state IN (${activeTurns})))`,id))) fail('ACP_SESSION_ACTIVE');
+    for(const {id} of rows) {
+      run('DELETE FROM agent_delivery_state WHERE session_id=?',id);
+      run('DELETE FROM agent_notifications WHERE session_id=?',id);
+      run('DELETE FROM agent_events WHERE session_id=?',id);
+      run('DELETE FROM agent_turns WHERE session_id=?',id);
+      run('DELETE FROM agent_work_projections WHERE session_id=?',id);
+      run('DELETE FROM agent_sessions WHERE id=?',id);
+    }
+    return {ok:true,clearedSessions:rows.length};
+  }),
   governance: ({bindingId}) => {
     const s=session(bindingId),g=JSON.parse(s.governance_json);
     return {binding:binding(s),latestUsage:g.latestUsage,metrics:{turns:g.historyIncomplete?null:g.turns,toolCalls:g.historyIncomplete?null:g.toolCalls,reportedTokens:g.historyIncomplete&&g.latestUsage?.aggregation!=='cumulative'?null:g.usageTokens,reportedCost:g.historyIncomplete&&g.latestUsage?.aggregation!=='cumulative'?null:g.usageCost,concurrency:get(`SELECT count(*) AS n FROM agent_turns WHERE state IN (${activeTurns})`).n,attempts:get('SELECT count(*) AS n FROM agent_sessions WHERE scope_kind=? AND task_id IS ? AND contribution_id IS ? AND goal_id IS ? AND goal_element_id IS ?',s.scope_kind,s.task_id,s.contribution_id,s.goal_id,s.goal_element_id).n}};

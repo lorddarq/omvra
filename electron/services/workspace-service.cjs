@@ -1925,6 +1925,19 @@ function recoverOrphanedTaskExecution(store, { taskId } = {}) {
   }
 }
 
+function resetAgentRuntimeTaskCache(store, taskId) {
+  const normalizedTaskId = normalizeString(taskId);
+  if (!normalizedTaskId) return { ok: false, error: 'INVALID_AGENT_WORK_IDENTIFIER' };
+  if (agentWorkServices.has(store)) return runtimeServiceCall('resetTaskCache', store, normalizedTaskId);
+  if (store.get(AGENT_WORK_STORAGE_KEY)) throw Object.assign(new Error('AGENT_WORK_OWNER_UNAVAILABLE'), { code: 'AGENT_WORK_OWNER_UNAVAILABLE' });
+  const taskBindings = readArray(store, SESSION_BINDINGS_KEY).filter(binding => binding.scope?.kind === 'task' && binding.scope.taskId === normalizedTaskId);
+  if (taskBindings.some(binding => OWNED_RUNTIME_SESSION_STATES.has(binding.state) || ACTIVE_RUNTIME_TURN_STATES.has(binding.turn?.state))) return { ok: false, error: 'ACP_SESSION_ACTIVE' };
+  const bindingIds = new Set(taskBindings.map(binding => binding.id));
+  store.set(SESSION_BINDINGS_KEY, readArray(store, SESSION_BINDINGS_KEY).filter(binding => !bindingIds.has(binding.id)));
+  store.set(SESSION_EVENTS_KEY, readArray(store, SESSION_EVENTS_KEY).filter(event => !bindingIds.has(event.bindingId)));
+  return { ok: true, clearedSessions: bindingIds.size };
+}
+
 const {
   append: appendTaskContextEntry,
   get: getTaskContextEntry,
@@ -2045,6 +2058,7 @@ module.exports = {
   getTaskById,
   getTaskCollaborationHistory,
   recoverOrphanedTaskExecution,
+  resetAgentRuntimeTaskCache,
   listTaskContextEntries,
   getTaskContextEntry,
   appendTaskContextEntry,

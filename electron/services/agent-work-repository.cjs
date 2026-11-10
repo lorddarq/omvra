@@ -130,6 +130,7 @@ async function createAgentWorkRepository({ storePath, policy, maintenanceSuspend
     resumeMaintenance: ()=>{ maintenanceSuspended=false; schedulePrune(); },
     createSession: input=>request('createSession',input),
     updateSession: input=>request('updateSession',input),
+    resetTaskCache: input=>request('resetTaskCache',input),
     appendEvent: input=>request('appendEvent',input),
     completeTurn: input=>request('completeTurn',input),
     governance: input=>request('governance',input),

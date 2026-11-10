@@ -76,6 +76,10 @@ function createAgentWorkSessionService({repository,store,attachBindingToAttempt,
     const result=await repository.updateSession({...input,...(['closed','failed'].includes(input.state)?{recoveryRequired:false}:{})});
     return {...result,binding:await load(input.bindingId)};
   }
+  async function completeTurn(_store,input) {
+    const result=await repository.completeTurn(input);
+    return {ok:true,binding:project(result.snapshot),notification:result.notification};
+  }
   async function appendEvent(_store,input) {
     const result=await repository.appendEvent(eventInput(input));
     const transient=eventNormalizer.normalizeEvent(input).event || {};
@@ -96,8 +100,17 @@ function createAgentWorkSessionService({repository,store,attachBindingToAttempt,
     if(!binding.opaqueSessionRef && !binding.recoveryRequired) return {ok:true,binding,changed:false};
     return {...await updateBinding(store,{bindingId,expectedRevision:binding.revision,state:'closed',terminalReason:'closed',opaqueSessionRef:''}),changed:true};
   }
+  async function resetTaskCache(_store,taskId) {
+    if(typeof taskId!=='string'||!taskId.trim()) return {ok:false,error:'INVALID_AGENT_WORK_IDENTIFIER'};
+    try {
+      const result=await repository.resetTaskCache({taskId:taskId.trim()});
+      return {ok:true,...result};
+    } catch(error) {
+      return {ok:false,error:error?.code||'AGENT_WORK_STORAGE_FAILED'};
+    }
+  }
   const maintenance=createAgentWorkMaintenance({repository,store});
-  return {maintenance,createBinding,updateBinding,appendEvent,list,appendDurableOutcome,evaluateGovernance,prepareArchive,reconcileInterrupted:()=>list(store,{includeEvents:false}),close:async()=>{await maintenance.close();await repository.close();}};
+  return {maintenance,createBinding,updateBinding,completeTurn,appendEvent,list,appendDurableOutcome,evaluateGovernance,prepareArchive,resetTaskCache,reconcileInterrupted:()=>list(store,{includeEvents:false}),close:async()=>{await maintenance.close();await repository.close();}};
 }
 async function openAgentWorkSessionService(options) {
   if(options.store.get(STORAGE_KEY)) {

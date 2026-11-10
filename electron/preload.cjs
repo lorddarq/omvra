@@ -162,6 +162,7 @@ contextBridge.exposeInMainWorld('electron', {
       cancel: (payload) => ipcRenderer.invoke('agent-runtime/sessions/cancel', payload),
       respond: (payload) => ipcRenderer.invoke('agent-runtime/sessions/respond', payload),
       close: (bindingId) => ipcRenderer.invoke('agent-runtime/sessions/close', bindingId),
+      resetTaskCache: (taskId) => ipcRenderer.invoke('agent-runtime/sessions/reset-task-cache', taskId),
       continueTask: (bindingId) => ipcRenderer.invoke('agent-runtime/sessions/continue-task', bindingId),
       resume: (payload) => ipcRenderer.invoke('agent-runtime/sessions/resume', payload),
     },

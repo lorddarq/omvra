@@ -2,6 +2,10 @@
 
 All notable changes for Omvra release candidates should be documented in this file.
 
+## 0.3.263 - 2026-11-11
+
+- Standardize execution notices and toast notifications with Omvra's semantic colors and typography; show task blockers and restart prerequisites directly in the supervision panel.
+
 ## Unreleased
 
 - Resolve task workspaces from Omvra's canonical task/project record when a launch surface omits the repository folder.

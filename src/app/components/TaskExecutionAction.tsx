@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { AlertTriangle, Folder, Info, Play, Server, Minimize2, ShieldCheck, Hourglass } from 'lucide-react';
+import { Folder, Play, Server, Minimize2, ShieldCheck, Hourglass } from 'lucide-react';
 import { AtomSpinner } from './ui/AtomSpinner';
 import { toast } from 'sonner';
 import type { Task } from '../types';
@@ -20,7 +20,6 @@ import { buildPermissionResponse } from './runtimePermissionResponse';
 import { ExecutionNotice } from './ExecutionNotice';
 import { getAttentionState } from '../utils/attention';
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from './ui/sheet';
-import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { measurePerformanceOperation } from '../services/performanceLogging.ts';
 
 interface RuntimeState {
@@ -114,20 +113,7 @@ function taskStatusLabel(status: Task['status']) {
 }
 
 function ExecutionHint({ tone, title, body }: { tone: 'info' | 'warning' | 'danger'; title: string; body: string }) {
-  const Icon = tone === 'info' ? Info : AlertTriangle;
-  const colorClass = tone === 'danger' ? 'text-red-700 hover:bg-red-50 focus-visible:ring-red-500' : tone === 'warning' ? 'text-amber-700 hover:bg-amber-50 focus-visible:ring-amber-500' : 'text-blue-700 hover:bg-blue-50 focus-visible:ring-blue-500';
-  return <Tooltip>
-    <TooltipTrigger asChild>
-      <button type="button" aria-label={`${title}: ${body}`} className={`inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ${colorClass}`}>
-        <Icon className="size-3.5" aria-hidden="true" />
-        <span>{title}</span>
-      </button>
-    </TooltipTrigger>
-    <TooltipContent side="bottom" align="start" className="w-[min(360px,calc(100vw-2rem))] flex-col items-start whitespace-normal text-left">
-      <div className="font-semibold">{title}</div>
-      <div className="mt-1 font-normal text-white/85">{body}</div>
-    </TooltipContent>
-  </Tooltip>;
+  return <ExecutionNotice tone={tone} title={title}>{body}</ExecutionNotice>;
 }
 
 export function TaskExecutionAction({ task, repositoryFolder, trigger, openRequest, onOpenRequestHandled, onVisibilityChange, onBindingChange, delivery, onBlockedByBinding, startOnTrigger = false, startOnOpenRequest = true, onOpen }: TaskExecutionActionProps) {
@@ -304,7 +290,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   const agentOutput = deliveredOutput?.text ?? '';
   const activity = projectDeliveryActivity(deliveryControl?.activity);
   const taskStarted = hasAgentRuntimeTaskStarted(turnState, []) || Boolean(binding?.turn?.id);
-  const visibleActivity = activity.length > 0 ? activity : binding?.state === 'interrupted'
+  const visibleActivity = inputRequestUnavailable ? [] : activity.length > 0 ? activity : binding?.state === 'interrupted'
     ? [{ id: `${binding.id}-interrupted`, label: 'Work was interrupted', detail: 'Start work again to reconnect and continue with the task instructions.', count: 1, tone: 'warning' as const }]
     : binding?.state === 'failed'
       ? [{ id: `${binding.id}-failed`, label: 'Previous runtime unavailable', detail: 'Start a new session to reconnect; the current task context is preserved.', count: 1, tone: 'danger' as const }]
@@ -686,13 +672,13 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
             {visibleActivity.length ? visibleActivity.map(item => <div key={item.id} className="flex items-start justify-between gap-4" title={item.detail}>
               <span className={`min-w-0 font-semibold ${item.tone === 'danger' ? 'text-red-600' : ''}`}>{item.label === 'Task instructions accepted' ? item.detail : item.label}{item.count > 1 ? ` × ${item.count}` : ''}</span>
               {'observedAt' in item && item.observedAt && <time className="shrink-0 text-slate-400" dateTime={item.observedAt}>{new Date(item.observedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</time>}
-            </div>) : !agentOutput && !binding?.latestSummary && <p className="px-3">{loading ? 'Preparing your work session…' : binding ? 'The agent has not started work yet.' : 'No session is running. Choose Start task to create a fresh work session.'}</p>}
+            </div>) : !agentOutput && !binding?.latestSummary && <p className="px-3">{loading ? 'Preparing your work session…' : inputRequestUnavailable ? 'The session is waiting for a request Omvra can no longer retrieve.' : binding ? 'The agent has not started work yet.' : 'No session is running. Choose Start task to create a fresh work session.'}</p>}
             {mcpReadOnly && <ExecutionNotice tone="warning" title="Task access is read-only">The agent can inspect this task but cannot change its description or status. Select Task Write under Settings → MCP Access, then restart the listener.</ExecutionNotice>}
             {error && <div className="mb-3"><ExecutionNotice tone="danger" title={getAttentionState('failed').label} nextStep={getAttentionState('failed').nextStep}>{error}</ExecutionNotice></div>}
             {!error && !authenticationRequired && blockers.length > 0 && <div className="mb-3"><ExecutionHint tone={taskAlreadyComplete ? 'warning' : 'danger'} title={taskAlreadyComplete ? 'Task already complete' : 'Action needed before work starts'} body={`${blockers.join(' ')} ${taskAlreadyComplete ? 'Reopen or move the task to In progress, then start work.' : getAttentionState('blocked').nextStep}`} /></div>}
-            {inputRequestUnavailable && <ExecutionNotice tone="warning" title="Input request unavailable" nextStep="Restart clears this task’s session cache and starts a fresh work session." assertive>
+            {inputRequestUnavailable && <ExecutionNotice tone="warning" title="Input request unavailable" nextStep={!resolvedRepositoryFolder ? 'Check the repository folder on this task or its project, and confirm that the folder exists.' : !resolution?.profile ? 'Choose an available agent runtime before restarting.' : 'Restart clears this task’s session cache and starts a fresh work session.'} assertive>
               <div>Omvra no longer has an answerable request for this session. The unanswered turn cannot continue.</div>
-              <button type="button" onClick={() => void startWork(true)} disabled={operationBusy || loading || !resolvedRepositoryFolder || !resolution?.profile} className="mt-3 rounded bg-black/5 px-2.5 py-1.5 font-semibold disabled:opacity-40">Restart task</button>
+              {resolvedRepositoryFolder && resolution?.profile && <button type="button" onClick={() => void startWork(true)} disabled={operationBusy || loading} className="mt-3 min-h-9 rounded-md border border-[var(--omvra-color-border-default)] bg-[var(--omvra-color-surface-default)] px-3 py-1.5 text-xs font-semibold text-[var(--omvra-color-text-primary)] hover:bg-[var(--omvra-color-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--omvra-color-focus)] disabled:opacity-50">Restart task</button>}
             </ExecutionNotice>}
             {/* Retained diagnostics for a future detail view; no underlying task/session data is removed. */}
             <div hidden>

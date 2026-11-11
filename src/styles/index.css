@@ -7,33 +7,27 @@
 @import './components.css';
 @import './onboarding.css';
 
-/* Compact success toast style aligned with the agent workflow notification pattern. */
-[data-sonner-toast][data-type='success'] {
-  width: min(400px, calc(100vw - 32px)) !important;
-  min-height: 64px !important;
-  padding: 14px 20px !important;
-  border: 0 !important;
-  border-radius: 16px !important;
-  background: #ffffff !important;
-  color: #71717a !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14) !important;
+/* Keep toast types visually consistent; color marks the icon, while content stays calm and readable. */
+[data-sonner-toast] {
+  border-radius: var(--omvra-radius-control) !important;
+  box-shadow: var(--omvra-elevation-floating) !important;
 }
 
-[data-sonner-toast][data-type='success'] [data-icon] {
-  color: #16a34a !important;
+[data-sonner-toast] [data-title] {
+  color: var(--omvra-color-text-primary) !important;
+  font-size: 13px !important;
+  font-weight: var(--omvra-font-weight-semibold) !important;
 }
 
-[data-sonner-toast][data-type='success'] [data-title] {
-  color: #16a34a !important;
-  font-size: 14px !important;
-  font-weight: 500 !important;
+[data-sonner-toast] [data-description] {
+  color: var(--omvra-color-text-secondary) !important;
+  font-size: 13px !important;
 }
 
-[data-sonner-toast][data-type='success'] [data-description] {
-  color: #71717a !important;
-  font-size: 14px !important;
-  font-weight: 400 !important;
-}
+[data-sonner-toast][data-type='success'] [data-icon] { color: var(--omvra-color-feedback-positive) !important; }
+[data-sonner-toast][data-type='error'] [data-icon] { color: var(--omvra-color-feedback-danger) !important; }
+[data-sonner-toast][data-type='warning'] [data-icon] { color: var(--omvra-color-feedback-warning) !important; }
+[data-sonner-toast][data-type='info'] [data-icon] { color: var(--omvra-color-feedback-info) !important; }
 
 * {
   -webkit-font-smoothing: antialiased;

@@ -5,13 +5,12 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       position="bottom-right"
       theme="light"
-      richColors
       className="toaster group"
       style={
         {
-          "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
-          "--normal-border": "var(--border)",
+          "--normal-bg": "var(--omvra-color-surface-default)",
+          "--normal-text": "var(--omvra-color-text-primary)",
+          "--normal-border": "var(--omvra-color-border-default)",
         } as React.CSSProperties
       }
       {...props}

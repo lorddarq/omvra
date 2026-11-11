@@ -42,6 +42,7 @@ function registerAgentRuntimeIpcHandlers({
   continueAgentRuntimeTaskSession,
   resumeAgentRuntimeSession,
   resolveManagedWorkspace,
+  resolveTaskWorkspace = null,
   logger = null,
 }) {
   const handle = (channel, action) => ipcMain.handle(channel, async (...args) => {
@@ -71,6 +72,7 @@ function registerAgentRuntimeIpcHandlers({
   handle('agent-runtime/delete-profile', (_, profileId) => resultOf(() => deleteProfile(store, profileId)));
   handle('agent-runtime/save-defaults', (_, defaults) => resultOf(() => saveDefaults(store, defaults)));
   handle('agent-runtime/resolve', (_, payload) => resultOf(() => resolveProfile(store, payload)));
+  handle('agent-runtime/resolve-task-workspace', (_, taskId) => resultOf(() => resolveTaskWorkspace?.(taskId) || null));
   handle('agent-runtime/resolve-managed-workspace', (_, taskId) => resultOf(() => resolveManagedWorkspace(taskId)));
   handle('agent-runtime/prepare-execution', async (_, payload = {}) => {
     return logged('prepare-execution', { taskId: payload.taskId || null }, async () => {

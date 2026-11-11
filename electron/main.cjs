@@ -777,6 +777,10 @@ registerAgentRuntimeIpcHandlers({
   listAgentRuntimeSessions: (payload) => listAgentRuntimeSessions(store, payload),
   prepareAgentExecution: (payload) => prepareAgentExecution(store, payload),
   recoverOrphanedTaskExecution: (payload) => recoverOrphanedTaskExecution(store, payload),
+  resolveTaskWorkspace: (taskId) => {
+    const context = resolveTaskExecutionContext(store, taskId);
+    return context.workspaceResolution?.repositoryFolder ? { repositoryFolder: context.workspaceResolution.repositoryFolder } : null;
+  },
   resetAgentRuntimeTaskCache: async (taskId) => {
     const { bindings = [] } = await listAgentRuntimeSessions(store, { taskId, limit: 100, includeEvents: false });
     for (const binding of bindings) {

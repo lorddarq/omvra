@@ -169,7 +169,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   const activeAttempt = isAgentRuntimeTurnInFlight(binding || undefined) || (Boolean(activeContribution?.latestAttemptId) && (
     !preflight || preflight.blockers?.some(blocker => blocker.code === 'ACP_EXECUTION_ALREADY_ACTIVE') === true
   ));
-  const executionContributionId = preflight?.contractSnapshot?.contributionId || startableContribution?.id;
+  const executionContributionId = preflight?.contractSnapshot?.contributionId || startableContribution?.id || activeContribution?.id;
   const resolvedRepositoryFolder = workspace?.workspacePath || '';
   const repositorySource = workspace ? agentRuntimeWorkspaceSourceLabel(workspace.source) : loading ? 'Resolving' : 'Not configured';
   const reportRuntimeError = (operation: string, caught: unknown, fallback: string) => {
@@ -217,9 +217,10 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
         setRuntimeState(state);
         const mcpCapabilities = await window.electron.mcp.getCapabilities();
         if (!cancelled) setMcpReadOnly(mcpCapabilities.ok ? Boolean(mcpCapabilities.data?.readOnly) : null);
+        const canonicalWorkspace = await window.electron.agentRuntime.resolveTaskWorkspace(task.id);
         const resolvedWorkspace = resolveAgentRuntimeWorkspace(
           task.repositoryFolder,
-          repositoryFolder,
+          canonicalWorkspace.ok ? canonicalWorkspace.value?.repositoryFolder || repositoryFolder : repositoryFolder,
           state.defaults?.globalWorkspacePath,
         );
         if (!cancelled) setWorkspace(resolvedWorkspace);
@@ -296,6 +297,7 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   const latestTurnCompleted = deliveryAttention?.category === 'completed' || binding?.turn?.state === 'completed';
   const sessionProjection = projectAgentRuntimeSession(binding || undefined, [], { turnCompleted: latestTurnCompleted });
   const { lastBatchCompleted, turnState } = sessionProjection;
+  const inputRequestUnavailable = !terminalBinding && turnState === 'waiting-input' && sessionLoaded && pendingRequests.length === 0 && Boolean(binding);
   const sessionSummary = sessionProjection.summary;
   const taskExecutionLabel: Record<string, string> = { starting: 'Starting', ready: 'Ready', working: 'Working', continuing: 'Continuing', waiting: 'Waiting for input', stopping: 'Stopping', 'batch-finished': 'Batch finished', interrupted: 'Interrupted', stopped: 'Stopped', failed: 'Failed', 'ready-for-review': 'Ready for review', 'outcome-unreconciled': 'Outcome needs review', complete: 'Complete' };
   // Model output and activity arrive only as bounded main-process projections, never as per-event streams.
@@ -418,12 +420,34 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   };
 
   const startWork = async (replaceBinding = false) => {
-    if (!resolvedRepositoryFolder || !resolution?.profile || blockers.length > 0 || operationBusy) return;
+    if (!resolvedRepositoryFolder || !resolution?.profile || (!replaceBinding && blockers.length > 0) || operationBusy) return;
     setOperationBusy(true);
     setError(null);
     console.info('[agent-runtime:ui] session-start.requested', { taskId: task.id, executionProfileId: resolution.profile.id });
     try {
-      if (replaceBinding) await resetTaskSessionCache();
+      let currentPreflight = preflight;
+      if (replaceBinding) {
+        await resetTaskSessionCache();
+        const refreshed = await window.electron?.agentRuntime?.prepareExecution?.({
+          taskId: task.id,
+          contributionId: executionContributionId,
+          projectId: task.projectIds?.[0] || task.swimlaneId,
+          executionProfileId: resolution.profile.id,
+          workspacePath: resolvedRepositoryFolder,
+          expectedRevision: task.__mcpRevision ?? 0,
+        }) as ExecutionPreflight | undefined;
+        if (!refreshed?.ok) {
+          setPreflight(refreshed || null);
+          const blocker = refreshed?.blockers?.[0];
+          const nextStep = blocker?.code === 'CONTRIBUTION_NOT_STARTABLE'
+            ? 'The cache is clear; return to the task and choose Start task to refresh its contribution state.'
+            : '';
+          throw new Error([blocker?.message, nextStep].filter(Boolean).join(' ')
+            || 'The task cache was cleared, but Omvra could not prepare a fresh attempt. Return to the task and choose Start task.');
+        }
+        currentPreflight = refreshed;
+        setPreflight(refreshed);
+      }
       const result = await window.electron?.agentRuntime?.sessions?.start?.({
         confirmed: true,
         taskId: task.id,
@@ -432,8 +456,8 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
         projectId: task.projectIds?.[0] || task.swimlaneId,
         executionProfileId: resolution.profile.id,
         workspacePath: resolvedRepositoryFolder,
-        expectedRevision: preflight?.contractSnapshot?.taskRevision ?? task.__mcpRevision ?? 0,
-        expectedContractDigest: preflight?.contractDigest,
+        expectedRevision: currentPreflight?.contractSnapshot?.taskRevision ?? task.__mcpRevision ?? 0,
+        expectedContractDigest: currentPreflight?.contractDigest,
         idempotencyKey: `renderer-start-${task.id}-${Date.now()}`,
       });
       if (!result?.ok) {
@@ -662,13 +686,13 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
             {visibleActivity.length ? visibleActivity.map(item => <div key={item.id} className="flex items-start justify-between gap-4" title={item.detail}>
               <span className={`min-w-0 font-semibold ${item.tone === 'danger' ? 'text-red-600' : ''}`}>{item.label === 'Task instructions accepted' ? item.detail : item.label}{item.count > 1 ? ` × ${item.count}` : ''}</span>
               {'observedAt' in item && item.observedAt && <time className="shrink-0 text-slate-400" dateTime={item.observedAt}>{new Date(item.observedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</time>}
-            </div>) : !agentOutput && !binding?.latestSummary && <p className="px-3">{loading ? 'Preparing your work session…' : 'The agent has not started work yet.'}</p>}
+            </div>) : !agentOutput && !binding?.latestSummary && <p className="px-3">{loading ? 'Preparing your work session…' : binding ? 'The agent has not started work yet.' : 'No session is running. Choose Start task to create a fresh work session.'}</p>}
             {mcpReadOnly && <ExecutionNotice tone="warning" title="Task access is read-only">The agent can inspect this task but cannot change its description or status. Select Task Write under Settings → MCP Access, then restart the listener.</ExecutionNotice>}
             {error && <div className="mb-3"><ExecutionNotice tone="danger" title={getAttentionState('failed').label} nextStep={getAttentionState('failed').nextStep}>{error}</ExecutionNotice></div>}
             {!error && !authenticationRequired && blockers.length > 0 && <div className="mb-3"><ExecutionHint tone={taskAlreadyComplete ? 'warning' : 'danger'} title={taskAlreadyComplete ? 'Task already complete' : 'Action needed before work starts'} body={`${blockers.join(' ')} ${taskAlreadyComplete ? 'Reopen or move the task to In progress, then start work.' : getAttentionState('blocked').nextStep}`} /></div>}
-            {!terminalBinding && turnState === 'waiting-input' && sessionLoaded && pendingRequests.length === 0 && binding && <ExecutionNotice tone="warning" title="Input request unavailable" nextStep="Restart this task to clear its session cache and start fresh." assertive>
+            {inputRequestUnavailable && <ExecutionNotice tone="warning" title="Input request unavailable" nextStep="Restart clears this task’s session cache and starts a fresh work session." assertive>
               <div>Omvra no longer has an answerable request for this session. The unanswered turn cannot continue.</div>
-              <button type="button" onClick={() => void startWork(true)} disabled={operationBusy || loading || blockers.length > 0 || !resolvedRepositoryFolder} className="mt-3 rounded bg-black/5 px-2.5 py-1.5 font-semibold disabled:opacity-40">Restart task</button>
+              <button type="button" onClick={() => void startWork(true)} disabled={operationBusy || loading || !resolvedRepositoryFolder || !resolution?.profile} className="mt-3 rounded bg-black/5 px-2.5 py-1.5 font-semibold disabled:opacity-40">Restart task</button>
             </ExecutionNotice>}
             {/* Retained diagnostics for a future detail view; no underlying task/session data is removed. */}
             <div hidden>
@@ -745,9 +769,9 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
                 <div className="ml-auto flex items-center gap-1">
                   {awayFromLatest && <button type="button" onClick={() => activityRef.current?.scrollTo({ top: activityRef.current.scrollHeight, behavior: 'instant' })} className="rounded px-1.5 py-1 hover:bg-black/5">Jump to latest</button>}
               {resolution?.profile?.integrationMode === 'external-handoff' && <button type="button" onClick={() => void openExternal()} disabled={operationBusy || !resolvedRepositoryFolder} className="rounded-md px-1.5 py-1 text-xs font-medium text-zinc-500 outline-none hover:bg-black/5 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-blue-500">Open externally</button>}
-              {!awayFromLatest && task.status !== 'done' && binding && <button type="button" onClick={() => void startWork(true)} disabled={operationBusy || loading || blockers.length > 0 || !resolvedRepositoryFolder || isAgentRuntimeTurnInFlight(binding)} className="rounded-md px-1.5 py-1 text-xs font-medium text-zinc-500 outline-none hover:bg-black/5 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-blue-500" title="Clear this task’s session cache and start a fresh work attempt">Restart</button>}
+              {!awayFromLatest && !inputRequestUnavailable && task.status !== 'done' && binding && <button type="button" onClick={() => void startWork(true)} disabled={operationBusy || loading || blockers.length > 0 || !resolvedRepositoryFolder || isAgentRuntimeTurnInFlight(binding)} className="rounded-md px-1.5 py-1 text-xs font-medium text-zinc-500 outline-none hover:bg-black/5 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-blue-500" title="Clear this task’s session cache and start a fresh work attempt">Restart</button>}
               {!awayFromLatest && task.status !== 'done' && binding?.state === 'ready' && <button type="button" onClick={() => void continueTaskSession()} disabled={operationBusy || isAgentRuntimeTurnInFlight(binding)} className="rounded-md px-1.5 py-1 text-xs font-medium text-zinc-500 outline-none hover:bg-black/5 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-blue-500">{operationBusy ? 'Continuing…' : 'Continue'}</button>}
-              {task.status !== 'done' && !authenticationRequired && (binding?.state === 'interrupted' || binding?.state === 'failed' || binding?.state === 'closed' || !binding) && <button type="button" onClick={() => void (binding?.state === 'interrupted' && hasCapability('resume') ? resumeSession() : startWork(Boolean(binding && !terminalBinding)))} disabled={operationBusy || (binding?.state === 'interrupted' ? !resolvedRepositoryFolder : loading || blockers.length > 0 || activeAttempt)} className="rounded-md px-1.5 py-1 text-xs font-medium text-zinc-500 outline-none hover:bg-black/5 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-blue-500">{binding?.state === 'interrupted' && hasCapability('resume') ? 'Resume' : binding?.state === 'closed' ? 'Restart' : binding?.state === 'failed' ? 'Restart' : activeAttempt ? 'Work in progress' : operationBusy ? 'Starting…' : 'Start'}</button>}
+              {task.status !== 'done' && !authenticationRequired && (binding?.state === 'interrupted' || binding?.state === 'failed' || binding?.state === 'closed' || !binding) && <button type="button" onClick={() => void (binding?.state === 'interrupted' && hasCapability('resume') ? resumeSession() : startWork(Boolean(binding && !terminalBinding)))} disabled={operationBusy || (binding?.state === 'interrupted' ? !resolvedRepositoryFolder : loading || blockers.length > 0 || activeAttempt)} className="rounded-md px-1.5 py-1 text-xs font-medium text-zinc-500 outline-none hover:bg-black/5 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-blue-500">{binding?.state === 'interrupted' && hasCapability('resume') ? 'Resume' : binding?.state === 'closed' ? 'Restart' : binding?.state === 'failed' ? 'Restart' : activeAttempt ? 'Work in progress' : operationBusy ? 'Starting…' : 'Start task'}</button>}
 
                 </div>
               </div>

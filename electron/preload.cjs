@@ -122,6 +122,7 @@ contextBridge.exposeInMainWorld('electron', {
     deleteProfile: (profileId) => ipcRenderer.invoke('agent-runtime/delete-profile', profileId),
     saveDefaults: (defaults) => ipcRenderer.invoke('agent-runtime/save-defaults', defaults),
     resolve: (payload) => ipcRenderer.invoke('agent-runtime/resolve', payload),
+    resolveTaskWorkspace: (taskId) => ipcRenderer.invoke('agent-runtime/resolve-task-workspace', taskId),
     resolveManagedWorkspace: (taskId) => ipcRenderer.invoke('agent-runtime/resolve-managed-workspace', taskId),
     prepareExecution: (payload) => ipcRenderer.invoke('agent-runtime/prepare-execution', payload),
     confirmStart: (payload) => ipcRenderer.invoke('agent-runtime/confirm-start', payload),

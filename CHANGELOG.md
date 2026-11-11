@@ -4,6 +4,9 @@ All notable changes for Omvra release candidates should be documented in this fi
 
 ## Unreleased
 
+- Resolve task workspaces from Omvra's canonical task/project record when a launch surface omits the repository folder.
+- Refresh execution preflight after a task restart clears its session cache, so orphaned working contributions can be recovered before starting a fresh attempt.
+- Clarify the next action when no agent session is running and make the unavailable-input restart message describe the full restart behavior.
 - Fixed milestone preflight passing task IDs as working directories; task, project, and global folder precedence now matches direct task launches. Missing folders block execution.
 - Repaired TypeScript errors in product code and stale fixtures, including status derivation left over from removed agent watchers.
 - Added type checking and tests to pull-request, branch, and packaging CI.

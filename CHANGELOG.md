@@ -2,6 +2,10 @@
 
 All notable changes for Omvra release candidates should be documented in this file.
 
+## 0.3.264 - 2026-11-11
+
+- Advertise human approval and MCP form-elicitation support in the Codex app-server handshake so approval requests can reach Omvra's task panel.
+
 ## 0.3.263 - 2026-11-11
 
 - Standardize execution notices and toast notifications with Omvra's semantic colors and typography; show task blockers and restart prerequisites directly in the supervision panel.

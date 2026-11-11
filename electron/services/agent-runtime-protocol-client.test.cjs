@@ -141,6 +141,11 @@ test('Codex client uses native thread and turn methods for start, resume, steer,
 
   const observation = await client.initialize();
   assert.equal('jsonrpc' in requests[0], false);
+  assert.deepEqual(requests[0].params.capabilities, {
+    experimentalApi: true,
+    mcpServerOpenaiFormElicitation: true,
+    requiredHumanApproval: true,
+  });
   assert.equal(observation.authentication, 'authenticated');
   assert.equal(observation.models[0].id, 'gpt');
   assert.equal(observation.capabilities.close, false);

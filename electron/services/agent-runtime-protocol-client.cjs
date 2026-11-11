@@ -411,7 +411,10 @@ class CodexAppServerClient {
   respond(id, result, error) { return this.transport.respond(id, result, error); }
 
   async initialize() {
-    const result = await this.transport.request('initialize', { clientInfo: { name: 'omvra', title: 'Omvra', version: '1' } });
+    const result = await this.transport.request('initialize', {
+      clientInfo: { name: 'omvra', title: 'Omvra', version: '1' },
+      capabilities: { experimentalApi: true, mcpServerOpenaiFormElicitation: true, requiredHumanApproval: true },
+    });
     this.transport.notify('initialized', {});
     const account = await this.transport.request('account/read', { refreshToken: false });
     const modelResult = await this.transport.request('model/list', { limit: 100, includeHidden: false });

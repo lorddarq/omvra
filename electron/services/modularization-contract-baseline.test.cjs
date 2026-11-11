@@ -161,6 +161,7 @@ const IPC_INVOKE_CHANNELS = [
   'agent-runtime/get-state',
   'agent-runtime/open-external',
   'agent-runtime/resolve',
+  'agent-runtime/resolve-task-workspace',
   'agent-runtime/resolve-managed-workspace',
   'agent-runtime/prepare-execution',
   'agent-runtime/confirm-start',

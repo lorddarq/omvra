@@ -382,6 +382,9 @@ function createRequestDispatcher(store, { skillsRoot, userSkillsRoot, emitRuntim
         });
       }
 
+      if (scopedGrant && !['omvra://agent/guide', 'omvra://schema/task-execution', scopedGrant.scope.kind === 'task' ? `omvra://tasks/${encodeURIComponent(scopedGrant.scope.taskId)}` : `omvra://goals/${encodeURIComponent(scopedGrant.scope.goalId)}`].includes(uri)) {
+        return respond({ error: createJsonRpcError(JSON_RPC_ERROR.MCP_WRITE_FORBIDDEN, 'The runtime MCP grant does not permit this resource.', {reason:'scope_denied'}) });
+      }
       const resourceResponse = getResourceForUri(store, uri, normalized);
       if (resourceResponse.error) {
         return respond({ error: resourceResponse.error });

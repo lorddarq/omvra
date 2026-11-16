@@ -1,7 +1,7 @@
 const { randomUUID } = require('node:crypto');
 const { createNativeRuntimeClient } = require('./agent-runtime-protocol-client.cjs');
 const { createAgentRuntimeContextPack } = require('../domain/agent-runtime-context-pack.cjs');
-const { issueScopedMcpGrant } = require('./agent-runtime-mcp-grant.cjs');
+const { issueScopedMcpGrant, revokeScopedMcpGrant } = require('./agent-runtime-mcp-grant.cjs');
 
 const ACTIVE_TURN_STATES = new Set(['queued', 'starting', 'active', 'waiting-input', 'cancelling']);
 const TERMINAL_TURN_STATES = new Set(['completed', 'failed', 'interrupted']);
@@ -131,6 +131,7 @@ function createAgentRuntimeSessionRunner({
     clearBindingTimers(bindingId);
     clearClientSubscriptions(bindingId);
     clearPendingRequests(bindingId);
+    revokeScopedMcpGrant(session?.client?.options?.mcpGrantId);
     clients.delete(bindingId);
     if (closeTransport) session?.client?.close?.();
     return Boolean(session);
@@ -152,6 +153,7 @@ function createAgentRuntimeSessionRunner({
       const grant = issueMcpGrant({
         endpoint: options.mcpEndpoint,
         scope,
+        sessionOwned: true,
         capabilityProfile: mcpReadiness.listenerStatus.capabilityProfile || 'read_only',
       });
       if (!grant?.ok) throw Object.assign(new Error(grant?.message || 'The scoped MCP grant could not be created.'), { code: grant?.error || 'ACP_MCP_GRANT_FAILED' });
@@ -807,6 +809,7 @@ function createAgentRuntimeSessionRunner({
       try {
         // Transport control must never wait for a database write or queue drain.
         session.cancelRequested = true;
+        revokeScopedMcpGrant(session.client?.options?.mcpGrantId);
         const result = await session.client.cancel(current.opaqueSessionRef);
         if (result?.acknowledged === true) clearPendingRequests(bindingId);
         const state = result?.acknowledged === true ? 'interrupted' : 'cancelling';
@@ -865,11 +868,21 @@ function createAgentRuntimeSessionRunner({
     if (!request || responsesInFlight.has(key) || request.turnId !== current.turn?.id) return failure('ACP_REQUEST_NOT_FOUND', 'This runtime request is no longer pending.');
     responsesInFlight.add(key);
     try {
-      await session.client.respond(requestId, result, error);
+      // Remove it before replying so a fast turn/completed event sees the request as
+      // answered. Restore it if writing the response fails.
       pendingRequests.delete(key);
-      const persisted = await persistControl(bindingId, listRequests(bindingId).length ? 'waiting-input' : 'active');
-      return {ok:true,...(!persisted ? {storageFailure:true,reconciliationRequired:true} : {})};
+      await session.client.respond(requestId, result, error);
+      // Runtime notifications and response-side state changes must share one queue.
+      // Otherwise a completion can persist first and this stale "active" write can
+      // either fail or leave the binding claiming to wait for an already answered request.
+      const persisted = await enqueueNotification(bindingId, session.client, async () => {
+        const latest = await controlBinding(bindingId);
+        if (!latest || TERMINAL_TURN_STATES.has(latest.turn?.state)) return true;
+        return persistControl(bindingId, listRequests(bindingId).length ? 'waiting-input' : 'active');
+      });
+      return {ok:true,...(persisted?.ok === false || persisted === false ? {storageFailure:true,reconciliationRequired:true} : {})};
     } catch (caught) {
+      if (!pendingRequests.has(key)) pendingRequests.set(key, request);
       return failure(caught.code || 'ACP_PROTOCOL_INCOMPATIBLE', 'The runtime request could not be answered.');
     } finally { responsesInFlight.delete(key); }
   }

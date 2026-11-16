@@ -281,7 +281,10 @@ test('injects the bounded Omvra context pack while leaving MCP configuration to 
     },
     onNotification: callback => { notify = callback; },
     onLifecycle: callback => { lifecycle = callback; },
-    respond: (requestId, response, error) => { responses.push({ requestId, response, error }); },
+    respond: (requestId, response, error) => {
+      responses.push({ requestId, response, error });
+      if (requestId === 44) void notify({ method: 'turn/completed', params: { turn: { status: 'completed' } } });
+    },
   };
   const runner = createAgentRuntimeSessionRunner({
     store: { get: () => [], set: () => {} },
@@ -391,6 +394,11 @@ test('injects the bounded Omvra context pack while leaving MCP configuration to 
   assert.equal(events.at(-1).outcome, 'Task tool failed.');
   await notify({ method: 'thread/inputTokens/updated', params: { inputTokens: 12 } });
   assert.equal(storedBinding.turn.state, 'active');
+  assert.equal(runner.listRequests('binding-1').length, 0);
+  await notify({ method: 'session/request_permission', id: 44, params: { sessionId: 'native-session-1', toolCall: { title: 'Run the final check' }, options: [{ optionId: 'allow-once', name: 'Allow once', kind: 'allow_once' }] } });
+  assert.equal(storedBinding.turn.state, 'waiting-input');
+  assert.equal((await runner.respond('binding-1', 44, { outcome: { outcome: 'selected', optionId: 'allow-once' } })).ok, true);
+  assert.equal(storedBinding.turn.state, 'completed', 'a completion arriving with the permission response must not leave stale waiting state');
   assert.equal(runner.listRequests('binding-1').length, 0);
   await lifecycle({ kind: 'exit', code: 'ACP_SESSION_INTERRUPTED' });
   assert.equal(storedBinding.state, 'interrupted');

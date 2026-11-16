@@ -16,6 +16,7 @@ function publicBinding(binding) {
 }
 function publicResult(result) {
   if(!result || typeof result!=='object') return result;
+  if(Array.isArray(result)) return result.map(publicResult);
   return {...result,...(result.binding?{binding:publicBinding(result.binding)}:{}),...(result.bindings?{bindings:result.bindings.map(publicBinding)}:{})};
 }
 function eventInput(input) {

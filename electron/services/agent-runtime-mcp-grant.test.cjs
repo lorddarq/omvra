@@ -36,3 +36,18 @@ test('revokes grants and expires them', () => {
   assert.equal(revokeScopedMcpGrant(grant.grantId), true);
   assert.equal(findScopedMcpGrant(grant.token), null);
 });
+
+test('scope checks reject conflicting aliases and unrelated write tools', () => {
+  const grant = issueScopedMcpGrant({endpoint:'http://localhost/mcp',scope:{kind:'task',taskId:'a'},capabilityProfile:'task_write'});
+  assert.equal(isScopedToolCallAllowed(grant,'tasks.update',{taskId:'a',id:'b'}),false);
+  assert.equal(isScopedToolCallAllowed(grant,'goals.lifecycle',{taskId:'a',goalId:'b'}),false);
+});
+
+test('session owned grants last until revoked and goal reads stay scoped', () => {
+  const grant = issueScopedMcpGrant({endpoint:'http://localhost/mcp',scope:{kind:'goal-node',goalId:'g',goalElementId:'n',goalExecutionId:'e'},sessionOwned:true});
+  assert.equal(grant.expiresAt,Infinity);
+  assert.equal(isScopedToolCallAllowed(grant,'goals.get',{goalId:'g'}),true);
+  assert.equal(isScopedToolCallAllowed(grant,'goals.get',{goalId:'other'}),false);
+  revokeScopedMcpGrant(grant.grantId);
+  assert.equal(findScopedMcpGrant(grant.token),null);
+});

@@ -8,6 +8,15 @@ const {createAgentWorkRepository}=require('./agent-work-repository.cjs');
 const {domainService}=require('./agent-work-contract.cjs');
 const {migrateAgentWork,STORAGE_KEY}=require('./agent-work-migration.cjs');
 const {createAgentWorkSessionService,publicResult}=require('./agent-work-session-service.cjs');
+
+test('IPC projection preserves pending request arrays and typed request IDs', () => {
+  const requests = [{bindingId:'binding-1',requestId:0,responseKind:'elicitation',message:'Approve?',fields:[]}];
+  const result = publicResult(requests);
+  assert.ok(Array.isArray(result));
+  assert.deepEqual(result, requests);
+  assert.deepEqual(publicResult([]), []);
+  assert.equal(publicResult({binding:{id:'binding-1',opaqueSessionRef:'private'}}).binding.opaqueSessionRef, undefined);
+});
 const {createAgentRuntimeSessionRunner}=require('./agent-runtime-session-runner.cjs');
 const {SESSION_BINDINGS_KEY,SESSION_EVENTS_KEY}=require('../domain/agent-runtime-session-service.cjs');
 async function fixture(t) {

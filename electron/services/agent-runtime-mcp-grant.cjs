@@ -21,13 +21,13 @@ function normalizeScope(scope) {
   return null;
 }
 
-function issueScopedMcpGrant({ endpoint, scope, capabilityProfile = 'read_only', ttlMs = DEFAULT_TTL_MS } = {}) {
+function issueScopedMcpGrant({ endpoint, scope, capabilityProfile = 'read_only', ttlMs = DEFAULT_TTL_MS, sessionOwned = false } = {}) {
   const normalizedScope = normalizeScope(scope);
   if (!normalizedScope || typeof endpoint !== 'string' || !endpoint.trim()) {
     return { ok: false, error: 'ACP_MCP_GRANT_FAILED', message: 'A scoped MCP endpoint and execution scope are required.' };
   }
   const ttl = Number(ttlMs);
-  const expiresAt = Date.now() + (Number.isFinite(ttl) && ttl > 0 ? Math.min(ttl, DEFAULT_TTL_MS) : DEFAULT_TTL_MS);
+  const expiresAt = sessionOwned ? Infinity : Date.now() + (Number.isFinite(ttl) && ttl > 0 ? Math.min(ttl, DEFAULT_TTL_MS) : DEFAULT_TTL_MS);
   const grant = {
     grantId: `mcp-grant-${randomUUID()}`,
     token: `omvra-runtime-${randomUUID()}`,
@@ -66,7 +66,12 @@ function isScopedToolCallAllowed(grant, toolName, args = {}) {
       && typeof args?.parentTaskId === 'string'
       && args.parentTaskId.trim() === grant.scope.taskId;
   }
-  const taskId = args && typeof args === 'object' ? (args.taskId || args.id) : null;
+  if (args.id !== undefined && args.taskId !== undefined && args.id !== args.taskId) return false;
+  if (grant.scope.kind === 'goal-node') {
+    if (args.id !== undefined && args.goalId !== undefined && args.id !== args.goalId) return false;
+    return toolName === 'goals.get' && (args.id || args.goalId) === grant.scope.goalId;
+  }
+  const taskId = args && typeof args === 'object' ? (args.id || args.taskId) : null;
   if (grant.scope.kind !== 'task') return false;
   if (typeof taskId !== 'string' || taskId.trim() !== grant.scope.taskId) return false;
   return toolName === 'tasks.get'
@@ -74,7 +79,7 @@ function isScopedToolCallAllowed(grant, toolName, args = {}) {
     || toolName === 'tasks.context.get'
     || toolName === 'tasks.collaboration_history'
     || toolName === 'agent.resolve_task_context'
-    || canWrite;
+    || (canWrite && toolName.startsWith('tasks.') && !['tasks.create', 'tasks.create_follow_up'].includes(toolName));
 }
 
 function _resetForTests() {

@@ -283,7 +283,20 @@ export function TaskExecutionAction({ task, repositoryFolder, trigger, openReque
   const latestTurnCompleted = deliveryAttention?.category === 'completed' || binding?.turn?.state === 'completed';
   const sessionProjection = projectAgentRuntimeSession(binding || undefined, [], { turnCompleted: latestTurnCompleted });
   const { lastBatchCompleted, turnState } = sessionProjection;
-  const inputRequestUnavailable = !terminalBinding && turnState === 'waiting-input' && sessionLoaded && pendingRequests.length === 0 && Boolean(binding);
+  const [requestLookupSettled, setRequestLookupSettled] = useState(false);
+  useEffect(() => {
+    setRequestLookupSettled(false);
+    if (!open || turnState !== 'waiting-input' || !binding?.id || pendingRequests.length) return;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void window.electron?.agentRuntime?.sessions?.requests?.(binding.id).then(requests => {
+        if (cancelled) return;
+        if (Array.isArray(requests)) { setPendingRequests(requests); setRequestLookupSettled(true); }
+      }).catch(() => {});
+    }, 500);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [open, binding?.id, turnState, deliveryRequestKey, pendingRequests.length]);
+  const inputRequestUnavailable = requestLookupSettled && !terminalBinding && turnState === 'waiting-input' && sessionLoaded && pendingRequests.length === 0 && Boolean(binding);
   const sessionSummary = sessionProjection.summary;
   const taskExecutionLabel: Record<string, string> = { starting: 'Starting', ready: 'Ready', working: 'Working', continuing: 'Continuing', waiting: 'Waiting for input', stopping: 'Stopping', 'batch-finished': 'Batch finished', interrupted: 'Interrupted', stopped: 'Stopped', failed: 'Failed', 'ready-for-review': 'Ready for review', 'outcome-unreconciled': 'Outcome needs review', complete: 'Complete' };
   // Model output and activity arrive only as bounded main-process projections, never as per-event streams.

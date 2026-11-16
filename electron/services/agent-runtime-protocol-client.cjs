@@ -482,6 +482,7 @@ class ClaudeStreamJsonClient {
     this.workspacePath = validateWorkspacePath(options.workspacePath);
     this.sessionId = null;
     this.transport = null;
+    this.permissionInputs = new Map();
     this.notificationListeners = new Set();
     this.lifecycleListeners = new Set();
   }
@@ -494,6 +495,10 @@ class ClaudeStreamJsonClient {
 
   #mapStreamMessage(message) {
     if (!message || typeof message.type !== 'string') return null;
+    if (message.type === 'control_request' && message.request?.subtype === 'can_use_tool' && typeof message.request_id === 'string') {
+      this.permissionInputs.set(message.request_id, message.request.input || {});
+      return {method:'item/commandExecution/requestApproval',id:message.request_id,params:{reason:`Use ${String(message.request.tool_name || 'a tool').slice(0,160)}`}};
+    }
     if (message.type === 'system') return {
       method: 'turn/started',
       params: {
@@ -564,10 +569,20 @@ class ClaudeStreamJsonClient {
     return Promise.resolve({ accepted: true });
   }
 
+  respond(id, result, error) {
+    if (!this.permissionInputs.has(id)) throw runtimeError('ACP_REQUEST_NOT_FOUND', 'Claude permission request is no longer pending.');
+    const response = error ? {subtype:'error',request_id:id,error:'Permission response failed.'}
+      : {subtype:'success',request_id:id,response:result?.decision === 'accept'
+        ? {behavior:'allow',updatedInput:this.permissionInputs.get(id)}
+        : {behavior:'deny',message:'The user denied this action.'}};
+    this.transport.send({type:'control_response',response});
+    this.permissionInputs.delete(id);
+  }
+
   steer(sessionId, text) { return this.prompt(sessionId, text); }
   cancel() { this.close(); return Promise.resolve({ acknowledged: false }); }
   closeSession() { this.close(); return Promise.resolve({ acknowledged: true }); }
-  close() { this.transport?.close(); }
+  close() { this.permissionInputs.clear(); this.transport?.close(); }
 }
 
 function createNativeRuntimeClient(profile, options = {}) {

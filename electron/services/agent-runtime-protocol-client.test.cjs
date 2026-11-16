@@ -464,3 +464,18 @@ test('ACP progress is scoped to an active prompt and cancellation/unknown stop r
     } finally {client.close();}
   }
 });
+
+test('Claude permission controls preserve input privately and send allow or deny replies', async () => {
+  const sent = [], notifications = [];
+  const child = createChild(message => sent.push(message));
+  const client = createNativeRuntimeClient({integrationMode:'claude-stream-json-stdio',executablePath:'/usr/bin/claude'}, {workspacePath:'/tmp/workspace',spawnProcess:()=>child});
+  client.onNotification(message => notifications.push(message));
+  await client.startSession({sessionId:'00000000-0000-4000-8000-000000000001'});
+  child.stdout.write(JSON.stringify({type:'control_request',request_id:'permission-1',request:{subtype:'can_use_tool',tool_name:'Read',input:{file_path:'/private/example'}}})+'\n');
+  assert.equal(notifications[0].id,'permission-1');
+  assert.equal(JSON.stringify(notifications).includes('/private/example'),false);
+  client.respond('permission-1',{decision:'accept'});
+  assert.deepEqual(sent.at(-1),{type:'control_response',response:{subtype:'success',request_id:'permission-1',response:{behavior:'allow',updatedInput:{file_path:'/private/example'}}}});
+  assert.throws(()=>client.respond('permission-1',{decision:'accept'}));
+  client.close();
+});

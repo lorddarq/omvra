@@ -2,6 +2,18 @@
 
 All notable changes for Omvra release candidates should be documented in this file.
 
+## 0.3.265 - 2026-11-17
+
+- Restore permission and input cards for fresh tasks and follow-up turns by preserving request arrays across IPC, including request ID zero.
+- Serialize permission responses with runtime completion events to avoid stale waiting states.
+- Retry request details before displaying the unavailable-input notice.
+- Handle Claude stream-json tool permission requests and return the selected allow or deny decision.
+- Restrict scoped MCP resource reads to the assigned task or Goal and shared agent guidance.
+- Reject conflicting task identifiers and unrelated tools under task write grants.
+- Permit scoped reads of the assigned Goal while retaining lifecycle authorization restrictions.
+- Keep managed Claude MCP grants valid for the session and revoke them on cancellation or cleanup.
+
+
 ## 0.3.264 - 2026-11-11
 
 - Advertise human approval and MCP form-elicitation support in the Codex app-server handshake so approval requests can reach Omvra's task panel.

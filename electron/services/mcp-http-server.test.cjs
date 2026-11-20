@@ -2590,3 +2590,13 @@ test('task and card MCP reads default to active and expose archived history expl
     assert.equal(call('all').length, tasks.length + 1);
   }
 });
+
+test('scoped credentials enforce resource and conflicting-alias boundaries in the dispatcher', () => {
+  const store=makeStoreFromFixture('workspace-basic');
+  const grant=issueScopedMcpGrant({endpoint:'http://127.0.0.1:3456/mcp',scope:{kind:'task',taskId:'task-1'},capabilityProfile:'task_write'});
+  const dispatch=createRequestDispatcher(store);
+  const call=(method,params)=>dispatch({jsonrpc:'2.0',id:1,method,params},makeReq({authorization:`Bearer ${grant.token}`}));
+  for(const uri of ['omvra://workspace','omvra://tasks/task-2','omvra://goals']) assert.equal(call('resources/read',{uri}).error.code,-32003);
+  assert.ok(call('resources/read',{uri:'omvra://tasks/task-1'}).result);
+  assert.equal(call('tools/call',{name:'tasks.update',arguments:{id:'task-2',taskId:'task-1',title:'Unauthorized'}}).error.code,-32003);
+});

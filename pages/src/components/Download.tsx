@@ -7,14 +7,14 @@ const Download = () => {
         <div className="mx-auto max-w-[72rem] border-t border-black/8 pt-14 md:pt-16">
           <div className="mx-auto max-w-[48rem] text-center">
             <div className="flex flex-wrap items-center justify-center gap-3 text-[clamp(2.85rem,5vw,4rem)] font-medium leading-[1.04] tracking-[-0.05em] text-[#5b5966]">
-              <h2>Download</h2>
+              <h2>Try one real task with</h2>
               <img src={logoSrc} alt="Omvra" className="h-12 w-auto md:h-14" />
             </div>
 
             <p className="mx-auto mt-8 max-w-[31rem] text-pretty text-lg leading-9 text-[#6d6a73] sm:text-[1.35rem]">
-              Get a local workspace for planning and shipping work with AI agents.
+              Bring a task you already need to finish. Set up your agent, follow the work, and review the result.
               <br />
-              Free to download, open source, local-first, and ready to use without an account.
+              Free and open source. No Omvra account required. Bring your own agent setup and provider account.
             </p>
 
             <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">

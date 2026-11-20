@@ -5,12 +5,12 @@ const navLinks = [
   { href: '#features', label: 'Features' },
   { href: '#how-it-works', label: 'How it works' },
   { href: '#anatomy', label: 'Anatomy' },
-  { href: '#acp', label: 'ACP' },
+  { href: '#acp', label: 'AI agents' },
   { href: '#privacy', label: 'Privacy' },
 ]
 
 const logoSrc = `${import.meta.env.BASE_URL}illustrations/logo.svg`
-const timelineSrc = `${import.meta.env.BASE_URL}illustrations/timeline.svg`
+const supervisionSrc = `${import.meta.env.BASE_URL}screens/supervision.jpg`
 
 const Hero = () => {
   return (
@@ -49,17 +49,16 @@ const Hero = () => {
       <div className="landing-container relative z-10 pb-16 pt-10 sm:pb-20 sm:pt-14 lg:pb-24 lg:pt-16">
         <div className="mx-auto max-w-[52rem] text-center">
           <h1 className="text-balance text-[clamp(3rem,7vw,5rem)] font-medium leading-[0.96] tracking-[-0.06em] text-[#5a5868]">
-            Keep work private. Move it forward.
+            Give your AI agents work.
             <br />
             <span className="relative inline-block pr-2">
-              Work with your agents.
+              Keep the whole project in view.
             </span>
           </h1>
 
           <p className="mx-auto mt-8 max-w-2xl text-pretty text-lg leading-8 text-[#6d6a73] sm:text-xl">
-            Omvra is a free, open-source workspace for planning and executing work with AI agents.
-            Your project data stays on your device while local agent access keeps work assigned,
-            visible, and ready for human review.
+            Plan tasks, run Claude Code or Codex, and follow progress from one desktop workspace.
+            Keep instructions and review notes with the task, so you can pick up where the agent leaves off.
           </p>
 
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -71,23 +70,26 @@ const Hero = () => {
               Download Omvra
             </a>
             <a
-              href="https://github.com/lorddarq/omvra"
+              href="#how-it-works"
               className="inline-flex min-h-14 items-center justify-center rounded-2xl bg-white/70 px-8 py-4 text-lg font-medium text-[#54515f] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.05)] backdrop-blur transition-[transform,background-color] duration-150 hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/10 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f8f7f5]"
             >
-              View on GitHub
+              See how it works
             </a>
           </div>
+          <p className="mt-5 text-sm leading-6 text-[#6d6a73]">
+            Free and open source. Local workspace. No Omvra account required.
+          </p>
         </div>
 
-        <div className="relative mx-auto mt-16 h-[260px] max-w-[72rem] sm:h-[360px] md:h-[470px] lg:h-[600px] xl:h-[749px]">
+        <div className="relative mx-auto mt-16 max-w-[72rem]">
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-x-10 top-10 h-32 rounded-full bg-[rgba(211,193,169,0.22)] blur-[90px] sm:h-44 sm:blur-[110px]"
           />
           <img
-            src={timelineSrc}
-            alt="Omvra timeline preview"
-            className="absolute left-1/2 top-0 h-auto w-[58rem] max-w-[155%] -translate-x-1/2 drop-shadow-[0_24px_48px_rgba(17,24,39,0.08)] sm:w-[70rem] md:w-[82rem] lg:w-[90rem] xl:w-[1442px]"
+            src={supervisionSrc}
+            alt="Agent supervision in Omvra: follow an active session alongside its task"
+            className="relative block h-auto w-full rounded-2xl drop-shadow-[0_24px_48px_rgba(17,24,39,0.08)]"
           />
         </div>
       </div>

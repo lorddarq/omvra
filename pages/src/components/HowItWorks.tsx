@@ -2,23 +2,23 @@ const illustrationBase = `${import.meta.env.BASE_URL}illustrations`
 
 const steps = [
   {
-    title: 'Plan the work',
+    title: 'Choose a task',
     description:
-      'Lay out tasks on a visual timeline, group them by project, and make dates, dependencies, and priorities visible before work starts.',
+      'For a broken export, describe what fails, link the relevant files, and explain what a successful fix should do.',
     illustration: 'simple-delivery-01.svg',
     widthClassName: 'w-[9.4rem] md:w-[10.2rem]',
   },
   {
-    title: 'Give work the right owner',
+    title: 'Start your agent',
     description:
-      'Move work through Kanban and assign it to yourself, a teammate, or an agent with the full task context attached.',
+      'Launch your configured coding agent for the task. Follow its activity, answer permission requests, and steer it when it needs more context.',
     illustration: 'simple-delivery-02.svg',
     widthClassName: 'w-[8.1rem] md:w-[8.75rem]',
   },
   {
     title: 'Review what comes back',
     description:
-      'Agents update the workspace through controlled MCP access, then hand completed work back to a person with context and activity intact.',
+      'Review the export fix and the checks the agent reports. Request changes or accept the submitted work when it meets the task requirements.',
     illustration: 'simple-delivery-03.svg',
     widthClassName: 'w-[7.2rem] md:w-[7.9rem]',
   },
@@ -31,15 +31,13 @@ const HowItWorks = () => {
         <div className="mx-auto max-w-[72rem]">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-balance text-[clamp(2.9rem,5vw,4rem)] font-medium leading-[1.04] tracking-[-0.05em] text-[#5b5966]">
-              From planning to
+              Choose a task. Start your agent.
               <br />
-              accountable delivery
+              Review what comes back.
             </h2>
             <p className="mx-auto mt-7 max-w-[40rem] text-pretty text-lg leading-9 text-[#6d6a73] sm:text-[1.35rem]">
-              <span className="font-semibold text-[#5b5966]">Omvra</span> keeps the planning surface,
-              execution state, and review handoff in one local workspace.
-              <br />
-              Use AI where it helps, while the work stays visible and under your control.
+              Try one real task, such as fixing a broken export. Keep the problem, agent activity,
+              and review notes together from the first instruction to the final decision.
             </p>
           </div>
 

@@ -17,7 +17,7 @@ const spotlightCards = [
     extra:
       'The task carries its context, so you spend less time copying instructions between tools.',
     illustration: 'what-can-do-02.svg',
-    chips: ['MCP STDIO', 'MCP HTTP'],
+    chips: ['Task context', 'Ownership', 'Review notes'],
     minHeight: 'md:min-h-[33.25rem]',
   },
   {
@@ -25,7 +25,7 @@ const spotlightCards = [
     description:
       'Let Codex, Claude, or another MCP-capable assistant read task context, make controlled updates, and hand work back for human review.',
     illustration: 'what-can-do-03.svg',
-    chips: ['Codex', 'Claude Code', 'Agentic-capable LLMs'],
+    chips: ['Codex', 'Claude Code', 'MCP-compatible agents'],
     minHeight: 'md:min-h-[29.5rem]',
   },
 ] as const
@@ -79,12 +79,12 @@ const supportNotes = [
   {
     label: 'Human in the loop',
     body:
-      "When an agent finishes work, Omvra hands the task back to you for review instead of silently closing the loop.",
+      "Review submitted work and its evidence. An agent session ending does not automatically accept or complete the task.",
   },
   {
     label: 'Connection',
     body:
-      'For MCP use STDIO or local HTTP with token and capability controls when you need a URL.',
+      'Connect an external MCP-compatible assistant, or start a supported local coding agent from a task.',
   },
   {
     label: 'Visibility',
@@ -108,11 +108,11 @@ const Features = () => {
         <div className="mx-auto max-w-[72rem]">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-balance text-[clamp(2.7rem,5vw,4rem)] font-medium leading-[1.04] tracking-[-0.05em] text-[#5b5966]">
-              What can it do?
+              See what’s planned, running, blocked, and waiting for you.
             </h2>
             <p className="mx-auto mt-7 max-w-[48rem] text-pretty text-lg leading-9 text-[#6d6a73] sm:text-[1.35rem]">
-              Every part of the product is aimed at the same outcome: clearer planning, smoother
-              execution, and less work lost between tools.
+              Connect tasks, dates, dependencies, and agent activity so you can see
+              where the project stands and what needs your attention.
             </p>
           </div>
 

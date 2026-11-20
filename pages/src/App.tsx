@@ -16,11 +16,11 @@ function App() {
   return (
     <div className="landing-shell">
       <Hero />
+      <HowItWorks />
+      <ProductScreenshots />
       <WhyOmvra />
       <Anatomy />
-      <ProductScreenshots />
       <Features />
-      <HowItWorks />
       <BestFor />
       <PrivacyProof />
       <AgentPrompts />

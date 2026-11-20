@@ -2,6 +2,12 @@ import { useState } from 'react'
 
 const screenshots = [
   {
+    label: 'Agent supervision',
+    title: 'Stay in control while agents work.',
+    description: 'Follow live progress, review activity, and guide an active task without leaving the workspace.',
+    src: `${import.meta.env.BASE_URL}screens/supervision.jpg`,
+  },
+  {
     label: 'Timeline planning',
     title: 'See when work happens.',
     description: 'Lay out projects across time, spot collisions, and keep the next move visible.',
@@ -21,15 +27,9 @@ const screenshots = [
   },
   {
     label: 'Workflow design',
-    title: 'Shape governed agent work.',
+    title: 'Plan the steps and review points.',
     description: 'Define outcomes, add agents and approval gates, then track the workflow from one canvas.',
     src: `${import.meta.env.BASE_URL}screens/workflows.jpg`,
-  },
-  {
-    label: 'Agent supervision',
-    title: 'Stay in control while agents work.',
-    description: 'Follow live progress, review activity, and guide an active task without leaving the workspace.',
-    src: `${import.meta.env.BASE_URL}screens/supervision.jpg`,
   },
 ] as const
 
@@ -64,7 +64,7 @@ const ProductScreenshots = () => {
               See Omvra in action
             </h2>
             <p className="mx-auto mt-7 max-w-[42rem] text-pretty text-lg leading-9 text-[#6d6a73] sm:text-[1.35rem]">
-              One workspace, different views for planning, execution, and delivery.
+              Follow an agent session, then see how its task fits into your board, timeline, and project milestones.
             </p>
           </div>
 

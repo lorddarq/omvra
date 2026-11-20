@@ -2,7 +2,7 @@ const reasons = [
   {
     title: 'Plan once.\nSee what is next.',
     description:
-      'Plan on a timeline, move work through Kanban, and keep one shared view of schedules, status, and ownership.',
+      'Plan on a timeline, move work through Kanban, and keep one view of schedules, status, and ownership.',
     illustration: 'Illustration01.svg',
     glow: 'bg-[linear-gradient(180deg,rgba(149,218,255,1)_20%,rgba(255,202,22,0.2)_100%)] blur-xl',
   },
@@ -16,7 +16,7 @@ const reasons = [
   {
     title: 'Keep control\nof sensitive work.',
     description:
-      'Local-first and open source, with no account required, no hosted workspace, and full-workspace backups.',
+      'Store your workspace on your computer, inspect the source, and back up your planning data without an Omvra account.',
     illustration: 'Illustration03.svg',
     glow: 'bg-[linear-gradient(180deg,rgba(244,192,222,0.5)_20%,rgba(255,202,22,0.3)_100%)] blur-xl',
   },
@@ -33,17 +33,16 @@ const WhyOmvra = () => {
         <div className="mx-auto max-w-[72rem]">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-balance text-[clamp(2.7rem,5vw,4rem)] font-medium leading-[1.04] tracking-[-0.05em] text-[#5b5966]">
-              Work faster without giving up control.
+              Stop rebuilding project context in every agent chat.
             </h2>
             <div className="mx-auto mt-7 max-w-[48rem] space-y-7 text-pretty text-lg leading-9 text-[#6d6a73] sm:text-[1.35rem]">
               <p>
-                Omvra is for people who need clear planning and faster execution without moving
-                sensitive project context into another cloud account.
+                Keep the brief, dependencies, and review notes with the task. Give your agent a place
+                to find the work and report what it did.
               </p>
               <p>
-                Most tools record what happened.
-                <br />
-                Omvra helps you and your agents know what is next—and who is accountable for it.
+                See what needs doing, who owns it, and what is waiting for your review
+                without piecing the project together from separate conversations.
               </p>
             </div>
           </div>

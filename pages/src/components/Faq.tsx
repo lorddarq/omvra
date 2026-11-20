@@ -1,5 +1,35 @@
 const faqs = [
   {
+    question: 'What should I try first?',
+    answer:
+      'Choose one small task you already need to finish, such as fixing an export bug. Add the expected result and relevant context, configure your coding agent and project folder, then start a session from the task. Follow its activity and review the changes and reported checks before accepting submitted work.',
+  },
+  {
+    question: 'Which AI agents can I use?',
+    answer:
+      'Omvra can launch configured Claude Code and Codex CLI sessions, as well as compatible ACP runtimes. External MCP-compatible assistants can connect to the workspace through its built-in MCP server. Launching a supervised session and connecting an external assistant are separate ways to use Omvra.',
+  },
+  {
+    question: 'Do I need my own AI account or subscription?',
+    answer:
+      'Yes. Bring your own installed agent and authenticate it with its provider. Omvra is free and does not include AI usage; any subscription, credentials, or usage charges depend on the provider you choose.',
+  },
+  {
+    question: 'Can I use Omvra without AI?',
+    answer:
+      'Yes. Plan projects, manage tasks in Kanban, schedule work on the Timeline, and track milestones without connecting an agent.',
+  },
+  {
+    question: 'Can my team collaborate live across computers?',
+    answer:
+      'Omvra currently keeps a local workspace on one computer. You can track people, assignments, and handoffs there, but it does not provide live workspace synchronization between computers. Backup and restore lets you move a workspace.',
+  },
+  {
+    question: 'Can several agents run at the same time?',
+    answer:
+      'Omvra currently allows one active supervised local agent session across the workspace. You can configure multiple agents and use them for different tasks in turn. This limit applies to sessions Omvra launches, rather than external assistants connected over MCP.',
+  },
+  {
     question: 'Where does Omvra store my workspace?',
     answer:
       'On your computer. Tasks, projects, people, boards, roadmap data, and preferences stay in Omvra’s local app storage, so you do not need an account or cloud workspace.',
@@ -12,7 +42,7 @@ const faqs = [
   {
     question: 'Does Omvra send my workspace data anywhere?',
     answer:
-      'Not during normal planning and task management. Network access only happens when you choose an online action, such as checking for updates, opening an external link, or connecting an MCP client.',
+      'Normal planning stores data locally. Online actions and connected agents can send information outside your computer. A cloud AI provider processes the context shared with it under its own policies; local workspace storage does not make that AI processing local.',
   },
   {
     question: 'Can I use Omvra for sensitive or regulated work?',
@@ -22,7 +52,7 @@ const faqs = [
   {
     question: 'How do AI agents access Omvra?',
     answer:
-      'Through Omvra’s built-in MCP server. Agent access stays off until you enable it, and you can use a local HTTP or stdio connection with an optional token. Stop the server or disable access whenever you want.',
+      'Start a supported coding agent from a task, or connect an external assistant through Omvra’s built-in MCP server. For external access, enable the server, choose the access level, and configure the client with the connection details. Stop the server or disable access when you no longer need it.',
   },
   {
     question: 'What can an agent read or change?',

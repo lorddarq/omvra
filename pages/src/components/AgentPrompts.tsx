@@ -1,18 +1,18 @@
 const interfaces = [
   {
-    title: 'Coordinate the\nworkflow',
+    title: 'Find the next\npiece of work',
     description:
-      'Define how work should move, who owns it, and where human review belongs.',
+      'Ask your connected assistant: “Read the project tasks and dependencies. Suggest what I should tackle next and explain what is blocked.”',
   },
   {
-    title: 'Give agents\naccountable work',
+    title: 'Start with a\nclear brief',
     description:
-      'Assign a task once and let the assistant start with the context, constraints, and expected handoff already attached.',
+      'Give the task a concrete outcome: “Fix the CSV export so accented names survive. Check the result and report any remaining limitations.”',
   },
   {
-    title: 'Connect the tools\nyou already use',
+    title: 'Ask for evidence\nyou can review',
     description:
-      'Keep the task in Omvra while approved MCP tools provide the background information needed to complete it.',
+      'Set the handoff expectation: “Summarize the changes, list the checks you ran, and submit the work for review with anything I still need to verify.”',
   },
 ] as const
 
@@ -23,14 +23,11 @@ const AgentPrompts = () => {
         <div className="mx-auto max-w-[72rem]">
           <div className="mx-auto max-w-[46rem] text-center">
             <h2 className="text-balance text-[clamp(2.9rem,5vw,4rem)] font-medium leading-[1.04] tracking-[-0.05em] text-[#5b5966]">
-              A controlled workspace between
-              <br />
-              people and agents
+              Give your agent a useful first task
             </h2>
             <p className="mx-auto mt-7 max-w-[43rem] text-pretty text-lg leading-9 text-[#6d6a73] sm:text-[1.35rem]">
-              Give approved assistants a clear place to find work, use context, and report back.
-              <br />
-              Codex, Claude, and other agents can help carry the load while people keep the final say.
+              Use these examples as a starting point once your agent is connected.
+              Add the instructions to a task or ask your assistant to work from the existing project context.
             </p>
           </div>
 

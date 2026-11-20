@@ -4,7 +4,7 @@ const pillars = [
   {
     title: 'No account',
     description:
-      'Download it and start working. No user profile, hosted workspace, or password account is required.',
+      'Start planning without an Omvra account. Connected AI agents use their own provider accounts.',
     illustration: 'local-by-design-01.svg',
     widthClassName: 'w-[8.5rem] md:w-[9rem]',
   },
@@ -18,7 +18,7 @@ const pillars = [
   {
     title: 'Network by choice',
     description:
-      'Normal planning works offline. Enable token-secured MCP access or online actions only when you choose.',
+      'Plan offline. Choose when to connect an agent and what workspace access to give it.',
     illustration: 'local-by-design-03.svg',
     widthClassName: 'w-[8.6rem] md:w-[9.1rem]',
   },
@@ -31,11 +31,11 @@ const PrivacyProof = () => {
         <div className="mx-auto max-w-[72rem]">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-balance text-[clamp(2.9rem,5vw,4rem)] font-medium leading-[1.04] tracking-[-0.05em] text-[#5b5966]">
-              Keep sensitive work close.
+              Keep your project workspace on your computer.
             </h2>
             <p className="mx-auto mt-7 max-w-[36rem] text-pretty text-lg leading-9 text-[#6d6a73] sm:text-[1.35rem]">
-              Omvra is built for people who need the speed of AI-assisted work without placing
-              project context in another cloud account.
+              Tasks, projects, and planning data live in your local workspace.
+              Connected cloud AI providers process the context you share with them under their own policies.
             </p>
           </div>
 

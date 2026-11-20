@@ -11,7 +11,7 @@ const Footer = () => {
           <div className="max-w-[15.625rem]">
             <img src={logoSrc} alt="Omvra" className="h-8 w-auto" />
             <p className="mt-5 text-sm leading-9 text-[#6d6a73]">
-              Free, open-source, local-first execution for teams that want clarity, speed, and control.
+              Plan projects, run your AI agents, and review their work in a free, open-source desktop workspace.
             </p>
           </div>
 
@@ -24,7 +24,7 @@ const Footer = () => {
                 <li><a href="#why-omvra" className={linkClassName}>Why Omvra</a></li>
                 <li><a href="#features" className={linkClassName}>Features</a></li>
                 <li><a href="#how-it-works" className={linkClassName}>How it works</a></li>
-                <li><a href="#acp" className={linkClassName}>ACP runtime</a></li>
+                <li><a href="#acp" className={linkClassName}>AI agents</a></li>
                 <li><a href="#privacy" className={linkClassName}>Privacy</a></li>
                 <li><a href="#download" className={linkClassName}>Download</a></li>
                 <li><a href="#faq" className={linkClassName}>FAQ</a></li>

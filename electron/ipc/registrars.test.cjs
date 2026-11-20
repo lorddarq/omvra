@@ -280,3 +280,16 @@ test('delivery commands are sender-scoped and fail closed without a delivery own
  await handlers.get('agent-runtime/sessions/delivery/diagnostics')({sender:{id:7}});
  assert.deepEqual(calls.map(([method,sender])=>[method,sender]),[['subscribe',7],['diagnostics',7]]);
 });
+
+test('runtime request IPC preserves permission arrays and numeric zero through response submission', async () => {
+  const {handlers,ipcMain}=createIpcHarness();
+  const pending=[{bindingId:'b',requestId:0,responseKind:'elicitation',message:'Approve?',fields:[]}];
+  let submitted;
+  registerAgentRuntimeIpcHandlers({ipcMain,store:{},listAgentRuntimeSessionRequests:()=>pending,respondAgentRuntimeSession:(bindingId,requestId,result)=>{submitted={bindingId,requestId,result};return {ok:true};}});
+  const requests=await handlers.get('agent-runtime/sessions/requests')(null,'b');
+  assert.ok(Array.isArray(requests));
+  assert.deepEqual(requests,pending);
+  const response={action:'accept',content:{approved:true}};
+  assert.equal((await handlers.get('agent-runtime/sessions/respond')(null,{bindingId:'b',requestId:requests[0].requestId,result:response})).ok,true);
+  assert.deepEqual(submitted,{bindingId:'b',requestId:0,result:response});
+});

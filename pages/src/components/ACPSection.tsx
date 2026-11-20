@@ -3,14 +3,14 @@ import { Check, CircleDot, RefreshCw, ShieldCheck, Terminal } from 'lucide-react
 const providers = [
   {
     name: 'Claude Code',
-    mode: 'stream-json over stdio',
-    detail: 'Native CLI sessions with the current Omvra MCP endpoint attached at launch.',
+    mode: 'Your installed CLI',
+    detail: 'Run task sessions with your existing Claude Code setup and respond to permission requests in Omvra.',
     accent: '#8b6fd6',
   },
   {
     name: 'Codex',
-    mode: 'app-server over stdio',
-    detail: 'Native app-server sessions with model and approval policy controls.',
+    mode: 'Your installed CLI',
+    detail: 'Run task sessions with your existing Codex setup and choose the model and approval policy.',
     accent: '#cf9b55',
   },
 ] as const
@@ -24,15 +24,15 @@ const ACPSection = () => {
             <div>
               <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6fd6]">
                 <Terminal className="size-4" strokeWidth={2} aria-hidden="true" />
-                Managed runtime
+                AI agents
               </div>
               <h2 className="mt-5 max-w-[34rem] text-balance text-[clamp(2.8rem,5vw,4.2rem)] font-medium leading-[1.02] tracking-[-0.06em] text-[#5b5966]">
-                Connect the agent.
+                Start your agent.
                 <br />
-                Keep the boundary.
+                Stay close to the work.
               </h2>
               <p className="mt-7 max-w-[31rem] text-pretty text-lg leading-8 text-[#6d6a73] sm:text-[1.25rem]">
-                Omvra starts local provider sessions, attaches only the MCP access you enable, and keeps each project folder in its own project context.
+                Launch a configured Claude Code or Codex session for a task. Follow activity, respond when it needs permission, and steer or cancel the session from Omvra.
               </p>
               <a
                 href="https://github.com/lorddarq/omvra/blob/main/ACP_SETUP.md"
@@ -47,8 +47,8 @@ const ACPSection = () => {
               <div className="absolute -right-16 -top-20 size-56 rounded-full bg-[#8b6fd6]/20 blur-3xl" aria-hidden="true" />
               <div className="relative">
                 <div className="flex items-center justify-between border-b border-white/10 pb-5 text-xs font-medium text-white/55">
-                  <span>OMVRA / AGENT RUNTIME</span>
-                  <span className="inline-flex items-center gap-2 text-emerald-300"><CircleDot className="size-3" aria-hidden="true" /> local</span>
+                  <span>OMVRA / YOUR AGENTS</span>
+                  <span className="inline-flex items-center gap-2 text-emerald-300"><CircleDot className="size-3" aria-hidden="true" /> local session</span>
                 </div>
                 <div className="mt-6 space-y-5">
                   {providers.map((provider) => (
@@ -65,8 +65,8 @@ const ACPSection = () => {
                   ))}
                 </div>
                 <div className="mt-6 flex flex-wrap gap-x-5 gap-y-3 border-t border-white/10 pt-5 text-xs text-white/55">
-                  <span className="inline-flex items-center gap-2"><ShieldCheck className="size-3.5 text-emerald-300" aria-hidden="true" /> Capability profiles</span>
-                  <span className="inline-flex items-center gap-2"><RefreshCw className="size-3.5 text-[#d8bdff]" aria-hidden="true" /> Fresh session recovery</span>
+                  <span className="inline-flex items-center gap-2"><ShieldCheck className="size-3.5 text-emerald-300" aria-hidden="true" /> Workspace access controls</span>
+                  <span className="inline-flex items-center gap-2"><RefreshCw className="size-3.5 text-[#d8bdff]" aria-hidden="true" /> Session recovery</span>
                   <span className="inline-flex items-center gap-2"><Check className="size-3.5 text-[#f1c98c]" aria-hidden="true" /> Human review</span>
                 </div>
               </div>
@@ -74,9 +74,9 @@ const ACPSection = () => {
           </div>
 
           <div className="mt-12 grid gap-6 border-t border-black/10 pt-7 text-sm text-[#706b72] sm:grid-cols-3 sm:gap-8">
-            <div><span className="font-semibold text-[#5b5966]">One profile</span><br />Executable, model, and provider options live together.</div>
-            <div><span className="font-semibold text-[#5b5966]">One project context</span><br />Repository folders stay with projects and swimlanes.</div>
-            <div><span className="font-semibold text-[#5b5966]">One clear handoff</span><br />Work returns to a person with activity and context intact.</div>
+            <div><span className="font-semibold text-[#5b5966]">Your agent setup</span><br />Use your own installed agent and provider account.</div>
+            <div><span className="font-semibold text-[#5b5966]">The right folder</span><br />Keep repository folders linked to their projects.</div>
+            <div><span className="font-semibold text-[#5b5966]">Your review</span><br />A session ending does not automatically accept the work.</div>
           </div>
         </div>
       </div>

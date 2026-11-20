@@ -2,16 +2,16 @@ const illustrationBase = `${import.meta.env.BASE_URL}illustrations`
 
 const audiences = [
   {
-    title: 'Privacy-sensitive teams',
+    title: 'People handling sensitive work',
     description:
-      'Keep project context on controlled devices while people and approved AI tools work from the same accountable plan.',
+      'Keep planning data on your computer and choose which context to share with your approved AI tools.',
     illustration: 'less-overhead-01.svg',
     widthClassName: 'w-[10.5rem] md:w-[11.6rem]',
   },
   {
     title: 'Technical leads',
     description:
-      'Coordinate people and agents across projects, see what is blocked, and send completed work back for review.',
+      'Track ownership and dependencies across projects, see what is blocked, and review what agents submit.',
     illustration: 'less-overhead-02.svg',
     widthClassName: 'w-[10.7rem] md:w-[11.7rem]',
   },
@@ -31,10 +31,10 @@ const BestFor = () => {
         <div className="mx-auto max-w-[72rem]">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-balance text-[clamp(2.9rem,5vw,4rem)] font-medium leading-[1.04] tracking-[-0.05em] text-[#5b5966]">
-              Built for controlled execution
+              For the projects you’re building
             </h2>
             <p className="mx-auto mt-7 max-w-[37rem] text-pretty text-lg leading-9 text-[#6d6a73] sm:text-[1.35rem]">
-              For teams that want the speed of AI-assisted work without another cloud system holding the context.
+              Whether you build on your own or coordinate other people, keep agent work connected to the project plan.
             </p>
           </div>
 
